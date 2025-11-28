@@ -1,6 +1,7 @@
 using System.CommandLine;
 using Timetracker.Common;
 using Timetracker.Domain.Deployment;
+using System.IO;
 
 var root = new RootCommand("Timetracker deploy CLI (Container Apps, スペック/タグ/Verbose対応)");
 
