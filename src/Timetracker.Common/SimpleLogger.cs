@@ -14,6 +14,14 @@ public class SimpleLogger
         Console.WriteLine($"[INFO] {message}");
     }
 
+    public void Verbose(string message)
+    {
+        if (_verbose)
+        {
+            Console.WriteLine($"[VERBOSE] {message}");
+        }
+    }
+
     public void Warn(string message)
     {
         Console.ForegroundColor = ConsoleColor.Yellow;
