@@ -1,53 +1,73 @@
 using System.CommandLine;
+using System.CommandLine.Invocation;
 using Timetracker.Common;
 using Timetracker.Domain.Deployment;
 using System.IO;
 
 var root = new RootCommand("Timetracker deploy CLI (Container Apps, スペック/タグ/Verbose対応)");
 
+// Define options as variables
+var subscriptionOption = new Option<string>("--subscription", "Azure サブスクリプション ID") { IsRequired = true };
+var resourceGroupOption = new Option<string>("--resource-group", "Azure リソースグループ名") { IsRequired = true };
+var locationOption = new Option<string>("--location", () => Defaults.DefaultLocation, "Azure リージョン（省略時は japaneast）");
+var appNameOption = new Option<string>("--app-name", () => Defaults.DefaultAppName, "アプリ名（省略時は TimeTracker）");
+var dbTypeOption = new Option<string>("--db-type", () => "postgres", "DB 種別 postgres | sqlserver");
+var dbPasswordOption = new Option<string>("--db-password", "DB パスワード（DB 種別にかかわらず同一パラメータ）") { IsRequired = true };
+var dbNameOption = new Option<string>("--db-name", () => "timetracker", "DB 名");
+var trackerPasswordOption = new Option<string>("--tracker-password", "Timetracker アプリ用パスワード (<your password>)") { IsRequired = true };
+var ttTagOption = new Option<string>("--tt-tag", () => "latest", "timetracker コンテナイメージのタグ（バージョン）。例: latest, 1.2.3");
+var dryRunOption = new Option<bool>("--dry-run", () => false, "ファイル生成のみ（Compose/.env）で Azure 実行をスキップ");
+var ttCpuOption = new Option<double>("--tt-cpu", () => 0.5, "Timetracker コンテナの vCPU");
+var ttMemoryOption = new Option<double>("--tt-memory", () => 1.0, "Timetracker コンテナのメモリ(Gi)");
+var dbCpuOption = new Option<double>("--db-cpu", () => 0.5, "DB コンテナの vCPU");
+var dbMemoryOption = new Option<double>("--db-memory", () => 1.0, "DB コンテナのメモリ(Gi)");
+var redisCpuOption = new Option<double>("--redis-cpu", () => 0.25, "Redis コンテナの vCPU");
+var redisMemoryOption = new Option<double>("--redis-memory", () => 0.5, "Redis コンテナのメモリ(Gi)");
+var verboseOption = new Option<bool>("--verbose", () => false, "詳細ログを出力");
+
 var deploy = new Command("deploy", "Timetracker を Azure Container Apps にデプロイ（または Dry-run で Compose/.env 生成）します。")
 {
-    new Option<string>("--subscription"){ IsRequired = true, Description = "Azure サブスクリプション ID" },
-    new Option<string>("--resource-group"){ IsRequired = true, Description = "Azure リソースグループ名" },
-    new Option<string>("--location", () => Defaults.DefaultLocation, "Azure リージョン（省略時は japaneast）"),
-    new Option<string>("--app-name", () => Defaults.DefaultAppName, "アプリ名（省略時は TimeTracker）"),
-    new Option<string>("--db-type", () => "postgres", "DB 種別 postgres | sqlserver"),
-    new Option<string>("--db-password"){ IsRequired = true, Description = "DB パスワード（DB 種別にかかわらず同一パラメータ）" },
-    new Option<string>("--db-name", () => "timetracker", "DB 名"),
-    new Option<string>("--tracker-password"){ IsRequired = true, Description = "Timetracker アプリ用パスワード (<your password>)" },
-    new Option<string>("--tt-tag", () => "latest", "timetracker コンテナイメージのタグ（バージョン）。例: latest, 1.2.3"),
-    new Option<bool>("--dry-run", () => false, "ファイル生成のみ（Compose/.env）で Azure 実行をスキップ"),
-    new Option<double>("--tt-cpu", () => 0.5, "Timetracker コンテナの vCPU"),
-    new Option<double>("--tt-memory", () => 1.0, "Timetracker コンテナのメモリ(Gi)"),
-    new Option<double>("--db-cpu", () => 0.5, "DB コンテナの vCPU"),
-    new Option<double>("--db-memory", () => 1.0, "DB コンテナのメモリ(Gi)"),
-    new Option<double>("--redis-cpu", () => 0.25, "Redis コンテナの vCPU"),
-    new Option<double>("--redis-memory", () => 0.5, "Redis コンテナのメモリ(Gi)"),
-    new Option<bool>("--verbose", () => false, "詳細ログを出力")
+    subscriptionOption,
+    resourceGroupOption,
+    locationOption,
+    appNameOption,
+    dbTypeOption,
+    dbPasswordOption,
+    dbNameOption,
+    trackerPasswordOption,
+    ttTagOption,
+    dryRunOption,
+    ttCpuOption,
+    ttMemoryOption,
+    dbCpuOption,
+    dbMemoryOption,
+    redisCpuOption,
+    redisMemoryOption,
+    verboseOption
 };
 
-deploy.SetHandler(async (ctx) =>
+deploy.SetHandler(async (InvocationContext ctx) =>
 {
     var p = ctx.ParseResult;
     var opts = new DeployOptions
     {
-        Subscription        = p.GetValueForOption<string>("--subscription")!,
-        ResourceGroup       = p.GetValueForOption<string>("--resource-group")!,
-        Location            = p.GetValueForOption<string>("--location")!,
-        AppName             = p.GetValueForOption<string>("--app-name")!,
-        DbType              = p.GetValueForOption<string>("--db-type")!,
-        DbPassword          = p.GetValueForOption<string>("--db-password")!,
-        DbName              = p.GetValueForOption<string>("--db-name")!,
-        TrackerPassword     = p.GetValueForOption<string>("--tracker-password")!,
-        TimetrackerTag      = p.GetValueForOption<string>("--tt-tag")!,
-        DryRun              = p.GetValueForOption<bool>("--dry-run"),
-        TimetrackerCpu      = p.GetValueForOption<double>("--tt-cpu"),
-        TimetrackerMemoryGi = p.GetValueForOption<double>("--tt-memory"),
-        DbCpu               = p.GetValueForOption<double>("--db-cpu"),
-        DbMemoryGi          = p.GetValueForOption<double>("--db-memory"),
-        RedisCpu            = p.GetValueForOption<double>("--redis-cpu"),
-        RedisMemoryGi       = p.GetValueForOption<double>("--redis-memory"),
-        Verbose             = p.GetValueForOption<bool>("--verbose")
+        Subscription        = p.GetValueForOption(subscriptionOption)!,
+        ResourceGroup       = p.GetValueForOption(resourceGroupOption)!,
+        Location            = p.GetValueForOption(locationOption)!,
+        AppName             = p.GetValueForOption(appNameOption)!,
+        DbType              = p.GetValueForOption(dbTypeOption)!,
+        DbPassword          = p.GetValueForOption(dbPasswordOption)!,
+        DbName              = p.GetValueForOption(dbNameOption)!,
+        TrackerPassword     = p.GetValueForOption(trackerPasswordOption)!,
+        TimetrackerTag      = p.GetValueForOption(ttTagOption)!,
+        DryRun              = p.GetValueForOption(dryRunOption),
+        TimetrackerCpu      = p.GetValueForOption(ttCpuOption),
+        TimetrackerMemoryGi = p.GetValueForOption(ttMemoryOption),
+        DbCpu               = p.GetValueForOption(dbCpuOption),
+        DbMemoryGi          = p.GetValueForOption(dbMemoryOption),
+        RedisCpu            = p.GetValueForOption(redisCpuOption),
+        RedisMemoryGi       = p.GetValueForOption(redisMemoryOption),
+        Verbose             = p.GetValueForOption(verboseOption)
     };
 
     var log = new SimpleLogger(opts.Verbose);
@@ -82,7 +102,7 @@ deploy.SetHandler(async (ctx) =>
         log.Error($"エラー: {ex}");
         Environment.ExitCode = 1;
     }
-}, deploy);
+});
 
 root.AddCommand(deploy);
 return await root.InvokeAsync(args);
