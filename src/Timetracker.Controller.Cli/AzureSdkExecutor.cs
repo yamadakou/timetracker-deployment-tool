@@ -1,4 +1,5 @@
 using Azure;
+using Azure.Core;
 using Azure.Identity;
 using Azure.ResourceManager;
 using Azure.ResourceManager.Resources;
@@ -66,16 +67,16 @@ public class AzureSdkExecutor
             Image = ttImage,
             Env =
             {
-                new EnvironmentVar("DB_HOST", "db"),
-                new EnvironmentVar("DB_PORT", dbPort.ToString()),
-                new EnvironmentVar("DB_USER", dbUserFixed),
-                new EnvironmentVar("DB_PASSWORD", opts.DbPassword),
-                new EnvironmentVar("DB_NAME", opts.DbName),
-                new EnvironmentVar("REDIS_HOST", "redis"),
-                new EnvironmentVar("REDIS_PORT", "6379"),
-                new EnvironmentVar("APP_PASSWORD", opts.TrackerPassword),
+                new ContainerAppEnvironmentVariable() { Name = "DB_HOST", Value = "db" },
+                new ContainerAppEnvironmentVariable() { Name = "DB_PORT", Value = dbPort.ToString() },
+                new ContainerAppEnvironmentVariable() { Name = "DB_USER", Value = dbUserFixed },
+                new ContainerAppEnvironmentVariable() { Name = "DB_PASSWORD", Value = opts.DbPassword },
+                new ContainerAppEnvironmentVariable() { Name = "DB_NAME", Value = opts.DbName },
+                new ContainerAppEnvironmentVariable() { Name = "REDIS_HOST", Value = "redis" },
+                new ContainerAppEnvironmentVariable() { Name = "REDIS_PORT", Value = "6379" },
+                new ContainerAppEnvironmentVariable() { Name = "APP_PASSWORD", Value = opts.TrackerPassword },
             },
-            Resources = new ContainerResources()
+            Resources = new AppContainerResources()
             {
                 Cpu = opts.TimetrackerCpu,
                 Memory = $"{opts.TimetrackerMemoryGi}Gi"
@@ -89,11 +90,11 @@ public class AzureSdkExecutor
                 Image = "postgres:16-alpine",
                 Env =
                 {
-                    new EnvironmentVar("POSTGRES_USER", dbUserFixed),
-                    new EnvironmentVar("POSTGRES_PASSWORD", opts.DbPassword),
-                    new EnvironmentVar("POSTGRES_DB", opts.DbName),
+                    new ContainerAppEnvironmentVariable() { Name = "POSTGRES_USER", Value = dbUserFixed },
+                    new ContainerAppEnvironmentVariable() { Name = "POSTGRES_PASSWORD", Value = opts.DbPassword },
+                    new ContainerAppEnvironmentVariable() { Name = "POSTGRES_DB", Value = opts.DbName },
                 },
-                Resources = new ContainerResources()
+                Resources = new AppContainerResources()
                 {
                     Cpu = opts.DbCpu,
                     Memory = $"{opts.DbMemoryGi}Gi"
@@ -105,11 +106,11 @@ public class AzureSdkExecutor
                 Image = "mcr.microsoft.com/mssql/server:2022-latest",
                 Env =
                 {
-                    new EnvironmentVar("ACCEPT_EULA", "Y"),
-                    new EnvironmentVar("MSSQL_PID", "Developer"),
-                    new EnvironmentVar("SA_PASSWORD", opts.DbPassword),
+                    new ContainerAppEnvironmentVariable() { Name = "ACCEPT_EULA", Value = "Y" },
+                    new ContainerAppEnvironmentVariable() { Name = "MSSQL_PID", Value = "Developer" },
+                    new ContainerAppEnvironmentVariable() { Name = "SA_PASSWORD", Value = opts.DbPassword },
                 },
-                Resources = new ContainerResources()
+                Resources = new AppContainerResources()
                 {
                     Cpu = opts.DbCpu,
                     Memory = $"{opts.DbMemoryGi}Gi"
@@ -121,7 +122,7 @@ public class AzureSdkExecutor
             Name = "redis",
             Image = "redis:7-alpine",
             Args = { "redis-server", "--appendonly", "yes" },
-            Resources = new ContainerResources()
+            Resources = new AppContainerResources()
             {
                 Cpu = opts.RedisCpu,
                 Memory = $"{opts.RedisMemoryGi}Gi"
@@ -145,7 +146,7 @@ public class AzureSdkExecutor
             Template = template,
             Configuration = new ContainerAppConfiguration()
             {
-                Ingress = new ContainerAppIngress()
+                Ingress = new ContainerAppIngressConfiguration()
                 {
                     External = true,
                     TargetPort = 8080,
