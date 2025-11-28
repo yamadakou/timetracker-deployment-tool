@@ -2,7 +2,7 @@ using System.CommandLine;
 using Timetracker.Common;
 using Timetracker.Domain.Deployment;
 
-var root = new RootCommand("Timetracker deploy CLI (Container Apps, スペック/タグ指定対応)");
+var root = new RootCommand("Timetracker deploy CLI (Container Apps, スペック/タグ/Verbose対応)");
 
 var deploy = new Command("deploy", "Timetracker を Azure Container Apps にデプロイ（または Dry-run で Compose/.env 生成）します。")
 {
@@ -14,42 +14,39 @@ var deploy = new Command("deploy", "Timetracker を Azure Container Apps にデ�
     new Option<string>("--db-password"){ IsRequired = true, Description = "DB パスワード（DB 種別にかかわらず同一パラメータ）" },
     new Option<string>("--db-name", () => "timetracker", "DB 名"),
     new Option<string>("--tracker-password"){ IsRequired = true, Description = "Timetracker アプリ用パスワード (<your password>)" },
-
-    // timetracker イメージタグ
     new Option<string>("--tt-tag", () => "latest", "timetracker コンテナイメージのタグ（バージョン）。例: latest, 1.2.3"),
-
     new Option<bool>("--dry-run", () => false, "ファイル生成のみ（Compose/.env）で Azure 実行をスキップ"),
-
-    // コンテナスペック
     new Option<double>("--tt-cpu", () => 0.5, "Timetracker コンテナの vCPU"),
     new Option<double>("--tt-memory", () => 1.0, "Timetracker コンテナのメモリ(Gi)"),
     new Option<double>("--db-cpu", () => 0.5, "DB コンテナの vCPU"),
     new Option<double>("--db-memory", () => 1.0, "DB コンテナのメモリ(Gi)"),
     new Option<double>("--redis-cpu", () => 0.25, "Redis コンテナの vCPU"),
     new Option<double>("--redis-memory", () => 0.5, "Redis コンテナのメモリ(Gi)"),
+    new Option<bool>("--verbose", () => false, "詳細ログを出力")
 };
 
-deply.SetHandler(async (ctx) =>
+deploy.SetHandler(async (ctx) =>
 {
     var p = ctx.ParseResult;
     var opts = new DeployOptions
     {
-        Subscription    = p.GetValueForOption<string>("--subscription")!,
-        ResourceGroup   = p.GetValueForOption<string>("--resource-group")!,
-        Location        = p.GetValueForOption<string>("--location")!,
-        AppName         = p.GetValueForOption<string>("--app-name")!,
-        DbType          = p.GetValueForOption<string>("--db-type")!,
-        DbPassword      = p.GetValueForOption<string>("--db-password")!,
-        DbName          = p.GetValueForOption<string>("--db-name")!,
-        TrackerPassword = p.GetValueForOption<string>("--tracker-password")!,
-        TimetrackerTag  = p.GetValueForOption<string>("--tt-tag")!,
-        DryRun          = p.GetValueForOption<bool>("--dry-run"),
+        Subscription        = p.GetValueForOption<string>("--subscription")!,
+        ResourceGroup       = p.GetValueForOption<string>("--resource-group")!,
+        Location            = p.GetValueForOption<string>("--location")!,
+        AppName             = p.GetValueForOption<string>("--app-name")!,
+        DbType              = p.GetValueForOption<string>("--db-type")!,
+        DbPassword          = p.GetValueForOption<string>("--db-password")!,
+        DbName              = p.GetValueForOption<string>("--db-name")!,
+        TrackerPassword     = p.GetValueForOption<string>("--tracker-password")!,
+        TimetrackerTag      = p.GetValueForOption<string>("--tt-tag")!,
+        DryRun              = p.GetValueForOption<bool>("--dry-run"),
         TimetrackerCpu      = p.GetValueForOption<double>("--tt-cpu"),
         TimetrackerMemoryGi = p.GetValueForOption<double>("--tt-memory"),
         DbCpu               = p.GetValueForOption<double>("--db-cpu"),
         DbMemoryGi          = p.GetValueForOption<double>("--db-memory"),
         RedisCpu            = p.GetValueForOption<double>("--redis-cpu"),
         RedisMemoryGi       = p.GetValueForOption<double>("--redis-memory"),
+        Verbose             = p.GetValueForOption<bool>("--verbose")
     };
 
     var log = new SimpleLogger(opts.Verbose);
@@ -59,7 +56,6 @@ deply.SetHandler(async (ctx) =>
         ComposeGenerator.Validate(opts);
         log.Info("検証 OK");
 
-        // Dry-run: Compose/.env の生成のみ
         if (opts.DryRun)
         {
             var compose = ComposeGenerator.GenerateCompose(opts);
@@ -73,7 +69,6 @@ deply.SetHandler(async (ctx) =>
             return;
         }
 
-        // SDK 実行
         var sdk = new AzureSdkExecutor(log);
         await sdk.EnsureResourceGroupAsync(opts.Subscription, opts.ResourceGroup, opts.Location);
         var env = await sdk.EnsureContainerAppEnvAsync(opts.Subscription, opts.ResourceGroup, $"{opts.AppName}-env", opts.Location);
@@ -83,7 +78,7 @@ deply.SetHandler(async (ctx) =>
     }
     catch (Exception ex)
     {
-        log.Error($"エラー: {ex.Message}");
+        log.Error($"エラー: {ex}");
         Environment.ExitCode = 1;
     }
 }, deploy);
