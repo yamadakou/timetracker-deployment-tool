@@ -62,10 +62,10 @@ public class ComposeGeneratorTests
         var env = ComposeGenerator.GenerateEnv(opts);
 
         env.Should().Contain("DB_PORT=5432");
-        env.Should().Contain($"DB_USER={{Defaults.DbUserFixedPostgres}});");
-        env.Should().Contain($"DB_PASSWORD={{opts.DbPassword}};");
-        env.Should().Contain($"DB_NAME={{opts.DbName}});");
-        env.Should().Contain($"TIMETRACKER_PASSWORD={{opts.TrackerPassword}});");
+        env.Should().Contain($"DB_USER={Defaults.DbUserFixedPostgres}");
+        env.Should().Contain($"DB_PASSWORD={opts.DbPassword}");
+        env.Should().Contain($"DB_NAME={opts.DbName}");
+        env.Should().Contain($"TIMETRACKER_PASSWORD={opts.TrackerPassword}");
     }
 
     [Fact]
@@ -77,8 +77,8 @@ public class ComposeGeneratorTests
         var env = ComposeGenerator.GenerateEnv(opts);
 
         env.Should().Contain("DB_PORT=1433");
-        env.Should().Contain($"DB_USER={{Defaults.DbUserFixedSqlServer}});");
-        env.Should().Contain($"DB_PASSWORD={{opts.DbPassword}});");
+        env.Should().Contain($"DB_USER={Defaults.DbUserFixedSqlServer}");
+        env.Should().Contain($"DB_PASSWORD={opts.DbPassword}");
     }
 
     [Theory]

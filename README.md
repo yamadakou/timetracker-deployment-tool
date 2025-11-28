@@ -1,3 +1,5 @@
+<a href="https://github.com/yamadakou/timetracker-deployment-tool/actions/workflows/ci.yml"><img src="https://github.com/yamadakou/timetracker-deployment-tool/actions/workflows/ci.yml/badge.svg"></a>
+
 # Timetracker デプロイ CLI
 
 ## ツールの概要
