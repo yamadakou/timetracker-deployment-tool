@@ -1,29 +1,45 @@
-using System;
-
 namespace Timetracker.Common;
 
 public class SimpleLogger
 {
     private readonly bool _verbose;
-    public SimpleLogger(bool verbose = false) => _verbose = verbose;
 
-    private static string Timestamp() => DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ");
-
-    private static void Write(string level, string message, bool toError = false)
+    public SimpleLogger(bool verbose)
     {
-        var line = $"[{level}] {Timestamp()} {message}";
-        if (toError)
-            Console.Error.WriteLine(line);
-        else
-            Console.WriteLine(line);
+        _verbose = verbose;
     }
 
-    public void Info(string message)    => Write("INFO",    message);
-    public void Warn(string message)    => Write("WARN",    message);
-    public void Error(string message)   => Write("ERROR",   message, toError: true);
-    public void Success(string message) => Write("SUCCESS", message);
+    public void Info(string message)
+    {
+        Console.WriteLine($"[INFO] {message}");
+    }
+
     public void Verbose(string message)
     {
-        if (_verbose) Write("VERBOSE", message);
+        if (_verbose)
+        {
+            Console.WriteLine($"[VERBOSE] {message}");
+        }
+    }
+
+    public void Warn(string message)
+    {
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine($"[WARN] {message}");
+        Console.ResetColor();
+    }
+
+    public void Success(string message)
+    {
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.WriteLine($"[SUCCESS] {message}");
+        Console.ResetColor();
+    }
+
+    public void Error(string message)
+    {
+        Console.ForegroundColor = ConsoleColor.Red;
+        Console.WriteLine($"[ERROR] {message}");
+        Console.ResetColor();
     }
 }
