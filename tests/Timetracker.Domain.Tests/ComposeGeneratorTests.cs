@@ -1,15 +1,25 @@
 using System;
+using System.Collections.Generic;
 using FluentAssertions;
+using Timetracker.Domain.Deployment;
 using Xunit;
 
 namespace Timetracker.Domain.Tests
 {
+    public class EnvironmentVariables : List<string> { }
+
     public class ComposeGeneratorTests
     {
         [Fact]
         public void RunTests()
         {
-            var env = new EnvironmentVariables();
+            var env = new EnvironmentVariables
+            {
+                $"DB_USER={Defaults.DbUserFixedPostgres}",
+                $"DB_PASSWORD={Defaults.DbPassword}",
+                $"DB_NAME={Defaults.DbName}",
+                $"TIMETRACKER_PASSWORD={Defaults.TimetrackerPassword}"
+            };
             env.Should().Contain($"DB_USER={Defaults.DbUserFixedPostgres}");
             env.Should().Contain($"DB_PASSWORD={Defaults.DbPassword}");
             env.Should().Contain($"DB_NAME={Defaults.DbName}");
