@@ -62,10 +62,10 @@ public class ComposeGeneratorTests
         var env = ComposeGenerator.GenerateEnv(opts);
 
         env.Should().Contain("DB_PORT=5432");
-        env.Should().Contain($"DB_USER={Defaults.DbUserFixedPostgres}");
-        env.Should().Contain($"DB_PASSWORD={opts.DbPassword}");
-        env.Should().Contain($"DB_NAME={opts.DbName}");
-        env.Should().Contain($"TIMETRACKER_PASSWORD={opts.TrackerPassword}");
+        env.Should().Contain($"DB_USER={{Defaults.DbUserFixedPostgres}});
+        env.Should().Contain($"DB_PASSWORD={{opts.DbPassword}});
+        env.Should().Contain($"DB_NAME={{opts.DbName}});
+        env.Should().Contain($"TIMETRACKER_PASSWORD={{opts.TrackerPassword}});
     }
 
     [Fact]
@@ -77,18 +77,18 @@ public class ComposeGeneratorTests
         var env = ComposeGenerator.GenerateEnv(opts);
 
         env.Should().Contain("DB_PORT=1433");
-        env.Should().Contain($"DB_USER={Defaults.DbUserFixedSqlServer}");
-        env.Should().Contain($"DB_PASSWORD={opts.DbPassword}");
+        env.Should().Contain($"DB_USER={{Defaults.DbUserFixedSqlServer}});
+        env.Should().Contain($"DB_PASSWORD={{opts.DbPassword}});
     }
 
     [Theory]
-    [InlineData("postgres")]
-    [InlineData("sqlserver")]
-    public void Validate_Valid_Options_Should_Not_Throw(string dbType)
+    [InlineData("postgres", "7.0-linux-postgres")]
+    [InlineData("sqlserver", "7.0-linux-mssql")]
+    public void Validate_Valid_Options_Should_Not_Throw(string dbType, string tag)
     {
         var opts = BaseOptions();
         opts.DbType = dbType;
-        opts.TimetrackerTag = "7.0-linux-postgres";
+        opts.TimetrackerTag = tag;
 
         var act = () => ComposeGenerator.Validate(opts);
         act.Should().NotThrow();
