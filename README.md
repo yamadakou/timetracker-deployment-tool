@@ -3,7 +3,7 @@
 # Timetracker デプロイ CLI
 
 ## ツールの概要
-Timetracker（DockerHub の `densocreate/timetracker` イメージ）を、選択可能な DB（PostgreSQL または SQL Server）および Redis（いずれもコンテナ）とともに Azure Container Apps にデプロイするためのコマンドラインツール（exe）です。  
+Timetracker（DockerHub の `densocreate/timetracker` イメージ）を、選択可能な DB（PostgreSQL または SQL Server）および Redis（いずれもコンテナ）とともに Azure Container Apps 上へデプロイするための CLI ツールです。
 本ツールは以下を行います。
 - Azure サブスクリプション／リソースグループの指定・作成
 - DockerHub「クイックスタート」準拠で `docker-compose.yml` と `.env` の生成（CLIのDry-run時）
@@ -81,7 +81,7 @@ Timetracker（DockerHub の `densocreate/timetracker` イメージ）を、選�
 
 補足:
 - DB ユーザは DockerHub の「クイックスタート」記載の固定値を使用します（CLI からは変更不可）。
-- `.env` に機密情報が出力��れます。取り扱いにはご注意ください。
+- `.env` に機密情報が出力されます。取り扱いにはご注意ください。
 - **アプリ名の命名規則**: `--app-name` で指定するアプリ名は Azure Container Apps の命名規則に従う必要があります:
   - 使用可能な文字: 英小文字 (a-z)、数字 (0-9)、ハイフン (-)
   - 英小文字で始まる必要があります
@@ -121,7 +121,7 @@ Timetracker（DockerHub の `densocreate/timetracker` イメージ）を、選�
     --dry-run "true"
   ```
 
-ローカル検証（Docker 必須）:
+ローカル検証時の事前準備（任意）:
 ```powershell
 docker compose --file .\docker-compose.yml --env-file .\.env up -d
 docker compose ps
@@ -184,7 +184,7 @@ docker compose ps
   A: いいえ。Azure Container Apps へのデプロイのみを行う場合、利用者側で Docker をインストールする必要はありません。
 
 - Q: ローカル検証を行うには何が必要ですか？  
-  A: Windows では Docker Desktop、macOS/Linux では Docker Engine と Docker Compose が必要です。CLI の Dry-run でファイルを生成し、`docker compose up -d` で起動してください。
+  A: Windows では Docker Desktop、macOS/Linux では Docker Engine と Docker Compose が必要です。CLI の Dry-run でファイルを生成し、`docker compose up -d` で起動して確認してください。
 
 - Q: スケール設定はできますか？  
   A: 本ツールではスケール構成は行いません。各コンテナとも 1 台固定です。
@@ -193,10 +193,10 @@ docker compose ps
   A: 再実行時にオプションを変更すれば Container Apps 上の設定が更新されます。
 
 - Q: App Service を使ったデプロイは可能ですか？  
-  A: 本ツールは Azure Container Apps を対象とした専用ツールです。App Service（マルチコンテナ／Compose）への直接デプロイ機能は含んでいません。App Service を利用する場合は ARM/Bicep テンプレートなど別方式をご検討ください。
+  A: 本ツールは Azure Container Apps を対象とした専用ツールです。App Service（マルチコンテナ／Compose）への直接デプロイ機能は含んでいません。App Service 化が必要な場合は別途テンプレート化を検討してください。
 
 - Q: どの認証方式が使われているか確認するには？  
-  A: `--verbose` オプションを付けて実行すると、使用される認証モードがログに出力されます。認証に関する問題を診断する場合は、`--auth-mode` オプションで明示的に認証方式を指定することを推奨します。例: `--auth-mode azure-cli --verbose`
+  A: `--verbose` オプションを付けて実行すると、使用される認証モードがログに出力されます。認証に関する問題を診断する場合は、`--auth-mode` を明示指定し、詳細ログを確認してください。
 
 ---
 
@@ -214,9 +214,8 @@ docker compose ps
 dotnet build .\Timetracker.sln
 dotnet publish .\src\Timetracker.Controller.Cli\Timetracker.Controller.Cli.csproj -c Release -r win-x64 `
   -p:PublishSingleFile=true -p:SelfContained=true -p:UseAppHost=true
-dotnet publish .\src\Timetracker.Domain\Timetracker.Domain.csproj -c Release -r win-x64 `
-  -p:PublishSingleFile=true -p:SelfContained=true -p:UseAppHost=true
 ```
+注意: Timetracker.Domain はクラスライブラリ（実行可能ファイルを生成しない）であり、SelfContained/SingleFile オプション付きの publish 対象ではありません。必要な成果物は CLI プロジェクトの publish で生成される単一ファイル EXE のみです。ライブラリ側で配布形態が必要になった場合は `dotnet pack` による NuGet パッケージ化等を検討してください。
 
 ### 設計概要
 - ドメイン層（Timetracker.Domain）
@@ -244,5 +243,4 @@ dotnet publish .\src\Timetracker.Domain\Timetracker.Domain.csproj -c Release -r 
   A: 初回起動時に一時展開が発生するためです。Self-contained を無効化（ランタイム依存）するか、ReadyToRun などの最適化を検討してください。
 
 - Q: Container Apps デプロイが失敗します  
-  A: 認証（Service Principal/Managed Identity）設定、ネットワーク到達性、コンテナイメージ取得可否、環境変数不足を確認してください。必要に応じて Azure Portal の Container Apps のイベント/ログを参照してください.
-
+  A: 認証（Service Principal/Managed Identity）設定、ネットワーク到達性、コンテナイメージ取得可否、環境変数不足を確認してください。必要に応じて`--verbose`で詳細ログを取得してください。
