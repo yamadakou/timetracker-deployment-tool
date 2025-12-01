@@ -10,7 +10,7 @@ var root = new RootCommand("Timetracker deploy CLI (Container Apps, スペック
 var subscriptionOpt = new Option<string>("--subscription"){ IsRequired = true, Description = "Azure サブスクリプション ID" };
 var resourceGroupOpt = new Option<string>("--resource-group"){ IsRequired = true, Description = "Azure リソースグループ名" };
 var locationOpt = new Option<string>("--location", () => Defaults.DefaultLocation, "Azure リージョン（省略時は japaneast）");
-var appNameOpt = new Option<string>("--app-name", () => Defaults.DefaultAppName, "アプリ名（省略時は timetracker）");
+var appNameOpt = new Option<string>("--app-name", () => Defaults.DefaultAppName, $"アプリ名（省略時は {Defaults.DefaultAppName}）");
 var dbTypeOpt = new Option<string>("--db-type", () => "postgres", "DB 種別 postgres | sqlserver");
 var dbPasswordOpt = new Option<string>("--db-password"){ IsRequired = true, Description = "DB パスワード（DB 種別にかかわらず同一パラメータ）" };
 var dbNameOpt = new Option<string>("--db-name", () => "timetracker", "DB 名");

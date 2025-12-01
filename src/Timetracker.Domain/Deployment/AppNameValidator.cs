@@ -16,8 +16,9 @@ public static partial class AppNameValidator
     private const int MinLength = 2;
     private const int MaxLength = 32;
 
-    // Pattern: ^[a-z][a-z0-9-]*[a-z0-9]$ for 2+ chars, or ^[a-z][a-z0-9]?$ for 1-2 chars
-    // Combined pattern for 2-32 chars: starts with letter, ends with letter/digit, middle can have letter/digit/hyphen
+    // Pattern: ^[a-z]([a-z0-9-]*[a-z0-9])?$ handles names from 1 to 32 chars
+    // - For single char: matches [a-z] with optional group absent
+    // - For 2+ chars: matches [a-z] followed by optional middle chars and final [a-z0-9]
     private static readonly Regex ValidPattern = CreateValidPattern();
 
     [GeneratedRegex(@"^[a-z]([a-z0-9-]*[a-z0-9])?$", RegexOptions.Compiled)]

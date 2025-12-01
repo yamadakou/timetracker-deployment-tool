@@ -20,7 +20,7 @@ public class AppNameValidatorTests
     }
 
     [Theory]
-    [InlineData("TimeTracker")] // Contains uppercase - should fail after lowercasing in CLI, but validator expects lowercase
+    [InlineData("TimeTracker")] // Contains uppercase letters
     [InlineData("")]
     [InlineData("a")] // Too short (1 char)
     [InlineData("a12345678901234567890123456789012")] // 33 chars - too long
