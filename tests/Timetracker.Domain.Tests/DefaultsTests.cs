@@ -9,7 +9,7 @@ public class DefaultsTests
     [Fact]
     public void Defaults_Should_Have_Expected_AppName_And_Location()
     {
-        Defaults.DefaultAppName.Should().Be("TimeTracker");
+        Defaults.DefaultAppName.Should().Be("timetracker");
         Defaults.DefaultLocation.Should().Be("japaneast");
     }
 

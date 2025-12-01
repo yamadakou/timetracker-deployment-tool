@@ -10,7 +10,7 @@ var root = new RootCommand("Timetracker deploy CLI (Container Apps, スペック
 var subscriptionOpt = new Option<string>("--subscription"){ IsRequired = true, Description = "Azure サブスクリプション ID" };
 var resourceGroupOpt = new Option<string>("--resource-group"){ IsRequired = true, Description = "Azure リソースグループ名" };
 var locationOpt = new Option<string>("--location", () => Defaults.DefaultLocation, "Azure リージョン（省略時は japaneast）");
-var appNameOpt = new Option<string>("--app-name", () => Defaults.DefaultAppName, "アプリ名（省略時は TimeTracker）");
+var appNameOpt = new Option<string>("--app-name", () => Defaults.DefaultAppName, $"アプリ名（省略時は {Defaults.DefaultAppName}）");
 var dbTypeOpt = new Option<string>("--db-type", () => "postgres", "DB 種別 postgres | sqlserver");
 var dbPasswordOpt = new Option<string>("--db-password"){ IsRequired = true, Description = "DB パスワード（DB 種別にかかわらず同一パラメータ）" };
 var dbNameOpt = new Option<string>("--db-name", () => "timetracker", "DB 名");
@@ -49,12 +49,32 @@ deploy.AddOption(authModeOpt);
 deploy.SetHandler(async (InvocationContext ctx) =>
 {
     var p = ctx.ParseResult;
+
+    // Get the raw app name and normalize it to lowercase
+    var rawAppName = p.GetValueForOption(appNameOpt)!;
+    var normalizedAppName = rawAppName.ToLowerInvariant();
+
+    // Validate the normalized app name
+    var appNameError = AppNameValidator.GetError(normalizedAppName);
+    if (appNameError != null)
+    {
+        Console.Error.WriteLine($"[ERROR] アプリ名 '{rawAppName}' は無効です: {appNameError}");
+        Console.Error.WriteLine("アプリ名は以下のルールに従う必要があります:");
+        Console.Error.WriteLine("  - 英小文字 (a-z)、数字 (0-9)、ハイフン (-) のみ使用可能");
+        Console.Error.WriteLine("  - 英小文字で始まる必要があります");
+        Console.Error.WriteLine("  - 英小文字または数字で終わる必要があります");
+        Console.Error.WriteLine("  - 連続するハイフン ('--') は使用できません");
+        Console.Error.WriteLine("  - 長さは2〜32文字である必要があります");
+        ctx.ExitCode = 1;
+        return;
+    }
+
     var opts = new DeployOptions
     {
         Subscription        = p.GetValueForOption(subscriptionOpt)!,
         ResourceGroup       = p.GetValueForOption(resourceGroupOpt)!,
         Location            = p.GetValueForOption(locationOpt)!,
-        AppName             = p.GetValueForOption(appNameOpt)!,
+        AppName             = normalizedAppName,
         DbType              = p.GetValueForOption(dbTypeOpt)!,
         DbPassword          = p.GetValueForOption(dbPasswordOpt)!,
         DbName              = p.GetValueForOption(dbNameOpt)!,
