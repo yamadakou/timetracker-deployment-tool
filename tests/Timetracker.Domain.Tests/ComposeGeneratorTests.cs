@@ -12,7 +12,7 @@ public class ComposeGeneratorTests
         ResourceGroup = "rg-test",
         TrackerPassword = "AppLoginP@ss!",
         DbPassword = "Str0ngP@ssw0rd!",
-        // defaults: location=japaneast, app=TimeTracker, dbType=postgres, dbName=timetracker, ttTag=latest
+        // defaults: location=japaneast, app=TimeTracker, dbType=postgres, dbName=timetracker, ttTag=7.0-linux-postgres
     };
 
     [Fact]
@@ -88,7 +88,7 @@ public class ComposeGeneratorTests
     {
         var opts = BaseOptions();
         opts.DbType = dbType;
-        opts.TimetrackerTag = "latest";
+        opts.TimetrackerTag = "7.0-linux-postgres";
 
         var act = () => ComposeGenerator.Validate(opts);
         act.Should().NotThrow();

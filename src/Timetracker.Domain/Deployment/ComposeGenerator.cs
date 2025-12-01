@@ -106,6 +106,6 @@ public static class ComposeGenerator
         if (string.IsNullOrWhiteSpace(o.DbPassword) || o.DbPassword.Length < 8)
             throw new ArgumentException("db-password が不足または短すぎます。");
         if (string.IsNullOrWhiteSpace(o.TimetrackerTag))
-            throw new ArgumentException("tt-tag（timetracker イメージタグ）が空です。例: latest, 1.2.3 など。");
+            throw new ArgumentException("tt-tag（timetracker イメージタグ）が空です。例: 7.0-linux-postgres, 7.0-linux-mssql など。");
     }
 }

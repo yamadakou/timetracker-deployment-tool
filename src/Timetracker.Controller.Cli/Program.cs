@@ -15,7 +15,7 @@ var dbTypeOpt = new Option<string>("--db-type", () => "postgres", "DB 種別 pos
 var dbPasswordOpt = new Option<string>("--db-password"){ IsRequired = true, Description = "DB パスワード（DB 種別にかかわらず同一パラメータ）" };
 var dbNameOpt = new Option<string>("--db-name", () => "timetracker", "DB 名");
 var trackerPasswordOpt = new Option<string>("--tracker-password"){ IsRequired = true, Description = "Timetracker アプリ用パスワード (<your password>)" };
-var ttTagOpt = new Option<string>("--tt-tag", () => "latest", "timetracker コンテナイメージのタグ（バージョン）。例: latest, 1.2.3");
+var ttTagOpt = new Option<string>("--tt-tag", () => "7.0-linux-postgres", "timetracker コンテナイメージのタグ（バージョン）。例: 7.0-linux-postgres, 7.0-linux-mssql");
 var dryRunOpt = new Option<bool>("--dry-run", () => false, "ファイル生成のみ（Compose/.env）で Azure 実行をスキップ");
 var ttCpuOpt = new Option<double>("--tt-cpu", () => 0.5, "Timetracker コンテナの vCPU");
 var ttMemoryOpt = new Option<double>("--tt-memory", () => 1.0, "Timetracker コンテナのメモリ(Gi)");
