@@ -48,7 +48,7 @@ Timetracker（DockerHub の `densocreate/timetracker` イメージ）を、選�
    - サブスクリプション ID（`SUBSCRIPTION_ID`）
    - リソースグループ名（未作成でも可）
    - リージョン（省略時は `japaneast`）
-   - アプリ名（省略時は `TimeTracker`）
+   - アプリ名（省略時は `timetracker`）
    - DB 種別（`postgres` または `sqlserver`）
    - DB パスワード（DB の種類に関わらず同一の CLI パラメータで指定）
    - Timetracker のアプリ用パスワード（DockerHub 記載の `<your password>` に相当）
@@ -65,7 +65,7 @@ Timetracker（DockerHub の `densocreate/timetracker` イメージ）を、選�
 - `--subscription` (必須): Azure サブスクリプション ID
 - `--resource-group` (必須): リソースグループ名（存在しなければ作成）
 - `--location` (任意): リージョン（省略時は `japaneast`）
-- `--app-name` (任意): アプリ名（省略時は `TimeTracker`）
+- `--app-name` (任意): アプリ名（省略時は `timetracker`）。Azure Container Apps の命名規則に従う必要があります（後述の注意事項参照）。
 - `--db-type` (任意): DB 種別。`postgres` または `sqlserver`（デフォルト: `postgres`）
 - `--db-password` (必須): DB パスワード（DB 種別に関わらず統一パラメータ）
 - `--db-name` (任意): DB 名。デフォルト `timetracker`
@@ -82,6 +82,13 @@ Timetracker（DockerHub の `densocreate/timetracker` イメージ）を、選�
 補足:
 - DB ユーザは DockerHub の「クイックスタート」記載の固定値を使用します（CLI からは変更不可）。
 - `.env` に機密情報が出力��れます。取り扱いにはご注意ください。
+- **アプリ名の命名規則**: `--app-name` で指定するアプリ名は Azure Container Apps の命名規則に従う必要があります:
+  - 使用可能な文字: 英小文字 (a-z)、数字 (0-9)、ハイフン (-)
+  - 英小文字で始まる必要があります
+  - 英小文字または数字で終わる必要があります
+  - 連続するハイフン (`--`) は使用できません
+  - 長さは2〜32文字である必要があります
+  - 大文字を指定した場合は自動的に小文字に変換されます
 
 ### コマンド例（PowerShell）
 
@@ -91,7 +98,7 @@ Timetracker（DockerHub の `densocreate/timetracker` イメージ）を、選�
     --subscription "<SUBSCRIPTION_ID>" `
     --resource-group "rg-tt-demo" `
     --location "japaneast" `
-    --app-name "TimeTracker" `
+    --app-name "timetracker" `
     --db-type "postgres" `
     --db-password "Str0ngP@ssw0rd!" `
     --db-name "timetracker" `
