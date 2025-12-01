@@ -23,3 +23,41 @@ public class DefaultsTests
         Defaults.DbUserFixedSqlServer.Should().Be("sa");
     }
 }
+
+public class DeployOptionsTests
+{
+    [Fact]
+    public void DeployOptions_AuthMode_Should_Default_To_Default()
+    {
+        // When creating DeployOptions, AuthMode should default to "default"
+        var opts = new DeployOptions
+        {
+            Subscription = "test-sub",
+            ResourceGroup = "test-rg",
+            DbPassword = "testPassword123!",
+            TrackerPassword = "testTracker123!"
+        };
+
+        opts.AuthMode.Should().Be("default");
+    }
+
+    [Theory]
+    [InlineData("default")]
+    [InlineData("azure-cli")]
+    [InlineData("sp-env")]
+    [InlineData("device-code")]
+    [InlineData("managed-identity")]
+    public void DeployOptions_AuthMode_Should_Accept_Valid_Values(string authMode)
+    {
+        var opts = new DeployOptions
+        {
+            Subscription = "test-sub",
+            ResourceGroup = "test-rg",
+            DbPassword = "testPassword123!",
+            TrackerPassword = "testTracker123!",
+            AuthMode = authMode
+        };
+
+        opts.AuthMode.Should().Be(authMode);
+    }
+}

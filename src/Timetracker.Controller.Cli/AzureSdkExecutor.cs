@@ -13,11 +13,10 @@ public class AzureSdkExecutor
     private readonly SimpleLogger _logger;
     private readonly ArmClient _arm;
 
-    public AzureSdkExecutor(SimpleLogger logger)
+    public AzureSdkExecutor(SimpleLogger logger, TokenCredential credential)
     {
         _logger = logger;
-        var cred = new DefaultAzureCredential();
-        _arm = new ArmClient(cred);
+        _arm = new ArmClient(credential);
     }
 
     public async Task EnsureResourceGroupAsync(string subscriptionId, string rgName, string location)

@@ -13,6 +13,9 @@ public class DeployOptions
     public bool DryRun { get; set; }
     public bool Verbose { get; set; }
 
+    // 認証モード（default | azure-cli | sp-env | device-code | managed-identity）
+    public string AuthMode { get; set; } = "default";
+
     // timetracker イメージタグ（バージョン）
     public string TimetrackerTag { get; set; } = "latest";
 

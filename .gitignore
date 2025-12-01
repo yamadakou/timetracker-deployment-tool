@@ -52,3 +52,7 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+# CLI generated files (dry-run output)
+docker-compose.yml
+.env
