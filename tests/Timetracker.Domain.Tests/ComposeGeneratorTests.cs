@@ -82,13 +82,13 @@ public class ComposeGeneratorTests
     }
 
     [Theory]
-    [InlineData("postgres")]
-    [InlineData("sqlserver")]
-    public void Validate_Valid_Options_Should_Not_Throw(string dbType)
+    [InlineData("postgres", "7.0-linux-postgres")]
+    [InlineData("sqlserver", "7.0-linux-mssql")]
+    public void Validate_Valid_Options_Should_Not_Throw(string dbType, string tag)
     {
         var opts = BaseOptions();
         opts.DbType = dbType;
-        opts.TimetrackerTag = "latest";
+        opts.TimetrackerTag = tag;
 
         var act = () => ComposeGenerator.Validate(opts);
         act.Should().NotThrow();
