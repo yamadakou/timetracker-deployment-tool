@@ -21,6 +21,11 @@ Timetracker（DockerHub の `densocreate/timetracker` イメージ）を、選�
 ### 前提環境（クラウドデプロイのみを行う場合）
 - Windows 10/11（PowerShell 5.1 以降推奨）または他 OS（macOS/Linux）
 - Azure SDK が利用できる認証方法を準備（Managed Identity または Service Principal）
+  - 参考リンク:
+    - [Managed Identity](https://learn.microsoft.com/ja-jp/azure/active-directory/managed-identities-azure-resources/overview)
+    - [Service Principal](https://learn.microsoft.com/ja-jp/azure/active-directory/develop/app-objects-and-service-principals)
+    - [RBAC ロール割り当て](https://learn.microsoft.com/ja-jp/azure/role-based-access-control/role-assignments-portal)
+    - [DefaultAzureCredential](https://learn.microsoft.com/ja-jp/dotnet/api/azure.identity.defaultazurecredential)
 - インターネット接続（Azure / DockerHub へのアクセスが可能であること）
 - Timetracker イメージ（`densocreate/timetracker`）が利用可能
 
@@ -67,6 +72,7 @@ Timetracker（DockerHub の `densocreate/timetracker` イメージ）を、選�
 - `--tracker-password` (必須): Timetracker アプリパスワード（DockerHub の `<your password>` に対応）
 - `--tt-tag` (任意): timetracker コンテナイメージのタグ（バージョン）。省略時は `latest`（例: `1.2.3`）
 - `--dry-run` (任意): true の場合、Azure 反映せず `docker-compose.yml` と `.env` の生成のみ
+- `--auth-mode` (任意): 認証モード。`default` | `azure-cli` | `sp-env` | `device-code` | `managed-identity`（デフォルト: `default`）
 - コンテナスペック（任意）:
   - Timetracker: `--tt-cpu`（vCPU、小数可。例: `0.5`）、`--tt-memory`（Gi。例: `1.0`）
   - DB: `--db-cpu`、`--db-memory`
@@ -114,6 +120,58 @@ docker compose --file .\docker-compose.yml --env-file .\.env up -d
 docker compose ps
 ```
 
+### 認証モード（--auth-mode）使い分け
+
+`--auth-mode` オプションで Azure への認証方法を明示的に指定できます。省略時は `default`（DefaultAzureCredential）が使用されます。
+
+| モード | 認証方式 | 用途・ユースケース | 必要な設定 |
+|--------|----------|-------------------|-----------|
+| `default` | DefaultAzureCredential | 開発環境・CI/CDで自動選択させたい場合 | 特になし（環境に応じて自動選択） |
+| `azure-cli` | AzureCliCredential | ローカル開発で `az login` 済みの場合 | 事前に `az login` を実行 |
+| `sp-env` | ClientSecretCredential | CI/CD パイプラインでサービスプリンシパルを使用 | 環境変数 `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` |
+| `device-code` | DeviceCodeCredential | ブラウザで対話的にログインしたい場合 | 実行時にブラウザでコード入力 |
+| `managed-identity` | ManagedIdentityCredential | Azure VM/App Service 等のマネージド ID を使用 | Azure リソースに Managed Identity を設定 |
+
+#### --auth-mode を使ったコマンド例
+
+- Azure CLI 認証を使用（ローカル開発向け）
+  ```powershell
+  timetracker-cli.exe deploy `
+    --subscription "<SUBSCRIPTION_ID>" `
+    --resource-group "rg-tt-demo" `
+    --db-type "postgres" `
+    --db-password "Str0ngP@ssw0rd!" `
+    --tracker-password "AppLoginP@ss!" `
+    --auth-mode "azure-cli"
+  ```
+
+- サービスプリンシパル（環境変数）を使用（CI/CD 向け）
+  ```powershell
+  # 事前に環境変数を設定
+  $env:AZURE_TENANT_ID = "<TENANT_ID>"
+  $env:AZURE_CLIENT_ID = "<CLIENT_ID>"
+  $env:AZURE_CLIENT_SECRET = "<CLIENT_SECRET>"
+
+  timetracker-cli.exe deploy `
+    --subscription "<SUBSCRIPTION_ID>" `
+    --resource-group "rg-tt-demo" `
+    --db-type "postgres" `
+    --db-password "Str0ngP@ssw0rd!" `
+    --tracker-password "AppLoginP@ss!" `
+    --auth-mode "sp-env"
+  ```
+
+- マネージド ID を使用（Azure VM/App Service 上で実行）
+  ```powershell
+  timetracker-cli.exe deploy `
+    --subscription "<SUBSCRIPTION_ID>" `
+    --resource-group "rg-tt-demo" `
+    --db-type "postgres" `
+    --db-password "Str0ngP@ssw0rd!" `
+    --tracker-password "AppLoginP@ss!" `
+    --auth-mode "managed-identity"
+  ```
+
 ### FAQ
 - Q: クラウドデプロイだけなら Docker は必要ですか？  
   A: いいえ。Azure Container Apps へのデプロイのみを行う場合、利用者側で Docker をインストールする必要はありません。
@@ -129,6 +187,9 @@ docker compose ps
 
 - Q: App Service を使ったデプロイは可能ですか？  
   A: 本ツールは Azure Container Apps を対象とした専用ツールです。App Service（マルチコンテナ／Compose）への直接デプロイ機能は含んでいません。App Service を利用する場合は ARM/Bicep テンプレートなど別方式をご検討ください。
+
+- Q: どの認証方式が使われているか確認するには？  
+  A: `--verbose` オプションを付けて実行すると、使用される認証モードがログに出力されます。認証に関する問題を診断する場合は、`--auth-mode` オプションで明示的に認証方式を指定することを推奨します。例: `--auth-mode azure-cli --verbose`
 
 ---
 

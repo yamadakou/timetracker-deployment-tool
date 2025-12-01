@@ -1,6 +1,7 @@
 using System.CommandLine;
 using System.CommandLine.Invocation;
 using Timetracker.Common;
+using Timetracker.Controller.Cli;
 using Timetracker.Domain.Deployment;
 using System.IO;
 
@@ -23,6 +24,7 @@ var dbMemoryOpt = new Option<double>("--db-memory", () => 1.0, "DB コンテナ�
 var redisCpuOpt = new Option<double>("--redis-cpu", () => 0.25, "Redis コンテナの vCPU");
 var redisMemoryOpt = new Option<double>("--redis-memory", () => 0.5, "Redis コンテナのメモリ(Gi)");
 var verboseOpt = new Option<bool>("--verbose", () => false, "詳細ログを出力");
+var authModeOpt = new Option<string>("--auth-mode", () => "default", "認証モード: default | azure-cli | sp-env | device-code | managed-identity");
 
 var deploy = new Command("deploy", "Timetracker を Azure Container Apps にデプロイ（または Dry-run で Compose/.env 生成）します。");
 deploy.AddOption(subscriptionOpt);
@@ -42,6 +44,7 @@ deploy.AddOption(dbMemoryOpt);
 deploy.AddOption(redisCpuOpt);
 deploy.AddOption(redisMemoryOpt);
 deploy.AddOption(verboseOpt);
+deploy.AddOption(authModeOpt);
 
 deploy.SetHandler(async (InvocationContext ctx) =>
 {
@@ -64,7 +67,8 @@ deploy.SetHandler(async (InvocationContext ctx) =>
         DbMemoryGi          = p.GetValueForOption(dbMemoryOpt),
         RedisCpu            = p.GetValueForOption(redisCpuOpt),
         RedisMemoryGi       = p.GetValueForOption(redisMemoryOpt),
-        Verbose             = p.GetValueForOption(verboseOpt)
+        Verbose             = p.GetValueForOption(verboseOpt),
+        AuthMode            = p.GetValueForOption(authModeOpt)!
     };
 
     var log = new SimpleLogger(opts.Verbose);
@@ -87,7 +91,8 @@ deploy.SetHandler(async (InvocationContext ctx) =>
             return;
         }
 
-        var sdk = new AzureSdkExecutor(log);
+        var credential = CredentialFactory.Create(opts.AuthMode, log);
+        var sdk = new AzureSdkExecutor(log, credential);
         await sdk.EnsureResourceGroupAsync(opts.Subscription, opts.ResourceGroup, opts.Location);
         var env = await sdk.EnsureContainerAppEnvAsync(opts.Subscription, opts.ResourceGroup, $"{opts.AppName}-env", opts.Location);
         await sdk.CreateOrUpdateContainerAppAsync(opts.Subscription, opts.ResourceGroup, opts.AppName, opts.Location, opts, env);
