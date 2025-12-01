@@ -52,7 +52,7 @@ Timetracker（DockerHub の `densocreate/timetracker` イメージ）を、選�
    - DB 種別（`postgres` または `sqlserver`）
    - DB パスワード（DB の種類に関わらず同一の CLI パラメータで指定）
    - Timetracker のアプリ用パスワード（DockerHub 記載の `<your password>` に相当）
-   - timetracker コンテナのバージョンタグ（省略時は `7.0-linux-postgres`）
+   - timetracker コンテナのバージョンタグ（省略時は `latest`）
    - コンテナスペック（必要に応じて CPU/メモリを各コンテナ別に指定）
 4. 実行（例は「コマンド例」参照）
 5. 成功後、Azure ポータルから Container Apps を確認
@@ -70,7 +70,7 @@ Timetracker（DockerHub の `densocreate/timetracker` イメージ）を、選�
 - `--db-password` (必須): DB パスワード（DB 種別に関わらず統一パラメータ）
 - `--db-name` (任意): DB 名。デフォルト `timetracker`
 - `--tracker-password` (必須): Timetracker アプリパスワード（DockerHub の `<your password>` に対応）
-- `--tt-tag` (任意): timetracker コンテナイメージのタグ（バージョン）。省略時は `7.0-linux-postgres`（例: `7.0-linux-postgres`, `7.0-linux-mssql`）。利用可能なタグ一覧は [DockerHub](https://hub.docker.com/r/densocreate/timetracker/tags) を参照してください。
+- `--tt-tag` (任意): timetracker コンテナイメージのタグ（バージョン）。省略時は `latest`（例: `1.2.3`）
 - `--dry-run` (任意): true の場合、Azure 反映せず `docker-compose.yml` と `.env` の生成のみ
 - `--auth-mode` (任意): 認証モード。`default` | `azure-cli` | `sp-env` | `device-code` | `managed-identity`（デフォルト: `default`）
 - コンテナスペック（任意）:
@@ -82,7 +82,6 @@ Timetracker（DockerHub の `densocreate/timetracker` イメージ）を、選�
 補足:
 - DB ユーザは DockerHub の「クイックスタート」記載の固定値を使用します（CLI からは変更不可）。
 - `.env` に機密情報が出力されます。取り扱いにはご注意ください。
-- **timetracker イメージタグについて**: DB 種別に応じて適切なタグを選択してください。PostgreSQL 用のタグ (例: `7.0-linux-postgres`) と SQL Server 用のタグ (例: `7.0-linux-mssql`) があります。異なる DB 種別用のタグを混在させないでください。利用可能なタグ一覧は [DockerHub](https://hub.docker.com/r/densocreate/timetracker/tags) を参照してください。
 - **アプリ名の命名規則**: `--app-name` で指定するアプリ名は Azure Container Apps の命名規則に従う必要があります:
   - 使用可能な文字: 英小文字 (a-z)、数字 (0-9)、ハイフン (-)
   - 英小文字で始まる必要があります
@@ -104,7 +103,7 @@ Timetracker（DockerHub の `densocreate/timetracker` イメージ）を、選�
     --db-password "Str0ngP@ssw0rd!" `
     --db-name "timetracker" `
     --tracker-password "AppLoginP@ss!" `
-    --tt-tag "7.0-linux-postgres" `
+    --tt-tag "1.2.3" `
     --tt-cpu 0.5 --tt-memory 1.0 `
     --db-cpu 0.5 --db-memory 1.0 `
     --redis-cpu 0.25 --redis-memory 0.5
@@ -118,7 +117,7 @@ Timetracker（DockerHub の `densocreate/timetracker` イメージ）を、選�
     --db-type "postgres" `
     --db-password "Str0ngP@ssw0rd!" `
     --tracker-password "AppLoginP@ss!" `
-    --tt-tag "7.0-linux-postgres" `
+    --tt-tag "latest" `
     --dry-run "true"
   ```
 
@@ -232,7 +231,7 @@ dotnet publish .\src\Timetracker.Controller.Cli\Timetracker.Controller.Cli.cspro
 - `redis`（`redis:7-alpine`）
 - Ingress: 外部公開、ターゲットポート 8080
 - スケール: MinReplicas=1 / MaxReplicas=1（固定）
-- timetracker のイメージタグは `--tt-tag` で指定した値を使用（省略時は `7.0-linux-postgres`）
+- timetracker のイメージタグは `--tt-tag` で指定した値を使用（省略時は `latest`）
 
 ### 注意点
 - Container Apps の永続ボリュームが必要な場合は Azure Files 等の設定を追加してください（DB/Redis のデータ保持用途）。
