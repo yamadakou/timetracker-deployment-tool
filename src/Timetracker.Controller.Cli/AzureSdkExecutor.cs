@@ -66,6 +66,7 @@ public class AzureSdkExecutor
             Image = ttImage,
             Env =
             {
+                new ContainerAppEnvironmentVariable() { Name = "ASPNETCORE_URLS", Value = "http://0.0.0.0:8080" },
                 new ContainerAppEnvironmentVariable() { Name = "DB_HOST", Value = "db" },
                 new ContainerAppEnvironmentVariable() { Name = "DB_PORT", Value = dbPort.ToString() },
                 new ContainerAppEnvironmentVariable() { Name = "DB_USER", Value = dbUserFixed },

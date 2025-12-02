@@ -20,6 +20,7 @@ public static class ComposeGenerator
         sb.AppendLine("    ports:");
         sb.AppendLine("      - \"8080:8080\"");
         sb.AppendLine("    environment:");
+        sb.AppendLine("      ASPNETCORE_URLS=http://0.0.0.0:8080");
         sb.AppendLine("      DB_HOST=db");
         sb.AppendLine("      DB_PORT=${DB_PORT}");
         sb.AppendLine("      DB_USER=${DB_USER}");

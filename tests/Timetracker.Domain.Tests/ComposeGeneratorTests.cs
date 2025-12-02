@@ -28,5 +28,26 @@ namespace Timetracker.Domain.Tests
             // Ensure all other interpolated strings are properly closed
             // further code and checks accordingly
         }
+
+        [Fact]
+        public void GenerateCompose_Should_Include_ASPNETCORE_URLS_Environment_Variable()
+        {
+            // Arrange
+            var options = new DeployOptions
+            {
+                DbType = "postgres",
+                DbPassword = "TestPassword123!",
+                TrackerPassword = "TrackerPassword123!",
+                TimetrackerTag = "7.0-linux-postgres",
+                Subscription = "test-subscription",
+                ResourceGroup = "test-rg"
+            };
+
+            // Act
+            var composeYml = ComposeGenerator.GenerateCompose(options);
+
+            // Assert
+            composeYml.Should().Contain("ASPNETCORE_URLS=http://0.0.0.0:8080");
+        }
     }
 }
