@@ -106,6 +106,22 @@ public static class ComposeGenerator
         if (string.IsNullOrWhiteSpace(o.DbPassword) || o.DbPassword.Length < 8)
             throw new ArgumentException("db-password が不足または短すぎます。");
         if (string.IsNullOrWhiteSpace(o.TimetrackerTag))
-            throw new ArgumentException("tt-tag（timetracker イメージタグ）が空です。例: latest, 1.2.3 など。");
+            throw new ArgumentException("tt-tag（timetracker イメージタグ）が空です。例: 7.0-linux-postgres, 7.0-linux-mssql など。");
+
+        // db-type と tt-tag の組み合わせ検証
+        var tagLower = o.TimetrackerTag.ToLowerInvariant();
+        bool tagMatchesDb = o.DbType switch
+        {
+            "postgres" => tagLower.Contains("postgres"),
+            "sqlserver" => tagLower.Contains("mssql") || tagLower.Contains("sqlserver"),
+            _ => false
+        };
+        if (!tagMatchesDb)
+        {
+            throw new ArgumentException(
+                $"不適切な組み合わせ: db-type='{o.DbType}' と tt-tag='{o.TimetrackerTag}' は対応していません。" +
+                " DB 種別に合致するタグを指定してください (例: postgres → 7.0-linux-postgres / sqlserver → 7.0-linux-mssql)。" +
+                " タグ一覧: https://hub.docker.com/r/densocreate/timetracker/tags");
+        }
     }
-}
+} 
