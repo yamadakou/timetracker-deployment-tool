@@ -21,6 +21,7 @@ public static class ComposeGenerator
         sb.AppendLine("      - \"8080:8080\"");
         sb.AppendLine("    environment:");
         sb.AppendLine("      ASPNETCORE_URLS=http://0.0.0.0:8080");
+        sb.AppendLine("      TTNX_DB_TYPE=${TTNX_DB_TYPE}");
         sb.AppendLine("      DB_HOST=db");
         sb.AppendLine("      DB_PORT=${DB_PORT}");
         sb.AppendLine("      DB_USER=${DB_USER}");
@@ -84,6 +85,7 @@ public static class ComposeGenerator
 
         var lines = new List<string>
         {
+            $"TTNX_DB_TYPE={o.DbType}",
             $"DB_PORT={dbPort}",
             $"DB_USER={dbUserFixed}",
             $"DB_PASSWORD={o.DbPassword}",

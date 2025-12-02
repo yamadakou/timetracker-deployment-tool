@@ -55,8 +55,8 @@ public class AzureSdkExecutor
         var rg = _arm.GetResourceGroupResource(new ResourceIdentifier($"/subscriptions/{subscriptionId}/resourceGroups/{rgName}"));
         var apps = rg.GetContainerApps();
 
-        var dbUserFixed = opts.DbType == "postgres" ? Defaults.DbUserFixedPostgres : Defaults.DbUserFixedSqlServer;
-        var dbPort = opts.DbType == "postgres" ? 5432 : 1433;
+        var dbUserFixed = opts.DbType == "postgresql" ? Defaults.DbUserFixedPostgres : Defaults.DbUserFixedSqlServer;
+        var dbPort = opts.DbType == "postgresql" ? 5432 : 1433;
 
         var ttImage = $"densocreate/timetracker:{opts.TimetrackerTag}";
 
@@ -67,6 +67,7 @@ public class AzureSdkExecutor
             Env =
             {
                 new ContainerAppEnvironmentVariable() { Name = "ASPNETCORE_URLS", Value = "http://0.0.0.0:8080" },
+                new ContainerAppEnvironmentVariable() { Name = "TTNX_DB_TYPE", Value = opts.DbType },
                 new ContainerAppEnvironmentVariable() { Name = "DB_HOST", Value = "db" },
                 new ContainerAppEnvironmentVariable() { Name = "DB_PORT", Value = dbPort.ToString() },
                 new ContainerAppEnvironmentVariable() { Name = "DB_USER", Value = dbUserFixed },
@@ -83,7 +84,7 @@ public class AzureSdkExecutor
             }
         };
 
-        var dbContainer = opts.DbType == "postgres"
+        var dbContainer = opts.DbType == "postgresql"
             ? new ContainerAppContainer()
             {
                 Name = "db",

@@ -35,7 +35,7 @@ namespace Timetracker.Domain.Tests
             // Arrange
             var options = new DeployOptions
             {
-                DbType = "postgres",
+                DbType = "postgresql",
                 DbPassword = "TestPassword123!",
                 TrackerPassword = "TrackerPassword123!",
                 TimetrackerTag = "7.0-linux-postgres",
@@ -48,6 +48,69 @@ namespace Timetracker.Domain.Tests
 
             // Assert
             composeYml.Should().Contain("ASPNETCORE_URLS=http://0.0.0.0:8080");
+        }
+
+        [Fact]
+        public void GenerateCompose_Should_Include_TTNX_DB_TYPE_Environment_Variable()
+        {
+            // Arrange
+            var options = new DeployOptions
+            {
+                DbType = "postgresql",
+                DbPassword = "TestPassword123!",
+                TrackerPassword = "TrackerPassword123!",
+                TimetrackerTag = "7.0-linux-postgres",
+                Subscription = "test-subscription",
+                ResourceGroup = "test-rg"
+            };
+
+            // Act
+            var composeYml = ComposeGenerator.GenerateCompose(options);
+
+            // Assert
+            composeYml.Should().Contain("TTNX_DB_TYPE=${TTNX_DB_TYPE}");
+        }
+
+        [Fact]
+        public void GenerateEnv_Should_Include_TTNX_DB_TYPE_For_Postgresql()
+        {
+            // Arrange
+            var options = new DeployOptions
+            {
+                DbType = "postgresql",
+                DbPassword = "TestPassword123!",
+                TrackerPassword = "TrackerPassword123!",
+                TimetrackerTag = "7.0-linux-postgres",
+                Subscription = "test-subscription",
+                ResourceGroup = "test-rg"
+            };
+
+            // Act
+            var env = ComposeGenerator.GenerateEnv(options);
+
+            // Assert
+            env.Should().Contain("TTNX_DB_TYPE=postgresql");
+        }
+
+        [Fact]
+        public void GenerateEnv_Should_Include_TTNX_DB_TYPE_For_SqlServer()
+        {
+            // Arrange
+            var options = new DeployOptions
+            {
+                DbType = "sqlserver",
+                DbPassword = "TestPassword123!",
+                TrackerPassword = "TrackerPassword123!",
+                TimetrackerTag = "7.0-linux-mssql",
+                Subscription = "test-subscription",
+                ResourceGroup = "test-rg"
+            };
+
+            // Act
+            var env = ComposeGenerator.GenerateEnv(options);
+
+            // Assert
+            env.Should().Contain("TTNX_DB_TYPE=sqlserver");
         }
     }
 }
