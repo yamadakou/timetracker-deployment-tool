@@ -49,7 +49,7 @@ Timetracker（DockerHub の `densocreate/timetracker` イメージ）を、選�
    - リソースグループ名（未作成でも可）
    - リージョン（省略時は `japaneast`）
    - アプリ名（省略時は `timetracker`）
-   - DB 種別（`postgres` または `sqlserver`）
+   - DB 種別（`postgresql` または `sqlserver`）
    - DB パスワード（DB の種類に関わらず同一の CLI パラメータで指定）
    - Timetracker のアプリ用パスワード（DockerHub 記載の `<your password>` に相当）
    - timetracker コンテナのバージョンタグ（省略時は `7.0-linux-postgres`）
@@ -66,7 +66,7 @@ Timetracker（DockerHub の `densocreate/timetracker` イメージ）を、選�
 - `--resource-group` (必須): リソースグループ名（存在しなければ作成）
 - `--location` (任意): リージョン（省略時は `japaneast`）
 - `--app-name` (任意): アプリ名（省略時は `timetracker`）。Azure Container Apps の命名規則に従う必要があります（後述の注意事項参照）。
-- `--db-type` (任意): DB 種別。`postgres` または `sqlserver`（デフォルト: `postgres`）
+- `--db-type` (任意): DB 種別。`postgresql` または `sqlserver`（デフォルト: `postgresql`）
 - `--db-password` (必須): DB パスワード（DB 種別に関わらず統一パラメータ）
 - `--db-name` (任意): DB 名。デフォルト `timetracker`
 - `--tracker-password` (必須): Timetracker アプリパスワード（DockerHub の `<your password>` に対応）
@@ -100,7 +100,7 @@ Timetracker（DockerHub の `densocreate/timetracker` イメージ）を、選�
     --resource-group "rg-tt-demo" `
     --location "japaneast" `
     --app-name "timetracker" `
-    --db-type "postgres" `
+    --db-type "postgresql" `
     --db-password "Str0ngP@ssw0rd!" `
     --db-name "timetracker" `
     --tracker-password "AppLoginP@ss!" `
@@ -115,7 +115,7 @@ Timetracker（DockerHub の `densocreate/timetracker` イメージ）を、選�
   timetracker-cli.exe deploy `
     --subscription "<SUBSCRIPTION_ID>" `
     --resource-group "rg-tt-demo" `
-    --db-type "postgres" `
+    --db-type "postgresql" `
     --db-password "Str0ngP@ssw0rd!" `
     --tracker-password "AppLoginP@ss!" `
     --tt-tag "7.0-linux-postgres" `
@@ -147,7 +147,7 @@ docker compose ps
   timetracker-cli.exe deploy `
     --subscription "<SUBSCRIPTION_ID>" `
     --resource-group "rg-tt-demo" `
-    --db-type "postgres" `
+    --db-type "postgresql" `
     --db-password "Str0ngP@ssw0rd!" `
     --tracker-password "AppLoginP@ss!" `
     --auth-mode "azure-cli"
@@ -163,7 +163,7 @@ docker compose ps
   timetracker-cli.exe deploy `
     --subscription "<SUBSCRIPTION_ID>" `
     --resource-group "rg-tt-demo" `
-    --db-type "postgres" `
+    --db-type "postgresql" `
     --db-password "Str0ngP@ssw0rd!" `
     --tracker-password "AppLoginP@ss!" `
     --auth-mode "sp-env"
@@ -174,7 +174,7 @@ docker compose ps
   timetracker-cli.exe deploy `
     --subscription "<SUBSCRIPTION_ID>" `
     --resource-group "rg-tt-demo" `
-    --db-type "postgres" `
+    --db-type "postgresql" `
     --db-password "Str0ngP@ssw0rd!" `
     --tracker-password "AppLoginP@ss!" `
     --auth-mode "managed-identity"
