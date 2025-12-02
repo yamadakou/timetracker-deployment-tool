@@ -6,7 +6,7 @@ public class DeployOptions
     public required string ResourceGroup { get; set; }
     public string Location { get; set; } = Defaults.DefaultLocation; // japaneast
     public string AppName { get; set; } = Defaults.DefaultAppName;   // TimeTracker
-    public string DbType { get; set; } = "postgres";                 // postgres | sqlserver
+    public string DbType { get; set; } = "postgresql";              // postgresql | sqlserver
     public required string DbPassword { get; set; }                  // 種別問わず統一パラメータ
     public string DbName { get; set; } = "timetracker";
     public required string TrackerPassword { get; set; }

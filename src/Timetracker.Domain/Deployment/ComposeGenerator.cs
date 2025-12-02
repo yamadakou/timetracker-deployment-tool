@@ -31,7 +31,7 @@ public static class ComposeGenerator
         sb.AppendLine("      APP_PASSWORD=${TIMETRACKER_PASSWORD}  # <your password>");
         sb.AppendLine("    restart: unless-stopped");
 
-        if (o.DbType == "postgres")
+        if (o.DbType == "postgresql")
         {
             sb.AppendLine("  db:");
             sb.AppendLine("    image: postgres:16-alpine");
@@ -70,7 +70,7 @@ public static class ComposeGenerator
 
         sb.AppendLine();
         sb.AppendLine("volumes:");
-        if (o.DbType == "postgres") sb.AppendLine("  pgdata:");
+        if (o.DbType == "postgresql") sb.AppendLine("  pgdata:");
         else sb.AppendLine("  mssqldata:");
         sb.AppendLine("  redisdata:");
 
@@ -79,8 +79,8 @@ public static class ComposeGenerator
 
     public static string GenerateEnv(DeployOptions o)
     {
-        var dbPort = o.DbType == "postgres" ? 5432 : 1433;
-        var dbUserFixed = o.DbType == "postgres" ? Defaults.DbUserFixedPostgres : Defaults.DbUserFixedSqlServer;
+        var dbPort = o.DbType == "postgresql" ? 5432 : 1433;
+        var dbUserFixed = o.DbType == "postgresql" ? Defaults.DbUserFixedPostgres : Defaults.DbUserFixedSqlServer;
 
         var lines = new List<string>
         {
@@ -96,8 +96,8 @@ public static class ComposeGenerator
 
     public static void Validate(DeployOptions o)
     {
-        if (o.DbType is not ("postgres" or "sqlserver"))
-            throw new ArgumentException("db-type は postgres または sqlserver を指定してください。");
+        if (o.DbType is not ("postgresql" or "sqlserver"))
+            throw new ArgumentException("db-type は postgresql または sqlserver を指定してください。");
         if (string.IsNullOrWhiteSpace(o.Subscription))
             throw new ArgumentException("subscription は必須です。");
         if (string.IsNullOrWhiteSpace(o.ResourceGroup))
@@ -113,7 +113,7 @@ public static class ComposeGenerator
         var tagLower = o.TimetrackerTag.ToLowerInvariant();
         bool tagMatchesDb = o.DbType switch
         {
-            "postgres" => tagLower.Contains("postgres"),
+            "postgresql" => tagLower.Contains("postgres"),
             "sqlserver" => tagLower.Contains("mssql") || tagLower.Contains("sqlserver"),
             _ => false
         };
@@ -121,8 +121,8 @@ public static class ComposeGenerator
         {
             throw new ArgumentException(
                 $"不適切な組み合わせ: db-type='{o.DbType}' と tt-tag='{o.TimetrackerTag}' は対応していません。" +
-                " DB 種別に合致するタグを指定してください (例: postgres → 7.0-linux-postgres / sqlserver → 7.0-linux-mssql)。" +
+                " DB 種別に合致するタグを指定してください (例: postgresql → 7.0-linux-postgres / sqlserver → 7.0-linux-mssql)。" +
                 " タグ一覧: https://hub.docker.com/r/densocreate/timetracker/tags");
         }
     }
-} 
+}
