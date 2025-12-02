@@ -35,7 +35,7 @@ namespace Timetracker.Domain.Tests
             // Arrange
             var options = new DeployOptions
             {
-                DbType = "postgres",
+                DbType = "postgresql",
                 DbPassword = "TestPassword123!",
                 TrackerPassword = "TrackerPassword123!",
                 TimetrackerTag = "7.0-linux-postgres",
