@@ -65,7 +65,7 @@ public class AzureSdkExecutor
             ? new ContainerAppContainer()
             {
                 Name = "timetracker-db",
-                Image = "postgres:16-alpine",
+                Image = "postgres:16", // Functions と合わせる
                 Env =
                 {
                     new ContainerAppEnvironmentVariable() { Name = "POSTGRES_USER", Value = dbUserFixed },
@@ -123,17 +123,18 @@ public class AzureSdkExecutor
             Configuration = dbConfig
         };
 
-        var dbAppOp = await apps.CreateOrUpdateAsync(WaitUntil.Completed, $"{appName}-db", dbAppData);
+        var dbAppName = $"{appName}-db";
+        var dbAppOp = await apps.CreateOrUpdateAsync(WaitUntil.Completed, dbAppName, dbAppData);
         var dbApp = dbAppOp.Value;
-        // 内部解決名（同じ環境内からの到達用）は Container App 名を使用
-        var dbEndpointHost = "timetracker-db";
+        // 内部接続は Container App 名を使用
+        var dbEndpointHost = dbAppName;
         _logger.Info($"DB app ready: {dbApp.Data.Name} (endpoint: {dbEndpointHost}:{dbPort})");
 
         // 2) Redis 用 Container App（Internal Ingress: TCP + ExposedPort）
         var redisContainer = new ContainerAppContainer()
         {
             Name = "timetracker-redis",
-            Image = "redis:7-alpine",
+            Image = "redis:latest", // Functions と合わせる
             Args = { "redis-server", "--appendonly", "yes" },
             Resources = new AppContainerResources()
             {
@@ -170,9 +171,10 @@ public class AzureSdkExecutor
             Configuration = redisConfig
         };
 
-        var redisAppOp = await apps.CreateOrUpdateAsync(WaitUntil.Completed, $"{appName}-redis", redisAppData);
+        var redisAppName = $"{appName}-redis";
+        var redisAppOp = await apps.CreateOrUpdateAsync(WaitUntil.Completed, redisAppName, redisAppData);
         var redisApp = redisAppOp.Value;
-        var redisEndpointHost = "timetracker-redis";
+        var redisEndpointHost = redisAppName;
         _logger.Info($"Redis app ready: {redisApp.Data.Name} (endpoint: {redisEndpointHost}:6379)");
 
         // 3) Timetracker 用 Container App（External Ingress: Auto）
@@ -184,12 +186,14 @@ public class AzureSdkExecutor
             {
                 new ContainerAppEnvironmentVariable() { Name = "ASPNETCORE_URLS", Value = "http://0.0.0.0:8080" },
                 new ContainerAppEnvironmentVariable() { Name = "TTNX_DB_TYPE", Value = opts.DbType },
-                // DB/Redis は同環境内の内部エンドポイント名 + ポートを使用
+                // DB/Redis は Container App 名 + ポートを使用
                 new ContainerAppEnvironmentVariable() { Name = "TTNX_DB_SERVER", Value = $"{dbEndpointHost}:{dbPort}" },
                 new ContainerAppEnvironmentVariable() { Name = "TTNX_DB_USER", Value = dbUserFixed },
                 new ContainerAppEnvironmentVariable() { Name = "TTNX_DB_PASSWORD", Value = opts.DbPassword },
                 new ContainerAppEnvironmentVariable() { Name = "TTNX_DB_NAME", Value = opts.DbName },
                 new ContainerAppEnvironmentVariable() { Name = "TTNX_DB_PORT", Value = dbPort.ToString() },
+                // Optional: DB オプション（Functions では空）
+                new ContainerAppEnvironmentVariable() { Name = "TTNX_DB_OPTIONS", Value = string.Empty },
                 new ContainerAppEnvironmentVariable() { Name = "TTNX_REDIS_GLOBALCACHE", Value = $"{redisEndpointHost}:6379" },
                 new ContainerAppEnvironmentVariable() { Name = "TTNX_REDIS_HANGFIRE", Value = $"{redisEndpointHost}:6379" },
                 new ContainerAppEnvironmentVariable() { Name = "TTNX_REDIS_BACKGROUNDJOB", Value = $"{redisEndpointHost}:6379" },

@@ -58,12 +58,14 @@ var ttTag           = GetOpt("--tt-tag", "7.0-linux-postgres");
 var dryRun          = GetBool("--dry-run");
 var verbose         = GetBool("--verbose");
 var authMode        = GetOpt("--auth-mode", "default");
-var ttCpu           = GetDouble("--tt-cpu", 0.5);
-var ttMem           = GetDouble("--tt-memory", 1.0);
-var dbCpu           = GetDouble("--db-cpu", 0.5);
-var dbMem           = GetDouble("--db-memory", 1.0);
-var redisCpu        = GetDouble("--redis-cpu", 0.25);
-var redisMem        = GetDouble("--redis-memory", 0.5);
+
+// デフォルト CPU/メモリは要件値に合わせる（未指定時のみ適用）
+var ttCpu           = GetDouble("--tt-cpu", 0.75);
+var ttMem           = GetDouble("--tt-memory", 1.5);
+var dbCpu           = GetDouble("--db-cpu", 1.0);
+var dbMem           = GetDouble("--db-memory", 2.0);
+var redisCpu        = GetDouble("--redis-cpu", 0.5);
+var redisMem        = GetDouble("--redis-memory", 1.0);
 
 var appNameError = AppNameValidator.GetError(normalizedAppName);
 if (appNameError != null)
