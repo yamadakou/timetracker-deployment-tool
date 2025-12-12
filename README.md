@@ -363,10 +363,10 @@ az provider show --namespace Microsoft.OperationalInsights --query "registration
 - `--dry-run` (任意): true の場合、Azure 反映せず `docker-compose.yml` と `.env` の生成のみ
 - `--auth-mode` (任意): 認証モード。`default` | `azure-cli` | `sp-env` | `device-code` | `managed-identity`（デフォルト: `default`）
 - コンテナスペック（任意）:
-  - Timetracker: `--tt-cpu`（vCPU、小数可。例: `0.5`）、`--tt-memory`（Gi。例: `1.0`）
+  - Timetracker: `--tt-cpu`（vCPU、小数可。例: `0.75`）、`--tt-memory`（Gi。例: `1.5`）
   - DB: `--db-cpu`、`--db-memory`
   - Redis: `--redis-cpu`、`--redis-memory`
-  - 省略時のデフォルト: Timetracker CPU=0.5 / Mem=1.0Gi、DB CPU=0.5 / Mem=1.0Gi、Redis CPU=0.25 / Mem=0.5Gi
+  - 省略時のデフォルト: Timetracker CPU=0.75 / Mem=1.5Gi、DB CPU=1.0 / Mem=2.0Gi、Redis CPU=0.5 / Mem=1.0Gi
 
 補足:
 - DB ユーザは DockerHub の「クイックスタート」記載の固定値を使用します（CLI からは変更不可）。
