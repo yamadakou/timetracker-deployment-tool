@@ -369,6 +369,9 @@ az provider show --namespace Microsoft.OperationalInsights --query "registration
   - DB: `--db-cpu`、`--db-memory`
   - Redis: `--redis-cpu`、`--redis-memory`
   - 省略時のデフォルト: Timetracker CPU=0.75 / Mem=1.5Gi、DB CPU=1.0 / Mem=2.0Gi、Redis CPU=0.5 / Mem=1.0Gi
+  - vCPUとメモリの組み合わせとなりますので、指定値は以下のＭＳドキュメントを参考にしてください。
+    - https://learn.microsoft.com/ja-jp/azure/container-apps/containers#allocations
+
 
 補足:
 - DB ユーザは DockerHub の「クイックスタート」記載の固定値を使用します（CLI からは変更不可）。
