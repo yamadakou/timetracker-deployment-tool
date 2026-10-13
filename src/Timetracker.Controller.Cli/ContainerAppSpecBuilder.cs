@@ -54,7 +54,7 @@ public static class ContainerAppSpecBuilder
                 {
                     Env("POSTGRES_USER", GetDbUser(opts)),
                     SecretEnv("POSTGRES_PASSWORD", DbPasswordSecretName),
-                    Env("POSTGRES_DB", opts.DbName),
+                    // POSTGRES_DB で DB を事前作成しない（サンプルDB作成が失敗するため。DB は Timetracker のセットアップで作成される）
                 },
                 Resources = new AppContainerResources()
                 {

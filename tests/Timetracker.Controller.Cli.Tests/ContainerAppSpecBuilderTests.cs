@@ -131,4 +131,12 @@ public class ContainerAppSpecBuilderTests
         env["TTNX_DB_SERVER"].Value.Should().Be("app-db");
         env["TTNX_DB_PORT"].Value.Should().Be(port);
     }
+
+    [Fact]
+    public void Postgres_DbApp_Should_Not_PreCreate_Database()
+    {
+        // compose と同様、DB は Timetracker のセットアップで作成させる（サンプルDB作成の失敗を防ぐ）
+        ContainerAppSpecBuilder.BuildDbApp(CreateOptions("postgresql"), "japaneast", EnvId)
+            .Template.Containers[0].Env.Select(e => e.Name).Should().NotContain("POSTGRES_DB");
+    }
 }

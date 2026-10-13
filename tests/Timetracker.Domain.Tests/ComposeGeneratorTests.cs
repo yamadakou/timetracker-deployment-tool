@@ -179,5 +179,19 @@ namespace Timetracker.Domain.Tests
                 ((YamlMappingNode)services[dep]).Children.Keys.Select(k => ((YamlScalarNode)k).Value).Should().Contain("healthcheck");
             }
         }
+    
+        [Fact]
+        public void GenerateCompose_Postgres_Should_Not_PreCreate_Database()
+        {
+            // POSTGRES_DB で DB を事前作成すると、Timetracker のサンプルDB作成時にアプリが対象DBへの接続を保持したまま
+            // DB を削除・復元しようとして失敗する（Exception while writing to stream）。DB はアプリのセットアップで作成させる。
+            var composeYml = ComposeGenerator.GenerateCompose(CreateOptions("postgresql"));
+            EnvironmentOf(composeYml, "db").Should().NotContainKey("POSTGRES_DB");
+
+            var services = (YamlMappingNode)ParseCompose(composeYml)["services"];
+            var test = string.Join(" ", ((YamlSequenceNode)((YamlMappingNode)((YamlMappingNode)services["db"])["healthcheck"])["test"])
+                .Select(n => ((YamlScalarNode)n).Value));
+            test.Should().Contain("-d postgres"); // 未作成の対象DBではなく既定DBで疎通確認する
+        }
     }
 }

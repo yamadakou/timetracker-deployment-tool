@@ -352,7 +352,8 @@ az provider show --namespace Microsoft.OperationalInsights --query "registration
    ```
 
 3. **動作確認**
-   - ブラウザで `http://localhost:8080` にアクセス
+   - ブラウザで `http://localhost:8080` にアクセスし、セットアップウィザードでライセンスキーを入力して DB を作成します（「空のデータベース」または「サンプルデータベース」）
+   - DB（PostgreSQL のデータベース）はセットアップウィザードが作成します。ツールは事前に作成しません
 
 ### コマンドパラメータの説明一覧
 - `--subscription` (必須): Azure サブスクリプション ID

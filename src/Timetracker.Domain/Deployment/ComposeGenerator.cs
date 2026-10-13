@@ -54,12 +54,14 @@ public static class ComposeGenerator
             sb.AppendLine("    environment:");
             sb.AppendLine("      POSTGRES_USER: \"${DB_USER}\"");
             sb.AppendLine("      POSTGRES_PASSWORD: \"${DB_PASSWORD}\"");
-            sb.AppendLine("      POSTGRES_DB: \"${DB_NAME}\"");
+            // POSTGRES_DB で DB を事前作成しない。事前作成すると、サンプルDB作成時にアプリが対象DBへの接続を
+            // 保持したまま DB を削除・復元しようとして失敗する。DB は Timetracker のセットアップで作成される。
             sb.AppendLine("    volumes:");
             sb.AppendLine("      - pgdata:/var/lib/postgresql/data");
-            // 初期化中の一時サーバーは TCP を待ち受けないため、-h 127.0.0.1 で本起動を判定する
+            // 初期化中の一時サーバーは TCP を待ち受けないため、-h 127.0.0.1 で本起動を判定する。
+            // 対象DB はセットアップまで存在しないため、既定の postgres DB で確認する
             sb.AppendLine("    healthcheck:");
-            sb.AppendLine("      test: [\"CMD-SHELL\", \"pg_isready -h 127.0.0.1 -U ${DB_USER} -d ${DB_NAME}\"]");
+            sb.AppendLine("      test: [\"CMD-SHELL\", \"pg_isready -h 127.0.0.1 -U ${DB_USER} -d postgres\"]");
             sb.AppendLine("      interval: 5s");
             sb.AppendLine("      timeout: 5s");
             sb.AppendLine("      retries: 20");
