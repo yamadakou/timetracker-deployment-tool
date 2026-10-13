@@ -30,7 +30,7 @@ Timetracker（DockerHub の `densocreate/timetracker` イメージ）を、選�
 |---|---|
 | DB データは永続化されない | DB はボリュームを持たないコンテナとして動作します。DB コンテナが再起動すると（ツールの再実行による設定変更、リビジョン更新、Azure 基盤のメンテナンス等）、**DB のデータは失われます**。既存の DB アプリがある状態で再実行すると、ツールは警告を表示します。残したいデータは事前にエクスポートしてください。 |
 | SQL Server は Developer エディション | `--db-type sqlserver` の場合、SQL Server は `MSSQL_PID=Developer` で起動します。Developer エディションは開発・テスト用途に限られ、本番環境では使用できません。 |
-| SQL Server ＋ Azure ではサンプル DB を作成できない | SQL Server の復元処理は DB コンテナ側のファイルを読むため、Azure Container Apps ではアプリコンテナ内のサンプル DB を参照できません。セットアップウィザードでは「空のデータベースを作成する」を選択してください。PostgreSQL、および Dry-run で生成する docker-compose（ローカル検証）では、サンプル DB を作成できます。 |
+| SQL Server ＋ Azure ではサンプル DB を作成できない | サンプル DB を利用する場合は、PostgreSQL（`--db-type` の既定値）を使用してください。SQL Server を使用する場合は、セットアップウィザードで「空のデータベースを作成する」を選択して評価してください（SQL Server の復元処理は DB コンテナ側のファイルを読むため、Azure Container Apps ではアプリコンテナ内のサンプル DB を参照できません。なお、Dry-run で生成する docker-compose によるローカル検証では、SQL Server でもサンプル DB を作成できます）。 |
 | スケールは 1 台固定 | 各コンテナとも 1 台で動作し、冗長化・スケールアウトは行いません。 |
 | 機密情報の取り扱い | Dry-run で生成する `.env` には DB パスワード等が平文で出力されます。共有やリポジトリへのコミットは避けてください。Azure 上ではパスワードを Container Apps の secret として登録します。 |
 | 不要になった環境の削除 | 検証が終わったら、リソースグループごと削除すると課金を止められます（例: `az group delete --name <リソースグループ名>`）。既存のリソースグループを指定した場合は、他のリソースを巻き込まないようご注意ください。 |
@@ -379,7 +379,7 @@ az provider show --namespace Microsoft.OperationalInsights --query "registration
 - `--location` (任意): リージョン（省略時は `japaneast`）
 - `--app-name` (任意): アプリ名（省略時は `timetracker`）。Azure Container Apps の命名規則に従う必要があります（後述の注意事項参照）。
 - `--db-type` (任意): DB 種別。`postgresql` または `sqlserver`（デフォルト: `postgresql`）
-  - `sqlserver` の場合は Developer エディションで起動し、Azure 上ではサンプル DB を作成できません（[本ツールの目的と注意事項](#本ツールの目的と注意事項) を参照）
+  - サンプル DB を利用する場合は `postgresql`（既定値）を使用してください。`sqlserver` の場合は Developer エディションで起動し、Azure 上では空のデータベースを作成して評価します（[本ツールの目的と注意事項](#本ツールの目的と注意事項) を参照）
 - `--db-password` (必須): DB パスワード（DB 種別に関わらず統一パラメータ。8 文字以上。`sqlserver` の場合は英大文字・英小文字・数字・記号のうち 3 種類以上を含む必要があります）
 - `--db-name` (任意): DB 名。デフォルト `timetracker`
 - `--tracker-password` (必須): Timetracker アプリパスワード（DockerHub の `<your password>` に対応）
