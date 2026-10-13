@@ -85,15 +85,36 @@ public class AzureSdkExecutorTests
         return (arm, envs);
     }
 
+    private static Mock<ContainerAppManagedEnvironmentResource> ExistingEnvironment(string location)
+    {
+        var env = new Mock<ContainerAppManagedEnvironmentResource>();
+        env.SetupGet(e => e.HasData).Returns(true);
+        env.SetupGet(e => e.Data).Returns(new ContainerAppManagedEnvironmentData(new AzureLocation(location)));
+        return env;
+    }
+
+    [Fact]
+    public async Task EnsureContainerAppEnv_Should_Fail_When_Existing_Environment_Is_In_Other_Region()
+    {
+        // Container App は Environment と同じリージョンに作成する必要があるため、異なる場合は明確なエラーで止める
+        var (arm, envs) = SetupEnvironments();
+        envs.Setup(c => c.GetIfExistsAsync("app-env", It.IsAny<CancellationToken>())).ReturnsAsync(Found(ExistingEnvironment("eastus").Object));
+
+        var sut = new AzureSdkExecutor(new SimpleLogger(false), arm.Object);
+        var act = () => sut.EnsureContainerAppEnvAsync(SubscriptionId, RgName, "app-env", "japaneast");
+
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*app-env*eastus*japaneast*");
+    }
+
     [Fact]
     public async Task EnsureContainerAppEnv_Should_Reuse_Existing_Environment()
     {
         var (arm, envs) = SetupEnvironments();
-        var existing = new Mock<ContainerAppManagedEnvironmentResource>();
+        var existing = ExistingEnvironment("japaneast");
         envs.Setup(c => c.GetIfExistsAsync("app-env", It.IsAny<CancellationToken>())).ReturnsAsync(Found(existing.Object));
 
         var sut = new AzureSdkExecutor(new SimpleLogger(false), arm.Object);
-        var result = await sut.EnsureContainerAppEnvAsync(SubscriptionId, RgName, "app-env", "japaneast");
+        var result = await sut.EnsureContainerAppEnvAsync(SubscriptionId, RgName, "app-env", "JapanEast");
 
         result.Should().BeSameAs(existing.Object);
         envs.Verify(c => c.CreateOrUpdateAsync(It.IsAny<WaitUntil>(), It.IsAny<string>(), It.IsAny<ContainerAppManagedEnvironmentData>(), It.IsAny<CancellationToken>()), Times.Never);

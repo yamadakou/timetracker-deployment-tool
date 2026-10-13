@@ -125,6 +125,11 @@ public static class ComposeGenerator
         return sb.ToString();
     }
 
+    // docker compose は .env のクォート無しの値に含まれる $VAR を展開するため、
+    // ダブルクォートで囲み \ " $ をエスケープして値をそのまま渡す
+    private static string EnvValue(string value) =>
+        "\"" + value.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("$", "\\$") + "\"";
+
     public static string GenerateEnv(DeployOptions o)
     {
         var dbPort = o.DbType == "postgresql" ? 5432 : 1433;
@@ -132,12 +137,12 @@ public static class ComposeGenerator
 
         var lines = new List<string>
         {
-            $"TTNX_DB_TYPE={o.DbType}",
-            $"DB_PORT={dbPort}",
-            $"DB_USER={dbUserFixed}",
-            $"DB_PASSWORD={o.DbPassword}",
-            $"DB_NAME={o.DbName}",
-            $"TIMETRACKER_PASSWORD={o.TrackerPassword}"
+            $"TTNX_DB_TYPE={EnvValue(o.DbType)}",
+            $"DB_PORT={EnvValue(dbPort.ToString())}",
+            $"DB_USER={EnvValue(dbUserFixed)}",
+            $"DB_PASSWORD={EnvValue(o.DbPassword)}",
+            $"DB_NAME={EnvValue(o.DbName)}",
+            $"TIMETRACKER_PASSWORD={EnvValue(o.TrackerPassword)}"
         };
 
         return string.Join(Environment.NewLine, lines) + Environment.NewLine;

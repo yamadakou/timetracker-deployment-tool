@@ -56,6 +56,14 @@ public class AzureSdkExecutor
         var existing = await envCollection.GetIfExistsAsync(envName);
         if (existing.HasValue)
         {
+            // Container App は Environment と同じリージョンに作成する必要があるため、異なる場合は作成前に止める
+            var envLocation = existing.Value!.Data.Location;
+            if (envLocation != new AzureLocation(location))
+            {
+                throw new InvalidOperationException(
+                    $"既存の Container Apps Environment '{envName}' のリージョン ({envLocation}) が --location ({location}) と異なります。" +
+                    $"--location {envLocation.Name} を指定するか、別の --app-name を指定してください。");
+            }
             _logger.Info($"既存の Container Apps Environment を使用: {envName}");
             return existing.Value!;
         }

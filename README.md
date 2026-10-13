@@ -28,7 +28,7 @@ Timetracker（DockerHub の `densocreate/timetracker` イメージ）を、選�
 
 | 項目 | 内容 |
 |---|---|
-| DB データは永続化されない | DB はボリュームを持たないコンテナとして動作します。DB コンテナが再起動すると（ツールの再実行による設定変更、リビジョン更新、Azure 基盤のメンテナンス等）、**DB のデータは失われます**。既存の DB アプリがある状態で再実行すると、ツールは警告を表示します。残したいデータは事前にエクスポートしてください。 |
+| Azure 上の DB データは永続化されない | Azure Container Apps では、DB はボリュームを持たないコンテナとして動作します。DB コンテナが再起動すると（ツールの再実行による設定変更、リビジョン更新、Azure 基盤のメンテナンス等）、**DB のデータは失われます**。既存の DB アプリがある状態で再実行すると、ツールは警告を表示します。残したいデータは事前にエクスポートしてください。なお、Dry-run で生成する docker-compose（ローカル検証）は名前付きボリュームを使用するため、コンテナを再起動してもデータは保持されます（`docker compose down -v` でボリュームごと削除されます）。 |
 | SQL Server は Developer エディション | `--db-type sqlserver` の場合、SQL Server は `MSSQL_PID=Developer` で起動します。Developer エディションは開発・テスト用途に限られ、本番環境では使用できません。 |
 | SQL Server ＋ Azure ではサンプル DB を作成できない | サンプル DB を利用する場合は、PostgreSQL（`--db-type` の既定値）を使用してください。SQL Server を使用する場合は、セットアップウィザードで「空のデータベースを作成する」を選択して評価してください（SQL Server の復元処理は DB コンテナ側のファイルを読むため、Azure Container Apps ではアプリコンテナ内のサンプル DB を参照できません。なお、Dry-run で生成する docker-compose によるローカル検証では、SQL Server でもサンプル DB を作成できます）。 |
 | スケールは 1 台固定 | 各コンテナとも 1 台で動作し、冗長化・スケールアウトは行いません。 |
@@ -61,7 +61,7 @@ Timetracker（DockerHub の `densocreate/timetracker` イメージ）を、選�
 - DB および Redis は **コンテナ** として Container Apps 内で実行されます
 - Azure Database for PostgreSQL、Azure SQL Database などの PaaS データベースリソースは作成されません
 - Log Analytics ワークスペースは自動作成されません（Container Apps Environment が必要に応じて作成する場合があります）
-- DB のデータは永続化されません（[本ツールの目的と注意事項](#本ツールの目的と注意事項) を参照）
+- Azure 上の DB のデータは永続化されません（[本ツールの目的と注意事項](#本ツールの目的と注意事項) を参照）
 
 ### 必要な RBAC ロールと権限
 
@@ -448,7 +448,7 @@ timetracker-cli.exe deploy `
   A: いいえ。本ツールは DB を **コンテナ** として Container Apps にデプロイします。PaaS データベースリソースは作成されません。
 
 - **Q: データの永続化はどうなりますか？**  
-  A: 永続化されません。本ツールは検証環境の構築が目的のため、DB はコンテナのエフェメラルストレージで動作し、コンテナの再起動でデータが失われます。
+  A: Azure 上では永続化されません。本ツールは検証環境の構築が目的のため、Azure Container Apps の DB はコンテナのエフェメラルストレージで動作し、コンテナの再起動でデータが失われます。Dry-run で生成する docker-compose（ローカル検証）は名前付きボリュームを使用するため、コンテナを再起動してもデータは保持されます。
 
 #### リソースとスケーリング
 
@@ -524,7 +524,7 @@ dotnet publish .\src\Timetracker.Controller.Cli\Timetracker.Controller.Cli.cspro
 - timetracker のイメージタグは `--tt-tag` で指定した値を使用（省略時は DB 種別に応じて `7.0-linux-postgres` / `7.0-linux-mssql`）
 
 ### 注意点
-- 本ツールは検証環境の構築支援が目的のため、DB/Redis の永続ボリュームは設定していません（[本ツールの目的と注意事項](#本ツールの目的と注意事項) を参照）。
+- 本ツールは検証環境の構築支援が目的のため、Azure Container Apps の DB/Redis には永続ボリュームを設定していません（Dry-run の docker-compose は名前付きボリュームを使用）（[本ツールの目的と注意事項](#本ツールの目的と注意事項) を参照）。
 - DB パスワード・Timetracker アプリパスワードは Container Apps の secret（`db-password` / `app-password`）として登録し、環境変数からは `secretRef` で参照します（ポータル上の環境変数一覧に平文で表示されません）。
 - 認証は Managed Identity もしくは Service Principal を推奨（DefaultAzureCredential 利用）。
 - DockerHub「クイックスタート」記載の固定 DB ユーザ名は Domain 層の Defaults に集約しています（必要に応じて正確値に更新）。

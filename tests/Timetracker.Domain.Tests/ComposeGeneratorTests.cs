@@ -70,7 +70,7 @@ namespace Timetracker.Domain.Tests
             var env = ComposeGenerator.GenerateEnv(options);
 
             // Assert
-            env.Should().Contain("TTNX_DB_TYPE=postgresql");
+            env.Should().Contain("TTNX_DB_TYPE=\"postgresql\"");
         }
 
         [Fact]
@@ -91,7 +91,7 @@ namespace Timetracker.Domain.Tests
             var env = ComposeGenerator.GenerateEnv(options);
 
             // Assert
-            env.Should().Contain("TTNX_DB_TYPE=sqlserver");
+            env.Should().Contain("TTNX_DB_TYPE=\"sqlserver\"");
         }
 
         private static DeployOptions CreateOptions(string dbType) => new()
@@ -218,6 +218,22 @@ namespace Timetracker.Domain.Tests
         {
             // PostgreSQL はアプリが SQL を接続経由で送るため共有不要
             ComposeGenerator.GenerateCompose(CreateOptions("postgresql")).Should().NotContain("ttsample");
+        }
+    
+        [Fact]
+        public void GenerateEnv_Should_Quote_Values_So_Special_Characters_Are_Preserved()
+        {
+            // docker compose は .env のクォート無しの値に含まれる $VAR を展開してしまうため、
+            // ダブルクォートで囲み \ " $ をエスケープする（docker compose config で復元を確認済みの形式）
+            var options = CreateOptions("postgresql");
+            options.DbPassword = "Pa$HOME\\x\"y'z";
+            options.TrackerPassword = "Tr@ck$1#";
+
+            var env = ComposeGenerator.GenerateEnv(options);
+
+            env.Should().Contain("DB_PASSWORD=\"Pa\\$HOME\\\\x\\\"y'z\"");
+            env.Should().Contain("TIMETRACKER_PASSWORD=\"Tr@ck\\$1#\"");
+            env.Should().Contain("DB_NAME=\"timetracker\"");
         }
     }
 }
