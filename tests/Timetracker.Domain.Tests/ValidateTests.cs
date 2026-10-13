@@ -51,4 +51,44 @@ public class ValidateTests
         var act = () => ComposeGenerator.Validate(CreateOptions("postgresql", "password"));
         act.Should().NotThrow();
     }
+
+    [Fact]
+    public void Valid_Options_Should_Pass()
+    {
+        var act = () => ComposeGenerator.Validate(CreateOptions());
+        act.Should().NotThrow();
+    }
+
+    public static IEnumerable<object[]> InvalidCases()
+    {
+        yield return new object[] { (Action<DeployOptions>)(o => o.DbType = "mysql"), "*db-type*" };
+        yield return new object[] { (Action<DeployOptions>)(o => o.DbType = "PostgreSQL"), "*db-type*" };
+        yield return new object[] { (Action<DeployOptions>)(o => o.Subscription = " "), "*subscription*" };
+        yield return new object[] { (Action<DeployOptions>)(o => o.ResourceGroup = ""), "*resource-group*" };
+        yield return new object[] { (Action<DeployOptions>)(o => o.TrackerPassword = "short"), "*tracker-password*" };
+        yield return new object[] { (Action<DeployOptions>)(o => o.DbPassword = "short"), "*db-password*" };
+        yield return new object[] { (Action<DeployOptions>)(o => o.TimetrackerTag = ""), "*tt-tag*" };
+        yield return new object[] { (Action<DeployOptions>)(o => o.TimetrackerTag = "7.0-linux-mssql"), "*不適切な組み合わせ*" };
+    }
+
+    [Theory]
+    [MemberData(nameof(InvalidCases))]
+    public void Invalid_Options_Should_Throw(Action<DeployOptions> mutate, string expectedMessage)
+    {
+        var o = CreateOptions();
+        mutate(o);
+        var act = () => ComposeGenerator.Validate(o);
+        act.Should().Throw<ArgumentException>().WithMessage(expectedMessage);
+    }
+
+    [Theory]
+    [InlineData("sqlserver", "7.0-linux-postgres")]
+    [InlineData("postgresql", "7.0-linux-sqlserver")]
+    public void Mismatched_DbType_And_Tag_Should_Throw(string dbType, string tag)
+    {
+        var o = CreateOptions(dbType);
+        o.TimetrackerTag = tag;
+        var act = () => ComposeGenerator.Validate(o);
+        act.Should().Throw<ArgumentException>().WithMessage("*不適切な組み合わせ*");
+    }
 }
