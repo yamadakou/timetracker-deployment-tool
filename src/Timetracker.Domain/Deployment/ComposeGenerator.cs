@@ -13,9 +13,12 @@ public static class ComposeGenerator
         sb.AppendLine("  timetracker:");
         sb.AppendLine($"    image: {ttImage}");
         sb.AppendLine("    container_name: timetracker-app");
+        // DB/Redis が接続可能になってから起動する（起動直後の接続失敗による再起動を防ぐ）
         sb.AppendLine("    depends_on:");
-        sb.AppendLine("      - db");
-        sb.AppendLine("      - redis");
+        sb.AppendLine("      db:");
+        sb.AppendLine("        condition: service_healthy");
+        sb.AppendLine("      redis:");
+        sb.AppendLine("        condition: service_healthy");
         sb.AppendLine("    ports:");
         sb.AppendLine("      - \"8080:8080\"");
         sb.AppendLine("    environment:");
@@ -54,6 +57,12 @@ public static class ComposeGenerator
             sb.AppendLine("      POSTGRES_DB: \"${DB_NAME}\"");
             sb.AppendLine("    volumes:");
             sb.AppendLine("      - pgdata:/var/lib/postgresql/data");
+            // 初期化中の一時サーバーは TCP を待ち受けないため、-h 127.0.0.1 で本起動を判定する
+            sb.AppendLine("    healthcheck:");
+            sb.AppendLine("      test: [\"CMD-SHELL\", \"pg_isready -h 127.0.0.1 -U ${DB_USER} -d ${DB_NAME}\"]");
+            sb.AppendLine("      interval: 5s");
+            sb.AppendLine("      timeout: 5s");
+            sb.AppendLine("      retries: 20");
             sb.AppendLine("    restart: unless-stopped");
         }
         else
@@ -67,6 +76,12 @@ public static class ComposeGenerator
             sb.AppendLine("      MSSQL_SA_PASSWORD: \"${DB_PASSWORD}\"");
             sb.AppendLine("    volumes:");
             sb.AppendLine("      - mssqldata:/var/opt/mssql");
+            sb.AppendLine("    healthcheck:");
+            sb.AppendLine("      test: [\"CMD-SHELL\", \"/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \\\"$$MSSQL_SA_PASSWORD\\\" -Q \\\"SELECT 1\\\" -b -o /dev/null\"]");
+            sb.AppendLine("      interval: 5s");
+            sb.AppendLine("      timeout: 5s");
+            sb.AppendLine("      retries: 30");
+            sb.AppendLine("      start_period: 10s");
             sb.AppendLine("    restart: unless-stopped");
         }
 
@@ -76,6 +91,11 @@ public static class ComposeGenerator
         sb.AppendLine("    command: [\"redis-server\", \"--appendonly\", \"yes\"]");
         sb.AppendLine("    volumes:");
         sb.AppendLine("      - redisdata:/data");
+        sb.AppendLine("    healthcheck:");
+        sb.AppendLine("      test: [\"CMD\", \"redis-cli\", \"ping\"]");
+        sb.AppendLine("      interval: 5s");
+        sb.AppendLine("      timeout: 5s");
+        sb.AppendLine("      retries: 20");
         sb.AppendLine("    restart: unless-stopped");
 
         sb.AppendLine();

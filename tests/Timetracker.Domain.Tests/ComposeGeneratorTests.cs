@@ -164,5 +164,20 @@ namespace Timetracker.Domain.Tests
             tt["TTNX_DB_SERVER"].Should().Be("db");
             tt["TTNX_DB_PORT"].Should().Be("${DB_PORT}");
         }
+    
+        [Theory]
+        [InlineData("postgresql")]
+        [InlineData("sqlserver")]
+        public void GenerateCompose_Timetracker_Should_Wait_For_Healthy_Db_And_Redis(string dbType)
+        {
+            // DB の起動完了前にアプリが接続して終了・再起動するのを防ぐ
+            var services = (YamlMappingNode)ParseCompose(ComposeGenerator.GenerateCompose(CreateOptions(dbType)))["services"];
+            var dependsOn = (YamlMappingNode)((YamlMappingNode)services["timetracker"])["depends_on"];
+            foreach (var dep in new[] { "db", "redis" })
+            {
+                ((YamlScalarNode)((YamlMappingNode)dependsOn[dep])["condition"]).Value.Should().Be("service_healthy");
+                ((YamlMappingNode)services[dep]).Children.Keys.Select(k => ((YamlScalarNode)k).Value).Should().Contain("healthcheck");
+            }
+        }
     }
 }
