@@ -4,6 +4,10 @@ namespace Timetracker.Domain.Deployment;
 
 public static class ComposeGenerator
 {
+    // timetracker イメージ内のサンプルDBバックアップの格納先と、SQL Server と共有するためのボリューム名
+    private const string SampleDir = "/usr/local/timetracker/sample";
+    private const string SampleVolume = "ttsample";
+
     public static string GenerateCompose(DeployOptions o)
     {
         var ttImage = ContainerImages.Timetracker(o.TimetrackerTag);
@@ -44,6 +48,13 @@ public static class ComposeGenerator
         sb.AppendLine("      REDIS_HOST: \"redis\"");
         sb.AppendLine("      REDIS_PORT: \"6379\"");
         sb.AppendLine("      APP_PASSWORD: \"${TIMETRACKER_PASSWORD}\"  # <your password>");
+        if (o.DbType == "sqlserver")
+        {
+            // SQL Server の RESTORE は DB サーバー側のファイルを読むため、サンプルDBのバックアップを
+            // 名前付きボリュームで SQL Server コンテナと共有する（空のボリュームにはイメージ内のファイルがコピーされる）
+            sb.AppendLine("    volumes:");
+            sb.AppendLine($"      - {SampleVolume}:{SampleDir}");
+        }
         sb.AppendLine("    restart: unless-stopped");
 
         if (o.DbType == "postgresql")
@@ -78,6 +89,7 @@ public static class ComposeGenerator
             sb.AppendLine("      MSSQL_SA_PASSWORD: \"${DB_PASSWORD}\"");
             sb.AppendLine("    volumes:");
             sb.AppendLine("      - mssqldata:/var/opt/mssql");
+            sb.AppendLine($"      - {SampleVolume}:{SampleDir}:ro");
             sb.AppendLine("    healthcheck:");
             sb.AppendLine("      test: [\"CMD-SHELL\", \"/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \\\"$$MSSQL_SA_PASSWORD\\\" -Q \\\"SELECT 1\\\" -b -o /dev/null\"]");
             sb.AppendLine("      interval: 5s");
@@ -103,7 +115,11 @@ public static class ComposeGenerator
         sb.AppendLine();
         sb.AppendLine("volumes:");
         if (o.DbType == "postgresql") sb.AppendLine("  pgdata:");
-        else sb.AppendLine("  mssqldata:");
+        else
+        {
+            sb.AppendLine("  mssqldata:");
+            sb.AppendLine($"  {SampleVolume}:");
+        }
         sb.AppendLine("  redisdata:");
 
         return sb.ToString();

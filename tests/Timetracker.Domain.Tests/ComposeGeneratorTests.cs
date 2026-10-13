@@ -193,5 +193,31 @@ namespace Timetracker.Domain.Tests
                 .Select(n => ((YamlScalarNode)n).Value));
             test.Should().Contain("-d postgres"); // 未作成の対象DBではなく既定DBで疎通確認する
         }
+    
+        private static List<string> VolumesOf(string composeYml, string service)
+        {
+            var svc = (YamlMappingNode)((YamlMappingNode)ParseCompose(composeYml)["services"])[service];
+            return ((YamlSequenceNode)svc["volumes"]).Select(n => ((YamlScalarNode)n).Value!).ToList();
+        }
+
+        [Fact]
+        public void GenerateCompose_SqlServer_Should_Share_Sample_Backup_With_Db_Container()
+        {
+            // SQL Server の RESTORE は DB サーバー側のファイルを読むため、アプリイメージ内のサンプルバックアップを
+            // 同じパスで SQL Server コンテナからも参照できるようにする
+            var composeYml = ComposeGenerator.GenerateCompose(CreateOptions("sqlserver"));
+
+            VolumesOf(composeYml, "timetracker").Should().Contain("ttsample:/usr/local/timetracker/sample");
+            VolumesOf(composeYml, "db").Should().Contain("ttsample:/usr/local/timetracker/sample:ro");
+            ((YamlMappingNode)ParseCompose(composeYml)["volumes"]).Children.Keys
+                .Select(k => ((YamlScalarNode)k).Value).Should().Contain("ttsample");
+        }
+
+        [Fact]
+        public void GenerateCompose_Postgres_Should_Not_Need_Sample_Volume()
+        {
+            // PostgreSQL はアプリが SQL を接続経由で送るため共有不要
+            ComposeGenerator.GenerateCompose(CreateOptions("postgresql")).Should().NotContain("ttsample");
+        }
     }
 }

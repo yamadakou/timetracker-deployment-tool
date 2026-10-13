@@ -354,6 +354,7 @@ az provider show --namespace Microsoft.OperationalInsights --query "registration
 3. **動作確認**
    - ブラウザで `http://localhost:8080` にアクセスし、セットアップウィザードでライセンスキーを入力して DB を作成します（「空のデータベース」または「サンプルデータベース」）
    - DB（PostgreSQL のデータベース）はセットアップウィザードが作成します。ツールは事前に作成しません
+   - SQL Server でサンプルデータベースを作成する場合、SQL Server がアプリイメージ内のバックアップファイルを読めるよう、生成される compose では共有ボリューム `ttsample` を両コンテナにマウントしています
 
 ### コマンドパラメータの説明一覧
 - `--subscription` (必須): Azure サブスクリプション ID
@@ -361,6 +362,7 @@ az provider show --namespace Microsoft.OperationalInsights --query "registration
 - `--location` (任意): リージョン（省略時は `japaneast`）
 - `--app-name` (任意): アプリ名（省略時は `timetracker`）。Azure Container Apps の命名規則に従う必要があります（後述の注意事項参照）。
 - `--db-type` (任意): DB 種別。`postgresql` または `sqlserver`（デフォルト: `postgresql`）
+  - `sqlserver` の場合、Azure Container Apps へのデプロイでは **サンプルデータベースの作成は利用できません**（SQL Server の復元は DB コンテナ側のファイルを読むため、アプリコンテナ内のバックアップファイルを参照できません）。「空のデータベースを作成する」を選択してください
   - `sqlserver` の場合、SQL Server は **Developer エディション**（`MSSQL_PID=Developer`）で起動します。Developer エディションは開発・テスト用途に限られ、本番環境では使用できません。本番利用する場合はライセンスに合ったエディションを別途ご検討ください。
 - `--db-password` (必須): DB パスワード（DB 種別に関わらず統一パラメータ。8 文字以上。`sqlserver` の場合は英大文字・英小文字・数字・記号のうち 3 種類以上を含む必要があります）
 - `--db-name` (任意): DB 名。デフォルト `timetracker`
