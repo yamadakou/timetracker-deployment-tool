@@ -495,6 +495,7 @@ dotnet publish .\src\Timetracker.Controller.Cli\Timetracker.Controller.Cli.cspro
 
 ### 注意点
 - Container Apps の永続ボリュームが必要な場合は Azure Files 等の設定を追加してください（DB/Redis のデータ保持用途）。
+- DB パスワード・Timetracker アプリパスワードは Container Apps の secret（`db-password` / `app-password`）として登録し、環境変数からは `secretRef` で参照します（ポータル上の環境変数一覧に平文で表示されません）。
 - 認証は Managed Identity もしくは Service Principal を推奨（DefaultAzureCredential 利用）。
 - DockerHub「クイックスタート」記載の固定 DB ユーザ名は Domain 層の Defaults に集約しています（必要に応じて正確値に更新）。
 
