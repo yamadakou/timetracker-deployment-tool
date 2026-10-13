@@ -53,9 +53,9 @@ public class CredentialFactoryTests
     }
 
     [Fact]
-    public void Create_SpEnv_Without_EnvVars_Should_Fallback_To_DefaultAzureCredential()
+    public void Create_SpEnv_Without_EnvVars_Should_Throw()
     {
-        // Clear env vars to ensure fallback
+        // sp-env を明示指定した場合は別の資格情報にフォールバックせず停止する
         var originalTenantId = Environment.GetEnvironmentVariable("AZURE_TENANT_ID");
         var originalClientId = Environment.GetEnvironmentVariable("AZURE_CLIENT_ID");
         var originalClientSecret = Environment.GetEnvironmentVariable("AZURE_CLIENT_SECRET");
@@ -67,8 +67,9 @@ public class CredentialFactoryTests
             Environment.SetEnvironmentVariable("AZURE_CLIENT_SECRET", null);
 
             var logger = new SimpleLogger(verbose: false);
-            var credential = CredentialFactory.Create("sp-env", logger);
-            credential.Should().BeOfType<DefaultAzureCredential>();
+            var action = () => CredentialFactory.Create("sp-env", logger);
+            action.Should().Throw<InvalidOperationException>()
+                .WithMessage("*AZURE_TENANT_ID*AZURE_CLIENT_ID*AZURE_CLIENT_SECRET*");
         }
         finally
         {

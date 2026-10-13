@@ -24,6 +24,35 @@ public class DefaultsTests
     }
 }
 
+public class DefaultTimetrackerTagTests
+{
+    [Theory]
+    [InlineData("postgresql", "7.0-linux-postgres")]
+    [InlineData("sqlserver", "7.0-linux-mssql")]
+    public void GetDefaultTimetrackerTag_Should_Match_DbType(string dbType, string expected)
+    {
+        Defaults.GetDefaultTimetrackerTag(dbType).Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData("postgresql")]
+    [InlineData("sqlserver")]
+    public void Default_Tag_Should_Pass_Validation_For_Each_DbType(string dbType)
+    {
+        var opts = new DeployOptions
+        {
+            Subscription = "sub",
+            ResourceGroup = "rg",
+            DbType = dbType,
+            DbPassword = "Passw0rd!x",
+            TrackerPassword = "Passw0rd!y",
+            TimetrackerTag = Defaults.GetDefaultTimetrackerTag(dbType),
+        };
+        var act = () => ComposeGenerator.Validate(opts);
+        act.Should().NotThrow();
+    }
+}
+
 public class DeployOptionsTests
 {
     [Fact]

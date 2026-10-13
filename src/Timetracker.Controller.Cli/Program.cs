@@ -1,38 +1,26 @@
 using Timetracker.Common;
 using Timetracker.Controller.Cli;
 using Timetracker.Domain.Deployment;
-using System.IO;
 
-// シンプルな手動パーサで System.CommandLine API 依存を排除 (CS1061 回避)
-var argsDict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-var boolFlags = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "--dry-run", "--verbose" };
-for (int i = 0; i < args.Length; i++)
+CliArgs cli;
+try
 {
-    var a = args[i];
-    if (!a.StartsWith("--")) continue;
-    if (boolFlags.Contains(a))
-    {
-        argsDict[a] = "true"; // フラグ形式
-        continue;
-    }
-    // 次が値か判定
-    if (i + 1 < args.Length && !args[i + 1].StartsWith("--"))
-    {
-        argsDict[a] = args[i + 1];
-        i++; // 値消費
-    }
-    else
-    {
-        // 値未指定 → 空文字
-        argsDict[a] = string.Empty;
-    }
+    cli = CliArgs.Parse(args);
+}
+catch (ArgumentException ex)
+{
+    Console.Error.WriteLine($"[ERROR] {ex.Message}");
+    return 1;
 }
 
-string GetOpt(string name, string defaultValue) =>
-    argsDict.TryGetValue(name, out var v) && !string.IsNullOrWhiteSpace(v) ? v : defaultValue;
-bool GetBool(string name) => argsDict.TryGetValue(name, out var v) && v.Equals("true", StringComparison.OrdinalIgnoreCase);
-double GetDouble(string name, double def)
-    => argsDict.TryGetValue(name, out var v) && double.TryParse(v, out var d) ? d : def;
+if (cli.IsHelp)
+{
+    Console.WriteLine(CliArgs.HelpText);
+    return 0;
+}
+
+string GetOpt(string name, string defaultValue) => cli.Get(name, defaultValue);
+bool GetBool(string name) => cli.GetBool(name);
 
 // 必須オプション取得 (subscription / resource-group / db-password / tracker-password)
 var subscription    = GetOpt("--subscription",  string.Empty);
@@ -45,7 +33,7 @@ if (string.IsNullOrWhiteSpace(subscription) ||
     string.IsNullOrWhiteSpace(dbPassword) ||
     string.IsNullOrWhiteSpace(trackerPassword))
 {
-    Console.Error.WriteLine("[ERROR] 必須パラメータ不足: --subscription --resource-group --db-password --tracker-password を指定してください。");
+    Console.Error.WriteLine("[ERROR] 必須パラメータ不足: --subscription --resource-group --db-password --tracker-password を指定してください。（--help で使い方を表示）");
     return 1;
 }
 
@@ -53,19 +41,28 @@ var location        = GetOpt("--location", Defaults.DefaultLocation);
 var rawAppName      = GetOpt("--app-name", Defaults.DefaultAppName);
 var normalizedAppName = rawAppName.ToLowerInvariant();
 var dbType          = GetOpt("--db-type", "postgresql");
-var dbName          = GetOpt("--db-name", "timetracker");
-var ttTag           = GetOpt("--tt-tag", "7.0-linux-postgres");
+var dbName          = GetOpt("--db-name", Defaults.DbName);
+var ttTag           = GetOpt("--tt-tag", Defaults.GetDefaultTimetrackerTag(dbType)); // 未指定時は DB 種別に合わせる
 var dryRun          = GetBool("--dry-run");
 var verbose         = GetBool("--verbose");
 var authMode        = GetOpt("--auth-mode", "default");
 
 // デフォルト CPU/メモリは要件値に合わせる（未指定時のみ適用）
-var ttCpu           = GetDouble("--tt-cpu", 0.75);
-var ttMem           = GetDouble("--tt-memory", 1.5);
-var dbCpu           = GetDouble("--db-cpu", 1.0);
-var dbMem           = GetDouble("--db-memory", 2.0);
-var redisCpu        = GetDouble("--redis-cpu", 0.5);
-var redisMem        = GetDouble("--redis-memory", 1.0);
+double ttCpu, ttMem, dbCpu, dbMem, redisCpu, redisMem;
+try
+{
+    ttCpu    = cli.GetDouble("--tt-cpu", 0.75);
+    ttMem    = cli.GetDouble("--tt-memory", 1.5);
+    dbCpu    = cli.GetDouble("--db-cpu", 1.0);
+    dbMem    = cli.GetDouble("--db-memory", 2.0);
+    redisCpu = cli.GetDouble("--redis-cpu", 0.5);
+    redisMem = cli.GetDouble("--redis-memory", 1.0);
+}
+catch (ArgumentException ex)
+{
+    Console.Error.WriteLine($"[ERROR] {ex.Message}");
+    return 1;
+}
 
 var appNameError = AppNameValidator.GetError(normalizedAppName);
 if (appNameError != null)
@@ -73,7 +70,7 @@ if (appNameError != null)
     Console.Error.WriteLine($"[ERROR] アプリ名 '{rawAppName}' は無効です: {appNameError}");
     Console.Error.WriteLine("  - 英小文字 (a-z)、数字 (0-9)、ハイフン (-) のみ使用可能");
     Console.Error.WriteLine("  - 英小文字で始まる/終わる必要があります（終端は英小文字または数字）");
-    Console.Error.WriteLine("  - 連続するハイフン '--' は不可 / 長さ 2〜32 文字");
+    Console.Error.WriteLine($"  - 連続するハイフン '--' は不可 / 長さ {AppNameValidator.MinLength}〜{AppNameValidator.MaxLength} 文字");
     return 1;
 }
 
@@ -127,6 +124,6 @@ try
 }
 catch (Exception ex)
 {
-    log.Error($"エラー: {ex.Message}");
+    log.Exception(ex);
     return 1;
 }

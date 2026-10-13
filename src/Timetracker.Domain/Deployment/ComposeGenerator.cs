@@ -4,79 +4,131 @@ namespace Timetracker.Domain.Deployment;
 
 public static class ComposeGenerator
 {
+    // timetracker イメージ内のサンプルDBバックアップの格納先と、SQL Server と共有するためのボリューム名
+    private const string SampleDir = "/usr/local/timetracker/sample";
+    private const string SampleVolume = "ttsample";
+
     public static string GenerateCompose(DeployOptions o)
     {
-        var ttImage = $"densocreate/timetracker:{o.TimetrackerTag}";
+        var ttImage = ContainerImages.Timetracker(o.TimetrackerTag);
 
         var sb = new StringBuilder();
-        sb.AppendLine("version: '3.9'");
         sb.AppendLine("services:");
         sb.AppendLine("  timetracker:");
         sb.AppendLine($"    image: {ttImage}");
         sb.AppendLine("    container_name: timetracker-app");
+        // DB/Redis が接続可能になってから起動する（起動直後の接続失敗による再起動を防ぐ）
         sb.AppendLine("    depends_on:");
-        sb.AppendLine("      - db");
-        sb.AppendLine("      - redis");
+        sb.AppendLine("      db:");
+        sb.AppendLine("        condition: service_healthy");
+        sb.AppendLine("      redis:");
+        sb.AppendLine("        condition: service_healthy");
         sb.AppendLine("    ports:");
         sb.AppendLine("      - \"8080:8080\"");
         sb.AppendLine("    environment:");
-        sb.AppendLine("      ASPNETCORE_URLS=http://0.0.0.0:8080");
-        sb.AppendLine("      TTNX_DB_TYPE=${TTNX_DB_TYPE}");
-        sb.AppendLine("      DB_HOST=db");
-        sb.AppendLine("      DB_PORT=${DB_PORT}");
-        sb.AppendLine("      DB_USER=${DB_USER}");
-        sb.AppendLine("      DB_PASSWORD=${DB_PASSWORD}");
-        sb.AppendLine("      DB_NAME=${DB_NAME}");
-        sb.AppendLine("      REDIS_HOST=redis");
-        sb.AppendLine("      REDIS_PORT=6379");
-        sb.AppendLine("      APP_PASSWORD=${TIMETRACKER_PASSWORD}  # <your password>");
+        sb.AppendLine("      ASPNETCORE_URLS: \"http://0.0.0.0:8080\"");
+        sb.AppendLine("      TTNX_DB_TYPE: \"${TTNX_DB_TYPE}\"");
+        // Azure Container Apps 側（ContainerAppSpecBuilder）と同じ環境変数を設定する
+        // TTNX_DB_SERVER はホスト名のみ（ポートは TTNX_DB_PORT。イメージ側で連結される）
+        sb.AppendLine("      TTNX_DB_SERVER: \"db\"");
+        sb.AppendLine("      TTNX_DB_USER: \"${DB_USER}\"");
+        sb.AppendLine("      TTNX_DB_PASSWORD: \"${DB_PASSWORD}\"");
+        sb.AppendLine("      TTNX_DB_NAME: \"${DB_NAME}\"");
+        sb.AppendLine("      TTNX_DB_PORT: \"${DB_PORT}\"");
+        sb.AppendLine("      TTNX_DB_OPTIONS: \"\"");
+        sb.AppendLine("      TTNX_REDIS_GLOBALCACHE: \"redis:6379\"");
+        sb.AppendLine("      TTNX_REDIS_HANGFIRE: \"redis:6379\"");
+        sb.AppendLine("      TTNX_REDIS_BACKGROUNDJOB: \"redis:6379\"");
+        // 互換のため従来の変数も設定
+        sb.AppendLine("      DB_HOST: \"db\"");
+        sb.AppendLine("      DB_PORT: \"${DB_PORT}\"");
+        sb.AppendLine("      DB_USER: \"${DB_USER}\"");
+        sb.AppendLine("      DB_PASSWORD: \"${DB_PASSWORD}\"");
+        sb.AppendLine("      DB_NAME: \"${DB_NAME}\"");
+        sb.AppendLine("      REDIS_HOST: \"redis\"");
+        sb.AppendLine("      REDIS_PORT: \"6379\"");
+        sb.AppendLine("      APP_PASSWORD: \"${TIMETRACKER_PASSWORD}\"  # <your password>");
+        if (o.DbType == "sqlserver")
+        {
+            // SQL Server の RESTORE は DB サーバー側のファイルを読むため、サンプルDBのバックアップを
+            // 名前付きボリュームで SQL Server コンテナと共有する（空のボリュームにはイメージ内のファイルがコピーされる）
+            sb.AppendLine("    volumes:");
+            sb.AppendLine($"      - {SampleVolume}:{SampleDir}");
+        }
         sb.AppendLine("    restart: unless-stopped");
 
         if (o.DbType == "postgresql")
         {
             sb.AppendLine("  db:");
-            sb.AppendLine("    image: postgres:16-alpine");
+            sb.AppendLine($"    image: {ContainerImages.Postgres}");
             sb.AppendLine("    container_name: timetracker-postgres");
             sb.AppendLine("    environment:");
-            sb.AppendLine("      POSTGRES_USER=${DB_USER}");
-            sb.AppendLine("      POSTGRES_PASSWORD=${DB_PASSWORD}");
-            sb.AppendLine("      POSTGRES_DB=${DB_NAME}");
+            sb.AppendLine("      POSTGRES_USER: \"${DB_USER}\"");
+            sb.AppendLine("      POSTGRES_PASSWORD: \"${DB_PASSWORD}\"");
+            // POSTGRES_DB で DB を事前作成しない。事前作成すると、サンプルDB作成時にアプリが対象DBへの接続を
+            // 保持したまま DB を削除・復元しようとして失敗する。DB は Timetracker のセットアップで作成される。
             sb.AppendLine("    volumes:");
             sb.AppendLine("      - pgdata:/var/lib/postgresql/data");
+            // 初期化中の一時サーバーは TCP を待ち受けないため、-h 127.0.0.1 で本起動を判定する。
+            // 対象DB はセットアップまで存在しないため、既定の postgres DB で確認する
+            sb.AppendLine("    healthcheck:");
+            sb.AppendLine("      test: [\"CMD-SHELL\", \"pg_isready -h 127.0.0.1 -U ${DB_USER} -d postgres\"]");
+            sb.AppendLine("      interval: 5s");
+            sb.AppendLine("      timeout: 5s");
+            sb.AppendLine("      retries: 20");
             sb.AppendLine("    restart: unless-stopped");
         }
         else
         {
             sb.AppendLine("  db:");
-            sb.AppendLine("    image: mcr.microsoft.com/mssql/server:2022-latest");
+            sb.AppendLine($"    image: {ContainerImages.SqlServer}");
             sb.AppendLine("    container_name: timetracker-sqlserver");
             sb.AppendLine("    environment:");
-            sb.AppendLine("      ACCEPT_EULA: 'Y'");
-            sb.AppendLine("      MSSQL_PID: 'Developer'");
-            sb.AppendLine("      SA_PASSWORD=${DB_PASSWORD}");
-            sb.AppendLine("    ports:");
-            sb.AppendLine("      - '1433:1433'");
+            sb.AppendLine("      ACCEPT_EULA: \"Y\"");
+            sb.AppendLine("      MSSQL_PID: \"Developer\"");
+            sb.AppendLine("      MSSQL_SA_PASSWORD: \"${DB_PASSWORD}\"");
             sb.AppendLine("    volumes:");
             sb.AppendLine("      - mssqldata:/var/opt/mssql");
+            sb.AppendLine($"      - {SampleVolume}:{SampleDir}:ro");
+            sb.AppendLine("    healthcheck:");
+            sb.AppendLine("      test: [\"CMD-SHELL\", \"/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \\\"$$MSSQL_SA_PASSWORD\\\" -Q \\\"SELECT 1\\\" -b -o /dev/null\"]");
+            sb.AppendLine("      interval: 5s");
+            sb.AppendLine("      timeout: 5s");
+            sb.AppendLine("      retries: 30");
+            sb.AppendLine("      start_period: 10s");
             sb.AppendLine("    restart: unless-stopped");
         }
 
         sb.AppendLine("  redis:");
-        sb.AppendLine("    image: redis:7-alpine");
+        sb.AppendLine($"    image: {ContainerImages.Redis}");
         sb.AppendLine("    container_name: timetracker-redis");
         sb.AppendLine("    command: [\"redis-server\", \"--appendonly\", \"yes\"]");
         sb.AppendLine("    volumes:");
         sb.AppendLine("      - redisdata:/data");
+        sb.AppendLine("    healthcheck:");
+        sb.AppendLine("      test: [\"CMD\", \"redis-cli\", \"ping\"]");
+        sb.AppendLine("      interval: 5s");
+        sb.AppendLine("      timeout: 5s");
+        sb.AppendLine("      retries: 20");
         sb.AppendLine("    restart: unless-stopped");
 
         sb.AppendLine();
         sb.AppendLine("volumes:");
         if (o.DbType == "postgresql") sb.AppendLine("  pgdata:");
-        else sb.AppendLine("  mssqldata:");
+        else
+        {
+            sb.AppendLine("  mssqldata:");
+            sb.AppendLine($"  {SampleVolume}:");
+        }
         sb.AppendLine("  redisdata:");
 
         return sb.ToString();
     }
+
+    // docker compose は .env のクォート無しの値に含まれる $VAR を展開するため、
+    // ダブルクォートで囲み \ " $ をエスケープして値をそのまま渡す
+    private static string EnvValue(string value) =>
+        "\"" + value.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("$", "\\$") + "\"";
 
     public static string GenerateEnv(DeployOptions o)
     {
@@ -85,15 +137,26 @@ public static class ComposeGenerator
 
         var lines = new List<string>
         {
-            $"TTNX_DB_TYPE={o.DbType}",
-            $"DB_PORT={dbPort}",
-            $"DB_USER={dbUserFixed}",
-            $"DB_PASSWORD={o.DbPassword}",
-            $"DB_NAME={o.DbName}",
-            $"TIMETRACKER_PASSWORD={o.TrackerPassword}"
+            $"TTNX_DB_TYPE={EnvValue(o.DbType)}",
+            $"DB_PORT={EnvValue(dbPort.ToString())}",
+            $"DB_USER={EnvValue(dbUserFixed)}",
+            $"DB_PASSWORD={EnvValue(o.DbPassword)}",
+            $"DB_NAME={EnvValue(o.DbName)}",
+            $"TIMETRACKER_PASSWORD={EnvValue(o.TrackerPassword)}"
         };
 
         return string.Join(Environment.NewLine, lines) + Environment.NewLine;
+    }
+
+    // SQL Server の SA パスワード要件: 8 文字以上で、英大文字・英小文字・数字・記号のうち 3 種類以上を含む
+    private static bool MeetsSqlServerPasswordPolicy(string password)
+    {
+        var categories = 0;
+        if (password.Any(char.IsAsciiLetterUpper)) categories++;
+        if (password.Any(char.IsAsciiLetterLower)) categories++;
+        if (password.Any(char.IsAsciiDigit)) categories++;
+        if (password.Any(c => !char.IsAsciiLetterOrDigit(c))) categories++;
+        return password.Length >= 8 && categories >= 3;
     }
 
     public static void Validate(DeployOptions o)
@@ -108,6 +171,10 @@ public static class ComposeGenerator
             throw new ArgumentException("tracker-password が不足または短すぎます。");
         if (string.IsNullOrWhiteSpace(o.DbPassword) || o.DbPassword.Length < 8)
             throw new ArgumentException("db-password が不足または短すぎます。");
+        if (o.DbType == "sqlserver" && !MeetsSqlServerPasswordPolicy(o.DbPassword))
+            throw new ArgumentException(
+                "db-password が SQL Server のパスワード要件を満たしていません。英大文字・英小文字・数字・記号のうち 3 種類以上を含めてください" +
+                "（要件を満たさない場合 SQL Server コンテナが起動しません）。");
         if (string.IsNullOrWhiteSpace(o.TimetrackerTag))
             throw new ArgumentException("tt-tag（timetracker イメージタグ）が空です。例: 7.0-linux-postgres, 7.0-linux-mssql など。");
 

@@ -9,14 +9,22 @@ namespace Timetracker.Domain.Deployment;
 /// - Must start with a lowercase letter
 /// - Must end with a lowercase letter or digit
 /// - Cannot contain "--" (double hyphen)
-/// - Length must be between 2 and 32 characters (inclusive)
+/// - Length must be between 2 and 26 characters (inclusive)
+///   Container App 名の上限は 32 文字だが、本ツールはアプリ名に接尾辞（最長 "-redis" の 6 文字）を
+///   付けてリソースを作成するため、アプリ名自体は 32 - 6 = 26 文字までとする。
 /// </summary>
 public static partial class AppNameValidator
 {
-    private const int MinLength = 2;
-    private const int MaxLength = 32;
+    /// <summary>Azure Container Apps のリソース名の最大長。</summary>
+    public const int ContainerAppNameMaxLength = 32;
 
-    // Pattern: ^[a-z]([a-z0-9-]*[a-z0-9])?$ handles names from 1 to 32 chars
+    /// <summary>アプリ名に付けて作成するリソース名の接尾辞。</summary>
+    public static readonly IReadOnlyList<string> ResourceSuffixes = new[] { "-env", "-db", "-redis", "-tt" };
+
+    public const int MinLength = 2;
+    public static readonly int MaxLength = ContainerAppNameMaxLength - ResourceSuffixes.Max(s => s.Length);
+
+    // Pattern: ^[a-z]([a-z0-9-]*[a-z0-9])?$ (length is checked separately)
     // - For single char: matches [a-z] with optional group absent
     // - For 2+ chars: matches [a-z] followed by optional middle chars and final [a-z0-9]
     private static readonly Regex ValidPattern = CreateValidPattern();
@@ -51,13 +59,13 @@ public static partial class AppNameValidator
     public static string? GetError(string name)
     {
         if (string.IsNullOrEmpty(name))
-            return "アプリ名が空です。アプリ名は2〜32文字の英小文字・数字・ハイフンで指定してください。";
+            return $"アプリ名が空です。アプリ名は{MinLength}〜{MaxLength}文字の英小文字・数字・ハイフンで指定してください。";
 
         if (name.Length < MinLength)
             return $"アプリ名 '{name}' は短すぎます。最低{MinLength}文字必要です。";
 
         if (name.Length > MaxLength)
-            return $"アプリ名 '{name}' は長すぎます。最大{MaxLength}文字まで指定可能です。";
+            return $"アプリ名 '{name}' は長すぎます。最大{MaxLength}文字まで指定可能です（リソース名に接尾辞 \"-redis\" 等が付くため）。";
 
         if (name.Contains("--"))
             return $"アプリ名 '{name}' に連続するハイフン ('--') が含まれています。連続するハイフンは使用できません。";

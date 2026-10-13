@@ -19,8 +19,12 @@ jobs:
       with:
         dotnet-version: 8.0.x
 
+    - name: Test
+      run: dotnet test Timetracker.sln --configuration Release
+
+    # README 記載と同じ単一ファイル・self-contained の EXE を生成（.NET ランタイム不要）
     - name: Publish
-      run: dotnet publish src/Timetracker.Controller.Cli/Timetracker.Controller.Cli.csproj --configuration Release --output publish
+      run: dotnet publish src/Timetracker.Controller.Cli/Timetracker.Controller.Cli.csproj --configuration Release -r win-x64 -p:PublishSingleFile=true -p:SelfContained=true -p:UseAppHost=true -p:DebugType=None --output publish
 
     - name: Zip artifacts
       run: Compress-Archive -Path publish\* -DestinationPath timetracker-cli-${{ github.ref_name }}.zip
