@@ -124,6 +124,6 @@ try
 }
 catch (Exception ex)
 {
-    log.Error($"エラー: {ex.Message}");
+    log.Exception(ex);
     return 1;
 }

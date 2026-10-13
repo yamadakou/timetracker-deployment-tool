@@ -4,16 +4,20 @@ public class SimpleLogger
 {
     private readonly bool _verbose;
     private readonly TextWriter? _out;
+    private readonly TextWriter? _err;
 
-    /// <param name="verbose">true の場合 Verbose ログを出力する</param>
+    /// <param name="verbose">true の場合 Verbose ログおよび例外のスタックトレースを出力する</param>
     /// <param name="output">出力先（省略時は Console.Out。テストでの出力検証用）</param>
-    public SimpleLogger(bool verbose, TextWriter? output = null)
+    /// <param name="error">エラーの出力先（省略時は Console.Error。テストでの出力検証用）</param>
+    public SimpleLogger(bool verbose, TextWriter? output = null, TextWriter? error = null)
     {
         _verbose = verbose;
         _out = output;
+        _err = error;
     }
 
     private TextWriter Out => _out ?? Console.Out;
+    private TextWriter Err => _err ?? Console.Error;
 
     public void Info(string message)
     {
@@ -45,7 +49,19 @@ public class SimpleLogger
     public void Error(string message)
     {
         Console.ForegroundColor = ConsoleColor.Red;
-        Out.WriteLine($"[ERROR] {message}");
+        Err.WriteLine($"[ERROR] {message}");
         Console.ResetColor();
+    }
+
+    /// <summary>
+    /// 例外をエラーとして出力する。Verbose 時はスタックトレースも出力する。
+    /// </summary>
+    public void Exception(Exception ex)
+    {
+        Error($"エラー: {ex.Message}");
+        if (_verbose)
+        {
+            Err.WriteLine(ex.ToString());
+        }
     }
 }
