@@ -78,6 +78,6 @@ public static class CredentialFactory
     private static TokenCredential CreateManagedIdentityCredential(SimpleLogger logger)
     {
         logger.Verbose("ManagedIdentityCredential を使用します");
-        return new ManagedIdentityCredential();
+        return new ManagedIdentityCredential(ManagedIdentityId.SystemAssigned);
     }
 }
