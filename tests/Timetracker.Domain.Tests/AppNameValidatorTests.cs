@@ -13,7 +13,7 @@ public class AppNameValidatorTests
     [InlineData("a1")]
     [InlineData("myapp-v2")]
     [InlineData("ab")]
-    [InlineData("a1234567890123456789012345678901")] // 32 chars - max length
+    [InlineData("a1234567890123456789012345")] // 26 chars - max length (32 - "-redis")
     public void IsValid_Should_Return_True_For_Valid_Names(string name)
     {
         AppNameValidator.IsValid(name).Should().BeTrue();
@@ -23,7 +23,8 @@ public class AppNameValidatorTests
     [InlineData("TimeTracker")] // Contains uppercase letters
     [InlineData("")]
     [InlineData("a")] // Too short (1 char)
-    [InlineData("a12345678901234567890123456789012")] // 33 chars - too long
+    [InlineData("a12345678901234567890123456")] // 27 chars - too long ("-redis" を付けると 33 文字)
+    [InlineData("a1234567890123456789012345678901")] // 32 chars - too long
     [InlineData("1app")] // Starts with digit
     [InlineData("-app")] // Starts with hyphen
     [InlineData("app-")] // Ends with hyphen
@@ -71,7 +72,7 @@ public class AppNameValidatorTests
     [Fact]
     public void GetError_Should_Return_Error_For_Long_Name()
     {
-        var longName = new string('a', 33);
+        var longName = new string('a', 27);
         var error = AppNameValidator.GetError(longName);
         error.Should().NotBeNull();
         error.Should().Contain("長すぎ");
@@ -123,5 +124,15 @@ public class AppNameValidatorTests
         var error = AppNameValidator.GetError("MyApp");
         error.Should().NotBeNull();
         error.Should().Contain("英小文字で始まる");
+    }
+
+    [Fact]
+    public void MaxLength_Plus_Longest_Suffix_Should_Fit_Container_App_Name_Limit()
+    {
+        var name = new string('a', AppNameValidator.MaxLength);
+        foreach (var suffix in AppNameValidator.ResourceSuffixes)
+        {
+            (name + suffix).Length.Should().BeLessThanOrEqualTo(AppNameValidator.ContainerAppNameMaxLength);
+        }
     }
 }

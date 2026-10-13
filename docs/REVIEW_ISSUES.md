@@ -6,8 +6,8 @@
 
 | No. | 重大度 | 優先度 | 問題の分類 | 問題の内容 | 対応方針 | 対応状況 | コミットハッシュ |
 |---|---|---|---|---|---|---|---|
-| 1 | 高 | P1 | 不具合 | Dry-run で生成される `docker-compose.yml` の `environment:` が `KEY=value` を `- ` 無しで並べており、PostgreSQL 版は文字列扱い、SQL Server 版は YAML 構文エラーになる。`docker compose up` が失敗する。テストも誤った形式を正としていた。 | `environment:` をマップ形式（`KEY: "value"`）で出力する。YamlDotNet でパースして environment がマップであることを検証するテストを追加する。併せて廃止済みの `version:` 行を削除。 | 対応済（修正前は新テスト4件失敗→修正後全件成功。生成ファイルを `docker compose config` で検証し両 DB 種別とも OK） | |
-| 2 | 高 | P1 | 不具合 | アプリ名の上限チェックが 32 文字だが、実際の Container App 名は `{appName}-redis` 等の接尾辞付き。27 文字以上だと Redis 作成時に Azure 側で失敗し、中途半端なリソースが残る。 | 最長接尾辞（`-redis`）を考慮し、アプリ名の上限を 26 文字にする。エラーメッセージ・README も更新。 | 未着手 | |
+| 1 | 高 | P1 | 不具合 | Dry-run で生成される `docker-compose.yml` の `environment:` が `KEY=value` を `- ` 無しで並べており、PostgreSQL 版は文字列扱い、SQL Server 版は YAML 構文エラーになる。`docker compose up` が失敗する。テストも誤った形式を正としていた。 | `environment:` をマップ形式（`KEY: "value"`）で出力する。YamlDotNet でパースして environment がマップであることを検証するテストを追加する。併せて廃止済みの `version:` 行を削除。 | 対応済（修正前は新テスト4件失敗→修正後全件成功。生成ファイルを `docker compose config` で検証し両 DB 種別とも OK） | 9799ae0 |
+| 2 | 高 | P1 | 不具合 | アプリ名の上限チェックが 32 文字だが、実際の Container App 名は `{appName}-redis` 等の接尾辞付き。27 文字以上だと Redis 作成時に Azure 側で失敗し、中途半端なリソースが残る。 | 最長接尾辞（`-redis`）を考慮し、アプリ名の上限を 26 文字にする。接尾辞一覧 `ResourceSuffixes` から上限を算出し、エラーメッセージ・README も更新。 | 対応済（26 文字は有効・27 文字は無効のテスト、上限＋最長接尾辞が 32 以内のテストを追加し全件成功。CLI で 27 文字がエラーになることを確認） | |
 | 3 | 高 | P1 | 不具合 | 既存リソースグループに `CreateOrUpdate(location のみ)` を実行するためタグが消える／リージョン不一致でエラーになる。Container Apps Environment も PUT で既存設定を上書きする。 | 存在確認を行い、既存ならそのまま使う（RG はリージョン不一致時に警告）。存在しない場合のみ作成する。 | 未着手 | |
 | 4 | 高 | P2 | 運用・データ | DB が永続ボリューム無しで稼働。再実行（リビジョン更新）で DB コンテナが再起動しデータが消えるが、README は再実行での設定変更を案内している。 | Azure Files 永続化は影響範囲が大きいため本対応では見送り、README に明確な注意を追記し、既存 DB アプリ更新時に警告ログを出す。 | 未着手 | |
 | 5 | 高 | P1 | セキュリティ | DB パスワード・アプリパスワードを Container Apps の通常環境変数（平文 Value）で渡しており、ポータル/ARM 上で閲覧できる。 | `Configuration.Secrets` に登録し、環境変数は `SecretRef` で参照する。コンテナ定義生成を純粋関数化してテスト追加。 | 未着手 | |

@@ -73,7 +73,7 @@ if (appNameError != null)
     Console.Error.WriteLine($"[ERROR] アプリ名 '{rawAppName}' は無効です: {appNameError}");
     Console.Error.WriteLine("  - 英小文字 (a-z)、数字 (0-9)、ハイフン (-) のみ使用可能");
     Console.Error.WriteLine("  - 英小文字で始まる/終わる必要があります（終端は英小文字または数字）");
-    Console.Error.WriteLine("  - 連続するハイフン '--' は不可 / 長さ 2〜32 文字");
+    Console.Error.WriteLine($"  - 連続するハイフン '--' は不可 / 長さ {AppNameValidator.MinLength}〜{AppNameValidator.MaxLength} 文字");
     return 1;
 }
 
