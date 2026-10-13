@@ -9,7 +9,6 @@ public static class ComposeGenerator
         var ttImage = $"densocreate/timetracker:{o.TimetrackerTag}";
 
         var sb = new StringBuilder();
-        sb.AppendLine("version: '3.9'");
         sb.AppendLine("services:");
         sb.AppendLine("  timetracker:");
         sb.AppendLine($"    image: {ttImage}");
@@ -20,16 +19,16 @@ public static class ComposeGenerator
         sb.AppendLine("    ports:");
         sb.AppendLine("      - \"8080:8080\"");
         sb.AppendLine("    environment:");
-        sb.AppendLine("      ASPNETCORE_URLS=http://0.0.0.0:8080");
-        sb.AppendLine("      TTNX_DB_TYPE=${TTNX_DB_TYPE}");
-        sb.AppendLine("      DB_HOST=db");
-        sb.AppendLine("      DB_PORT=${DB_PORT}");
-        sb.AppendLine("      DB_USER=${DB_USER}");
-        sb.AppendLine("      DB_PASSWORD=${DB_PASSWORD}");
-        sb.AppendLine("      DB_NAME=${DB_NAME}");
-        sb.AppendLine("      REDIS_HOST=redis");
-        sb.AppendLine("      REDIS_PORT=6379");
-        sb.AppendLine("      APP_PASSWORD=${TIMETRACKER_PASSWORD}  # <your password>");
+        sb.AppendLine("      ASPNETCORE_URLS: \"http://0.0.0.0:8080\"");
+        sb.AppendLine("      TTNX_DB_TYPE: \"${TTNX_DB_TYPE}\"");
+        sb.AppendLine("      DB_HOST: \"db\"");
+        sb.AppendLine("      DB_PORT: \"${DB_PORT}\"");
+        sb.AppendLine("      DB_USER: \"${DB_USER}\"");
+        sb.AppendLine("      DB_PASSWORD: \"${DB_PASSWORD}\"");
+        sb.AppendLine("      DB_NAME: \"${DB_NAME}\"");
+        sb.AppendLine("      REDIS_HOST: \"redis\"");
+        sb.AppendLine("      REDIS_PORT: \"6379\"");
+        sb.AppendLine("      APP_PASSWORD: \"${TIMETRACKER_PASSWORD}\"  # <your password>");
         sb.AppendLine("    restart: unless-stopped");
 
         if (o.DbType == "postgresql")
@@ -38,9 +37,9 @@ public static class ComposeGenerator
             sb.AppendLine("    image: postgres:16-alpine");
             sb.AppendLine("    container_name: timetracker-postgres");
             sb.AppendLine("    environment:");
-            sb.AppendLine("      POSTGRES_USER=${DB_USER}");
-            sb.AppendLine("      POSTGRES_PASSWORD=${DB_PASSWORD}");
-            sb.AppendLine("      POSTGRES_DB=${DB_NAME}");
+            sb.AppendLine("      POSTGRES_USER: \"${DB_USER}\"");
+            sb.AppendLine("      POSTGRES_PASSWORD: \"${DB_PASSWORD}\"");
+            sb.AppendLine("      POSTGRES_DB: \"${DB_NAME}\"");
             sb.AppendLine("    volumes:");
             sb.AppendLine("      - pgdata:/var/lib/postgresql/data");
             sb.AppendLine("    restart: unless-stopped");
@@ -51,9 +50,9 @@ public static class ComposeGenerator
             sb.AppendLine("    image: mcr.microsoft.com/mssql/server:2022-latest");
             sb.AppendLine("    container_name: timetracker-sqlserver");
             sb.AppendLine("    environment:");
-            sb.AppendLine("      ACCEPT_EULA: 'Y'");
-            sb.AppendLine("      MSSQL_PID: 'Developer'");
-            sb.AppendLine("      SA_PASSWORD=${DB_PASSWORD}");
+            sb.AppendLine("      ACCEPT_EULA: \"Y\"");
+            sb.AppendLine("      MSSQL_PID: \"Developer\"");
+            sb.AppendLine("      SA_PASSWORD: \"${DB_PASSWORD}\"");
             sb.AppendLine("    ports:");
             sb.AppendLine("      - '1433:1433'");
             sb.AppendLine("    volumes:");
