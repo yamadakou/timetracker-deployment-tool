@@ -492,7 +492,7 @@ timetracker-cli.exe deploy `
 ## 開発者向け情報
 
 ### 前提環境
-- .NET 8 SDK
+- .NET 10 SDK
 - PowerShell 7（推奨）または 5.1 以上
 - Azure SDK for .NET（NuGet: Azure.Identity, Azure.ResourceManager, Azure.ResourceManager.AppContainers など）
 - （Dry-runのローカル検証を行う場合のみ）Docker Desktop（Windows）または Docker Engine（他 OS）
