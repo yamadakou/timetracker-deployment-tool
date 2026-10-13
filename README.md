@@ -364,7 +364,13 @@ az provider show --namespace Microsoft.OperationalInsights --query "registration
 - `--db-name` (任意): DB 名。デフォルト `timetracker`
 - `--tracker-password` (必須): Timetracker アプリパスワード（DockerHub の `<your password>` に対応）
 - `--tt-tag` (任意): timetracker コンテナイメージのタグ（バージョン）。省略時は `7.0-linux-postgres`（例: `7.0-linux-postgres`, `7.0-linux-mssql`）。利用可能なタグ一覧は [DockerHub](https://hub.docker.com/r/densocreate/timetracker/tags) を参照してください。
-- `--dry-run` (任意): true の場合、Azure 反映せず `docker-compose.yml` と `.env` の生成のみ
+- `--dry-run` (任意): 指定した場合（または `--dry-run true`）、Azure 反映せず `docker-compose.yml` と `.env` の生成のみ。`--dry-run false` で無効
+- `--verbose` (任意): 詳細ログを出力
+- `--help` / `-h`: 使い方を表示
+
+補足（引数の書式）:
+- 未知のオプションや値の無いオプションはエラーになります（タイプミス防止）
+- `--` で始まる値（例: パスワード）は `--db-password=--xxxx` のように `=` で指定してください
 - `--auth-mode` (任意): 認証モード。`default` | `azure-cli` | `sp-env` | `device-code` | `managed-identity`（デフォルト: `default`）
 - コンテナスペック（任意）:
   - Timetracker: `--tt-cpu`（vCPU、小数可。例: `0.75`）、`--tt-memory`（Gi。例: `1.5`）
@@ -484,7 +490,7 @@ dotnet publish .\src\Timetracker.Controller.Cli\Timetracker.Controller.Cli.cspro
 - ドメイン層（Timetracker.Domain）
   - パラメータモデル、デフォルト、検証、Compose/.env生成（Dry-run用）、Container Apps のコンテナ仕様生成
 - コントローラー層（Timetracker.Controller.Cli）
-  - CLIの入出力、オプション解析（System.CommandLine）、Azure SDK 実行（ArmClient）
+  - CLIの入出力、オプション解析（CliArgs）、Azure SDK 実行（ArmClient）
 - 共通（Timetracker.Common）
   - ロガーなどのユーティリティ
 
