@@ -99,4 +99,23 @@ public class ContainerAppSpecBuilderTests
         template.Should().Contain("\"secretRef\":\"app-password\"");
         template.Should().NotContain(AppPassword).And.NotContain(DbPassword);
     }
+
+    [Fact]
+    public void Memory_Should_Be_Formatted_With_Dot_Decimal_Regardless_Of_Culture()
+    {
+        var original = System.Globalization.CultureInfo.CurrentCulture;
+        try
+        {
+            System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo("de-DE");
+            var o = CreateOptions("postgresql");
+            ContainerAppSpecBuilder.BuildTimetrackerApp(o, "japaneast", EnvId, "app-db", "app-redis")
+                .Template.Containers[0].Resources.Memory.Should().Be("1.5Gi");
+            ContainerAppSpecBuilder.BuildDbApp(o, "japaneast", EnvId).Template.Containers[0].Resources.Memory.Should().Be("2Gi");
+            ContainerAppSpecBuilder.BuildRedisApp(o, "japaneast", EnvId).Template.Containers[0].Resources.Memory.Should().Be("1Gi");
+        }
+        finally
+        {
+            System.Globalization.CultureInfo.CurrentCulture = original;
+        }
+    }
 }

@@ -1,3 +1,4 @@
+using System.Globalization;
 using Azure.Core;
 using Azure.ResourceManager.AppContainers;
 using Azure.ResourceManager.AppContainers.Models;
@@ -21,6 +22,9 @@ public static class ContainerAppSpecBuilder
 
     public static string GetDbUser(DeployOptions opts) =>
         opts.DbType == "postgresql" ? Defaults.DbUserFixedPostgres : Defaults.DbUserFixedSqlServer;
+
+    // ロケールに依存せず "1.5Gi" 形式で出力する
+    private static string Gi(double memory) => memory.ToString(CultureInfo.InvariantCulture) + "Gi";
 
     private static ContainerAppEnvironmentVariable Env(string name, string value) => new() { Name = name, Value = value };
 
@@ -55,7 +59,7 @@ public static class ContainerAppSpecBuilder
                 Resources = new AppContainerResources()
                 {
                     Cpu = opts.DbCpu,
-                    Memory = $"{opts.DbMemoryGi}Gi"
+                    Memory = Gi(opts.DbMemoryGi)
                 }
             }
             : new ContainerAppContainer()
@@ -71,7 +75,7 @@ public static class ContainerAppSpecBuilder
                 Resources = new AppContainerResources()
                 {
                     Cpu = opts.DbCpu,
-                    Memory = $"{opts.DbMemoryGi}Gi"
+                    Memory = Gi(opts.DbMemoryGi)
                 }
             };
 
@@ -107,7 +111,7 @@ public static class ContainerAppSpecBuilder
             Resources = new AppContainerResources()
             {
                 Cpu = opts.RedisCpu,
-                Memory = $"{opts.RedisMemoryGi}Gi"
+                Memory = Gi(opts.RedisMemoryGi)
             }
         };
 
@@ -168,7 +172,7 @@ public static class ContainerAppSpecBuilder
             Resources = new AppContainerResources()
             {
                 Cpu = opts.TimetrackerCpu,
-                Memory = $"{opts.TimetrackerMemoryGi}Gi"
+                Memory = Gi(opts.TimetrackerMemoryGi)
             }
         };
 

@@ -21,7 +21,6 @@ if (cli.IsHelp)
 
 string GetOpt(string name, string defaultValue) => cli.Get(name, defaultValue);
 bool GetBool(string name) => cli.GetBool(name);
-double GetDouble(string name, double def) => cli.GetDouble(name, def);
 
 // 必須オプション取得 (subscription / resource-group / db-password / tracker-password)
 var subscription    = GetOpt("--subscription",  string.Empty);
@@ -49,12 +48,21 @@ var verbose         = GetBool("--verbose");
 var authMode        = GetOpt("--auth-mode", "default");
 
 // デフォルト CPU/メモリは要件値に合わせる（未指定時のみ適用）
-var ttCpu           = GetDouble("--tt-cpu", 0.75);
-var ttMem           = GetDouble("--tt-memory", 1.5);
-var dbCpu           = GetDouble("--db-cpu", 1.0);
-var dbMem           = GetDouble("--db-memory", 2.0);
-var redisCpu        = GetDouble("--redis-cpu", 0.5);
-var redisMem        = GetDouble("--redis-memory", 1.0);
+double ttCpu, ttMem, dbCpu, dbMem, redisCpu, redisMem;
+try
+{
+    ttCpu    = cli.GetDouble("--tt-cpu", 0.75);
+    ttMem    = cli.GetDouble("--tt-memory", 1.5);
+    dbCpu    = cli.GetDouble("--db-cpu", 1.0);
+    dbMem    = cli.GetDouble("--db-memory", 2.0);
+    redisCpu = cli.GetDouble("--redis-cpu", 0.5);
+    redisMem = cli.GetDouble("--redis-memory", 1.0);
+}
+catch (ArgumentException ex)
+{
+    Console.Error.WriteLine($"[ERROR] {ex.Message}");
+    return 1;
+}
 
 var appNameError = AppNameValidator.GetError(normalizedAppName);
 if (appNameError != null)

@@ -1,3 +1,4 @@
+using System.Globalization;
 using FluentAssertions;
 using Xunit;
 
@@ -91,5 +92,42 @@ public class CliArgsTests
         {
             CliArgs.HelpText.Should().Contain(opt);
         }
+    }
+
+    [Theory]
+    [InlineData("de-DE")] // 小数点がカンマのロケール
+    [InlineData("ja-JP")]
+    [InlineData("")]      // InvariantCulture
+    public void GetDouble_Should_Parse_Dot_Decimal_Regardless_Of_Culture(string culture)
+    {
+        var original = CultureInfo.CurrentCulture;
+        try
+        {
+            CultureInfo.CurrentCulture = new CultureInfo(culture);
+            CliArgs.Parse(new[] { "--tt-cpu", "0.75" }).GetDouble("--tt-cpu", 1.0).Should().Be(0.75);
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = original;
+        }
+    }
+
+    [Fact]
+    public void GetDouble_Should_Return_Default_When_Not_Specified()
+    {
+        CliArgs.Parse(Array.Empty<string>()).GetDouble("--tt-cpu", 0.75).Should().Be(0.75);
+    }
+
+    [Theory]
+    [InlineData("abc")]
+    [InlineData("0,75")]
+    [InlineData("1,000")]
+    [InlineData("-1")]
+    [InlineData("0")]
+    [InlineData("NaN")]
+    public void GetDouble_Should_Throw_On_Invalid_Value(string value)
+    {
+        var act = () => CliArgs.Parse(new[] { "--tt-cpu", value }).GetDouble("--tt-cpu", 0.75);
+        act.Should().Throw<ArgumentException>().WithMessage("*--tt-cpu*");
     }
 }

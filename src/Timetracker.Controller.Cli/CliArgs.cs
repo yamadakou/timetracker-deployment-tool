@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace Timetracker.Controller.Cli;
 
 /// <summary>
@@ -137,6 +139,19 @@ public sealed class CliArgs
 
     public bool GetBool(string name) => _values.TryGetValue(name, out var v) && v == "true";
 
-    public double GetDouble(string name, double defaultValue) =>
-        _values.TryGetValue(name, out var v) && double.TryParse(v, out var d) ? d : defaultValue;
+    /// <summary>
+    /// 正の数値を取得する。OS のロケールに依存せず小数点は "." として解釈する
+    /// （小数点がカンマのロケールで "0.75" が 75 と解釈されるのを防ぐ）。
+    /// </summary>
+    /// <exception cref="ArgumentException">数値として解釈できない、または 0 以下の場合</exception>
+    public double GetDouble(string name, double defaultValue)
+    {
+        if (!_values.TryGetValue(name, out var v) || string.IsNullOrWhiteSpace(v))
+            return defaultValue;
+
+        if (double.TryParse(v, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var d) && d > 0)
+            return d;
+
+        throw new ArgumentException($"オプション '{name}' には正の数値（小数点は '.'）を指定してください: '{v}'");
+    }
 }
