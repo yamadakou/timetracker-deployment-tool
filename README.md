@@ -363,7 +363,7 @@ az provider show --namespace Microsoft.OperationalInsights --query "registration
 - `--db-password` (必須): DB パスワード（DB 種別に関わらず統一パラメータ）
 - `--db-name` (任意): DB 名。デフォルト `timetracker`
 - `--tracker-password` (必須): Timetracker アプリパスワード（DockerHub の `<your password>` に対応）
-- `--tt-tag` (任意): timetracker コンテナイメージのタグ（バージョン）。省略時は `7.0-linux-postgres`（例: `7.0-linux-postgres`, `7.0-linux-mssql`）。利用可能なタグ一覧は [DockerHub](https://hub.docker.com/r/densocreate/timetracker/tags) を参照してください。
+- `--tt-tag` (任意): timetracker コンテナイメージのタグ（バージョン）。省略時は DB 種別に応じて `7.0-linux-postgres`（postgresql）または `7.0-linux-mssql`（sqlserver）。利用可能なタグ一覧は [DockerHub](https://hub.docker.com/r/densocreate/timetracker/tags) を参照してください。
 - `--dry-run` (任意): 指定した場合（または `--dry-run true`）、Azure 反映せず `docker-compose.yml` と `.env` の生成のみ。`--dry-run false` で無効
 - `--verbose` (任意): 詳細ログを出力
 - `--help` / `-h`: 使い方を表示
@@ -500,7 +500,7 @@ dotnet publish .\src\Timetracker.Controller.Cli\Timetracker.Controller.Cli.cspro
 - `redis`（`redis:7-alpine`）
 - Ingress: 外部公開、ターゲットポート 8080
 - スケール: MinReplicas=1 / MaxReplicas=1（固定）
-- timetracker のイメージタグは `--tt-tag` で指定した値を使用（省略時は `7.0-linux-postgres`）
+- timetracker のイメージタグは `--tt-tag` で指定した値を使用（省略時は DB 種別に応じて `7.0-linux-postgres` / `7.0-linux-mssql`）
 
 ### 注意点
 - Container Apps の永続ボリュームが必要な場合は Azure Files 等の設定を追加してください（DB/Redis のデータ保持用途）。

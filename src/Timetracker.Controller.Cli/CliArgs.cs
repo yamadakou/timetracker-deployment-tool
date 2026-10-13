@@ -34,7 +34,7 @@ public sealed class CliArgs
           --app-name <名前>           既定: timetracker
           --db-type <種別>            postgresql | sqlserver（既定: postgresql）
           --db-name <名前>            既定: timetracker
-          --tt-tag <タグ>             timetracker イメージタグ
+          --tt-tag <タグ>             timetracker イメージタグ（既定: postgresql→7.0-linux-postgres / sqlserver→7.0-linux-mssql）
           --auth-mode <モード>        default | azure-cli | sp-env | device-code | managed-identity（既定: default）
           --tt-cpu / --tt-memory      Timetracker の vCPU / メモリ(Gi)（既定: 0.75 / 1.5）
           --db-cpu / --db-memory      DB の vCPU / メモリ(Gi)（既定: 1.0 / 2.0）

@@ -17,7 +17,7 @@ public class DeployOptions
     public string AuthMode { get; set; } = "default";
 
     // timetracker イメージタグ（バージョン）
-    public string TimetrackerTag { get; set; } = "7.0-linux-postgres";
+    public string TimetrackerTag { get; set; } = Defaults.TimetrackerTagPostgres;
 
     // コンテナスペック（CPU: vCPU、小数可 / Memory: Gi）
     // デフォルト値を要件に合わせて更新
