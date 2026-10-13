@@ -58,7 +58,7 @@ public class ContainerAppSpecBuilderTests
 
     [Theory]
     [InlineData("postgresql", "POSTGRES_PASSWORD")]
-    [InlineData("sqlserver", "SA_PASSWORD")]
+    [InlineData("sqlserver", "MSSQL_SA_PASSWORD")]
     public void DbApp_Should_Reference_Db_Password_Secret(string dbType, string envName)
     {
         var data = ContainerAppSpecBuilder.BuildDbApp(CreateOptions(dbType), "japaneast", EnvId);

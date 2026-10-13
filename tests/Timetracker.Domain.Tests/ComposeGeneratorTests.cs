@@ -8,29 +8,8 @@ using YamlDotNet.RepresentationModel;
 
 namespace Timetracker.Domain.Tests
 {
-    public class EnvironmentVariables : List<string> { }
-
     public class ComposeGeneratorTests
     {
-        [Fact]
-        public void RunTests()
-        {
-            var env = new EnvironmentVariables
-            {
-                $"DB_USER={Defaults.DbUserFixedPostgres}",
-                $"DB_PASSWORD={Defaults.DbPassword}",
-                $"DB_NAME={Defaults.DbName}",
-                $"TIMETRACKER_PASSWORD={Defaults.TimetrackerPassword}"
-            };
-            env.Should().Contain($"DB_USER={Defaults.DbUserFixedPostgres}");
-            env.Should().Contain($"DB_PASSWORD={Defaults.DbPassword}");
-            env.Should().Contain($"DB_NAME={Defaults.DbName}");
-            env.Should().Contain($"TIMETRACKER_PASSWORD={Defaults.TimetrackerPassword}");
-
-            // Ensure all other interpolated strings are properly closed
-            // further code and checks accordingly
-        }
-
         [Fact]
         public void GenerateCompose_Should_Include_ASPNETCORE_URLS_Environment_Variable()
         {
@@ -159,6 +138,20 @@ namespace Timetracker.Domain.Tests
                 db["POSTGRES_PASSWORD"].Should().Be("${DB_PASSWORD}");
             else
                 db["ACCEPT_EULA"].Should().Be("Y");
+        }
+    
+        [Fact]
+        public void GenerateCompose_SqlServer_Should_Use_MSSQL_SA_PASSWORD_And_Not_Publish_Db_Port()
+        {
+            var composeYml = ComposeGenerator.GenerateCompose(CreateOptions("sqlserver"));
+
+            var db = EnvironmentOf(composeYml, "db");
+            db["MSSQL_SA_PASSWORD"].Should().Be("${DB_PASSWORD}");
+            db.Should().NotContainKey("SA_PASSWORD"); // 非推奨
+
+            var services = (YamlMappingNode)ParseCompose(composeYml)["services"];
+            ((YamlMappingNode)services["db"]).Children.Keys.Select(k => ((YamlScalarNode)k).Value)
+                .Should().NotContain("ports"); // DB をホストに公開しない
         }
     }
 }

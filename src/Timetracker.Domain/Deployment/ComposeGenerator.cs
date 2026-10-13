@@ -52,9 +52,7 @@ public static class ComposeGenerator
             sb.AppendLine("    environment:");
             sb.AppendLine("      ACCEPT_EULA: \"Y\"");
             sb.AppendLine("      MSSQL_PID: \"Developer\"");
-            sb.AppendLine("      SA_PASSWORD: \"${DB_PASSWORD}\"");
-            sb.AppendLine("    ports:");
-            sb.AppendLine("      - '1433:1433'");
+            sb.AppendLine("      MSSQL_SA_PASSWORD: \"${DB_PASSWORD}\"");
             sb.AppendLine("    volumes:");
             sb.AppendLine("      - mssqldata:/var/opt/mssql");
             sb.AppendLine("    restart: unless-stopped");

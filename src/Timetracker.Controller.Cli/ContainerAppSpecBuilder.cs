@@ -70,7 +70,7 @@ public static class ContainerAppSpecBuilder
                 {
                     Env("ACCEPT_EULA", "Y"),
                     Env("MSSQL_PID", "Developer"),
-                    SecretEnv("SA_PASSWORD", DbPasswordSecretName),
+                    SecretEnv("MSSQL_SA_PASSWORD", DbPasswordSecretName), // SA_PASSWORD は非推奨
                 },
                 Resources = new AppContainerResources()
                 {

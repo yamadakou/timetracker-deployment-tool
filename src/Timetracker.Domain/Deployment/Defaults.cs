@@ -17,8 +17,6 @@ public static class Defaults
     public const string DbUserFixedPostgres = "postgres";
     public const string DbUserFixedSqlServer = "sa";
 
-    // デフォルトパスワードおよびデータベース名
-    public const string DbPassword = "DefaultDbPassword123!";
+    // データベース名
     public const string DbName = "timetracker_db";
-    public const string TimetrackerPassword = "DefaultTimetrackerPassword123!";
 }
