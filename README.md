@@ -358,7 +358,7 @@ az provider show --namespace Microsoft.OperationalInsights --query "registration
      --db-type "postgresql" `
      --db-password "Str0ngP@ssw0rd!" `
      --tracker-password "AppLoginP@ss!" `
-     --tt-tag "7.0-linux-postgres" `
+     --tt-tag "11.0.1-linux-postgres" `
      --dry-run "true"
    ```
 
@@ -383,7 +383,7 @@ az provider show --namespace Microsoft.OperationalInsights --query "registration
 - `--db-password` (必須): DB パスワード（DB 種別に関わらず統一パラメータ。8 文字以上。`sqlserver` の場合は英大文字・英小文字・数字・記号のうち 3 種類以上を含む必要があります）
 - `--db-name` (任意): DB 名。デフォルト `timetracker`
 - `--tracker-password` (必須): Timetracker アプリパスワード（DockerHub の `<your password>` に対応）
-- `--tt-tag` (任意): timetracker コンテナイメージのタグ（バージョン）。省略時は DB 種別に応じて `7.0-linux-postgres`（postgresql）または `7.0-linux-mssql`（sqlserver）。利用可能なタグ一覧は [DockerHub](https://hub.docker.com/r/densocreate/timetracker/tags) を参照してください。
+- `--tt-tag` (任意): timetracker コンテナイメージのタグ（バージョン）。省略時は DB 種別に応じて `11.0.1-linux-postgres`（postgresql）または `11.0.1-linux-mssql`（sqlserver）。利用可能なタグ一覧は [DockerHub](https://hub.docker.com/r/densocreate/timetracker/tags) を参照してください。
 - `--dry-run` (任意): 指定した場合（または `--dry-run true`）、Azure 反映せず `docker-compose.yml` と `.env` の生成のみ。`--dry-run false` で無効
 - `--verbose` (任意): 詳細ログを出力
 - `--help` / `-h`: 使い方を表示
@@ -404,7 +404,7 @@ az provider show --namespace Microsoft.OperationalInsights --query "registration
 補足:
 - DB ユーザは DockerHub の「クイックスタート」記載の固定値を使用します（CLI からは変更不可）。
 - `.env` に機密情報が出力されます。取り扱いにはご注意ください（[本ツールの目的と注意事項](#本ツールの目的と注意事項) を参照）。
-- **timetracker イメージタグについて**: DB 種別に応じて適切なタグを選択してください。PostgreSQL 用のタグ (例: `7.0-linux-postgres`) と SQL Server 用のタグ (例: `7.0-linux-mssql`) があります。異なる DB 種別用のタグを混在させないでください。利用可能なタグ一覧は [DockerHub](https://hub.docker.com/r/densocreate/timetracker/tags) を参照してください。
+- **timetracker イメージタグについて**: DB 種別に応じて適切なタグを選択してください。PostgreSQL 用のタグ (例: `11.0.1-linux-postgres`) と SQL Server 用のタグ (例: `11.0.1-linux-mssql`) があります。異なる DB 種別用のタグを混在させないでください。利用可能なタグ一覧は [DockerHub](https://hub.docker.com/r/densocreate/timetracker/tags) を参照してください。
 - **アプリ名の命名規則**: `--app-name` で指定するアプリ名は Azure Container Apps の命名規則に従う必要があります:
   - 使用可能な文字: 英小文字 (a-z)、数字 (0-9)、ハイフン (-)
   - 英小文字で始まる必要があります
@@ -427,7 +427,7 @@ timetracker-cli.exe deploy `
   --db-password "Str0ngP@ssw0rd!" `
   --db-name "timetracker" `
   --tracker-password "AppLoginP@ss!" `
-  --tt-tag "7.0-linux-postgres" `
+  --tt-tag "11.0.1-linux-postgres" `
   --tt-cpu 0.75 --tt-memory 1.5 `
   --db-cpu 1.0 --db-memory 2.0 `
   --redis-cpu 0.5 --redis-memory 1.0 `
@@ -521,7 +521,7 @@ dotnet publish .\src\Timetracker.Controller.Cli\Timetracker.Controller.Cli.cspro
 - Dry-run で生成する `docker-compose.yml` も同じイメージ・環境変数を使用します
 - Ingress: 外部公開、ターゲットポート 8080
 - スケール: MinReplicas=1 / MaxReplicas=1（固定）
-- timetracker のイメージタグは `--tt-tag` で指定した値を使用（省略時は DB 種別に応じて `7.0-linux-postgres` / `7.0-linux-mssql`）
+- timetracker のイメージタグは `--tt-tag` で指定した値を使用（省略時は DB 種別に応じて `11.0.1-linux-postgres` / `11.0.1-linux-mssql`）
 
 ### 注意点
 - 本ツールは検証環境の構築支援が目的のため、Azure Container Apps の DB/Redis には永続ボリュームを設定していません（Dry-run の docker-compose は名前付きボリュームを使用）（[本ツールの目的と注意事項](#本ツールの目的と注意事項) を参照）。

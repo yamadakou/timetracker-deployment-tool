@@ -6,8 +6,8 @@ public static class Defaults
     public const string DefaultAppName = "timetracker";
 
     // timetracker イメージの既定タグ（DB 種別ごと）
-    public const string TimetrackerTagPostgres = "7.0-linux-postgres";
-    public const string TimetrackerTagSqlServer = "7.0-linux-mssql";
+    public const string TimetrackerTagPostgres = "11.0.1-linux-postgres";
+    public const string TimetrackerTagSqlServer = "11.0.1-linux-mssql";
 
     /// <summary>--tt-tag 未指定時に使う、DB 種別に対応した既定のイメージタグを返す。</summary>
     public static string GetDefaultTimetrackerTag(string dbType) =>

@@ -22,7 +22,7 @@ public class ContainerAppSpecBuilderTests
         DbType = dbType,
         DbPassword = DbPassword,
         TrackerPassword = AppPassword,
-        TimetrackerTag = dbType == "postgresql" ? "7.0-linux-postgres" : "7.0-linux-mssql",
+        TimetrackerTag = dbType == "postgresql" ? "11.0.1-linux-postgres" : "11.0.1-linux-mssql",
     };
 
     public static IEnumerable<object[]> AllApps()
@@ -78,6 +78,8 @@ public class ContainerAppSpecBuilderTests
             "ASPNETCORE_URLS", "TTNX_DB_TYPE", "TTNX_DB_SERVER", "TTNX_DB_USER", "TTNX_DB_PASSWORD", "TTNX_DB_NAME",
             "TTNX_DB_PORT", "TTNX_DB_OPTIONS", "TTNX_REDIS_GLOBALCACHE", "TTNX_REDIS_HANGFIRE", "TTNX_REDIS_BACKGROUNDJOB",
             "DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME", "REDIS_HOST", "REDIS_PORT", "APP_PASSWORD",
+            "TT_DB_TYPE", "TT_DB_SERVER", "TT_DB_USER", "TT_DB_PASSWORD", "TT_DB_NAME",
+            "TT_DB_PORT", "TT_DB_OPTIONS", "TT_REDIS_GLOBALCACHE", "TT_REDIS_HANGFIRE", "TT_REDIS_BACKGROUNDJOB",
         });
         env["TTNX_DB_PASSWORD"].SecretRef.Should().Be(ContainerAppSpecBuilder.DbPasswordSecretName);
         env["DB_PASSWORD"].SecretRef.Should().Be(ContainerAppSpecBuilder.DbPasswordSecretName);
@@ -138,5 +140,24 @@ public class ContainerAppSpecBuilderTests
         // compose と同様、DB は Timetracker のセットアップで作成させる（サンプルDB作成の失敗を防ぐ）
         ContainerAppSpecBuilder.BuildDbApp(CreateOptions("postgresql"), "japaneast", EnvId)
             .Template.Containers[0].Env.Select(e => e.Name).Should().NotContain("POSTGRES_DB");
+    }
+
+    [Theory]
+    [InlineData("postgresql")]
+    [InlineData("sqlserver")]
+    public void TimetrackerApp_Should_Set_Both_TTNX_And_TT_Prefixed_Variables(string dbType)
+    {
+        // timetracker 11.x のイメージは TT_ 接頭辞、7.x 以前は TTNX_ 接頭辞の環境変数を読むため、両方を同じ値で設定する
+        var env = ContainerAppSpecBuilder.BuildTimetrackerApp(CreateOptions(dbType), "japaneast", EnvId, "app-db", "app-redis")
+            .Template.Containers[0].Env.ToDictionary(e => e.Name);
+        var ttnx = env.Keys.Where(k => k.StartsWith("TTNX_")).ToList();
+        ttnx.Should().NotBeEmpty();
+        foreach (var k in ttnx)
+        {
+            var newKey = "TT_" + k["TTNX_".Length..];
+            env.Should().ContainKey(newKey);
+            env[newKey].Value.Should().Be(env[k].Value);
+            env[newKey].SecretRef.Should().Be(env[k].SecretRef);
+        }
     }
 }
