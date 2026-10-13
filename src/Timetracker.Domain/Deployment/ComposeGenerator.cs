@@ -104,6 +104,17 @@ public static class ComposeGenerator
         return string.Join(Environment.NewLine, lines) + Environment.NewLine;
     }
 
+    // SQL Server の SA パスワード要件: 8 文字以上で、英大文字・英小文字・数字・記号のうち 3 種類以上を含む
+    private static bool MeetsSqlServerPasswordPolicy(string password)
+    {
+        var categories = 0;
+        if (password.Any(char.IsAsciiLetterUpper)) categories++;
+        if (password.Any(char.IsAsciiLetterLower)) categories++;
+        if (password.Any(char.IsAsciiDigit)) categories++;
+        if (password.Any(c => !char.IsAsciiLetterOrDigit(c))) categories++;
+        return password.Length >= 8 && categories >= 3;
+    }
+
     public static void Validate(DeployOptions o)
     {
         if (o.DbType is not ("postgresql" or "sqlserver"))
@@ -116,6 +127,10 @@ public static class ComposeGenerator
             throw new ArgumentException("tracker-password が不足または短すぎます。");
         if (string.IsNullOrWhiteSpace(o.DbPassword) || o.DbPassword.Length < 8)
             throw new ArgumentException("db-password が不足または短すぎます。");
+        if (o.DbType == "sqlserver" && !MeetsSqlServerPasswordPolicy(o.DbPassword))
+            throw new ArgumentException(
+                "db-password が SQL Server のパスワード要件を満たしていません。英大文字・英小文字・数字・記号のうち 3 種類以上を含めてください" +
+                "（要件を満たさない場合 SQL Server コンテナが起動しません）。");
         if (string.IsNullOrWhiteSpace(o.TimetrackerTag))
             throw new ArgumentException("tt-tag（timetracker イメージタグ）が空です。例: 7.0-linux-postgres, 7.0-linux-mssql など。");
 

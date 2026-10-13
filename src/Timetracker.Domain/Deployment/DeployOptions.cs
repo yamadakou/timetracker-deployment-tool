@@ -8,7 +8,7 @@ public class DeployOptions
     public string AppName { get; set; } = Defaults.DefaultAppName;   // TimeTracker
     public string DbType { get; set; } = "postgresql";              // postgresql | sqlserver
     public required string DbPassword { get; set; }                  // 種別問わず統一パラメータ
-    public string DbName { get; set; } = "timetracker";
+    public string DbName { get; set; } = Defaults.DbName;
     public required string TrackerPassword { get; set; }
     public bool DryRun { get; set; }
     public bool Verbose { get; set; }

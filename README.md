@@ -361,7 +361,7 @@ az provider show --namespace Microsoft.OperationalInsights --query "registration
 - `--app-name` (任意): アプリ名（省略時は `timetracker`）。Azure Container Apps の命名規則に従う必要があります（後述の注意事項参照）。
 - `--db-type` (任意): DB 種別。`postgresql` または `sqlserver`（デフォルト: `postgresql`）
   - `sqlserver` の場合、SQL Server は **Developer エディション**（`MSSQL_PID=Developer`）で起動します。Developer エディションは開発・テスト用途に限られ、本番環境では使用できません。本番利用する場合はライセンスに合ったエディションを別途ご検討ください。
-- `--db-password` (必須): DB パスワード（DB 種別に関わらず統一パラメータ）
+- `--db-password` (必須): DB パスワード（DB 種別に関わらず統一パラメータ。8 文字以上。`sqlserver` の場合は英大文字・英小文字・数字・記号のうち 3 種類以上を含む必要があります）
 - `--db-name` (任意): DB 名。デフォルト `timetracker`
 - `--tracker-password` (必須): Timetracker アプリパスワード（DockerHub の `<your password>` に対応）
 - `--tt-tag` (任意): timetracker コンテナイメージのタグ（バージョン）。省略時は DB 種別に応じて `7.0-linux-postgres`（postgresql）または `7.0-linux-mssql`（sqlserver）。利用可能なタグ一覧は [DockerHub](https://hub.docker.com/r/densocreate/timetracker/tags) を参照してください。

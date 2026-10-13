@@ -18,5 +18,5 @@ public static class Defaults
     public const string DbUserFixedSqlServer = "sa";
 
     // データベース名
-    public const string DbName = "timetracker_db";
+    public const string DbName = "timetracker";
 }
