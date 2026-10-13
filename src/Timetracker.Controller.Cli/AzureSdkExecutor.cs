@@ -1,6 +1,5 @@
 using Azure;
 using Azure.Core;
-using Azure.Identity;
 using Azure.ResourceManager;
 using Azure.ResourceManager.Resources;
 using Azure.ResourceManager.AppContainers;
@@ -8,25 +7,45 @@ using Azure.ResourceManager.AppContainers.Models;
 using Timetracker.Common;
 using Timetracker.Domain.Deployment;
 
+namespace Timetracker.Controller.Cli;
+
 public class AzureSdkExecutor
 {
     private readonly SimpleLogger _logger;
     private readonly ArmClient _arm;
 
     public AzureSdkExecutor(SimpleLogger logger, TokenCredential credential)
+        : this(logger, new ArmClient(credential))
+    {
+    }
+
+    public AzureSdkExecutor(SimpleLogger logger, ArmClient arm)
     {
         _logger = logger;
-        _arm = new ArmClient(credential);
+        _arm = arm;
     }
 
     public async Task EnsureResourceGroupAsync(string subscriptionId, string rgName, string location)
     {
         var sub = _arm.GetSubscriptionResource(new ResourceIdentifier($"/subscriptions/{subscriptionId}"));
-        var rgOp = await sub.GetResourceGroups().CreateOrUpdateAsync(
-            WaitUntil.Completed,
-            rgName,
-            new ResourceGroupData(location));
-        _logger.Info($"ResourceGroup ready: {rgName}");
+        var rgs = sub.GetResourceGroups();
+
+        // 既存 RG に CreateOrUpdate(PUT) するとタグが消える／リージョン不一致でエラーになるため、
+        // 既存の場合は変更せずそのまま使う
+        var existing = await rgs.GetIfExistsAsync(rgName);
+        if (existing.HasValue)
+        {
+            var rgLocation = existing.Value!.Data.Location;
+            if (rgLocation != new AzureLocation(location))
+            {
+                _logger.Warn($"既存の ResourceGroup '{rgName}' のリージョン ({rgLocation}) は --location ({location}) と異なります。Container Apps は {location} に作成されます。");
+            }
+            _logger.Info($"既存の ResourceGroup を使用: {rgName}");
+            return;
+        }
+
+        await rgs.CreateOrUpdateAsync(WaitUntil.Completed, rgName, new ResourceGroupData(location));
+        _logger.Info($"ResourceGroup を作成: {rgName}");
     }
 
     public async Task<ContainerAppManagedEnvironmentResource> EnsureContainerAppEnvAsync(string subscriptionId, string rgName, string envName, string location)
@@ -34,13 +53,21 @@ public class AzureSdkExecutor
         var rg = _arm.GetResourceGroupResource(new ResourceIdentifier($"/subscriptions/{subscriptionId}/resourceGroups/{rgName}"));
         var envCollection = rg.GetContainerAppManagedEnvironments();
 
+        // 既存 Environment に PUT すると既存設定（ログ設定など）が上書きされるため、既存ならそのまま使う
+        var existing = await envCollection.GetIfExistsAsync(envName);
+        if (existing.HasValue)
+        {
+            _logger.Info($"既存の Container Apps Environment を使用: {envName}");
+            return existing.Value!;
+        }
+
         var data = new ContainerAppManagedEnvironmentData(location)
         {
             // VNet 設定は呼び出し側で必要に応じて追加（例: InfrastructureSubnetId）
         };
         var envOp = await envCollection.CreateOrUpdateAsync(WaitUntil.Completed, envName, data);
         var env = envOp.Value;
-        _logger.Info($"Container Apps Environment ready: {envName}");
+        _logger.Info($"Container Apps Environment を作成: {envName}");
         return env;
     }
 

@@ -27,11 +27,12 @@ Timetracker（DockerHub の `densocreate/timetracker` イメージ）を、選�
 
 1. **リソースグループ** (Resource Group)
    - 指定した名前のリソースグループが存在しない場合、新規作成されます
-   - 既に存在する場合は、そのリソースグループを使用します
+   - 既に存在する場合は、そのリソースグループを変更せずに使用します（タグ等は保持されます）
 
 2. **Container Apps Environment** (Container Apps 環境)
    - すべての Container Apps が実行される環境
    - 名前: `{アプリ名}-env`（例: `timetracker-env`）
+   - 既に存在する場合は、設定を変更せずにそのまま使用します
 
 3. **3つの Container Apps**
    - **`{アプリ名}-tt`**: Timetracker アプリケーション本体（外部公開、ポート 8080）
