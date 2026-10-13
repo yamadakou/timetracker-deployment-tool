@@ -52,8 +52,10 @@ public static class CredentialFactory
             string.IsNullOrWhiteSpace(clientId) ||
             string.IsNullOrWhiteSpace(clientSecret))
         {
-            logger.Error("sp-env モードで必要な環境変数（AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET）が不足しています。DefaultAzureCredential にフォールバックします。");
-            return new DefaultAzureCredential();
+            // 明示的に sp-env が指定された場合、別の資格情報（例: 開発者の az login）で意図せずデプロイされないよう停止する
+            throw new InvalidOperationException(
+                "sp-env モードで必要な環境変数（AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET）が不足しています。" +
+                "環境変数を設定するか、別の --auth-mode を指定してください。");
         }
 
         logger.Verbose("ClientSecretCredential を使用します（Service Principal 環境変数より）");

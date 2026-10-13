@@ -185,7 +185,7 @@ az provider show --namespace Microsoft.OperationalInsights --query "registration
 
 ##### 前提環境
 - サービスプリンシパルが作成されていること
-- 環境変数 `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` が設定されていること
+- 環境変数 `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` が設定されていること（いずれかが未設定の場合はエラーで停止します）
 - CI/CD パイプライン（GitHub Actions、Azure DevOps など）での利用に最適
 - 必要な RBAC ロール: サービスプリンシパルに Owner、Contributor、または Container Apps Contributor ロールを付与
 - 参考: [Service Principal](https://learn.microsoft.com/ja-jp/azure/active-directory/develop/app-objects-and-service-principals)
