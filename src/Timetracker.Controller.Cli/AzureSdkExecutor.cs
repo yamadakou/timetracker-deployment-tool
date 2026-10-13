@@ -70,6 +70,23 @@ public class AzureSdkExecutor
         return env;
     }
 
+    /// <summary>
+    /// DB アプリが既に存在する場合、更新（リビジョン再作成）で DB コンテナが再起動し、
+    /// 永続ボリューム未設定のためデータが失われる旨を警告する。
+    /// </summary>
+    /// <returns>DB アプリが既に存在する場合 true</returns>
+    public async Task<bool> WarnIfDbAppExistsAsync(string subscriptionId, string rgName, string dbAppName)
+    {
+        var rg = _arm.GetResourceGroupResource(new ResourceIdentifier($"/subscriptions/{subscriptionId}/resourceGroups/{rgName}"));
+        var existing = await rg.GetContainerApps().GetIfExistsAsync(dbAppName);
+        if (!existing.HasValue)
+            return false;
+
+        _logger.Warn($"DB アプリ '{dbAppName}' は既に存在します。設定が変わると DB コンテナが再起動し、" +
+                     "永続ボリュームを設定していないため DB のデータは失われます。必要に応じて事前にバックアップしてください。");
+        return true;
+    }
+
     public async Task CreateOrUpdateContainerAppAsync(
         string subscriptionId,
         string rgName,
@@ -85,6 +102,7 @@ public class AzureSdkExecutor
 
         // 1) DB
         var dbAppName = $"{appName}-db";
+        await WarnIfDbAppExistsAsync(subscriptionId, rgName, dbAppName);
         var dbAppOp = await apps.CreateOrUpdateAsync(WaitUntil.Completed, dbAppName,
             ContainerAppSpecBuilder.BuildDbApp(opts, location, env.Id));
         var dbApp = dbAppOp.Value;

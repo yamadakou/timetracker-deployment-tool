@@ -44,6 +44,7 @@ Timetracker（DockerHub の `densocreate/timetracker` イメージ）を、選�
 - Azure Database for PostgreSQL、Azure SQL Database などの PaaS データベースリソースは作成されません
 - Log Analytics ワークスペースは自動作成されません（Container Apps Environment が必要に応じて作成する場合があります）
 - データの永続化が必要な場合は、Azure Files などの永続ボリュームを別途設定する必要があります
+- **DB コンテナの再起動（再実行による設定変更、リビジョン更新、基盤メンテナンス等）で DB のデータは失われます**。本番運用では永続ボリュームの設定とバックアップを必ず行ってください
 
 ### 必要な RBAC ロールと権限
 
@@ -429,7 +430,9 @@ timetracker-cli.exe deploy `
   A: 本ツールではスケール構成は行いません。各コンテナとも 1 台固定です。
 
 - **Q: コンテナのCPU/メモリは後から変更できますか？**  
-  A: 再実行時にオプションを変更すれば Container Apps 上の設定が更新されます。
+  A: 再実行時にオプションを変更すれば Container Apps 上の設定が更新されます。  
+  > [!WARNING]
+  > DB アプリ（`{アプリ名}-db`）の設定が変わると DB コンテナが再起動し、永続ボリュームを設定していないため **DB のデータは失われます**。既存の DB アプリがある状態で再実行すると、ツールは警告を表示します。運用中の環境で再実行する前に、必ずバックアップを取得してください。
 
 - **Q: Log Analytics ワークスペースは作成されますか？**  
   A: 本ツールは明示的に作成しません。ただし、Container Apps Environment が必要に応じて自動作成する場合があります。

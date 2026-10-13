@@ -115,4 +115,44 @@ public class AzureSdkExecutorTests
 
         result.Should().BeSameAs(created.Object);
     }
+
+    private static (Mock<ArmClient> arm, Mock<ContainerAppCollection> apps) SetupContainerApps()
+    {
+        var arm = new Mock<ArmClient>();
+        var rg = new Mock<ResourceGroupResource>();
+        var mockable = new Mock<MockableAppContainersResourceGroupResource>();
+        var apps = new Mock<ContainerAppCollection>();
+        arm.Setup(a => a.GetResourceGroupResource(It.IsAny<ResourceIdentifier>())).Returns(rg.Object);
+        rg.Setup(r => r.GetCachedClient(It.IsAny<Func<ArmClient, MockableAppContainersResourceGroupResource>>())).Returns(mockable.Object);
+        mockable.Setup(m => m.GetContainerApps()).Returns(apps.Object);
+        return (arm, apps);
+    }
+
+    [Fact]
+    public async Task WarnIfDbAppExists_Should_Warn_About_Data_Loss_When_Db_App_Exists()
+    {
+        var (arm, apps) = SetupContainerApps();
+        apps.Setup(c => c.GetIfExistsAsync("app-db", It.IsAny<CancellationToken>())).ReturnsAsync(Found(new Mock<ContainerAppResource>().Object));
+        var output = new StringWriter();
+
+        var sut = new AzureSdkExecutor(new SimpleLogger(false, output), arm.Object);
+        var exists = await sut.WarnIfDbAppExistsAsync(SubscriptionId, RgName, "app-db");
+
+        exists.Should().BeTrue();
+        output.ToString().Should().Contain("[WARN]").And.Contain("データ");
+    }
+
+    [Fact]
+    public async Task WarnIfDbAppExists_Should_Not_Warn_When_Db_App_Not_Exists()
+    {
+        var (arm, apps) = SetupContainerApps();
+        apps.Setup(c => c.GetIfExistsAsync("app-db", It.IsAny<CancellationToken>())).ReturnsAsync(NotFound<ContainerAppResource>());
+        var output = new StringWriter();
+
+        var sut = new AzureSdkExecutor(new SimpleLogger(false, output), arm.Object);
+        var exists = await sut.WarnIfDbAppExistsAsync(SubscriptionId, RgName, "app-db");
+
+        exists.Should().BeFalse();
+        output.ToString().Should().NotContain("[WARN]");
+    }
 }
