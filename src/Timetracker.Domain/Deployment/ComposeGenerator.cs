@@ -22,7 +22,8 @@ public static class ComposeGenerator
         sb.AppendLine("      ASPNETCORE_URLS: \"http://0.0.0.0:8080\"");
         sb.AppendLine("      TTNX_DB_TYPE: \"${TTNX_DB_TYPE}\"");
         // Azure Container Apps 側（ContainerAppSpecBuilder）と同じ環境変数を設定する
-        sb.AppendLine("      TTNX_DB_SERVER: \"db:${DB_PORT}\"");
+        // TTNX_DB_SERVER はホスト名のみ（ポートは TTNX_DB_PORT。イメージ側で連結される）
+        sb.AppendLine("      TTNX_DB_SERVER: \"db\"");
         sb.AppendLine("      TTNX_DB_USER: \"${DB_USER}\"");
         sb.AppendLine("      TTNX_DB_PASSWORD: \"${DB_PASSWORD}\"");
         sb.AppendLine("      TTNX_DB_NAME: \"${DB_NAME}\"");

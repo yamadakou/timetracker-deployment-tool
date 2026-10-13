@@ -82,7 +82,7 @@ public class ContainerAppSpecBuilderTests
         env["TTNX_DB_PASSWORD"].SecretRef.Should().Be(ContainerAppSpecBuilder.DbPasswordSecretName);
         env["DB_PASSWORD"].SecretRef.Should().Be(ContainerAppSpecBuilder.DbPasswordSecretName);
         env["APP_PASSWORD"].SecretRef.Should().Be(ContainerAppSpecBuilder.AppPasswordSecretName);
-        env["TTNX_DB_SERVER"].Value.Should().Be("app-db:5432");
+        env["TTNX_DB_SERVER"].Value.Should().Be("app-db"); // ポートは TTNX_DB_PORT で別指定（イメージ側で連結される）
         env["TTNX_REDIS_GLOBALCACHE"].Value.Should().Be("app-redis:6379");
         data.Configuration.Secrets.Should().Contain(s => s.Name == ContainerAppSpecBuilder.AppPasswordSecretName && s.Value == AppPassword);
         data.Configuration.Ingress.External.Should().BeTrue();
@@ -117,5 +117,18 @@ public class ContainerAppSpecBuilderTests
         {
             System.Globalization.CultureInfo.CurrentCulture = original;
         }
+    }
+
+    [Theory]
+    [InlineData("postgresql", "5432")]
+    [InlineData("sqlserver", "1433")]
+    public void TTNX_DB_SERVER_Should_Be_Host_Only_And_Port_Separate(string dbType, string port)
+    {
+        // イメージの entrypoint.sh は SQL Server の場合 "Data Source=${TTNX_DB_SERVER},${TTNX_DB_PORT}" と連結するため、
+        // TTNX_DB_SERVER にポートを含めると "app-db:1433,1433" となり接続できない
+        var env = ContainerAppSpecBuilder.BuildTimetrackerApp(CreateOptions(dbType), "japaneast", EnvId, "app-db", "app-redis")
+            .Template.Containers[0].Env.ToDictionary(e => e.Name);
+        env["TTNX_DB_SERVER"].Value.Should().Be("app-db");
+        env["TTNX_DB_PORT"].Value.Should().Be(port);
     }
 }

@@ -148,8 +148,9 @@ public static class ContainerAppSpecBuilder
             {
                 Env("ASPNETCORE_URLS", "http://0.0.0.0:8080"),
                 Env("TTNX_DB_TYPE", opts.DbType),
-                // DB/Redis は Container App 名 + ポートを使用
-                Env("TTNX_DB_SERVER", $"{dbEndpointHost}:{dbPort}"),
+                // DB はホスト名のみ。ポートは TTNX_DB_PORT で別指定する
+                // （イメージの entrypoint.sh が SQL Server では "Data Source=サーバー,ポート" に連結するため、ここにポートを含めると接続できない）
+                Env("TTNX_DB_SERVER", dbEndpointHost),
                 Env("TTNX_DB_USER", dbUser),
                 SecretEnv("TTNX_DB_PASSWORD", DbPasswordSecretName),
                 Env("TTNX_DB_NAME", opts.DbName),

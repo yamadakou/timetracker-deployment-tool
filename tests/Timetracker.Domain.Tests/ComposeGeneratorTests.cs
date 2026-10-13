@@ -153,5 +153,16 @@ namespace Timetracker.Domain.Tests
             ((YamlMappingNode)services["db"]).Children.Keys.Select(k => ((YamlScalarNode)k).Value)
                 .Should().NotContain("ports"); // DB をホストに公開しない
         }
+    
+        [Theory]
+        [InlineData("postgresql")]
+        [InlineData("sqlserver")]
+        public void GenerateCompose_TTNX_DB_SERVER_Should_Be_Host_Only(string dbType)
+        {
+            // ポートは TTNX_DB_PORT で別指定（イメージ側で SQL Server は "server,port" に連結される）
+            var tt = EnvironmentOf(ComposeGenerator.GenerateCompose(CreateOptions(dbType)), "timetracker");
+            tt["TTNX_DB_SERVER"].Should().Be("db");
+            tt["TTNX_DB_PORT"].Should().Be("${DB_PORT}");
+        }
     }
 }
