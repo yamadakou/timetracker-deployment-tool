@@ -497,8 +497,9 @@ dotnet publish .\src\Timetracker.Controller.Cli\Timetracker.Controller.Cli.cspro
 
 生成する Container Apps の構成は常に以下の3コンテナを含みます。
 - `timetracker`（`densocreate/timetracker` イメージ）
-- `db`（`postgres:16-alpine` または `mcr.microsoft.com/mssql/server:2022-latest`）
-- `redis`（`redis:7-alpine`）
+- `db`（`postgres:16` または `mcr.microsoft.com/mssql/server:2022-latest`）
+- `redis`（`redis:7`）
+- Dry-run で生成する `docker-compose.yml` も同じイメージ・環境変数を使用します
 - Ingress: 外部公開、ターゲットポート 8080
 - スケール: MinReplicas=1 / MaxReplicas=1（固定）
 - timetracker のイメージタグは `--tt-tag` で指定した値を使用（省略時は DB 種別に応じて `7.0-linux-postgres` / `7.0-linux-mssql`）

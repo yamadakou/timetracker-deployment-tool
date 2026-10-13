@@ -49,7 +49,7 @@ public static class ContainerAppSpecBuilder
             ? new ContainerAppContainer()
             {
                 Name = "timetracker-db",
-                Image = "postgres:16", // Functions と合わせる
+                Image = ContainerImages.Postgres,
                 Env =
                 {
                     Env("POSTGRES_USER", GetDbUser(opts)),
@@ -65,7 +65,7 @@ public static class ContainerAppSpecBuilder
             : new ContainerAppContainer()
             {
                 Name = "timetracker-db",
-                Image = "mcr.microsoft.com/mssql/server:2022-latest",
+                Image = ContainerImages.SqlServer,
                 Env =
                 {
                     Env("ACCEPT_EULA", "Y"),
@@ -106,7 +106,7 @@ public static class ContainerAppSpecBuilder
         var redisContainer = new ContainerAppContainer()
         {
             Name = "timetracker-redis",
-            Image = "redis:latest", // Functions と合わせる
+            Image = ContainerImages.Redis,
             Args = { "redis-server", "--appendonly", "yes" },
             Resources = new AppContainerResources()
             {
@@ -143,7 +143,7 @@ public static class ContainerAppSpecBuilder
         var timetrackerContainer = new ContainerAppContainer()
         {
             Name = "timetracker",
-            Image = $"densocreate/timetracker:{opts.TimetrackerTag}",
+            Image = ContainerImages.Timetracker(opts.TimetrackerTag),
             Env =
             {
                 Env("ASPNETCORE_URLS", "http://0.0.0.0:8080"),

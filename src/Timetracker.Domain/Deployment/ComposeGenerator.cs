@@ -6,7 +6,7 @@ public static class ComposeGenerator
 {
     public static string GenerateCompose(DeployOptions o)
     {
-        var ttImage = $"densocreate/timetracker:{o.TimetrackerTag}";
+        var ttImage = ContainerImages.Timetracker(o.TimetrackerTag);
 
         var sb = new StringBuilder();
         sb.AppendLine("services:");
@@ -21,6 +21,17 @@ public static class ComposeGenerator
         sb.AppendLine("    environment:");
         sb.AppendLine("      ASPNETCORE_URLS: \"http://0.0.0.0:8080\"");
         sb.AppendLine("      TTNX_DB_TYPE: \"${TTNX_DB_TYPE}\"");
+        // Azure Container Apps 側（ContainerAppSpecBuilder）と同じ環境変数を設定する
+        sb.AppendLine("      TTNX_DB_SERVER: \"db:${DB_PORT}\"");
+        sb.AppendLine("      TTNX_DB_USER: \"${DB_USER}\"");
+        sb.AppendLine("      TTNX_DB_PASSWORD: \"${DB_PASSWORD}\"");
+        sb.AppendLine("      TTNX_DB_NAME: \"${DB_NAME}\"");
+        sb.AppendLine("      TTNX_DB_PORT: \"${DB_PORT}\"");
+        sb.AppendLine("      TTNX_DB_OPTIONS: \"\"");
+        sb.AppendLine("      TTNX_REDIS_GLOBALCACHE: \"redis:6379\"");
+        sb.AppendLine("      TTNX_REDIS_HANGFIRE: \"redis:6379\"");
+        sb.AppendLine("      TTNX_REDIS_BACKGROUNDJOB: \"redis:6379\"");
+        // 互換のため従来の変数も設定
         sb.AppendLine("      DB_HOST: \"db\"");
         sb.AppendLine("      DB_PORT: \"${DB_PORT}\"");
         sb.AppendLine("      DB_USER: \"${DB_USER}\"");
@@ -34,7 +45,7 @@ public static class ComposeGenerator
         if (o.DbType == "postgresql")
         {
             sb.AppendLine("  db:");
-            sb.AppendLine("    image: postgres:16-alpine");
+            sb.AppendLine($"    image: {ContainerImages.Postgres}");
             sb.AppendLine("    container_name: timetracker-postgres");
             sb.AppendLine("    environment:");
             sb.AppendLine("      POSTGRES_USER: \"${DB_USER}\"");
@@ -47,7 +58,7 @@ public static class ComposeGenerator
         else
         {
             sb.AppendLine("  db:");
-            sb.AppendLine("    image: mcr.microsoft.com/mssql/server:2022-latest");
+            sb.AppendLine($"    image: {ContainerImages.SqlServer}");
             sb.AppendLine("    container_name: timetracker-sqlserver");
             sb.AppendLine("    environment:");
             sb.AppendLine("      ACCEPT_EULA: \"Y\"");
@@ -59,7 +70,7 @@ public static class ComposeGenerator
         }
 
         sb.AppendLine("  redis:");
-        sb.AppendLine("    image: redis:7-alpine");
+        sb.AppendLine($"    image: {ContainerImages.Redis}");
         sb.AppendLine("    container_name: timetracker-redis");
         sb.AppendLine("    command: [\"redis-server\", \"--appendonly\", \"yes\"]");
         sb.AppendLine("    volumes:");
