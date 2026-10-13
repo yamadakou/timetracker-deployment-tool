@@ -19,6 +19,24 @@ Timetracker（DockerHub の `densocreate/timetracker` イメージ）を、選�
 
 ---
 
+## 本ツールの目的と注意事項
+
+> [!IMPORTANT]
+> 本ツールは、Timetracker の **検証環境（評価・動作確認・デモ用途）を手早く構築するための支援ツール** です。本番環境の構築は対象外です。本番運用に必要な構成（データの永続化、バックアップ、冗長化、ネットワーク設計、ライセンスに合った DB エディションの選択など）は、本ツールでは行いません。
+
+検証用途に割り切った設計のため、以下の点にご注意ください。
+
+| 項目 | 内容 |
+|---|---|
+| DB データは永続化されない | DB はボリュームを持たないコンテナとして動作します。DB コンテナが再起動すると（ツールの再実行による設定変更、リビジョン更新、Azure 基盤のメンテナンス等）、**DB のデータは失われます**。既存の DB アプリがある状態で再実行すると、ツールは警告を表示します。残したいデータは事前にエクスポートしてください。 |
+| SQL Server は Developer エディション | `--db-type sqlserver` の場合、SQL Server は `MSSQL_PID=Developer` で起動します。Developer エディションは開発・テスト用途に限られ、本番環境では使用できません。 |
+| SQL Server ＋ Azure ではサンプル DB を作成できない | SQL Server の復元処理は DB コンテナ側のファイルを読むため、Azure Container Apps ではアプリコンテナ内のサンプル DB を参照できません。セットアップウィザードでは「空のデータベースを作成する」を選択してください。PostgreSQL、および Dry-run で生成する docker-compose（ローカル検証）では、サンプル DB を作成できます。 |
+| スケールは 1 台固定 | 各コンテナとも 1 台で動作し、冗長化・スケールアウトは行いません。 |
+| 機密情報の取り扱い | Dry-run で生成する `.env` には DB パスワード等が平文で出力されます。共有やリポジトリへのコミットは避けてください。Azure 上ではパスワードを Container Apps の secret として登録します。 |
+| 不要になった環境の削除 | 検証が終わったら、リソースグループごと削除すると課金を止められます（例: `az group delete --name <リソースグループ名>`）。既存のリソースグループを指定した場合は、他のリソースを巻き込まないようご注意ください。 |
+
+---
+
 ## 利用者向けマニュアル
 
 ### 作成される Azure リソース
@@ -43,8 +61,7 @@ Timetracker（DockerHub の `densocreate/timetracker` イメージ）を、選�
 - DB および Redis は **コンテナ** として Container Apps 内で実行されます
 - Azure Database for PostgreSQL、Azure SQL Database などの PaaS データベースリソースは作成されません
 - Log Analytics ワークスペースは自動作成されません（Container Apps Environment が必要に応じて作成する場合があります）
-- データの永続化が必要な場合は、Azure Files などの永続ボリュームを別途設定する必要があります
-- **DB コンテナの再起動（再実行による設定変更、リビジョン更新、基盤メンテナンス等）で DB のデータは失われます**。本番運用では永続ボリュームの設定とバックアップを必ず行ってください
+- DB のデータは永続化されません（[本ツールの目的と注意事項](#本ツールの目的と注意事項) を参照）
 
 ### 必要な RBAC ロールと権限
 
@@ -53,7 +70,7 @@ Timetracker（DockerHub の `densocreate/timetracker` イメージ）を、選�
 | ロール | 説明 | 推奨用途 |
 |--------|------|----------|
 | **Owner** | サブスクリプションまたはリソースグループの完全な管理権限 | 開発・テスト環境 |
-| **Contributor** | リソースの作成・変更・削除が可能（RBACの管理は不可） | 本番環境での推奨ロール |
+| **Contributor** | リソースの作成・変更・削除が可能（RBACの管理は不可） | 通常利用での推奨ロール |
 | **Container Apps Contributor** | Container Apps リソースの管理に特化 | 最小権限の原則に基づく運用 |
 
 **参考リンク**:
@@ -274,7 +291,7 @@ az provider show --namespace Microsoft.OperationalInsights --query "registration
 ##### 前提環境
 - Azure VM、Azure App Service、Azure Container Instances、または Azure Functions 上で実行
 - 実行環境に Managed Identity が有効化されていること
-- 本番環境での推奨認証モード（認証情報の管理が不要）
+- Azure 上で実行する場合の推奨認証モード（認証情報の管理が不要）
 - 必要な RBAC ロール: Managed Identity に Owner、Contributor、または Container Apps Contributor ロールを付与
 - 参考: [Managed Identity](https://learn.microsoft.com/ja-jp/azure/active-directory/managed-identities-azure-resources/overview)
 
@@ -362,8 +379,7 @@ az provider show --namespace Microsoft.OperationalInsights --query "registration
 - `--location` (任意): リージョン（省略時は `japaneast`）
 - `--app-name` (任意): アプリ名（省略時は `timetracker`）。Azure Container Apps の命名規則に従う必要があります（後述の注意事項参照）。
 - `--db-type` (任意): DB 種別。`postgresql` または `sqlserver`（デフォルト: `postgresql`）
-  - `sqlserver` の場合、Azure Container Apps へのデプロイでは **サンプルデータベースの作成は利用できません**（SQL Server の復元は DB コンテナ側のファイルを読むため、アプリコンテナ内のバックアップファイルを参照できません）。「空のデータベースを作成する」を選択してください
-  - `sqlserver` の場合、SQL Server は **Developer エディション**（`MSSQL_PID=Developer`）で起動します。Developer エディションは開発・テスト用途に限られ、本番環境では使用できません。本番利用する場合はライセンスに合ったエディションを別途ご検討ください。
+  - `sqlserver` の場合は Developer エディションで起動し、Azure 上ではサンプル DB を作成できません（[本ツールの目的と注意事項](#本ツールの目的と注意事項) を参照）
 - `--db-password` (必須): DB パスワード（DB 種別に関わらず統一パラメータ。8 文字以上。`sqlserver` の場合は英大文字・英小文字・数字・記号のうち 3 種類以上を含む必要があります）
 - `--db-name` (任意): DB 名。デフォルト `timetracker`
 - `--tracker-password` (必須): Timetracker アプリパスワード（DockerHub の `<your password>` に対応）
@@ -387,7 +403,7 @@ az provider show --namespace Microsoft.OperationalInsights --query "registration
 
 補足:
 - DB ユーザは DockerHub の「クイックスタート」記載の固定値を使用します（CLI からは変更不可）。
-- `.env` に機密情報が出力されます。取り扱いにはご注意ください。
+- `.env` に機密情報が出力されます。取り扱いにはご注意ください（[本ツールの目的と注意事項](#本ツールの目的と注意事項) を参照）。
 - **timetracker イメージタグについて**: DB 種別に応じて適切なタグを選択してください。PostgreSQL 用のタグ (例: `7.0-linux-postgres`) と SQL Server 用のタグ (例: `7.0-linux-mssql`) があります。異なる DB 種別用のタグを混在させないでください。利用可能なタグ一覧は [DockerHub](https://hub.docker.com/r/densocreate/timetracker/tags) を参照してください。
 - **アプリ名の命名規則**: `--app-name` で指定するアプリ名は Azure Container Apps の命名規則に従う必要があります:
   - 使用可能な文字: 英小文字 (a-z)、数字 (0-9)、ハイフン (-)
@@ -432,7 +448,7 @@ timetracker-cli.exe deploy `
   A: いいえ。本ツールは DB を **コンテナ** として Container Apps にデプロイします。PaaS データベースリソースは作成されません。
 
 - **Q: データの永続化はどうなりますか？**  
-  A: デフォルトではコンテナのエフェメラルストレージを使用します。データの永続化が必要な場合は、Azure Files などの永続ボリュームを別途設定する必要があります。
+  A: 永続化されません。本ツールは検証環境の構築が目的のため、DB はコンテナのエフェメラルストレージで動作し、コンテナの再起動でデータが失われます。
 
 #### リソースとスケーリング
 
@@ -442,7 +458,7 @@ timetracker-cli.exe deploy `
 - **Q: コンテナのCPU/メモリは後から変更できますか？**  
   A: 再実行時にオプションを変更すれば Container Apps 上の設定が更新されます。  
   > [!WARNING]
-  > DB アプリ（`{アプリ名}-db`）の設定が変わると DB コンテナが再起動し、永続ボリュームを設定していないため **DB のデータは失われます**。既存の DB アプリがある状態で再実行すると、ツールは警告を表示します。運用中の環境で再実行する前に、必ずバックアップを取得してください。
+  > DB アプリ（`{アプリ名}-db`）の設定が変わると DB コンテナが再起動し、**DB のデータは失われます**。既存の DB アプリがある状態で再実行すると、ツールは警告を表示します。
 
 - **Q: Log Analytics ワークスペースは作成されますか？**  
   A: 本ツールは明示的に作成しません。ただし、Container Apps Environment が必要に応じて自動作成する場合があります。
@@ -508,7 +524,7 @@ dotnet publish .\src\Timetracker.Controller.Cli\Timetracker.Controller.Cli.cspro
 - timetracker のイメージタグは `--tt-tag` で指定した値を使用（省略時は DB 種別に応じて `7.0-linux-postgres` / `7.0-linux-mssql`）
 
 ### 注意点
-- Container Apps の永続ボリュームが必要な場合は Azure Files 等の設定を追加してください（DB/Redis のデータ保持用途）。
+- 本ツールは検証環境の構築支援が目的のため、DB/Redis の永続ボリュームは設定していません（[本ツールの目的と注意事項](#本ツールの目的と注意事項) を参照）。
 - DB パスワード・Timetracker アプリパスワードは Container Apps の secret（`db-password` / `app-password`）として登録し、環境変数からは `secretRef` で参照します（ポータル上の環境変数一覧に平文で表示されません）。
 - 認証は Managed Identity もしくは Service Principal を推奨（DefaultAzureCredential 利用）。
 - DockerHub「クイックスタート」記載の固定 DB ユーザ名は Domain 層の Defaults に集約しています（必要に応じて正確値に更新）。
