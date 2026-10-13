@@ -19,7 +19,7 @@ namespace Timetracker.Domain.Tests
                 DbType = "postgresql",
                 DbPassword = "TestPassword123!",
                 TrackerPassword = "TrackerPassword123!",
-                TimetrackerTag = "7.0-linux-postgres",
+                TimetrackerTag = "11.0.1-linux-postgres",
                 Subscription = "test-subscription",
                 ResourceGroup = "test-rg"
             };
@@ -40,7 +40,7 @@ namespace Timetracker.Domain.Tests
                 DbType = "postgresql",
                 DbPassword = "TestPassword123!",
                 TrackerPassword = "TrackerPassword123!",
-                TimetrackerTag = "7.0-linux-postgres",
+                TimetrackerTag = "11.0.1-linux-postgres",
                 Subscription = "test-subscription",
                 ResourceGroup = "test-rg"
             };
@@ -61,7 +61,7 @@ namespace Timetracker.Domain.Tests
                 DbType = "postgresql",
                 DbPassword = "TestPassword123!",
                 TrackerPassword = "TrackerPassword123!",
-                TimetrackerTag = "7.0-linux-postgres",
+                TimetrackerTag = "11.0.1-linux-postgres",
                 Subscription = "test-subscription",
                 ResourceGroup = "test-rg"
             };
@@ -82,7 +82,7 @@ namespace Timetracker.Domain.Tests
                 DbType = "sqlserver",
                 DbPassword = "TestPassword123!",
                 TrackerPassword = "TrackerPassword123!",
-                TimetrackerTag = "7.0-linux-mssql",
+                TimetrackerTag = "11.0.1-linux-mssql",
                 Subscription = "test-subscription",
                 ResourceGroup = "test-rg"
             };
@@ -99,7 +99,7 @@ namespace Timetracker.Domain.Tests
             DbType = dbType,
             DbPassword = "TestPassword123!",
             TrackerPassword = "TrackerPassword123!",
-            TimetrackerTag = dbType == "postgresql" ? "7.0-linux-postgres" : "7.0-linux-mssql",
+            TimetrackerTag = dbType == "postgresql" ? "11.0.1-linux-postgres" : "11.0.1-linux-mssql",
             Subscription = "test-subscription",
             ResourceGroup = "test-rg"
         };
@@ -234,6 +234,24 @@ namespace Timetracker.Domain.Tests
             env.Should().Contain("DB_PASSWORD=\"Pa\\$HOME\\\\x\\\"y'z\"");
             env.Should().Contain("TIMETRACKER_PASSWORD=\"Tr@ck\\$1#\"");
             env.Should().Contain("DB_NAME=\"timetracker\"");
+        }
+    
+        [Theory]
+        [InlineData("postgresql")]
+        [InlineData("sqlserver")]
+        public void GenerateCompose_Should_Set_Both_TTNX_And_TT_Prefixed_Variables(string dbType)
+        {
+            // timetracker 11.x のイメージは TT_ 接頭辞、7.x 以前は TTNX_ 接頭辞の環境変数を読むため、両方を同じ値で設定する
+            var tt = EnvironmentOf(ComposeGenerator.GenerateCompose(CreateOptions(dbType)), "timetracker");
+            var ttnxKeys = tt.Keys.Where(k => k.StartsWith("TTNX_")).ToList();
+            ttnxKeys.Should().Contain(new[] { "TTNX_DB_TYPE", "TTNX_DB_SERVER", "TTNX_DB_USER", "TTNX_DB_PASSWORD",
+                "TTNX_REDIS_GLOBALCACHE", "TTNX_REDIS_HANGFIRE", "TTNX_REDIS_BACKGROUNDJOB" });
+            foreach (var k in ttnxKeys)
+            {
+                var newKey = "TT_" + k["TTNX_".Length..];
+                tt.Should().ContainKey(newKey);
+                tt[newKey].Should().Be(tt[k]);
+            }
         }
     }
 }

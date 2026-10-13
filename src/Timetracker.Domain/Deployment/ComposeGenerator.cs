@@ -27,18 +27,29 @@ public static class ComposeGenerator
         sb.AppendLine("      - \"8080:8080\"");
         sb.AppendLine("    environment:");
         sb.AppendLine("      ASPNETCORE_URLS: \"http://0.0.0.0:8080\"");
-        sb.AppendLine("      TTNX_DB_TYPE: \"${TTNX_DB_TYPE}\"");
-        // Azure Container Apps 側（ContainerAppSpecBuilder）と同じ環境変数を設定する
-        // TTNX_DB_SERVER はホスト名のみ（ポートは TTNX_DB_PORT。イメージ側で連結される）
-        sb.AppendLine("      TTNX_DB_SERVER: \"db\"");
-        sb.AppendLine("      TTNX_DB_USER: \"${DB_USER}\"");
-        sb.AppendLine("      TTNX_DB_PASSWORD: \"${DB_PASSWORD}\"");
-        sb.AppendLine("      TTNX_DB_NAME: \"${DB_NAME}\"");
-        sb.AppendLine("      TTNX_DB_PORT: \"${DB_PORT}\"");
-        sb.AppendLine("      TTNX_DB_OPTIONS: \"\"");
-        sb.AppendLine("      TTNX_REDIS_GLOBALCACHE: \"redis:6379\"");
-        sb.AppendLine("      TTNX_REDIS_HANGFIRE: \"redis:6379\"");
-        sb.AppendLine("      TTNX_REDIS_BACKGROUNDJOB: \"redis:6379\"");
+        // Azure Container Apps 側（ContainerAppSpecBuilder）と同じ環境変数を設定する。
+        // timetracker 11.x のイメージは TT_、7.x 以前は TTNX_ 接頭辞を読むため、両方を同じ値で設定する。
+        // DB_SERVER はホスト名のみ（ポートは DB_PORT。イメージ側で連結される）
+        var ttVariables = new (string Name, string Value)[]
+        {
+            ("DB_TYPE", "${TTNX_DB_TYPE}"),
+            ("DB_SERVER", "db"),
+            ("DB_USER", "${DB_USER}"),
+            ("DB_PASSWORD", "${DB_PASSWORD}"),
+            ("DB_NAME", "${DB_NAME}"),
+            ("DB_PORT", "${DB_PORT}"),
+            ("DB_OPTIONS", ""),
+            ("REDIS_GLOBALCACHE", "redis:6379"),
+            ("REDIS_HANGFIRE", "redis:6379"),
+            ("REDIS_BACKGROUNDJOB", "redis:6379"),
+        };
+        foreach (var prefix in new[] { ContainerImages.LegacyEnvPrefix, ContainerImages.EnvPrefix })
+        {
+            foreach (var (name, value) in ttVariables)
+            {
+                sb.AppendLine($"      {prefix}{name}: \"{value}\"");
+            }
+        }
         // 互換のため従来の変数も設定
         sb.AppendLine("      DB_HOST: \"db\"");
         sb.AppendLine("      DB_PORT: \"${DB_PORT}\"");
@@ -176,7 +187,7 @@ public static class ComposeGenerator
                 "db-password が SQL Server のパスワード要件を満たしていません。英大文字・英小文字・数字・記号のうち 3 種類以上を含めてください" +
                 "（要件を満たさない場合 SQL Server コンテナが起動しません）。");
         if (string.IsNullOrWhiteSpace(o.TimetrackerTag))
-            throw new ArgumentException("tt-tag（timetracker イメージタグ）が空です。例: 7.0-linux-postgres, 7.0-linux-mssql など。");
+            throw new ArgumentException("tt-tag（timetracker イメージタグ）が空です。例: 11.0.1-linux-postgres, 11.0.1-linux-mssql など。");
 
         // db-type と tt-tag の組み合わせ検証
         var tagLower = o.TimetrackerTag.ToLowerInvariant();
@@ -190,7 +201,7 @@ public static class ComposeGenerator
         {
             throw new ArgumentException(
                 $"不適切な組み合わせ: db-type='{o.DbType}' と tt-tag='{o.TimetrackerTag}' は対応していません。" +
-                " DB 種別に合致するタグを指定してください (例: postgresql → 7.0-linux-postgres / sqlserver → 7.0-linux-mssql)。" +
+                " DB 種別に合致するタグを指定してください (例: postgresql → 11.0.1-linux-postgres / sqlserver → 11.0.1-linux-mssql)。" +
                 " タグ一覧: https://hub.docker.com/r/densocreate/timetracker/tags");
         }
     }

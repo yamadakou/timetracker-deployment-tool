@@ -177,6 +177,18 @@ public static class ContainerAppSpecBuilder
             }
         };
 
+        // timetracker 11.x のイメージは TT_、7.x 以前は TTNX_ 接頭辞の環境変数を読むため、
+        // どちらのタグでも動くよう TTNX_ の各変数と同じ値で TT_ の変数も設定する
+        foreach (var e in timetrackerContainer.Env.Where(e => e.Name.StartsWith(ContainerImages.LegacyEnvPrefix)).ToList())
+        {
+            timetrackerContainer.Env.Add(new ContainerAppEnvironmentVariable
+            {
+                Name = ContainerImages.EnvPrefix + e.Name[ContainerImages.LegacyEnvPrefix.Length..],
+                Value = e.Value,
+                SecretRef = e.SecretRef,
+            });
+        }
+
         return new ContainerAppData(location)
         {
             EnvironmentId = envId,

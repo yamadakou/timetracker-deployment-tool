@@ -68,7 +68,7 @@ public class ValidateTests
         yield return new object[] { (Action<DeployOptions>)(o => o.TrackerPassword = "short"), "*tracker-password*" };
         yield return new object[] { (Action<DeployOptions>)(o => o.DbPassword = "short"), "*db-password*" };
         yield return new object[] { (Action<DeployOptions>)(o => o.TimetrackerTag = ""), "*tt-tag*" };
-        yield return new object[] { (Action<DeployOptions>)(o => o.TimetrackerTag = "7.0-linux-mssql"), "*不適切な組み合わせ*" };
+        yield return new object[] { (Action<DeployOptions>)(o => o.TimetrackerTag = "11.0.1-linux-mssql"), "*不適切な組み合わせ*" };
     }
 
     [Theory]
@@ -82,8 +82,8 @@ public class ValidateTests
     }
 
     [Theory]
-    [InlineData("sqlserver", "7.0-linux-postgres")]
-    [InlineData("postgresql", "7.0-linux-sqlserver")]
+    [InlineData("sqlserver", "11.0.1-linux-postgres")]
+    [InlineData("postgresql", "11.0.1-linux-sqlserver")]
     public void Mismatched_DbType_And_Tag_Should_Throw(string dbType, string tag)
     {
         var o = CreateOptions(dbType);

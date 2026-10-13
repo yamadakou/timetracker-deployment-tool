@@ -27,8 +27,8 @@ public class DefaultsTests
 public class DefaultTimetrackerTagTests
 {
     [Theory]
-    [InlineData("postgresql", "7.0-linux-postgres")]
-    [InlineData("sqlserver", "7.0-linux-mssql")]
+    [InlineData("postgresql", "11.0.1-linux-postgres")]
+    [InlineData("sqlserver", "11.0.1-linux-mssql")]
     public void GetDefaultTimetrackerTag_Should_Match_DbType(string dbType, string expected)
     {
         Defaults.GetDefaultTimetrackerTag(dbType).Should().Be(expected);
