@@ -160,4 +160,14 @@ public class ContainerAppSpecBuilderTests
             env[newKey].SecretRef.Should().Be(env[k].SecretRef);
         }
     }
+
+    [Fact]
+    public void ManagedEnvironment_Should_Serialize_Properties()
+    {
+        // properties が無いと Container Apps API が 400 (Must contain 'properties') を返す
+        var data = ContainerAppSpecBuilder.BuildManagedEnvironment("japaneast");
+        using var doc = JsonDocument.Parse(ModelReaderWriter.Write(data).ToString());
+        doc.RootElement.TryGetProperty("properties", out var props).Should().BeTrue();
+        props.ValueKind.Should().Be(JsonValueKind.Object);
+    }
 }

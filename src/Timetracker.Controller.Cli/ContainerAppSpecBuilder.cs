@@ -41,6 +41,14 @@ public static class ContainerAppSpecBuilder
         }
     };
 
+    // Container Apps Environment（VNet 設定は必要に応じて追加。例: InfrastructureSubnetId）
+    public static ContainerAppManagedEnvironmentData BuildManagedEnvironment(string location) => new(location)
+    {
+        // Azure.ResourceManager.AppContainers 1.6.0 以降は properties が空だとボディから省かれ、
+        // API が 400 (Must contain 'properties') を返すため、既定値（ゾーン冗長なし）を明示して properties を送る
+        IsZoneRedundant = false,
+    };
+
     // 1) DB 用 Container App（Internal Ingress: TCP + ExposedPort）
     public static ContainerAppData BuildDbApp(DeployOptions opts, string location, ResourceIdentifier envId)
     {
