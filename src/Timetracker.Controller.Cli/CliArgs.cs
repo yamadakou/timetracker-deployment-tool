@@ -36,7 +36,7 @@ public sealed class CliArgs
           --db-name <名前>            既定: timetracker
           --tt-tag <タグ>             timetracker イメージタグ（既定: postgresql→11.0.1-linux-postgres / sqlserver→11.0.1-linux-mssql）
           --auth-mode <モード>        default | azure-cli | sp-env | device-code | managed-identity（既定: default）
-          --tt-cpu / --tt-memory      Timetracker の vCPU / メモリ(Gi)（既定: 0.75 / 1.5）
+          --tt-cpu / --tt-memory      Timetracker の vCPU / メモリ(Gi)（既定: 1.5 / 3.0）
           --db-cpu / --db-memory      DB の vCPU / メモリ(Gi)（既定: 1.0 / 2.0）
           --redis-cpu / --redis-memory Redis の vCPU / メモリ(Gi)（既定: 0.5 / 1.0）
           --dry-run [true|false]      Azure へ反映せず docker-compose.yml と .env を生成

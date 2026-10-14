@@ -70,6 +70,25 @@ public class DeployOptionsTests
         opts.AuthMode.Should().Be("default");
     }
 
+    [Fact]
+    public void DeployOptions_TimetrackerSpec_Should_Default_To_1_5_vCPU_And_3_0Gi()
+    {
+        // 2Gi 以下ではサンプル DB の復元が OutOfMemoryException で失敗するため
+        var opts = new DeployOptions
+        {
+            Subscription = "test-sub",
+            ResourceGroup = "test-rg",
+            DbPassword = "testPassword123!",
+            TrackerPassword = "testTracker123!"
+        };
+
+        opts.TimetrackerCpu.Should().Be(1.5);
+        opts.TimetrackerMemoryGi.Should().Be(3.0);
+        // CLI（Program.cs）も同じ Defaults を既定値に使う
+        Defaults.TimetrackerCpu.Should().Be(1.5);
+        Defaults.TimetrackerMemoryGi.Should().Be(3.0);
+    }
+
     [Theory]
     [InlineData("default")]
     [InlineData("azure-cli")]

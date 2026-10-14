@@ -68,10 +68,7 @@ public class AzureSdkExecutor
             return existing.Value!;
         }
 
-        var data = new ContainerAppManagedEnvironmentData(location)
-        {
-            // VNet 設定は呼び出し側で必要に応じて追加（例: InfrastructureSubnetId）
-        };
+        var data = ContainerAppSpecBuilder.BuildManagedEnvironment(location);
         var envOp = await envCollection.CreateOrUpdateAsync(WaitUntil.Completed, envName, data);
         var env = envOp.Value;
         _logger.Info($"Container Apps Environment を作成: {envName}");

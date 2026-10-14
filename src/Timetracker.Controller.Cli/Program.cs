@@ -51,12 +51,12 @@ var authMode        = GetOpt("--auth-mode", "default");
 double ttCpu, ttMem, dbCpu, dbMem, redisCpu, redisMem;
 try
 {
-    ttCpu    = cli.GetDouble("--tt-cpu", 0.75);
-    ttMem    = cli.GetDouble("--tt-memory", 1.5);
-    dbCpu    = cli.GetDouble("--db-cpu", 1.0);
-    dbMem    = cli.GetDouble("--db-memory", 2.0);
-    redisCpu = cli.GetDouble("--redis-cpu", 0.5);
-    redisMem = cli.GetDouble("--redis-memory", 1.0);
+    ttCpu    = cli.GetDouble("--tt-cpu", Defaults.TimetrackerCpu);
+    ttMem    = cli.GetDouble("--tt-memory", Defaults.TimetrackerMemoryGi);
+    dbCpu    = cli.GetDouble("--db-cpu", Defaults.DbCpu);
+    dbMem    = cli.GetDouble("--db-memory", Defaults.DbMemoryGi);
+    redisCpu = cli.GetDouble("--redis-cpu", Defaults.RedisCpu);
+    redisMem = cli.GetDouble("--redis-memory", Defaults.RedisMemoryGi);
 }
 catch (ArgumentException ex)
 {
