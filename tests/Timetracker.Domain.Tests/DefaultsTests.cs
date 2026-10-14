@@ -84,6 +84,9 @@ public class DeployOptionsTests
 
         opts.TimetrackerCpu.Should().Be(1.5);
         opts.TimetrackerMemoryGi.Should().Be(3.0);
+        // CLI（Program.cs）も同じ Defaults を既定値に使う
+        Defaults.TimetrackerCpu.Should().Be(1.5);
+        Defaults.TimetrackerMemoryGi.Should().Be(3.0);
     }
 
     [Theory]

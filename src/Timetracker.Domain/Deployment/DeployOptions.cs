@@ -20,14 +20,12 @@ public class DeployOptions
     public string TimetrackerTag { get; set; } = Defaults.TimetrackerTagPostgres;
 
     // コンテナスペック（CPU: vCPU、小数可 / Memory: Gi）
-    // デフォルト値を要件に合わせて更新
-    // timetracker-tt は 2Gi 以下だとサンプル DB の復元（約 155MB の SQL）が OutOfMemoryException で失敗するため 1.5 / 3.0 とする
-    public double TimetrackerCpu { get; set; } = 1.5;       // timetracker-tt
-    public double TimetrackerMemoryGi { get; set; } = 3.0;  // timetracker-tt
-    public double DbCpu { get; set; } = 1.0;                // timetracker-db
-    public double DbMemoryGi { get; set; } = 2.0;           // timetracker-db
-    public double RedisCpu { get; set; } = 0.5;             // timetracker-redis
-    public double RedisMemoryGi { get; set; } = 1.0;        // timetracker-redis
+    public double TimetrackerCpu { get; set; } = Defaults.TimetrackerCpu;            // timetracker-tt
+    public double TimetrackerMemoryGi { get; set; } = Defaults.TimetrackerMemoryGi;  // timetracker-tt
+    public double DbCpu { get; set; } = Defaults.DbCpu;                              // timetracker-db
+    public double DbMemoryGi { get; set; } = Defaults.DbMemoryGi;                    // timetracker-db
+    public double RedisCpu { get; set; } = Defaults.RedisCpu;                        // timetracker-redis
+    public double RedisMemoryGi { get; set; } = Defaults.RedisMemoryGi;              // timetracker-redis
 
     // Dry-run 用ファイル出力
     public string OutputCompose { get; set; } = "./docker-compose.yml";
