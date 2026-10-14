@@ -110,6 +110,7 @@ public class ContainerAppSpecBuilderTests
         {
             System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo("de-DE");
             var o = CreateOptions("postgresql");
+            o.TimetrackerMemoryGi = 1.5;
             ContainerAppSpecBuilder.BuildTimetrackerApp(o, "japaneast", EnvId, "app-db", "app-redis")
                 .Template.Containers[0].Resources.Memory.Should().Be("1.5Gi");
             ContainerAppSpecBuilder.BuildDbApp(o, "japaneast", EnvId).Template.Containers[0].Resources.Memory.Should().Be("2Gi");

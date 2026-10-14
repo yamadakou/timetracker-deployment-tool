@@ -21,8 +21,9 @@ public class DeployOptions
 
     // コンテナスペック（CPU: vCPU、小数可 / Memory: Gi）
     // デフォルト値を要件に合わせて更新
-    public double TimetrackerCpu { get; set; } = 0.75;      // timetracker-tt
-    public double TimetrackerMemoryGi { get; set; } = 1.5;  // timetracker-tt
+    // timetracker-tt は 2Gi 以下だとサンプル DB の復元（約 155MB の SQL）が OutOfMemoryException で失敗するため 1.5 / 3.0 とする
+    public double TimetrackerCpu { get; set; } = 1.5;       // timetracker-tt
+    public double TimetrackerMemoryGi { get; set; } = 3.0;  // timetracker-tt
     public double DbCpu { get; set; } = 1.0;                // timetracker-db
     public double DbMemoryGi { get; set; } = 2.0;           // timetracker-db
     public double RedisCpu { get; set; } = 0.5;             // timetracker-redis

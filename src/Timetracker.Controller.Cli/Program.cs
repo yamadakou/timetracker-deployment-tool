@@ -51,8 +51,8 @@ var authMode        = GetOpt("--auth-mode", "default");
 double ttCpu, ttMem, dbCpu, dbMem, redisCpu, redisMem;
 try
 {
-    ttCpu    = cli.GetDouble("--tt-cpu", 0.75);
-    ttMem    = cli.GetDouble("--tt-memory", 1.5);
+    ttCpu    = cli.GetDouble("--tt-cpu", 1.5);
+    ttMem    = cli.GetDouble("--tt-memory", 3.0);
     dbCpu    = cli.GetDouble("--db-cpu", 1.0);
     dbMem    = cli.GetDouble("--db-memory", 2.0);
     redisCpu = cli.GetDouble("--redis-cpu", 0.5);

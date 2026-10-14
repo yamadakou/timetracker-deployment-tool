@@ -393,10 +393,11 @@ az provider show --namespace Microsoft.OperationalInsights --query "registration
 - `--` で始まる値（例: パスワード）は `--db-password=--xxxx` のように `=` で指定してください
 - `--auth-mode` (任意): 認証モード。`default` | `azure-cli` | `sp-env` | `device-code` | `managed-identity`（デフォルト: `default`）
 - コンテナスペック（任意）:
-  - Timetracker: `--tt-cpu`（vCPU、小数可。例: `0.75`）、`--tt-memory`（Gi。例: `1.5`）
+  - Timetracker: `--tt-cpu`（vCPU、小数可。例: `1.5`）、`--tt-memory`（Gi。例: `3.0`）
   - DB: `--db-cpu`、`--db-memory`
   - Redis: `--redis-cpu`、`--redis-memory`
-  - 省略時のデフォルト: Timetracker CPU=0.75 / Mem=1.5Gi、DB CPU=1.0 / Mem=2.0Gi、Redis CPU=0.5 / Mem=1.0Gi
+  - 省略時のデフォルト: Timetracker CPU=1.5 / Mem=3.0Gi、DB CPU=1.0 / Mem=2.0Gi、Redis CPU=0.5 / Mem=1.0Gi
+  - Timetracker のメモリを 2Gi 以下にすると、Azure 上でセットアップウィザードの「サンプルデータベースを作成する」がメモリ不足（`OutOfMemoryException`）で失敗します。サンプル DB を利用する場合は既定値（1.5 / 3.0Gi）以上を指定してください
   - vCPUとメモリの組み合わせとなりますので、指定値は以下のＭＳドキュメントを参考にしてください。
     - https://learn.microsoft.com/ja-jp/azure/container-apps/containers#allocations
 
@@ -428,7 +429,7 @@ timetracker-cli.exe deploy `
   --db-name "timetracker" `
   --tracker-password "AppLoginP@ss!" `
   --tt-tag "11.0.1-linux-postgres" `
-  --tt-cpu 0.75 --tt-memory 1.5 `
+  --tt-cpu 1.5 --tt-memory 3.0 `
   --db-cpu 1.0 --db-memory 2.0 `
   --redis-cpu 0.5 --redis-memory 1.0 `
   --auth-mode "azure-cli"
