@@ -14,14 +14,16 @@ namespace Timetracker.SystemTests.E2E;
 public sealed class LocalComposeSetupTests
 {
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(10);
-    private static readonly TimeSpan SetupTimeout = TimeSpan.FromMinutes(30);
+    private static readonly TimeSpan SetupTimeout = TimeSpan.FromMinutes(50);
 
-    [Theory(Timeout = 50 * 60 * 1000)]
+    [Theory(Timeout = 70 * 60 * 1000)]
     [InlineData("postgresql")]
     [InlineData("sqlserver")]
     public async Task Sample_Database_Setup_And_Login_Should_Succeed(string dbType)
     {
         var (licenseKey, user) = E2ESettings.Require();
+        // CI では DB 種別ごとにジョブを分けて並行に実行する（TT_E2E_DB_TYPE で 1 つに絞る）
+        Assert.SkipWhen(E2ESettings.DbType is { } only && only != dbType, $"TT_E2E_DB_TYPE={E2ESettings.DbType} のため {dbType} はスキップします。");
         Assert.SkipUnless(await DockerComposeAvailableAsync(), "docker compose が使えないためスキップします。");
         var ct = TestContext.Current.CancellationToken;
 

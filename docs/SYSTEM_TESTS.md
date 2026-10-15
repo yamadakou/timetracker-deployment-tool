@@ -90,7 +90,7 @@ scripts/run-system-tests.sh <サブスクリプション ID> <appId>
 ### CI（自動）
 GitHub の Actions → **System Test** → Run workflow で実行します（`workflow_dispatch`）。結果はジョブの成果物（`system-test-results`）に保存されます。ローカルの docker compose での確認（`LocalComposeSetupTests`）は、ここでは行いません（次の PR の CI で行うため）。
 
-ローカルの docker compose でのセットアップウィザードとログインの確認（`LocalComposeSetupTests`）は、PR と `main` へのプッシュのたびに CI（`ci.yml` の `e2e-local`。ubuntu）で実行します。Azure は使わず、料金はかかりません（20 分前後）。結果は成果物（`e2e-local-results`）に保存されます。
+ローカルの docker compose でのセットアップウィザードとログインの確認（`LocalComposeSetupTests`）は、PR と `main` へのプッシュのたびに CI（`ci.yml` の `e2e-local`。ubuntu）で実行します。Azure は使わず、料金はかかりません。サンプルデータベースの作成に時間がかかるため、DB 種別ごとにジョブを分けて並行に実行します（環境変数 `TT_E2E_DB_TYPE` で 1 つに絞る）。結果は成果物（`e2e-local-results-<DB 種別>`）に保存されます。待つ間は、実行中の画面の進み具合をテストの出力に記録します。
 
 - GitHub の仕様により、手動で実行できるのは既定のブランチ（`main`）にあるワークフローだけです。他のブランチのワークフローは、`main` にマージされるまで Actions の一覧に表示されません
 - `main` にマージされた後は、Run workflow の「Use workflow from」で、テストするブランチを選べます
@@ -103,6 +103,7 @@ GitHub の Actions → **System Test** → Run workflow で実行します（`wo
 | `TT_SYSTEMTEST_LIMITED_RESOURCE_GROUP` | – | `rg-ttst-limited` | |
 | `TT_SYSTEMTEST_LIMITED_TENANT_ID` / `_CLIENT_ID` / `_CLIENT_SECRET` | – | – | 無ければ `LimitedPermissionTests` をスキップ |
 | `TT_E2E_LICENSE_KEY` / `TT_E2E_SAMPLE_LOGIN` / `TT_E2E_SAMPLE_PASSWORD` | – | – | ライセンスキーと、サンプルデータベースのユーザー。そろっていなければセットアップウィザードとログインの確認をスキップ（`LocalComposeSetupTests` は `TT_SYSTEMTEST_SUBSCRIPTION_ID` が無くても、これらがあれば実行する） |
+| `TT_E2E_DB_TYPE` | – | – | `LocalComposeSetupTests` で確かめる DB 種別（`postgresql` / `sqlserver`。省略時は両方） |
 | `TT_E2E_CHROMIUM_PATH` | – | – | 使う Chromium の実行ファイル（`playwright install` で入れたものを使わない場合） |
 
 Azure への接続は、実行環境の Azure CLI のログイン（`az login`、CI では `azure/login`）を使います（CLI は `--auth-mode azure-cli`）。

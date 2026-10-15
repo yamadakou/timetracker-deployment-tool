@@ -51,13 +51,54 @@ public sealed class TimetrackerSetupWizard
         await ExpectStepAsync("実行の確認");
         await ClickButtonAsync("実行");
 
-        // 実行中の画面の後、完了かエラーのどちらかが表示されるまで待つ
+        await WaitForCompletionAsync(baseUrl, setupTimeout);
+        Log("セットアップが完了しました（サンプルデータベース）");
+    }
+
+    // 実行中の画面の後、完了かエラーのどちらかが表示されるまで待つ。待つ間は進み具合（実行中の画面の文言）を変わるたびに出し、
+    // 画面の更新が止まっても気づけるよう、ときどき /setup を開き直す（実行中はブラウザーを閉じても、開き直せば続きが表示される）
+    private async Task WaitForCompletionAsync(string baseUrl, TimeSpan timeout)
+    {
         var done = Heading("セットアップの完了");
         var failed = Heading("セットアップエラー");
-        await done.Or(failed).WaitForAsync(new() { Timeout = (float)setupTimeout.TotalMilliseconds });
-        if (await failed.IsVisibleAsync())
-            Assert.Fail($"セットアップエラーになりました: {await VisibleTextAsync()}");
-        Log("セットアップが完了しました（サンプルデータベース）");
+        var dialog = _page.Locator(".x-message-box:visible").First;
+        var started = DateTime.UtcNow;
+        var lastReload = started;
+        string? lastProgress = null;
+        while (true)
+        {
+            try
+            {
+                await done.Or(failed).Or(dialog).WaitForAsync(new() { Timeout = 30_000 });
+            }
+            catch (Exception ex) when (ex is System.TimeoutException or PlaywrightException)
+            {
+                // まだ実行中
+            }
+            if (await done.IsVisibleAsync())
+                return;
+            if (await failed.IsVisibleAsync())
+                Assert.Fail($"セットアップエラーになりました: {await VisibleTextAsync()}");
+            if (await dialog.IsVisibleAsync())
+                Assert.Fail($"セットアップの実行中にエラーが表示されました: {Regex.Replace(await dialog.InnerTextAsync(), @"\s+", " ").Trim()}");
+
+            var elapsed = DateTime.UtcNow - started;
+            var progress = await VisibleTextAsync();
+            if (progress != lastProgress)
+            {
+                Log($"[{elapsed:mm\\:ss}] {progress}");
+                lastProgress = progress;
+            }
+            if (elapsed > timeout)
+                Assert.Fail($"{timeout.TotalMinutes} 分以内にセットアップが終わりませんでした（{_page.Url}）: {progress}");
+            if (DateTime.UtcNow - lastReload > TimeSpan.FromMinutes(5))
+            {
+                await _page.GotoAsync($"{baseUrl.TrimEnd('/')}/setup");
+                await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+                lastReload = DateTime.UtcNow;
+                Log($"[{elapsed:mm\\:ss}] /setup を開き直しました（{_page.Url}）");
+            }
+        }
     }
 
     /// <summary>完了画面の「管理画面へ移動」から、指定したユーザーでログインする。ログインできたら、ログイン後の画面の文言を返す。</summary>

@@ -11,6 +11,9 @@ public static class E2ESettings
 {
     public static string? LicenseKey => Get("TT_E2E_LICENSE_KEY");
 
+    /// <summary>ローカルの docker compose のテストで確かめる DB 種別（省略時はすべて）。</summary>
+    public static string? DbType => Get("TT_E2E_DB_TYPE");
+
     /// <summary>使う Chromium の実行ファイル（省略時は playwright install で入れたもの）。</summary>
     public static string? ChromiumPath => Get("TT_E2E_CHROMIUM_PATH");
 
