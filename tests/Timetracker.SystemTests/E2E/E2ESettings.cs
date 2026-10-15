@@ -14,9 +14,17 @@ public static class E2ESettings
     /// <summary>使う Chromium の実行ファイル（省略時は playwright install で入れたもの）。</summary>
     public static string? ChromiumPath => Get("TT_E2E_CHROMIUM_PATH");
 
-    /// <summary>サンプルデータベースに入っている、ログインに使うユーザー。</summary>
+    /// <summary>
+    /// サンプルデータベースに入っている、ログインに使うユーザー。パスワードが空のユーザーは、TT_E2E_SAMPLE_PASSWORD に "" と書く
+    /// （GitHub のシークレットは空にできず、未登録のシークレットは空の文字列として渡されるため、空の値は未設定とみなす）。
+    /// </summary>
     public static LoginUser? SampleUser =>
-        Get("TT_E2E_SAMPLE_LOGIN") is { } login && Get("TT_E2E_SAMPLE_PASSWORD") is { } password ? new LoginUser(login, password) : null;
+        Get("TT_E2E_SAMPLE_LOGIN") is { } login && Get("TT_E2E_SAMPLE_PASSWORD") is { } password
+            ? new LoginUser(login, password == EmptyPassword ? "" : password)
+            : null;
+
+    /// <summary>空のパスワードを表す値。</summary>
+    public const string EmptyPassword = "\"\"";
 
     /// <summary>設定がそろっていればライセンスキーとユーザーを返す（そろっていなければ null）。</summary>
     public static (string LicenseKey, LoginUser User)? Configured =>
