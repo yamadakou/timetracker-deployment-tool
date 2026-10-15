@@ -53,7 +53,8 @@ public sealed class DeploymentLifecycleTests
                 await using var browser = await TimetrackerSetupWizard.LaunchBrowserAsync(playwright);
                 var wizard = new TimetrackerSetupWizard(await browser.NewPageAsync(new() { Locale = "ja-JP" }));
                 await wizard.CreateSampleDatabaseAsync($"https://{fqdn}", licenseKey, TimeSpan.FromMinutes(30));
-                (await wizard.LoginFromCompletionAsync(user)).Should().NotBeNullOrWhiteSpace();
+                var home = await wizard.LoginFromCompletionAsync(user);
+                TimetrackerSetupWizard.ActiveUserCount(home).Should().BeGreaterThan(1, home);
             }
             else
             {

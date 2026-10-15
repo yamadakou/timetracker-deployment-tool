@@ -4,7 +4,7 @@
 
 - 環境変数 `TT_SYSTEMTEST_SUBSCRIPTION_ID` が無い場合はスキップされます。通常の `dotnet test Timetracker.sln` や PR の CI では実行されません
 - **料金が発生します**（Azure Container Apps。1 回 20〜40 分）。リリース前などに実行してください
-- Timetracker のライセンスキーとサンプルデータベースのユーザー（環境変数 `TT_E2E_LICENSE_KEY` / `TT_E2E_SAMPLE_LOGIN` / `TT_E2E_SAMPLE_PASSWORD`）がある場合は、ブラウザー（Playwright）でセットアップウィザードを操作し、サンプルデータベースの作成と、そのユーザーでのログインまで確認します（Azure 上と、ローカルの docker compose 上）。無い場合はその確認だけを省略します
+- Timetracker のライセンスキーとサンプルデータベースのユーザー（環境変数 `TT_E2E_LICENSE_KEY` / `TT_E2E_SAMPLE_LOGIN` / `TT_E2E_SAMPLE_PASSWORD`）がある場合は、ブラウザー（Playwright）でセットアップウィザードを操作し、サンプルデータベースの作成と、そのユーザーでのログイン（管理画面のユーザー一覧にサンプルのユーザーが表示されること）まで確認します（Azure 上と、ローカルの docker compose 上）。無い場合はその確認だけを省略します
 - テスト用のリソースは、テストの最後に削除します（下記「後片付け」）
 
 ## シナリオ

@@ -50,7 +50,8 @@ public sealed class LocalComposeSetupTests
             await wizard.CreateSampleDatabaseAsync("http://localhost:8080", licenseKey, SetupTimeout);
             var home = await wizard.LoginFromCompletionAsync(user);
 
-            home.Should().NotBeNullOrWhiteSpace();
+            // サンプルデータベースのユーザーが一覧に表示される
+            TimetrackerSetupWizard.ActiveUserCount(home).Should().BeGreaterThan(1, home);
         }
         finally
         {

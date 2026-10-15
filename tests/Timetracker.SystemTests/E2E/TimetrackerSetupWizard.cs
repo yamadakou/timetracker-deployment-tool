@@ -130,9 +130,16 @@ public sealed class TimetrackerSetupWizard
         }
         await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         var text = await VisibleTextAsync();
-        Log($"ログイン後の画面（{_page.Url}）: {text}");
+        Log($"ログイン後の画面（{_page.Url}）: {(text.Length > 200 ? text[..200] + "…" : text)}");
         return text;
     }
+
+    /// <summary>
+    /// ログイン後の管理画面（ユーザーの一覧）に表示される「有効ユーザー数」。サンプルデータベースが入っていれば、多くのユーザーが表示される。
+    /// 見つからなければ null。
+    /// </summary>
+    public static int? ActiveUserCount(string pageText) =>
+        Regex.Match(pageText, @"有効ユーザー数[:：]\s*(\d+)") is { Success: true } m ? int.Parse(m.Groups[1].Value) : null;
 
     // ウィザードの各画面の見出し。表示中の画面だけを対象にする（ほかの画面も DOM には残っている）
     private ILocator Heading(string title) => _page.GetByText(title, new() { Exact = true }).Filter(new() { Visible = true }).First;
