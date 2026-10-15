@@ -1,6 +1,6 @@
 # MCP ツール設計案（Timetracker.Controller.Mcp）
 
-- ステータス: 設計案 第 4 版（オーナー回答を反映。コード変更はまだ行っていない）
+- ステータス: 設計案 第 4.1 版（オーナー回答を反映。コード変更はまだ行っていない）
 - 対象ブランチ: `MCP-Tool`
 - 前提: `main`（a32cc3d, v0.6 系 / .NET 10）時点のコード
 
@@ -11,6 +11,7 @@
 | 2 | オーナー回答を反映。パスワードは引数と環境変数の両方を受け付け、環境変数を推奨する。デプロイは非同期ジョブにする。削除ツールを追加する（CLI に先に実装）。Dry-run では subscription / resource_group を不要にする（CLI に先に実装）。HTTP 公開と WebAPI フロントエンドを見据えた構成にする。動作確認クライアントの方針と配布形態の比較を追加 |
 | 3 | オーナー回答を反映。ブランチをフェーズごとに分ける（1.3）。管理タグの説明と運用イメージを追加（4.12）。HTTP 公開時はサーバーの ID と利用者本人の権限の両方に対応する（4.11）。配布形態は stdio を単一ファイル EXE、HTTP をコンテナイメージに決定 |
 | 4 | README の RBAC 記載との整合を確認した結果を反映。必要な Azure 権限の章（4.13）を追加。計画ツールで権限を事前に確認する（4.7・4.12・4.13）。`server` 方式は RG 単位の権限・RG の事前作成を前提に変更（4.11）。Entra ID のアプリロールと Azure RBAC の区別を明記。stdio の既定の認証モードを `azure-cli` に変更。README の誤り（Container Apps Contributor）は `docs/fix-rbac-requirements` ブランチで先に修正（1.3） |
+| 4.1 | Phase 0（`refactor/shared-layer`）の実施結果を 8.3 に追記。R5 は `feature/cli-delete` に移した |
 
 ---
 
@@ -785,6 +786,12 @@ README の「必要な RBAC ロールと権限」（`docs/fix-rbac-requirements`
 | R7 | `ResourceNaming`（Domain）を新設し、`{app}-env/-db/-redis/-tt` の組み立てを 1 か所にまとめる（今は `Program.cs` と `AzureSdkExecutor` に分散） | 4.12 |
 
 ※ `ICallerContext`・`IPlanStore`・`IJobStore`・`JobManager` は CLI では使わないため、Phase 3b で MCP と一緒に追加する（使わない抽象を先に作らない）。
+
+**実施結果（`refactor/shared-layer`）**: R1〜R4・R6・R7 を実施した。
+- R5（`DeploymentPlanner`）は、使う側（CLI の `delete --dry-run` と権限の事前確認）がそろう `feature/cli-delete` に移した。Phase 0 では使われない処理を追加しないため
+- `IAzureDeploymentGateway` は Infrastructure.Azure に置き、`AzureSdkExecutor` が実装する。Application はこのインターフェースに依存する
+- `DeploymentProgress` の手順は「リソースグループ」「Environment」「Container Apps」の 3 段階にした。DB / Redis / Timetracker の個別の進捗は、MCP の `get_job_status` を実装するときに必要に応じて細かくする
+- CLI の挙動が変わらないことは、代表的な 10 通りの引数で、出力・終了コード・生成ファイル（compose / .env）が変更前と一致することで確認した
 
 ---
 
