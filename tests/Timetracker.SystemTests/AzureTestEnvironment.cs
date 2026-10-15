@@ -21,8 +21,8 @@ public sealed class AzureTestEnvironment
     public const string CreatedAtTag = "ttst-created-at";
     public const string AppNamePrefix = "ttst";
 
-    // 中断されたテストが残したリソースグループを消すまでの時間
-    private static readonly TimeSpan LeftoverAge = TimeSpan.FromHours(3);
+    /// <summary>中断されたテストが残したものとみなすまでの時間（実行中の別のテストのリソースを消さないため）。</summary>
+    public static readonly TimeSpan LeftoverAge = TimeSpan.FromHours(3);
 
     public AzureTestEnvironment(string subscriptionId)
     {
@@ -72,12 +72,10 @@ public sealed class AzureTestEnvironment
     public async Task<IReadOnlyList<string>> SweepLeftoverResourceGroupsAsync(CancellationToken cancellationToken)
     {
         var swept = new List<string>();
+        var now = DateTimeOffset.UtcNow;
         await foreach (var rg in Subscription.GetResourceGroups().GetAllAsync(cancellationToken: cancellationToken))
         {
-            if (!rg.Data.Name.StartsWith(ResourceGroupPrefix, StringComparison.OrdinalIgnoreCase)
-                || !rg.Data.Tags.TryGetValue(CreatedAtTag, out var createdAt)
-                || !DateTimeOffset.TryParse(createdAt, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var created)
-                || DateTimeOffset.UtcNow - created < LeftoverAge)
+            if (!IsLeftoverResourceGroup(rg.Data.Name, rg.Data.Tags, now))
                 continue;
 
             await rg.DeleteAsync(WaitUntil.Started, cancellationToken: cancellationToken);
@@ -85,6 +83,16 @@ public sealed class AzureTestEnvironment
         }
         return swept;
     }
+
+    /// <summary>
+    /// 中断されたテストが残したリソースグループか（接頭辞が rg-ttst- で、作成日時のタグが <see cref="LeftoverAge"/> 以上前のもの）。
+    /// 作成日時のタグが無い・読めないものは、テストが作ったものと確かめられないため対象にしない。
+    /// </summary>
+    public static bool IsLeftoverResourceGroup(string name, IDictionary<string, string> tags, DateTimeOffset now) =>
+        name.StartsWith(ResourceGroupPrefix, StringComparison.OrdinalIgnoreCase)
+        && tags.TryGetValue(CreatedAtTag, out var createdAt)
+        && DateTimeOffset.TryParse(createdAt, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var created)
+        && now - created >= LeftoverAge;
 
     /// <summary>
     /// リソースグループ内の Container App と Environment の名前の一覧（昇順）。
@@ -128,25 +136,31 @@ public sealed class AzureTestEnvironment
     /// </summary>
     public async Task<IReadOnlyList<string>> ListLeftoverTestAppNamesAsync(string rgName, CancellationToken cancellationToken)
     {
+        var now = DateTimeOffset.UtcNow;
         var names = new HashSet<string>(StringComparer.Ordinal);
         await foreach (var app in ResourceGroup(rgName).GetContainerApps().GetAllAsync(cancellationToken))
         {
-            if (IsLeftoverTestApp(app.Data.Tags, app.Data.SystemData?.CreatedOn, out var appName))
+            if (LeftoverTestAppName(app.Data.Tags, app.Data.SystemData?.CreatedOn, now) is { } appName)
                 names.Add(appName);
         }
         await foreach (var env in ResourceGroup(rgName).GetContainerAppManagedEnvironments().GetAllAsync(cancellationToken))
         {
-            if (IsLeftoverTestApp(env.Data.Tags, env.Data.SystemData?.CreatedOn, out var appName))
+            if (LeftoverTestAppName(env.Data.Tags, env.Data.SystemData?.CreatedOn, now) is { } appName)
                 names.Add(appName);
         }
         return names.ToList();
     }
 
-    // 作成日時が取得できないものは、古いものとみなす（残り続けて料金が発生しないように）
-    private static bool IsLeftoverTestApp(IDictionary<string, string> tags, DateTimeOffset? createdOn, out string appName) =>
-        tags.TryGetValue(ManagedTags.AppNameKey, out appName!)
+    /// <summary>
+    /// 中断されたテストが残したリソースであれば、そのアプリ名（tt-app-name の値）。そうでなければ null。
+    /// 作成日時が取得できないものは、古いものとみなす（残り続けて料金が発生しないように）。
+    /// </summary>
+    public static string? LeftoverTestAppName(IDictionary<string, string> tags, DateTimeOffset? createdOn, DateTimeOffset now) =>
+        tags.TryGetValue(ManagedTags.AppNameKey, out var appName)
         && appName.StartsWith(AppNamePrefix, StringComparison.Ordinal)
-        && (createdOn == null || DateTimeOffset.UtcNow - createdOn.Value >= LeftoverAge);
+        && (createdOn == null || now - createdOn.Value >= LeftoverAge)
+            ? appName
+            : null;
 
     public async Task<IReadOnlyDictionary<string, string>> GetContainerAppTagsAsync(string rgName, string name, CancellationToken cancellationToken)
     {
