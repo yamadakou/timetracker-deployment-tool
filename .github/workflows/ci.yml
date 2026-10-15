@@ -28,3 +28,41 @@ jobs:
     
     - name: Test
       run: dotnet test Timetracker.sln --configuration Release --no-build --verbosity normal
+
+  # CLI の Dry-run で作った docker-compose.yml でローカルに起動し、セットアップウィザードでサンプルデータベースを作って
+  # ログインできることをブラウザー（Playwright）で確かめる（PostgreSQL / SQL Server）。Linux コンテナを使うため ubuntu で動かす。
+  # ライセンスキー（リポジトリのシークレット TT_E2E_LICENSE_KEY）が無い場合（フォークからの PR など）は、テストがスキップされる
+  e2e-local:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: 10.0.x
+
+    - name: Install Playwright browser
+      run: |
+        dotnet build tests/Timetracker.SystemTests
+        pwsh tests/Timetracker.SystemTests/bin/Debug/net10.0/playwright.ps1 install --with-deps chromium
+
+    # すべてスキップされた場合の終了コード 8（テストが 0 件）は失敗にしない
+    - name: Setup wizard and login (docker compose)
+      env:
+        TT_E2E_LICENSE_KEY: ${{ secrets.TT_E2E_LICENSE_KEY }}
+      run: >
+        dotnet test --project tests/Timetracker.SystemTests --no-build --
+        --filter-class Timetracker.SystemTests.E2E.LocalComposeSetupTests
+        --output detailed --report-xunit-trx --results-directory=TestResults --ignore-exit-code 8
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: e2e-local-results
+        path: TestResults

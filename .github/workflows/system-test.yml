@@ -1,6 +1,6 @@
 name: System Test
 
-# 本物の Azure に対するシステムテスト。所要時間 20 分前後で料金が発生するため、PR ごとには実行せず、
+# 本物の Azure に対するシステムテスト。所要時間 20〜40 分で料金が発生するため、PR ごとには実行せず、
 # リリース前などに手動で実行する。準備（OIDC 用のアプリ登録・変数・シークレット）は docs/SYSTEM_TESTS.md を参照。
 on:
   workflow_dispatch:
@@ -18,7 +18,7 @@ jobs:
   system-test:
     runs-on: ubuntu-latest
     environment: systemtest
-    timeout-minutes: 75
+    timeout-minutes: 110
 
     steps:
     - uses: actions/checkout@v6
@@ -35,6 +35,13 @@ jobs:
         tenant-id: ${{ vars.AZURE_TENANT_ID }}
         subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
+    # セットアップウィザードとログインの確認（TT_E2E_LICENSE_KEY がある場合）に使うブラウザー
+    - name: Install Playwright browser
+      run: |
+        dotnet build tests/Timetracker.SystemTests
+        pwsh tests/Timetracker.SystemTests/bin/Debug/net10.0/playwright.ps1 install --with-deps chromium
+
+    # ローカルの docker compose での確認（LocalComposeSetupTests）は CI（ci.yml）で行うため、ここでは除く
     - name: System test
       env:
         TT_SYSTEMTEST_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
@@ -43,8 +50,10 @@ jobs:
         TT_SYSTEMTEST_LIMITED_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
         TT_SYSTEMTEST_LIMITED_CLIENT_ID: ${{ vars.TT_SYSTEMTEST_LIMITED_CLIENT_ID }}
         TT_SYSTEMTEST_LIMITED_CLIENT_SECRET: ${{ secrets.TT_SYSTEMTEST_LIMITED_CLIENT_SECRET }}
+        TT_E2E_LICENSE_KEY: ${{ secrets.TT_E2E_LICENSE_KEY }}
       run: >
         dotnet test --project tests/Timetracker.SystemTests --
+        --filter-not-class Timetracker.SystemTests.E2E.LocalComposeSetupTests
         --output detailed --report-xunit-trx --results-directory=TestResults
 
     - name: Upload test results

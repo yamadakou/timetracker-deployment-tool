@@ -1,16 +1,19 @@
 using FluentAssertions;
+using Microsoft.Playwright;
 using Timetracker.Domain.Deployment;
+using Timetracker.SystemTests.E2E;
 using Xunit;
 
 namespace Timetracker.SystemTests;
 
 /// <summary>
 /// デプロイ → 管理タグ → 再デプロイ（利用者のタグの引き継ぎ）→ 削除計画 → 削除 の一連の流れを、本物の Azure で確認する。
-/// 実行ごとに専用のリソースグループを作り、最後に削除する（所要時間 20 分前後。Environment の削除に時間がかかる）。
+/// TT_E2E_LICENSE_KEY がある場合は、デプロイの後にセットアップウィザードでサンプルデータベースを作り、管理ユーザーでログインできることも確かめる。
+/// 実行ごとに専用のリソースグループを作り、最後に削除する（所要時間 20〜40 分。Environment の削除とサンプル DB の作成に時間がかかる）。
 /// </summary>
 public sealed class DeploymentLifecycleTests
 {
-    [Fact(Timeout = 60 * 60 * 1000)]
+    [Fact(Timeout = 90 * 60 * 1000)]
     public async Task Deploy_Redeploy_And_Delete()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -42,6 +45,21 @@ public sealed class DeploymentLifecycleTests
             fqdn.Should().NotBeNullOrEmpty();
             var status = await AzureTestEnvironment.WaitForHttpResponseAsync($"https://{fqdn}", TimeSpan.FromMinutes(10), ct);
             TestContext.Current.TestOutputHelper?.WriteLine($"https://{fqdn} → {status}");
+
+            // 1b. セットアップウィザードでサンプルデータベースを作り、管理ユーザーでログインできる（Azure の既定のスペックで足りること）
+            if (E2ESettings.LicenseKey is { } licenseKey)
+            {
+                using var playwright = await Playwright.CreateAsync();
+                await using var browser = await TimetrackerSetupWizard.LaunchBrowserAsync(playwright);
+                var wizard = new TimetrackerSetupWizard(await browser.NewPageAsync(new() { Locale = "ja-JP" }));
+                var admin = E2ESettings.NewAdmin();
+                await wizard.RunAsync($"https://{fqdn}", licenseKey, admin, sampleDatabase: true, TimeSpan.FromMinutes(30));
+                (await wizard.LoginFromCompletionAsync(admin)).Should().NotBeNullOrWhiteSpace();
+            }
+            else
+            {
+                TestContext.Current.TestOutputHelper?.WriteLine("TT_E2E_LICENSE_KEY が未設定のため、セットアップウィザードとログインの確認を省略します。");
+            }
 
             // 2. 再デプロイ: 利用者が付けたタグが残る（No.33）
             await azure.AddContainerAppTagAsync(rg, Tt, "owner", "systemtest", ct);

@@ -52,7 +52,17 @@ try {
         Write-Warning "-LimitedClientId が無いため、権限不足のシナリオはスキップします。"
     }
 
-    Write-Host "システムテストを実行します（20 分前後かかり、Azure Container Apps の料金が発生します）。"
+    # セットアップウィザードとログインの確認は、ライセンスキー（環境変数 TT_E2E_LICENSE_KEY）がある場合だけ行う。使うブラウザーを入れる
+    if ($env:TT_E2E_LICENSE_KEY) {
+        dotnet build (Join-Path $repo "tests/Timetracker.SystemTests")
+        if ($LASTEXITCODE -ne 0) { throw "ビルドに失敗しました。" }
+        & (Join-Path $repo "tests/Timetracker.SystemTests/bin/Debug/net10.0/playwright.ps1") install chromium
+        if ($LASTEXITCODE -ne 0) { throw "Playwright のブラウザーを入れられませんでした。" }
+    } else {
+        Write-Warning "TT_E2E_LICENSE_KEY が無いため、セットアップウィザードとログインの確認はスキップします。"
+    }
+
+    Write-Host "システムテストを実行します（20〜40 分かかり、Azure Container Apps の料金が発生します）。"
     # --results-directory は "=" でつなぐ（既存のディレクトリをスペース区切りで渡すと、dotnet test がプロジェクトの指定と誤解する）
     $results = Join-Path $repo "TestResults/system"
     dotnet test --project (Join-Path $repo "tests/Timetracker.SystemTests") -- `

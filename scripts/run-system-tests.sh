@@ -33,9 +33,17 @@ else
   echo "警告: クライアント ID が無いため、権限不足のシナリオはスキップします。" >&2
 fi
 
-echo "システムテストを実行します（20 分前後かかり、Azure Container Apps の料金が発生します）。"
 # global.json（Microsoft.Testing.Platform を使う設定）を読むため、リポジトリのディレクトリで実行する
 cd "$repo"
+# セットアップウィザードとログインの確認は、ライセンスキー（環境変数 TT_E2E_LICENSE_KEY）がある場合だけ行う。使うブラウザーを入れる（PowerShell が必要）
+if [ -n "${TT_E2E_LICENSE_KEY:-}" ]; then
+  dotnet build "$repo/tests/Timetracker.SystemTests"
+  pwsh "$repo/tests/Timetracker.SystemTests/bin/Debug/net10.0/playwright.ps1" install chromium
+else
+  echo "警告: TT_E2E_LICENSE_KEY が無いため、セットアップウィザードとログインの確認はスキップします。" >&2
+fi
+
+echo "システムテストを実行します（20〜40 分かかり、Azure Container Apps の料金が発生します）。"
 # --results-directory は "=" でつなぐ（既存のディレクトリをスペース区切りで渡すと、dotnet test がプロジェクトの指定と誤解する）
 dotnet test --project "$repo/tests/Timetracker.SystemTests" -- \
   --output detailed --report-xunit-trx "--results-directory=$repo/TestResults/system"
