@@ -50,6 +50,9 @@ public sealed class TimetrackerSetupWizard
 
         await ExpectStepAsync("実行の確認");
         await ClickButtonAsync("実行");
+        // 「本当に実行してよろしいですか？」の確認に OK で答えると、セットアップが始まる
+        await _page.GetByText("本当に実行してよろしいですか？").Filter(new() { Visible = true }).First.WaitForAsync(new() { Timeout = 30_000 });
+        await ClickButtonAsync("OK");
 
         await WaitForCompletionAsync(baseUrl, setupTimeout);
         Log("セットアップが完了しました（サンプルデータベース）");
@@ -97,6 +100,9 @@ public sealed class TimetrackerSetupWizard
                 await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
                 lastReload = DateTime.UtcNow;
                 Log($"[{elapsed:mm\\:ss}] /setup を開き直しました（{_page.Url}）");
+                // 実行中であれば実行中の画面が表示される。最初の画面に戻った場合は、セットアップが始まっていない
+                if (await Heading("セットアップの開始").IsVisibleAsync())
+                    Assert.Fail("/setup を開き直すと最初の画面に戻りました（セットアップが始まっていません）。");
             }
         }
     }
