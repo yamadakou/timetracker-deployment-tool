@@ -1,6 +1,6 @@
 # MCP ツール設計案（Timetracker.Controller.Mcp）
 
-- ステータス: 第 4.3 版。Phase 0〜2 は main にマージ済み。Phase 3a・3b を `MCP-Tool` ブランチで実装した（8.2）
+- ステータス: 第 4.4 版。Phase 0〜2 は main にマージ済み。Phase 3a〜3c を `MCP-Tool` ブランチで実装した（8.2）
 - 対象ブランチ: `MCP-Tool`
 - 前提: `main`（a32cc3d, v0.6 系 / .NET 10）時点のコード
 
@@ -14,6 +14,7 @@
 | 4.1 | Phase 0（`refactor/shared-layer`）の実施結果を 8.3 に追記。R5 は `feature/cli-delete` に移した |
 | 4.2 | Phase 1（PR #22）・Phase 2（PR #23）のマージを反映。Phase 3a の実施結果を 8.2 に追記（詳細設計は `docs/design/mcp-phase3a.md`） |
 | 4.3 | Phase 3b の実施結果を 8.2 に追記（詳細設計は `docs/design/mcp-phase3b.md`）。進捗の通知（`notifications/progress`）は送らず、`get_job_status` のポーリングで完結させることにした |
+| 4.4 | Phase 3c の実施結果を 8.2 に追記（詳細設計は `docs/design/mcp-phase3c.md`）。Prompts に `delete-timetracker` を追加（5.3）。削除の結果は `get_job_status` の `deletion_result` で返す |
 
 ---
 
@@ -665,6 +666,7 @@ README の「必要な RBAC ロールと権限」（`docs/fix-rbac-requirements`
 ### 5.3 Prompts（任意・Phase 3 の後半）
 - `deploy-timetracker`: サブスクリプションの選択 → DB 種別 → 検証 → 計画 → 実行までを案内する定型プロンプト
 - `local-dry-run`: ローカルの Docker で動作を確認する手順
+- `delete-timetracker`: 計画 → 対象と残るものの確認 → 利用者によるアプリ名の入力 → 削除の手順（第 4.4 版で追加）
 
 ### 5.4 ログ
 - stdio では stdout に一切書かない（JSON-RPC 専用のため）。Generic Host の既定コンソールロガーも stderr に出す設定にする（`LogToStandardErrorThreshold = Trace`）
@@ -791,6 +793,13 @@ README の「必要な RBAC ロールと権限」（`docs/fix-rbac-requirements`
 - 進捗の通知は送らない（ジョブはツールの呼び出しが終わった後に進むため。詳細設計 6.2）。`get_job_status` が手順・ログの差分・デバイスコードの案内を返す
 - 確認: 単体テスト（計画の各規則・再確認・計画ストア・ジョブ・各ツールの分岐）とプロトコル結合テスト。分岐網羅率は Program.cs を除き 100%
 - Azure（japaneast、`azure-cli` 認証）での確認: SDK のクライアントから stdio で接続し、ツールだけで次を行った。`list_subscriptions` の成功（Phase 3a で残した確認）、`get_deployment_info`（デプロイ前は `exists: false`）、`plan_deployment`（新規。すべて create、リソースグループが無いため権限は not_checked）→ `start_deployment` → `get_job_status`（約 2 分 20 秒で succeeded、URL が返り、アクセスするとセットアップ画面に転送される）、`get_deployment_info`（3 つのアプリが Running、管理タグあり）、`plan_deployment`（再デプロイ。DB は update・data_loss、`requires_data_loss_ack: true`、権限は ok）→ 同意なしの `start_deployment` が拒否される → 同意ありで succeeded（約 50 秒）→ 使用済みの plan_id が拒否される、`list_jobs`（2 件）。結果・ログにパスワードが含まれないことも確認した。後片付けは CLI の `delete` で行った
+
+**実施結果（Phase 3c）**: 詳細設計は `docs/design/mcp-phase3c.md`。
+- `plan_deletion` / `start_deletion` を追加した（ツールは 11）。削除の規則は CLI の `delete` と同じ `DeletionPlanner` / `DeletionRunner` を使う。`start_deletion` は計画と同じアプリ名（`confirm_app_name`）が無ければ実行しない（一致しない場合は計画を使用済みにしない）。実行の直前に計画を作り直し、権限の不足や対象の変化があれば始めない
+- Resources（`timetracker://docs/constraints`、`timetracker://docs/rbac`、`timetracker://deployments/{subscription}/{resource_group}/{app_name}`）と Prompts（`deploy-timetracker`、`local-dry-run`、`delete-timetracker`）を追加した。文書はサーバーに埋め込み、README の主な記述が含まれることをテストで確かめる
+- release.yml で `timetracker-mcp-vX.Y.Z.zip`（win-x64 の単一ファイル EXE）を CLI の zip と並べて Release に載せる。同じ `dotnet publish` で EXE ができることを確認した（約 86MB）。実際の Release は次のリリースで確認する
+- README に「MCP サーバー（AI アシスタントから使う）」の章を追加した（ツール、安全策、導入、環境変数、Claude Code / VS Code / Claude Desktop の設定例）
+- 確認: 単体テストとプロトコル結合テスト（Resources / Prompts を含む）。分岐網羅率は Program.cs を除き 100%。Azure での確認は実施中
 
 ### 8.3 共有層のリファクタリング内容（Phase 0）
 | # | 変更 | 対応する課題 |
