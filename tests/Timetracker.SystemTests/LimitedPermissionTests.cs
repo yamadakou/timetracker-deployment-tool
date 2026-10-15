@@ -25,13 +25,15 @@ public sealed class LimitedPermissionTests
 
         (await azure.ResourceGroupExistsAsync(rg, ct)).Should().BeTrue($"リソースグループ {rg} を事前に作成してください（docs/SYSTEM_TESTS.md）");
         // 中断された前回のテストが残したアプリを削除する（このリソースグループは削除しないため）
-        foreach (var leftover in await azure.ListTestAppNamesAsync(rg, ct))
+        foreach (var leftover in await azure.ListLeftoverTestAppNamesAsync(rg, ct))
         {
-            await privileged.DeleteAsync(leftover, null, "--include-untagged", "--yes");
+            var sweep = await privileged.DeleteAsync(leftover, null, "--include-untagged", "--yes");
+            sweep.ExitCode.Should().Be(0, $"前回のテストが残したアプリ {leftover} を削除できませんでした\n{sweep}");
         }
 
         var app = AzureTestEnvironment.NewAppName();
         var newApp = AzureTestEnvironment.NewAppName();
+        var completed = false;
         try
         {
             // 準備: 十分な権限の ID で Environment を含めてデプロイする
@@ -58,13 +60,26 @@ public sealed class LimitedPermissionTests
             {
                 ResourceNaming.TimetrackerApp(app), ResourceNaming.RedisApp(app), ResourceNaming.DbApp(app), ResourceNaming.Environment(app),
             });
+            completed = true;
         }
         finally
         {
-            // 後片付け（このリソースグループ自体は残す）
+            // 後片付け（このリソースグループ自体は残す）。両方の削除を試み、失敗があればテストを失敗にする
+            // （料金が発生するリソースが残ったままテストが成功しないように）。
+            // テスト本体が失敗している場合は、その失敗を隠さないよう、後片付けの失敗は出力に書くだけにする
+            var failures = new List<CliResult>();
             foreach (var name in new[] { app, newApp })
             {
-                await privileged.DeleteAsync(name, null, "--include-untagged", "--yes");
+                var cleanup = await privileged.DeleteAsync(name, null, "--include-untagged", "--yes");
+                if (cleanup.ExitCode != 0)
+                    failures.Add(cleanup);
+            }
+            if (failures.Count > 0)
+            {
+                var message = $"後片付けに失敗しました。{rg} に残ったリソースを削除してください。\n{string.Join("\n", failures)}";
+                if (completed)
+                    Assert.Fail(message);
+                TestContext.Current.TestOutputHelper?.WriteLine(message);
             }
         }
     }

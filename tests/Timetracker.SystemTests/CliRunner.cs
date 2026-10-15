@@ -35,7 +35,7 @@ public sealed class CliRunner
 
     public Task<CliResult> DeployAsync(string appName, string password, params string[] extra) =>
         RunAsync(["deploy", "--subscription", _subscriptionId, "--resource-group", _resourceGroup, "--app-name", appName,
-            "--auth-mode", "azure-cli", "--db-password", password, "--tracker-password", password, "--verbose", .. extra]);
+            "--location", SystemTestSettings.Location, "--auth-mode", "azure-cli", "--db-password", password, "--tracker-password", password, "--verbose", .. extra]);
 
     public Task<CliResult> DeleteAsync(string appName, string? input, params string[] extra) =>
         RunAsync(["delete", "--subscription", _subscriptionId, "--resource-group", _resourceGroup, "--app-name", appName,

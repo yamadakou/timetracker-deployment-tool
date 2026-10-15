@@ -34,6 +34,8 @@ else
 fi
 
 echo "システムテストを実行します（20 分前後かかり、Azure Container Apps の料金が発生します）。"
+# global.json（Microsoft.Testing.Platform を使う設定）を読むため、リポジトリのディレクトリで実行する
+cd "$repo"
 # --results-directory は "=" でつなぐ（既存のディレクトリをスペース区切りで渡すと、dotnet test がプロジェクトの指定と誤解する）
 dotnet test --project "$repo/tests/Timetracker.SystemTests" -- \
   --output detailed --report-xunit-trx "--results-directory=$repo/TestResults/system"

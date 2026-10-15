@@ -68,6 +68,8 @@ scripts/run-system-tests.sh <サブスクリプション ID> <appId>
 - シークレットは環境変数 `TT_SYSTEMTEST_LIMITED_CLIENT_SECRET` から読み、無ければ入力を求めます
 - `-LimitedClientId`（第 2 引数）を省略すると、権限不足のシナリオはスキップします
 - 結果（TRX）は `TestResults/system` に出力します
+- スクリプトが設定した環境変数（`TT_SYSTEMTEST_*`）は、終了時に元に戻します（PowerShell）。そのため、続けて実行した通常の `dotnet test` がシステムテストを実行することはありません
+- スクリプトは、どのディレクトリから実行しても構いません（リポジトリのディレクトリに移動して `dotnet test` を実行します）
 
 ### CI（自動）
 GitHub の Actions → **System Test** → Run workflow で実行します（`workflow_dispatch`）。結果はジョブの成果物（`system-test-results`）に保存されます。
@@ -88,5 +90,5 @@ Azure への接続は、実行環境の Azure CLI のログイン（`az login`�
 ## 後片付け
 - `DeploymentLifecycleTests` は `rg-ttst-<日時>-<乱数>` というリソースグループを作り、テストの最後に削除を開始します（完了は待ちません）
 - テストが中断されて残ったリソースグループは、次回の実行の開始時に削除します（名前が `rg-ttst-` で始まり、`ttst-created-at` タグが 3 時間以上前のもの）
-- `LimitedPermissionTests` は、`rg-ttst-limited` に作ったアプリをテストの最後に削除します。前回の実行で残ったアプリ（`tt-app-name` タグが `ttst` で始まるもの）は、開始時に削除します
+- `LimitedPermissionTests` は、`rg-ttst-limited` に作ったアプリをテストの最後に削除します。前回の実行で残ったアプリ（`tt-app-name` タグが `ttst` で始まり、作成から 3 時間以上たったもの）は、開始時に削除します。作成から間もないものは、同時に実行中の別のテスト（ローカルと CI など）のものかもしれないため削除しません。後片付けに失敗した場合は、テストを失敗にします
 - 手動で確認する場合: `az group list --query "[?starts_with(name, 'rg-ttst-')].name" -o tsv`

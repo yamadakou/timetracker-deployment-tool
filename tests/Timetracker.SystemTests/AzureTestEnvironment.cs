@@ -122,22 +122,31 @@ public sealed class AzureTestEnvironment
         }
     }
 
-    /// <summary>リソースグループ内の、テストのアプリ名（接頭辞 ttst）の管理タグが付いた Container App のアプリ名。</summary>
-    public async Task<IReadOnlyList<string>> ListTestAppNamesAsync(string rgName, CancellationToken cancellationToken)
+    /// <summary>
+    /// リソースグループ内の、中断されたテストが残したアプリ名（接頭辞 ttst の管理タグが付き、作成から <see cref="LeftoverAge"/> 以上たったもの）。
+    /// 作成から間もないものは、同時に実行中の別のテスト（ローカルと CI など）のものかもしれないため含めない。
+    /// </summary>
+    public async Task<IReadOnlyList<string>> ListLeftoverTestAppNamesAsync(string rgName, CancellationToken cancellationToken)
     {
         var names = new HashSet<string>(StringComparer.Ordinal);
         await foreach (var app in ResourceGroup(rgName).GetContainerApps().GetAllAsync(cancellationToken))
         {
-            if (app.Data.Tags.TryGetValue(ManagedTags.AppNameKey, out var appName) && appName.StartsWith(AppNamePrefix, StringComparison.Ordinal))
+            if (IsLeftoverTestApp(app.Data.Tags, app.Data.SystemData?.CreatedOn, out var appName))
                 names.Add(appName);
         }
         await foreach (var env in ResourceGroup(rgName).GetContainerAppManagedEnvironments().GetAllAsync(cancellationToken))
         {
-            if (env.Data.Tags.TryGetValue(ManagedTags.AppNameKey, out var appName) && appName.StartsWith(AppNamePrefix, StringComparison.Ordinal))
+            if (IsLeftoverTestApp(env.Data.Tags, env.Data.SystemData?.CreatedOn, out var appName))
                 names.Add(appName);
         }
         return names.ToList();
     }
+
+    // 作成日時が取得できないものは、古いものとみなす（残り続けて料金が発生しないように）
+    private static bool IsLeftoverTestApp(IDictionary<string, string> tags, DateTimeOffset? createdOn, out string appName) =>
+        tags.TryGetValue(ManagedTags.AppNameKey, out appName!)
+        && appName.StartsWith(AppNamePrefix, StringComparison.Ordinal)
+        && (createdOn == null || DateTimeOffset.UtcNow - createdOn.Value >= LeftoverAge);
 
     public async Task<IReadOnlyDictionary<string, string>> GetContainerAppTagsAsync(string rgName, string name, CancellationToken cancellationToken)
     {
