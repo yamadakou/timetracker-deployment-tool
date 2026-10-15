@@ -72,6 +72,9 @@ scripts/run-system-tests.sh <サブスクリプション ID> <appId>
 ### CI（自動）
 GitHub の Actions → **System Test** → Run workflow で実行します（`workflow_dispatch`）。結果はジョブの成果物（`system-test-results`）に保存されます。
 
+- GitHub の仕様により、手動で実行できるのは既定のブランチ（`main`）にあるワークフローだけです。他のブランチのワークフローは、`main` にマージされるまで Actions の一覧に表示されません
+- `main` にマージされた後は、Run workflow の「Use workflow from」で、テストするブランチを選べます
+
 ## 設定（環境変数）
 | 環境変数 | 必須 | 既定 | 説明 |
 |---|---|---|---|
