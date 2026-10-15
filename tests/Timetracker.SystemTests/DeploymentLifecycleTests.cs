@@ -72,12 +72,13 @@ public sealed class DeploymentLifecycleTests
             // 5. 確認して削除: 管理タグがあるものだけ削除される
             var partial = await cli.DeleteAsync(app, app + "\n");
             partial.ExitCode.Should().Be(0, partial.ToString());
-            (await azure.ListResourceNamesAsync(rg, ct)).Should().Equal(new[] { Db, Env }.Order(StringComparer.Ordinal));
+            var remaining = new[] { Db, Env }.Order(StringComparer.Ordinal).ToList();
+            (await azure.WaitForResourceNamesAsync(rg, names => names.SequenceEqual(remaining), ct)).Should().Equal(remaining);
 
             // 6. 残りを --include-untagged で削除。リソースグループは残る
             var rest = await cli.DeleteAsync(app, null, "--include-untagged", "--yes");
             rest.ExitCode.Should().Be(0, rest.ToString());
-            (await azure.ListResourceNamesAsync(rg, ct)).Should().BeEmpty();
+            (await azure.WaitForResourceNamesAsync(rg, names => names.Count == 0, ct)).Should().BeEmpty();
             (await azure.ResourceGroupExistsAsync(rg, ct)).Should().BeTrue();
 
             // 7. 再実行しても失敗しない

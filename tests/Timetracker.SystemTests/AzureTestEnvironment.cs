@@ -86,25 +86,55 @@ public sealed class AzureTestEnvironment
         return swept;
     }
 
-    /// <summary>リソースグループ内のリソース名の一覧（昇順）。</summary>
+    /// <summary>
+    /// リソースグループ内の Container App と Environment の名前の一覧（昇順）。
+    /// ARM の汎用のリソース一覧（GetGenericResourcesAsync）は削除の反映が遅れることがあるため、各リソースプロバイダーから直接読む。
+    /// </summary>
     public async Task<IReadOnlyList<string>> ListResourceNamesAsync(string rgName, CancellationToken cancellationToken)
     {
+        var rg = ResourceGroup(rgName);
         var names = new List<string>();
-        await foreach (var resource in ResourceGroup(rgName).GetGenericResourcesAsync(cancellationToken: cancellationToken))
+        await foreach (var app in rg.GetContainerApps().GetAllAsync(cancellationToken))
         {
-            names.Add(resource.Data.Name);
+            names.Add(app.Data.Name);
+        }
+        await foreach (var env in rg.GetContainerAppManagedEnvironments().GetAllAsync(cancellationToken))
+        {
+            names.Add(env.Data.Name);
         }
         return names.Order(StringComparer.Ordinal).ToList();
+    }
+
+    /// <summary>
+    /// リソース名の一覧が条件を満たすまで待ち、最後に読んだ一覧を返す（削除の直後は反映が遅れることがあるため）。
+    /// 時間内に満たさなければ、そのときの一覧を返す（判定は呼び出し側のアサーションで行う）。
+    /// </summary>
+    public async Task<IReadOnlyList<string>> WaitForResourceNamesAsync(
+        string rgName, Func<IReadOnlyList<string>, bool> condition, CancellationToken cancellationToken)
+    {
+        var deadline = DateTime.UtcNow + TimeSpan.FromMinutes(3);
+        while (true)
+        {
+            var names = await ListResourceNamesAsync(rgName, cancellationToken);
+            if (condition(names) || DateTime.UtcNow > deadline)
+                return names;
+            await Task.Delay(TimeSpan.FromSeconds(10), cancellationToken);
+        }
     }
 
     /// <summary>リソースグループ内の、テストのアプリ名（接頭辞 ttst）の管理タグが付いた Container App のアプリ名。</summary>
     public async Task<IReadOnlyList<string>> ListTestAppNamesAsync(string rgName, CancellationToken cancellationToken)
     {
         var names = new HashSet<string>(StringComparer.Ordinal);
-        await foreach (var resource in ResourceGroup(rgName).GetGenericResourcesAsync(cancellationToken: cancellationToken))
+        await foreach (var app in ResourceGroup(rgName).GetContainerApps().GetAllAsync(cancellationToken))
         {
-            if (resource.Data.Tags.TryGetValue(ManagedTags.AppNameKey, out var app) && app.StartsWith(AppNamePrefix, StringComparison.Ordinal))
-                names.Add(app);
+            if (app.Data.Tags.TryGetValue(ManagedTags.AppNameKey, out var appName) && appName.StartsWith(AppNamePrefix, StringComparison.Ordinal))
+                names.Add(appName);
+        }
+        await foreach (var env in ResourceGroup(rgName).GetContainerAppManagedEnvironments().GetAllAsync(cancellationToken))
+        {
+            if (env.Data.Tags.TryGetValue(ManagedTags.AppNameKey, out var appName) && appName.StartsWith(AppNamePrefix, StringComparison.Ordinal))
+                names.Add(appName);
         }
         return names.ToList();
     }
