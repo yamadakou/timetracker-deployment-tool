@@ -1,6 +1,6 @@
 # MCP ツール設計案（Timetracker.Controller.Mcp）
 
-- ステータス: 設計案 第 3 版（オーナー回答を反映。コード変更はまだ行っていない）
+- ステータス: 設計案 第 4 版（オーナー回答を反映。コード変更はまだ行っていない）
 - 対象ブランチ: `MCP-Tool`
 - 前提: `main`（a32cc3d, v0.6 系 / .NET 10）時点のコード
 
@@ -10,6 +10,7 @@
 | 1 | 初版 |
 | 2 | オーナー回答を反映。パスワードは引数と環境変数の両方を受け付け、環境変数を推奨する。デプロイは非同期ジョブにする。削除ツールを追加する（CLI に先に実装）。Dry-run では subscription / resource_group を不要にする（CLI に先に実装）。HTTP 公開と WebAPI フロントエンドを見据えた構成にする。動作確認クライアントの方針と配布形態の比較を追加 |
 | 3 | オーナー回答を反映。ブランチをフェーズごとに分ける（1.3）。管理タグの説明と運用イメージを追加（4.12）。HTTP 公開時はサーバーの ID と利用者本人の権限の両方に対応する（4.11）。配布形態は stdio を単一ファイル EXE、HTTP をコンテナイメージに決定 |
+| 4 | README の RBAC 記載との整合を確認した結果を反映。必要な Azure 権限の章（4.13）を追加。計画ツールで権限を事前に確認する（4.7・4.12・4.13）。`server` 方式は RG 単位の権限・RG の事前作成を前提に変更（4.11）。Entra ID のアプリロールと Azure RBAC の区別を明記。stdio の既定の認証モードを `azure-cli` に変更。README の誤り（Container Apps Contributor）は `docs/fix-rbac-requirements` ブランチで先に修正（1.3） |
 
 ---
 
@@ -41,7 +42,8 @@ README の「将来の GUI 化に備えドメイン層とコントローラー�
 
 | 順 | ブランチ名（案） | フェーズ | 内容 | 前提 |
 |---|---|---|---|---|
-| 1 | `refactor/shared-layer` | Phase 0 | 共有層の切り出し（8.3）。**挙動は変えない** | – |
+| 0 | `docs/fix-rbac-requirements` | – | README の必要な RBAC ロールの誤りを修正（レビュー指摘 No.29。4.13） | – |
+| 1 | `refactor/shared-layer` | Phase 0 | 共有層の切り出し（8.3）。**挙動は変えない** | 0 |
 | 2 | `feature/cli-dryrun-optional-azure` | Phase 1 | Dry-run で subscription / resource-group を不要にする（4.5） | 1 |
 | 3 | `feature/cli-delete` | Phase 2 | 管理タグの付与と CLI の `delete` コマンド（4.12） | 1（2 の後を推奨） |
 | 4 | `MCP-Tool` | Phase 3 | MCP サーバー（stdio）。デプロイ・削除のツールを含む | 3 |
@@ -49,7 +51,8 @@ README の「将来の GUI 化に備えドメイン層とコントローラー�
 
 ```mermaid
 flowchart LR
-  B1["① refactor/shared-layer<br/>共有層の切り出し"] --> M1[(main)]
+  B0["⓪ docs/fix-rbac-requirements<br/>README の RBAC 修正"] --> M0[(main)]
+  M0 --> B1["① refactor/shared-layer<br/>共有層の切り出し"] --> M1[(main)]
   M1 --> B2["② feature/cli-dryrun-optional-azure<br/>Dry-run の緩和"] --> M2[(main)]
   M2 --> B3["③ feature/cli-delete<br/>管理タグ + delete"] --> M3[(main)]
   M3 --> B4["④ MCP-Tool<br/>MCP（stdio）"] --> M4[(main)]
@@ -181,7 +184,7 @@ flowchart TB
 | 設定 | 環境変数 | 既定 | stdio | HTTP | 説明 |
 |---|---|---|---|---|---|
 | トランスポート | `--transport` 引数 | `stdio` | – | – | `stdio` / `http` |
-| 認証モード | `TT_MCP_AUTH_MODE` | `default` | ✔ | –（4.11） | `default` / `azure-cli` / `sp-env` / `device-code` / `managed-identity`（`CredentialFactory` をそのまま使用）。HTTP では使わず、4.11 の設定を使う |
+| 認証モード | `TT_MCP_AUTH_MODE` | `azure-cli` | ✔ | –（4.11） | `default` / `azure-cli` / `sp-env` / `device-code` / `managed-identity`（`CredentialFactory` をそのまま使用）。HTTP では使わず、4.11 の設定を使う。既定を CLI（`default`）と変えて `azure-cli` にするのは、README で動作確認済みなのが `azure-cli` だけであることと、`default`（`DefaultAzureCredential`）はクライアントから引き継いだ環境変数などを自動で拾い、意図しない資格情報で動くおそれがあるため |
 | 既定サブスクリプション | `TT_MCP_DEFAULT_SUBSCRIPTION` | なし | ✔ | ✔ | ツール引数を省略したときに使う |
 | 既定リソースグループ | `TT_MCP_DEFAULT_RESOURCE_GROUP` | なし | ✔ | ✔ | 同上 |
 | DB パスワード | `TT_MCP_DB_PASSWORD` | なし | ✔ | **無視** | 4.10 |
@@ -314,12 +317,15 @@ DB を再デプロイするとデータが消えるため、**計画（読み取
   3. Environment: 存在の有無とリージョン（不一致なら **ブロッカー**。現行の `EnsureContainerAppEnvAsync` と同じ判定）
   4. `-db` / `-redis` / `-tt` の各 Container App: 作成か更新か
   5. `-db` が既にある場合はデータ消失の警告（`WarnIfDbAppExistsAsync` と同じ内容）
+  6. **権限の事前確認**（4.13）: 上の 2〜5 で決まった操作（RG の作成、Environment の作成、Container App の作成・更新）に必要な権限が、実行する ID にあるかを確認する。足りなければ、足りない権限と対処（「リソースグループを事前に作成してください」「Contributor をこのスコープに割り当ててください」など）を**ブロッカー**として返す
 - 出力:
   ```json
   {
     "plan_id": "pln_7f3c...",
     "expires_at": "2026-10-15T10:15:00Z",
     "blockers": [],
+    "identity": { "mode": "local", "display": "azure-cli（az login のアカウント）" },
+    "permission_check": { "status": "ok", "missing": [] },
     "actions": [
       { "resource": "resource_group", "name": "rg-tt-verify", "action": "use_existing" },
       { "resource": "environment", "name": "timetracker-env", "action": "create" },
@@ -407,10 +413,29 @@ stdio では利用者の PC の資格情報（`az login` 等）をそのまま�
 |---|---|---|
 | `TT_MCP_HTTP__IDENTITY_MODES` | `server` / `user` / `server,user` | 使える方式 |
 | `TT_MCP_HTTP__DEFAULT_IDENTITY_MODE` | `server` / `user` | 両方使える場合の既定 |
-| `TT_MCP_HTTP__SERVER_IDENTITY` | `managed-identity` / `sp-env` | `server` 方式で使う資格情報（`CredentialFactory` を利用） |
-| `TT_MCP_HTTP__SERVER_ALLOWED_SCOPES` | 例: `/subscriptions/<ID>/resourceGroups/rg-tt-*` | `server` 方式で操作してよい範囲（サブスクリプション・リソースグループ名のパターン）。サーバーの ID は権限が広くなりがちなため、範囲外への操作は計画の段階で拒否する |
+| `TT_MCP_HTTP__SERVER_IDENTITY` | `managed-identity` / `sp-env` | `server` 方式で使う資格情報（`CredentialFactory` を利用）。ユーザー割り当てのマネージド ID を使う場合は `AZURE_CLIENT_ID` でクライアント ID を指定する（`CredentialFactory` の拡張が必要。下記） |
+| `TT_MCP_HTTP__SERVER_ALLOWED_RESOURCE_GROUPS` | 例: `/subscriptions/<ID>/resourceGroups/rg-tt-team1,/subscriptions/<ID>/resourceGroups/rg-tt-team2` | `server` 方式で操作してよいリソースグループの**一覧**。範囲外への操作は計画の段階で拒否する |
+| `TT_MCP_HTTP__SERVER_CAN_CREATE_RESOURCE_GROUP` | `false`（既定） / `true` | `server` 方式でのリソースグループの新規作成を許すか。`true` にする場合は、サーバーの ID にサブスクリプション単位の権限が必要（下記） |
+
+#### `server` 方式の権限の前提
+- **既定は、リソースグループ単位の最小限の運用**とする。管理者がリソースグループを事前に作成し（`TT_MCP_HTTP__SERVER_ALLOWED_RESOURCE_GROUPS` に列挙）、サーバーのマネージド ID にはそのリソースグループのスコープで Contributor を割り当てる。リソースプロバイダーの登録も管理者が事前に行う
+- この場合、`server` 方式では存在しないリソースグループへのデプロイは計画の段階でブロッカーになる（「管理者にリソースグループの作成を依頼してください」）
+- リソースグループの自動作成が必要な場合だけ、`TT_MCP_HTTP__SERVER_CAN_CREATE_RESOURCE_GROUP=true` にし、マネージド ID にサブスクリプションのスコープで Contributor を割り当てる。このとき作成できるリソースグループ名は `TT_MCP_HTTP__SERVER_ALLOWED_RESOURCE_GROUPS` に列挙したものに限る（パターンでの許可はしない。サーバーの ID の権限でどこにでも作れる状態を避けるため）
+- 第 3 版ではリソースグループ名のパターン（`rg-tt-*`）で範囲を指定する案だったが、新しいリソースグループを作るにはサブスクリプション単位の権限が要るため、「マネージド ID の権限を絞る」という狙いと矛盾していた。第 4 版で上のとおり改めた
+- 現在の `CredentialFactory` はシステム割り当てのマネージド ID だけに対応している。Container Apps 上でユーザー割り当てのマネージド ID を使えるよう、`feature/mcp-http` ブランチで `AZURE_CLIENT_ID` が設定されていればユーザー割り当てを使うように拡張する（CLI の `managed-identity` でも同じく使えるようになる）。README の `managed-identity` の節（対象が VM / App Service / ACI / Functions）にも Container Apps を追記する
+
+#### `user` 方式の権限の前提
+- 利用者本人に、[README の必要な RBAC ロールと権限](../README.md#必要な-rbac-ロールと権限) のロール（Contributor 等）が割り当てられている必要がある（CLI を自分で実行する場合と同じ）
+- 加えて、MCP サーバーの Entra ID アプリ登録で、Azure Service Management の委任アクセス許可（`user_impersonation`）を追加し、テナント管理者の同意を得ておく
+- 条件付きアクセス（MFA の要求など）により OBO のトークン交換が失敗することがある。その場合は「再サインインが必要」というエラーとして返す
+- README への手順の追記は `feature/mcp-http` ブランチで行う
 
 #### だれがどちらを使えるか（Entra ID のアプリロール）
+> [!NOTE]
+> ここでいう**アプリロール**は、Entra ID のアプリ登録に定義する「MCP サーバーを使ってよいか」を表す役割で、README の **Azure RBAC ロール**（Contributor など。「Azure のリソースを操作してよいか」）とは別物である。HTTP 公開では次の 2 段階で確認する。
+> 1. アプリロール: MCP サーバーのツールを使ってよいか、どの方式を使ってよいか（MCP サーバーが確認）
+> 2. Azure RBAC ロール: 実際に Azure を操作できるか（Azure が確認。`server` 方式ではサーバーの ID の、`user` 方式では利用者本人のロール割り当てが使われる）
+
 | アプリロール | 使える方式 |
 |---|---|
 | `Timetracker.Deploy.User` | `user` のみ（本人の Azure 権限で操作） |
@@ -511,7 +536,7 @@ MCP では、`plan_deletion` が同じ内容を返し、LLM がそれを示し�
 **C. タグ導入前のバージョンで作った環境を消す**
 既存の環境にはタグがないため、既定では何も削除されない。次のどちらかで対応する。
 1. タグがないことを承知の上で、`--include-untagged`（MCP では `include_untagged=true`）を付けて削除する。計画の表示で「管理タグなし」と示されるので、対象が正しいかを確認してから実行する
-2. 先に Azure CLI でタグを付けてから、通常どおり削除する
+2. 先に Azure CLI でタグを付けてから、通常どおり削除する（`Microsoft.Resources/tags/write` が必要。Contributor にはあるが、Container Apps Contributor にはない）
    ```powershell
    az tag update --resource-id <リソース ID> --operation merge `
      --tags managed-by=timetracker-deployment-tool tt-app-name=demo1
@@ -556,6 +581,7 @@ Azure のコスト分析でもタグごとに費用を集計できるため、�
   }
   ```
 - Environment の中に、本ツールの命名規則以外の Container App があれば、Environment は削除しない
+- `plan_deployment` と同じく権限を事前に確認する（4.13）。削除に必要な権限（`Microsoft.App/containerApps/delete`、`Microsoft.App/managedEnvironments/delete`）が足りなければブロッカーとして返す
 
 #### `start_deletion`
 - 入力: `plan_id`（必須）、`confirm_app_name`（必須。計画の `app_name` と完全に一致すること）
@@ -573,6 +599,47 @@ timetracker-cli delete --subscription <ID> --resource-group <RG> --app-name time
 ```
 - 現在の `CliArgs` は書式 `[deploy] --option ...` なので、サブコマンド `delete` を追加し、サブコマンドごとに使えるオプションを分ける
 - CLI の `delete` と MCP の `plan_deletion` / `start_deletion` は、同じ `DeletionPlanner` / `DeletionRunner`（Application）を使う
+
+### 4.13 必要な Azure 権限
+
+README の「必要な RBAC ロールと権限」（`docs/fix-rbac-requirements` で修正）を正とし、MCP で追加する操作（計画・状態確認・削除など）も含めて整理する。ここでの「ロール」は Azure RBAC のロールを指す（Entra ID のアプリロールとの違いは 4.11）。
+
+#### 操作ごとに必要な権限
+| 操作 | 使うツール | 必要な権限（Action） | スコープ |
+|---|---|---|---|
+| サブスクリプションの一覧 | `list_subscriptions` | `Microsoft.Resources/subscriptions/read` | – |
+| RG・Environment・Container App の読み取り | `plan_*`、`get_deployment_info` | `Microsoft.Resources/subscriptions/resourceGroups/read`、`Microsoft.App/managedEnvironments/read`、`Microsoft.App/containerApps/read` | RG |
+| 自分の権限の確認（事前確認） | `plan_*` | `Microsoft.Authorization/permissions/read`（自分自身の権限の照会。通常どのロールでも可） | RG またはサブスクリプション |
+| RG の作成 | `start_deployment` | `Microsoft.Resources/subscriptions/resourceGroups/write` | サブスクリプション |
+| Environment の作成 | `start_deployment` | `Microsoft.App/managedEnvironments/write` | RG |
+| Container App の作成・更新（タグの付与を含む） | `start_deployment` | `Microsoft.App/containerApps/write`、`Microsoft.App/managedEnvironments/join/action` | RG |
+| Container App の削除 | `start_deletion` | `Microsoft.App/containerApps/delete` | RG |
+| Environment の削除 | `start_deletion` | `Microsoft.App/managedEnvironments/delete` | RG |
+| 既存リソースへのタグの後付け（運用イメージ C） | Azure CLI（手作業） | `Microsoft.Resources/tags/write` | リソース |
+| リソースプロバイダーの登録 | Azure CLI（手作業、初回のみ） | `*/register/action` | サブスクリプション |
+
+#### ロールごとにできること
+| ロール（スコープ） | デプロイ（RG あり） | デプロイ（RG 自動作成） | 削除 | 状態確認・計画 |
+|---|---|---|---|---|
+| Contributor / Owner（サブスクリプション） | ✔ | ✔ | ✔ | ✔ |
+| Contributor / Owner（RG） | ✔ | ✗（RG の事前作成が必要） | ✔ | ✔ |
+| Reader（RG） | ✗ | ✗ | ✗ | ✔（計画は作れるが、権限不足のブロッカーになる） |
+| Container Apps Contributor（RG） | ✗（RG の読み取りと Environment の作成ができない） | ✗ | ✗（Environment を削除できない） | ✗（RG を読み取れない） |
+
+#### 権限の事前確認（`plan_deployment` / `plan_deletion`）
+実行の途中で 403 になると、一部のリソースだけが作られた（または削除された）中途半端な状態が残る。そこで計画の段階で、実行する ID の実効的な権限を確認する。
+- 方法: Azure の「アクセス許可の一覧」API（`GET {scope}/providers/Microsoft.Authorization/permissions`）で、実行する ID のスコープでの `actions` / `notActions` を取得し、上の表の必要な権限と照合する（ワイルドカード `*` の展開を含む）。RG が存在しない場合はサブスクリプションのスコープで照会する
+- 実装: `IAzureDeploymentGateway` に `GetPermissionsAsync(scope)` を追加し、照合ロジック（`PermissionEvaluator`）は Domain の純粋関数にして単体テストする。SDK は `Azure.ResourceManager.Authorization` を使うか REST を直接呼ぶかを実装時に決める
+- 結果: 計画の `permission_check` に `ok` / `missing`（足りない権限と対処）/ `unknown`（照会自体に失敗した場合。警告として示し、実行は止めない）を入れる。`missing` はブロッカー
+- 限界: この API は拒否割り当て（deny assignment）や Azure Policy による拒否（リージョンやタグの制限など）を反映しない。これらで失敗した場合は、実行時のエラーとして返す
+- CLI でも同じ確認を `deploy` / `delete` の最初に行う（`feature/cli-delete` ブランチで追加。`--dry-run` で計画を表示するときにも示す）
+
+#### stdio・CLI と HTTP の違い
+| 実行形態 | Azure を操作する ID | 必要な RBAC の割り当て先 |
+|---|---|---|
+| CLI / MCP（stdio） | 利用者の PC の資格情報（`az login` のアカウント、サービスプリンシパル等） | その利用者・サービスプリンシパル（README のとおり） |
+| MCP（HTTP、`server` 方式） | MCP サーバーのマネージド ID | マネージド ID（既定は RG 単位。4.11） |
+| MCP（HTTP、`user` 方式） | 利用者本人（OBO） | 利用者本人（README のとおり） |
 
 ---
 
@@ -684,7 +751,7 @@ timetracker-cli delete --subscription <ID> --resource-group <RG> --app-name time
 | # | 論点 | 案 | 推奨 |
 |---|---|---|---|
 | R-5 | WebAPI を MCP と同じホストに置くか | 同居 / 別ホスト | WebAPI の設計時に決める（どちらにもできる構成にしておく） |
-| R-6 | `server` 方式で操作してよい範囲（`TT_MCP_HTTP__SERVER_ALLOWED_SCOPES`） | 運用するサブスクリプション・リソースグループの命名 | Phase 4 の着手時に決める |
+| R-6 | `server` 方式で操作してよいリソースグループ（`TT_MCP_HTTP__SERVER_ALLOWED_RESOURCE_GROUPS`）と、リソースグループの自動作成を許すか | 運用するリソースグループの一覧 | Phase 4 の着手時に決める。既定は自動作成なし |
 
 ---
 
@@ -693,9 +760,10 @@ timetracker-cli delete --subscription <ID> --resource-group <RG> --app-name time
 ### 8.1 CLI 側のブランチ（MCP より先に行う。ブランチ名は 1.3）
 | フェーズ | 内容 | 完了条件 |
 |---|---|---|
+| –（`docs/fix-rbac-requirements`） | README の必要な RBAC ロールの修正（No.29。ドキュメントのみ） | README の記載が 4.13 の表と一致する |
 | Phase 0（`refactor/shared-layer`） | 共有層の切り出し（8.3 の R1〜R7）。**CLI の挙動は変えない** | 既存テストが全件成功。CI が成功。`--help` と Dry-run の出力が変更前と同じ |
 | Phase 1（`feature/cli-dryrun-optional-azure`） | Dry-run の必須項目を緩和（Azure 用の検証を分ける。4.5） | `--dry-run` で subscription / resource-group を省略して compose が生成できる。Azure へのデプロイでは引き続き必須 |
-| Phase 2（`feature/cli-delete`） | 管理タグの付与（更新時は既存タグを引き継ぐ）と `delete` サブコマンド（4.12） | Azure（japaneast）で、デプロイ → `delete --dry-run` → `delete` が成功し、リソースグループが残る。運用イメージの A〜D（4.12）がそのとおりに動く |
+| Phase 2（`feature/cli-delete`） | 管理タグの付与（更新時は既存タグを引き継ぐ）と `delete` サブコマンド（4.12） | Azure（japaneast）で、デプロイ → `delete --dry-run` → `delete` が成功し、リソースグループが残る。運用イメージの A〜D（4.12）がそのとおりに動く。権限の事前確認（4.13）で、RG 単位の Reader では計画がブロッカーになることを確認する |
 
 ### 8.2 MCP のブランチ（main を取り込んでから）
 | フェーズ | 内容 | 完了条件 |
@@ -728,6 +796,7 @@ timetracker-cli delete --subscription <ID> --resource-group <RG> --app-name time
   - Infrastructure: 既存の `AzureSdkExecutorTests` と同じく `ArmClient` をモックする。管理タグが付くことを検証する
   - MCP ツール: 引数から `DeployOptions` への変換、パスワードの取得元の優先順位、マスク処理、stdio / HTTP での `generate_compose` の違い
   - **パスワードが結果・ログ・ジョブログに含まれないこと**（既存 No.5 のテストと同じ考え方）
+  - `PermissionEvaluator`: ワイルドカード（`*`、`Microsoft.App/*` など）と `notActions` の扱い、4.13 の「ロールごとにできること」の表の各行（Contributor・Reader・Container Apps Contributor の定義を入力にする）
 - **プロトコル結合テスト**: SDK のクライアントとサーバーをメモリ上のストリームでつなぎ、`tools/list` のスキーマ・annotations と `tools/call` の結果を検証する。stdio で stdout にログが混ざらないことも確認する。HTTP は `WebApplicationFactory` で `/mcp` を呼び、認証なしで拒否されることを確認する
 - **手動確認**: MCP Inspector、Claude Code（開発中）、リリース前に利用者のクライアント（6.1）。Azure 上での確認結果は、既存のレビュー表と同じように記録する
 
