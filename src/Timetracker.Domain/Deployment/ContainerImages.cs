@@ -14,6 +14,4 @@ public static class ContainerImages
     public const string LegacyEnvPrefix = "TTNX_";
 
     public static string Timetracker(string tag) => $"densocreate/timetracker:{tag}";
-
-    public static string Db(string dbType) => dbType == "postgresql" ? Postgres : SqlServer;
 }

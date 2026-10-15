@@ -71,6 +71,30 @@ public class CliArgsTests
     }
 
     [Fact]
+    public void Parse_Should_Reject_Missing_Value_At_End_Of_Arguments()
+    {
+        var act = () => CliArgs.Parse(new[] { "--resource-group", "rg", "--subscription" });
+        act.Should().Throw<ArgumentException>().WithMessage("*--subscription*");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Get_Should_Return_Null_For_Blank_Value(string value)
+    {
+        var cli = CliArgs.Parse(new[] { $"--location={value}" });
+
+        cli.Get("--location").Should().BeNull();
+        cli.Get("--location", "japaneast").Should().Be("japaneast");
+    }
+
+    [Fact]
+    public void GetDouble_Should_Return_Null_When_Not_Specified()
+    {
+        CliArgs.Parse(Array.Empty<string>()).GetDouble("--tt-cpu").Should().BeNull();
+    }
+
+    [Fact]
     public void Parse_Should_Reject_Invalid_Bool_Value_With_Equals()
     {
         var act = () => CliArgs.Parse(new[] { "--dry-run=yes" });
@@ -129,5 +153,65 @@ public class CliArgsTests
     {
         var act = () => CliArgs.Parse(new[] { "--tt-cpu", value }).GetDouble("--tt-cpu", 0.75);
         act.Should().Throw<ArgumentException>().WithMessage("*--tt-cpu*");
+    }
+
+    [Theory]
+    [InlineData(new string[0], CliCommand.Deploy)]
+    [InlineData(new[] { "deploy" }, CliCommand.Deploy)]
+    [InlineData(new[] { "delete" }, CliCommand.Delete)]
+    [InlineData(new[] { "DELETE" }, CliCommand.Delete)]
+    public void Parse_Should_Read_Command(string[] args, CliCommand expected)
+    {
+        CliArgs.Parse(args).Command.Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData("0")]       // 数値は列挙値として解釈しない
+    [InlineData("destroy")]
+    public void Parse_Should_Reject_Unknown_Command(string command)
+    {
+        var act = () => CliArgs.Parse(new[] { command });
+        act.Should().Throw<ArgumentException>().WithMessage($"*{command}*");
+    }
+
+    [Fact]
+    public void Parse_Should_Reject_Command_After_Options()
+    {
+        var act = () => CliArgs.Parse(new[] { "--subscription", "sub", "delete" });
+        act.Should().Throw<ArgumentException>().WithMessage("*delete*");
+    }
+
+    [Fact]
+    public void Parse_Should_Read_Delete_Options()
+    {
+        var cli = CliArgs.Parse(new[]
+        {
+            "delete", "--subscription", "sub", "--resource-group", "rg", "--app-name", "demo", "--auth-mode", "azure-cli",
+            "--include-untagged", "--yes", "--dry-run", "false", "--verbose",
+        });
+
+        cli.Get("--subscription").Should().Be("sub");
+        cli.Get("--app-name").Should().Be("demo");
+        cli.GetBool("--include-untagged").Should().BeTrue();
+        cli.GetBool("--yes").Should().BeTrue();
+        cli.GetBool("--dry-run").Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("delete", "--db-password", "delete")]
+    [InlineData("delete", "--tt-cpu", "delete")]
+    [InlineData("deploy", "--yes", "deploy")]
+    [InlineData("deploy", "--include-untagged", "deploy")]
+    public void Parse_Should_Reject_Option_Of_Other_Command(string command, string option, string expectedCommand)
+    {
+        var act = () => CliArgs.Parse(new[] { command, option, "x" });
+        act.Should().Throw<ArgumentException>().WithMessage($"*'{option}' は {expectedCommand} では使えません*");
+    }
+
+    [Fact]
+    public void Parse_Should_Reject_Unknown_Option_For_Delete()
+    {
+        var act = () => CliArgs.Parse(new[] { "delete", "--unknown", "x" });
+        act.Should().Throw<ArgumentException>().WithMessage("*不明なオプション*--unknown*");
     }
 }

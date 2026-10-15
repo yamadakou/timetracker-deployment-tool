@@ -2,7 +2,7 @@ using Azure.Core;
 using Azure.Identity;
 using Timetracker.Common;
 
-namespace Timetracker.Controller.Cli;
+namespace Timetracker.Infrastructure.Azure;
 
 /// <summary>
 /// Factory class that creates Azure TokenCredential based on the specified AuthMode.
@@ -15,7 +15,7 @@ public static class CredentialFactory
     /// <param name="authMode">The authentication mode: default, azure-cli, sp-env, device-code, or managed-identity</param>
     /// <param name="logger">Logger for verbose output and error messages</param>
     /// <returns>A TokenCredential instance appropriate for the specified mode</returns>
-    public static TokenCredential Create(string authMode, SimpleLogger logger)
+    public static TokenCredential Create(string authMode, IDeploymentLogger logger)
     {
         logger.Verbose($"認証モード: {authMode}");
 
@@ -30,19 +30,19 @@ public static class CredentialFactory
         };
     }
 
-    private static TokenCredential CreateDefaultCredential(SimpleLogger logger)
+    private static TokenCredential CreateDefaultCredential(IDeploymentLogger logger)
     {
         logger.Verbose("DefaultAzureCredential を使用します");
         return new DefaultAzureCredential();
     }
 
-    private static TokenCredential CreateAzureCliCredential(SimpleLogger logger)
+    private static TokenCredential CreateAzureCliCredential(IDeploymentLogger logger)
     {
         logger.Verbose("AzureCliCredential を使用します（az login が必要）");
         return new AzureCliCredential();
     }
 
-    private static TokenCredential CreateServicePrincipalCredential(SimpleLogger logger)
+    private static TokenCredential CreateServicePrincipalCredential(IDeploymentLogger logger)
     {
         var tenantId = Environment.GetEnvironmentVariable("AZURE_TENANT_ID");
         var clientId = Environment.GetEnvironmentVariable("AZURE_CLIENT_ID");
@@ -62,20 +62,24 @@ public static class CredentialFactory
         return new ClientSecretCredential(tenantId, clientId, clientSecret);
     }
 
-    private static TokenCredential CreateDeviceCodeCredential(SimpleLogger logger)
+    private static TokenCredential CreateDeviceCodeCredential(IDeploymentLogger logger)
     {
         logger.Verbose("DeviceCodeCredential を使用します（デバイスコード認証）");
         return new DeviceCodeCredential(new DeviceCodeCredentialOptions
         {
-            DeviceCodeCallback = (code, cancellation) =>
-            {
-                logger.Info($"デバイスコード認証: {code.Message}");
-                return Task.CompletedTask;
-            }
+            DeviceCodeCallback = DeviceCodeCallback(logger)
         });
     }
 
-    private static TokenCredential CreateManagedIdentityCredential(SimpleLogger logger)
+    /// <summary>デバイスコード認証の案内（サインイン用の URL とコード）をログに出すコールバック。</summary>
+    internal static Func<DeviceCodeInfo, CancellationToken, Task> DeviceCodeCallback(IDeploymentLogger logger) =>
+        (code, cancellation) =>
+        {
+            logger.Info($"デバイスコード認証: {code.Message}");
+            return Task.CompletedTask;
+        };
+
+    private static TokenCredential CreateManagedIdentityCredential(IDeploymentLogger logger)
     {
         logger.Verbose("ManagedIdentityCredential を使用します");
         return new ManagedIdentityCredential(ManagedIdentityId.SystemAssigned);

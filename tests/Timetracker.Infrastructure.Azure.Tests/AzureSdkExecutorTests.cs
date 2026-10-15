@@ -1,3 +1,4 @@
+using System.ClientModel.Primitives;
 using Azure;
 using Azure.Core;
 using Azure.ResourceManager;
@@ -8,9 +9,10 @@ using Azure.ResourceManager.Resources;
 using FluentAssertions;
 using Moq;
 using Timetracker.Common;
+using Timetracker.Domain.Deployment;
 using Xunit;
 
-namespace Timetracker.Controller.Cli.Tests;
+namespace Timetracker.Infrastructure.Azure.Tests;
 
 public class AzureSdkExecutorTests
 {
@@ -53,7 +55,7 @@ public class AzureSdkExecutorTests
         rgs.Setup(c => c.GetIfExistsAsync(RgName, It.IsAny<CancellationToken>())).ReturnsAsync(Found(existing.Object));
 
         var sut = new AzureSdkExecutor(new SimpleLogger(false), arm.Object);
-        await sut.EnsureResourceGroupAsync(SubscriptionId, RgName, "japaneast");
+        await sut.EnsureResourceGroupAsync(SubscriptionId, RgName, "japaneast", TestContext.Current.CancellationToken);
 
         rgs.Verify(c => c.CreateOrUpdateAsync(It.IsAny<WaitUntil>(), It.IsAny<string>(), It.IsAny<ResourceGroupData>(), It.IsAny<CancellationToken>()), Times.Never);
     }
@@ -67,7 +69,7 @@ public class AzureSdkExecutorTests
            .ReturnsAsync(Mock.Of<ArmOperation<ResourceGroupResource>>());
 
         var sut = new AzureSdkExecutor(new SimpleLogger(false), arm.Object);
-        await sut.EnsureResourceGroupAsync(SubscriptionId, RgName, "japaneast");
+        await sut.EnsureResourceGroupAsync(SubscriptionId, RgName, "japaneast", TestContext.Current.CancellationToken);
 
         rgs.Verify(c => c.CreateOrUpdateAsync(WaitUntil.Completed, RgName,
             It.Is<ResourceGroupData>(d => d.Location == new AzureLocation("japaneast")), It.IsAny<CancellationToken>()), Times.Once);
@@ -101,7 +103,7 @@ public class AzureSdkExecutorTests
         envs.Setup(c => c.GetIfExistsAsync("app-env", It.IsAny<CancellationToken>())).ReturnsAsync(Found(ExistingEnvironment("eastus").Object));
 
         var sut = new AzureSdkExecutor(new SimpleLogger(false), arm.Object);
-        var act = () => sut.EnsureContainerAppEnvAsync(SubscriptionId, RgName, "app-env", "japaneast");
+        var act = () => sut.EnsureContainerAppEnvAsync(SubscriptionId, RgName, "app", "japaneast", TestContext.Current.CancellationToken);
 
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*app-env*eastus*japaneast*");
     }
@@ -114,7 +116,7 @@ public class AzureSdkExecutorTests
         envs.Setup(c => c.GetIfExistsAsync("app-env", It.IsAny<CancellationToken>())).ReturnsAsync(Found(existing.Object));
 
         var sut = new AzureSdkExecutor(new SimpleLogger(false), arm.Object);
-        var result = await sut.EnsureContainerAppEnvAsync(SubscriptionId, RgName, "app-env", "JapanEast");
+        var result = await sut.EnsureContainerAppEnvAsync(SubscriptionId, RgName, "app", "JapanEast", TestContext.Current.CancellationToken);
 
         result.Should().BeSameAs(existing.Object);
         envs.Verify(c => c.CreateOrUpdateAsync(It.IsAny<WaitUntil>(), It.IsAny<string>(), It.IsAny<ContainerAppManagedEnvironmentData>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -132,7 +134,7 @@ public class AzureSdkExecutorTests
             .ReturnsAsync(op.Object);
 
         var sut = new AzureSdkExecutor(new SimpleLogger(false), arm.Object);
-        var result = await sut.EnsureContainerAppEnvAsync(SubscriptionId, RgName, "app-env", "japaneast");
+        var result = await sut.EnsureContainerAppEnvAsync(SubscriptionId, RgName, "app", "japaneast", TestContext.Current.CancellationToken);
 
         result.Should().BeSameAs(created.Object);
     }
@@ -157,7 +159,7 @@ public class AzureSdkExecutorTests
         var output = new StringWriter();
 
         var sut = new AzureSdkExecutor(new SimpleLogger(false, output), arm.Object);
-        var exists = await sut.WarnIfDbAppExistsAsync(SubscriptionId, RgName, "app-db");
+        var exists = await sut.WarnIfDbAppExistsAsync(SubscriptionId, RgName, "app-db", TestContext.Current.CancellationToken);
 
         exists.Should().BeTrue();
         output.ToString().Should().Contain("[WARN]").And.Contain("データ");
@@ -171,9 +173,108 @@ public class AzureSdkExecutorTests
         var output = new StringWriter();
 
         var sut = new AzureSdkExecutor(new SimpleLogger(false, output), arm.Object);
-        var exists = await sut.WarnIfDbAppExistsAsync(SubscriptionId, RgName, "app-db");
+        var exists = await sut.WarnIfDbAppExistsAsync(SubscriptionId, RgName, "app-db", TestContext.Current.CancellationToken);
 
         exists.Should().BeFalse();
         output.ToString().Should().NotContain("[WARN]");
+    }
+
+    // name・fqdn は読み取り専用のため、Azure の応答と同じ JSON から作る
+    // （ArmAppContainersModelFactory.ContainerAppIngressConfiguration は stickySessionsAffinity 省略時に例外になる）
+    private static ContainerAppResource CreatedApp(string name, string? fqdn = null, bool withConfiguration = true)
+    {
+        var ingress = fqdn == null ? "" : $$""", "ingress": { "fqdn": "{{fqdn}}" }""";
+        var properties = withConfiguration ? $$"""{ "configuration": { "activeRevisionsMode": "Single"{{ingress}} } }""" : "{}";
+        var json = $$"""{ "name": "{{name}}", "location": "japaneast", "properties": {{properties}} }""";
+        var app = new Mock<ContainerAppResource>();
+        app.SetupGet(a => a.HasData).Returns(true);
+        app.SetupGet(a => a.Data).Returns(ModelReaderWriter.Read<ContainerAppData>(BinaryData.FromString(json))!);
+        return app.Object;
+    }
+
+    private static Mock<ContainerAppCollection> SetupCreateOrUpdate(string? ttFqdn, out Mock<ArmClient> arm, bool ttWithConfiguration = true)
+    {
+        (arm, var apps) = SetupContainerApps();
+        foreach (var name in new[] { "app-db", "app-redis", "app-tt" })
+        {
+            apps.Setup(c => c.GetIfExistsAsync(name, It.IsAny<CancellationToken>())).ReturnsAsync(NotFound<ContainerAppResource>());
+        }
+        foreach (var (name, fqdn) in new[] { ("app-db", (string?)null), ("app-redis", null), ("app-tt", ttFqdn) })
+        {
+            var op = new Mock<ArmOperation<ContainerAppResource>>();
+            op.SetupGet(o => o.Value).Returns(CreatedApp(name, fqdn, name != "app-tt" || ttWithConfiguration));
+            apps.Setup(c => c.CreateOrUpdateAsync(WaitUntil.Completed, name, It.IsAny<ContainerAppData>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(op.Object);
+        }
+        return apps;
+    }
+
+    private static ContainerAppManagedEnvironmentResource Environment()
+    {
+        var env = new Mock<ContainerAppManagedEnvironmentResource>();
+        env.SetupGet(e => e.Id).Returns(new ResourceIdentifier(
+            $"/subscriptions/{SubscriptionId}/resourceGroups/{RgName}/providers/Microsoft.App/managedEnvironments/app-env"));
+        return env.Object;
+    }
+
+    private static DeployOptions Options() => new()
+    {
+        Subscription = SubscriptionId,
+        ResourceGroup = RgName,
+        AppName = "app",
+        DbPassword = "DbPassw0rd!",
+        TrackerPassword = "TrackerPass!",
+    };
+
+    [Fact]
+    public async Task CreateOrUpdateContainerApp_Should_Return_App_Names_And_Endpoint()
+    {
+        var apps = SetupCreateOrUpdate("app-tt.example.japaneast.azurecontainerapps.io", out var arm);
+
+        var sut = new AzureSdkExecutor(new SimpleLogger(false, new StringWriter()), arm.Object);
+        var result = await sut.CreateOrUpdateContainerAppAsync(
+            SubscriptionId, RgName, "app", "japaneast", Options(), Environment(), TestContext.Current.CancellationToken);
+
+        result.Should().Be(new ContainerAppsDeployment(
+            "app-tt", "app-db", "app-redis", "https://app-tt.example.japaneast.azurecontainerapps.io"));
+        apps.Verify(c => c.CreateOrUpdateAsync(WaitUntil.Completed, It.IsAny<string>(), It.IsAny<ContainerAppData>(), It.IsAny<CancellationToken>()),
+            Times.Exactly(3));
+    }
+
+    [Fact]
+    public async Task CreateOrUpdateContainerApp_Should_Return_Null_Endpoint_When_Fqdn_Is_Not_Available()
+    {
+        SetupCreateOrUpdate(ttFqdn: null, out var arm);
+        var output = new StringWriter();
+
+        var sut = new AzureSdkExecutor(new SimpleLogger(false, output), arm.Object);
+        var result = await sut.CreateOrUpdateContainerAppAsync(
+            SubscriptionId, RgName, "app", "japaneast", Options(), Environment(), TestContext.Current.CancellationToken);
+
+        result.TimetrackerUrl.Should().BeNull();
+        output.ToString().Should().Contain("[WARN]").And.Contain("FQDN");
+    }
+
+    [Fact]
+    public async Task CreateOrUpdateContainerApp_Should_Return_Null_Endpoint_When_Configuration_Is_Not_Returned()
+    {
+        SetupCreateOrUpdate(ttFqdn: null, out var arm, ttWithConfiguration: false);
+        var output = new StringWriter();
+
+        var sut = new AzureSdkExecutor(new SimpleLogger(false, output), arm.Object);
+        var result = await sut.CreateOrUpdateContainerAppAsync(
+            SubscriptionId, RgName, "app", "japaneast", Options(), Environment(), TestContext.Current.CancellationToken);
+
+        result.TimetrackerUrl.Should().BeNull();
+        output.ToString().Should().Contain("[WARN]").And.Contain("FQDN");
+    }
+
+    [Fact]
+    public void Constructor_Should_Accept_Credential()
+    {
+        // ArmClient の作成だけで、Azure には接続しない
+        var act = () => new AzureSdkExecutor(new SimpleLogger(false, new StringWriter()), new Mock<TokenCredential>().Object);
+
+        act.Should().NotThrow();
     }
 }

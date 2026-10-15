@@ -4,7 +4,7 @@ using Azure.ResourceManager.AppContainers;
 using Azure.ResourceManager.AppContainers.Models;
 using Timetracker.Domain.Deployment;
 
-namespace Timetracker.Controller.Cli;
+namespace Timetracker.Infrastructure.Azure;
 
 /// <summary>
 /// Timetracker / DB / Redis の各 Container App の定義（ContainerAppData）を組み立てる。
@@ -42,12 +42,34 @@ public static class ContainerAppSpecBuilder
     };
 
     // Container Apps Environment（VNet 設定は必要に応じて追加。例: InfrastructureSubnetId）
-    public static ContainerAppManagedEnvironmentData BuildManagedEnvironment(string location) => new(location)
+    public static ContainerAppManagedEnvironmentData BuildManagedEnvironment(string location, string appName)
     {
-        // Azure.ResourceManager.AppContainers 1.6.0 以降は properties が空だとボディから省かれ、
-        // API が 400 (Must contain 'properties') を返すため、既定値（ゾーン冗長なし）を明示して properties を送る
-        IsZoneRedundant = false,
-    };
+        var data = new ContainerAppManagedEnvironmentData(location)
+        {
+            // Azure.ResourceManager.AppContainers 1.6.0 以降は properties が空だとボディから省かれ、
+            // API が 400 (Must contain 'properties') を返すため、既定値（ゾーン冗長なし）を明示して properties を送る
+            IsZoneRedundant = false,
+        };
+        foreach (var (key, value) in ManagedTags.For(appName))
+        {
+            data.Tags[key] = value;
+        }
+        return data;
+    }
+
+    /// <summary>
+    /// Container App の定義に管理タグを付ける。更新時は既存のタグを引き継ぐ
+    /// （PUT はタグを置き換えるため、送らないと利用者が付けたタグが消える）。
+    /// </summary>
+    public static ContainerAppData WithManagedTags(ContainerAppData data, string appName, IReadOnlyDictionary<string, string>? existingTags)
+    {
+        data.Tags.Clear();
+        foreach (var (key, value) in ManagedTags.Merge(existingTags, appName))
+        {
+            data.Tags[key] = value;
+        }
+        return data;
+    }
 
     // 1) DB 用 Container App（Internal Ingress: TCP + ExposedPort）
     public static ContainerAppData BuildDbApp(DeployOptions opts, string location, ResourceIdentifier envId)

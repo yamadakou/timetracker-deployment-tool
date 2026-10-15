@@ -19,7 +19,7 @@ public static partial class AppNameValidator
     public const int ContainerAppNameMaxLength = 32;
 
     /// <summary>アプリ名に付けて作成するリソース名の接尾辞。</summary>
-    public static readonly IReadOnlyList<string> ResourceSuffixes = new[] { "-env", "-db", "-redis", "-tt" };
+    public static readonly IReadOnlyList<string> ResourceSuffixes = ResourceNaming.Suffixes;
 
     public const int MinLength = 2;
     public static readonly int MaxLength = ContainerAppNameMaxLength - ResourceSuffixes.Max(s => s.Length);

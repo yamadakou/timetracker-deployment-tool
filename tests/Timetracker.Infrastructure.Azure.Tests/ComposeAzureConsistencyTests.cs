@@ -4,7 +4,7 @@ using Timetracker.Domain.Deployment;
 using Xunit;
 using YamlDotNet.RepresentationModel;
 
-namespace Timetracker.Controller.Cli.Tests;
+namespace Timetracker.Infrastructure.Azure.Tests;
 
 /// <summary>
 /// Dry-run の compose と Azure Container Apps の構成が食い違わないことを検証する。

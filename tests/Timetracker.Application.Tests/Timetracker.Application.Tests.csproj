@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="FluentAssertions" Version="8.11.0" />
+    <PackageReference Include="Moq" Version="4.21.0" />
+    <PackageReference Include="xunit.v3" Version="4.0.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Timetracker.Application\Timetracker.Application.csproj" />
+  </ItemGroup>
+</Project>

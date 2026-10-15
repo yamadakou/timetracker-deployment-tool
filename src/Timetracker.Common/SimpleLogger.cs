@@ -1,6 +1,6 @@
 namespace Timetracker.Common;
 
-public class SimpleLogger
+public class SimpleLogger : IDeploymentLogger
 {
     private readonly bool _verbose;
     private readonly TextWriter? _out;
