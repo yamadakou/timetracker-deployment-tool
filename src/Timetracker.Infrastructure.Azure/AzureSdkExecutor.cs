@@ -3,7 +3,9 @@ using Azure.Core;
 using Azure.ResourceManager;
 using Azure.ResourceManager.Resources;
 using Azure.ResourceManager.AppContainers;
+using Azure.ResourceManager.Authorization;
 using Timetracker.Common;
+using Timetracker.Domain.Azure;
 using Timetracker.Domain.Deployment;
 
 namespace Timetracker.Infrastructure.Azure;
@@ -48,8 +50,9 @@ public class AzureSdkExecutor : IAzureDeploymentGateway
     }
 
     public async Task<ContainerAppManagedEnvironmentResource> EnsureContainerAppEnvAsync(
-        string subscriptionId, string rgName, string envName, string location, CancellationToken cancellationToken = default)
+        string subscriptionId, string rgName, string appName, string location, CancellationToken cancellationToken = default)
     {
+        var envName = ResourceNaming.Environment(appName);
         var rg = _arm.GetResourceGroupResource(new ResourceIdentifier($"/subscriptions/{subscriptionId}/resourceGroups/{rgName}"));
         var envCollection = rg.GetContainerAppManagedEnvironments();
 
@@ -69,7 +72,7 @@ public class AzureSdkExecutor : IAzureDeploymentGateway
             return existing.Value!;
         }
 
-        var data = ContainerAppSpecBuilder.BuildManagedEnvironment(location);
+        var data = ContainerAppSpecBuilder.BuildManagedEnvironment(location, appName);
         var envOp = await envCollection.CreateOrUpdateAsync(WaitUntil.Completed, envName, data, cancellationToken);
         var env = envOp.Value;
         _logger.Info($"Container Apps Environment を作成: {envName}");
@@ -88,9 +91,20 @@ public class AzureSdkExecutor : IAzureDeploymentGateway
         if (!existing.HasValue)
             return false;
 
+        WarnDbDataLoss(dbAppName);
+        return true;
+    }
+
+    private void WarnDbDataLoss(string dbAppName) =>
         _logger.Warn($"DB アプリ '{dbAppName}' は既に存在します。設定が変わると DB コンテナが再起動し、" +
                      "永続ボリュームを設定していないため DB のデータは失われます。必要に応じて事前にバックアップしてください。");
-        return true;
+
+    // 既存の Container App のタグ（存在しなければ null）。更新時に引き継ぐために読む
+    private static async Task<IReadOnlyDictionary<string, string>?> GetExistingTagsAsync(
+        ContainerAppCollection apps, string name, CancellationToken cancellationToken)
+    {
+        var existing = await apps.GetIfExistsAsync(name, cancellationToken);
+        return existing.HasValue ? new Dictionary<string, string>(existing.Value!.Data.Tags) : null;
     }
 
     public async Task<ContainerAppsDeployment> CreateOrUpdateContainerAppAsync(
@@ -109,9 +123,12 @@ public class AzureSdkExecutor : IAzureDeploymentGateway
 
         // 1) DB
         var dbAppName = ResourceNaming.DbApp(appName);
-        await WarnIfDbAppExistsAsync(subscriptionId, rgName, dbAppName, cancellationToken);
+        var dbTags = await GetExistingTagsAsync(apps, dbAppName, cancellationToken);
+        if (dbTags != null)
+            WarnDbDataLoss(dbAppName);
         var dbAppOp = await apps.CreateOrUpdateAsync(WaitUntil.Completed, dbAppName,
-            ContainerAppSpecBuilder.BuildDbApp(opts, location, env.Id), cancellationToken);
+            ContainerAppSpecBuilder.WithManagedTags(ContainerAppSpecBuilder.BuildDbApp(opts, location, env.Id), appName, dbTags),
+            cancellationToken);
         var dbApp = dbAppOp.Value;
         // 内部接続は Container App 名を使用
         var dbEndpointHost = dbAppName;
@@ -119,15 +136,21 @@ public class AzureSdkExecutor : IAzureDeploymentGateway
 
         // 2) Redis
         var redisAppName = ResourceNaming.RedisApp(appName);
+        var redisTags = await GetExistingTagsAsync(apps, redisAppName, cancellationToken);
         var redisAppOp = await apps.CreateOrUpdateAsync(WaitUntil.Completed, redisAppName,
-            ContainerAppSpecBuilder.BuildRedisApp(opts, location, env.Id), cancellationToken);
+            ContainerAppSpecBuilder.WithManagedTags(ContainerAppSpecBuilder.BuildRedisApp(opts, location, env.Id), appName, redisTags),
+            cancellationToken);
         var redisApp = redisAppOp.Value;
         var redisEndpointHost = redisAppName;
         _logger.Info($"Redis app ready: {redisApp.Data.Name} (endpoint: {redisEndpointHost}:{ContainerAppSpecBuilder.RedisPort})");
 
         // 3) Timetracker
-        var ttAppOp = await apps.CreateOrUpdateAsync(WaitUntil.Completed, ResourceNaming.TimetrackerApp(appName),
-            ContainerAppSpecBuilder.BuildTimetrackerApp(opts, location, env.Id, dbEndpointHost, redisEndpointHost), cancellationToken);
+        var ttAppName = ResourceNaming.TimetrackerApp(appName);
+        var ttTags = await GetExistingTagsAsync(apps, ttAppName, cancellationToken);
+        var ttAppOp = await apps.CreateOrUpdateAsync(WaitUntil.Completed, ttAppName,
+            ContainerAppSpecBuilder.WithManagedTags(
+                ContainerAppSpecBuilder.BuildTimetrackerApp(opts, location, env.Id, dbEndpointHost, redisEndpointHost), appName, ttTags),
+            cancellationToken);
         var ttApp = ttAppOp.Value;
         var ttUrl = ttApp.Data.Configuration?.Ingress?.Fqdn != null
             ? $"https://{ttApp.Data.Configuration.Ingress.Fqdn}"
@@ -145,5 +168,77 @@ public class AzureSdkExecutor : IAzureDeploymentGateway
 
         return new ContainerAppsDeployment(ttApp.Data.Name, dbApp.Data.Name, redisApp.Data.Name,
             string.IsNullOrEmpty(ttUrl) ? null : ttUrl);
+    }
+
+    private ResourceGroupResource ResourceGroup(string subscriptionId, string rgName) =>
+        _arm.GetResourceGroupResource(new ResourceIdentifier($"/subscriptions/{subscriptionId}/resourceGroups/{rgName}"));
+
+    public async Task<ResourceGroupInfo?> GetResourceGroupAsync(string subscriptionId, string rgName, CancellationToken cancellationToken = default)
+    {
+        var sub = _arm.GetSubscriptionResource(new ResourceIdentifier($"/subscriptions/{subscriptionId}"));
+        var existing = await sub.GetResourceGroups().GetIfExistsAsync(rgName, cancellationToken);
+        return existing.HasValue ? new ResourceGroupInfo(existing.Value!.Data.Name, existing.Value.Data.Location.Name) : null;
+    }
+
+    public async Task<ManagedEnvironmentInfo?> GetEnvironmentAsync(
+        string subscriptionId, string rgName, string envName, CancellationToken cancellationToken = default)
+    {
+        var existing = await ResourceGroup(subscriptionId, rgName).GetContainerAppManagedEnvironments().GetIfExistsAsync(envName, cancellationToken);
+        if (!existing.HasValue)
+            return null;
+        var env = existing.Value!;
+        return new ManagedEnvironmentInfo(env.Id.ToString(), env.Data.Name, env.Data.Location.Name, new Dictionary<string, string>(env.Data.Tags));
+    }
+
+    public async Task<IReadOnlyList<ContainerAppInfo>> ListContainerAppsAsync(
+        string subscriptionId, string rgName, CancellationToken cancellationToken = default)
+    {
+        var result = new List<ContainerAppInfo>();
+        await foreach (var app in ResourceGroup(subscriptionId, rgName).GetContainerApps().GetAllAsync(cancellationToken))
+        {
+            var environmentId = app.Data.EnvironmentId ?? app.Data.ManagedEnvironmentId;
+            result.Add(new ContainerAppInfo(app.Data.Name, environmentId?.ToString(), new Dictionary<string, string>(app.Data.Tags)));
+        }
+        return result;
+    }
+
+    public async Task<bool> DeleteContainerAppAsync(string subscriptionId, string rgName, string name, CancellationToken cancellationToken = default)
+    {
+        var existing = await ResourceGroup(subscriptionId, rgName).GetContainerApps().GetIfExistsAsync(name, cancellationToken);
+        if (!existing.HasValue)
+            return false;
+        await existing.Value!.DeleteAsync(WaitUntil.Completed, cancellationToken);
+        return true;
+    }
+
+    public async Task<bool> DeleteEnvironmentAsync(string subscriptionId, string rgName, string name, CancellationToken cancellationToken = default)
+    {
+        var existing = await ResourceGroup(subscriptionId, rgName).GetContainerAppManagedEnvironments().GetIfExistsAsync(name, cancellationToken);
+        if (!existing.HasValue)
+            return false;
+        await existing.Value!.DeleteAsync(WaitUntil.Completed, cancellationToken);
+        return true;
+    }
+
+    public async Task<IReadOnlyList<PermissionSet>> GetPermissionsAsync(string subscriptionId, string rgName, CancellationToken cancellationToken = default)
+    {
+        var result = new List<PermissionSet>();
+        await foreach (var p in ResourceGroup(subscriptionId, rgName).GetAzurePermissionsForResourceGroupsAsync(cancellationToken))
+        {
+            result.Add(new PermissionSet(p.Actions.ToList(), p.NotActions.ToList()));
+        }
+        return result;
+    }
+
+    public async Task<IReadOnlyList<PermissionSet>> GetResourcePermissionsAsync(
+        string subscriptionId, string rgName, string resourceType, string name, CancellationToken cancellationToken = default)
+    {
+        var result = new List<PermissionSet>();
+        await foreach (var p in ResourceGroup(subscriptionId, rgName)
+                           .GetAzurePermissionsForResourcesAsync("Microsoft.App", "", resourceType, name, cancellationToken))
+        {
+            result.Add(new PermissionSet(p.Actions.ToList(), p.NotActions.ToList()));
+        }
+        return result;
     }
 }

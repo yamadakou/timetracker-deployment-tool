@@ -2,34 +2,67 @@ using System.Globalization;
 
 namespace Timetracker.Controller.Cli;
 
+public enum CliCommand
+{
+    Deploy,
+    Delete,
+}
+
 /// <summary>
 /// コマンドライン引数の解析。
-/// 書式: [deploy] --option value | --option=value | --flag [true|false]
+/// 書式: [deploy|delete] --option value | --option=value | --flag [true|false]
 /// </summary>
 public sealed class CliArgs
 {
-    public static readonly IReadOnlySet<string> ValueOptions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    // サブコマンドごとに使えるオプション（タイプミスや、別のサブコマンドのオプションの指定をエラーにするため）
+    private static readonly IReadOnlySet<string> DeployValueOptions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
         "--subscription", "--resource-group", "--location", "--app-name", "--db-type", "--db-password", "--db-name",
         "--tracker-password", "--tt-tag", "--auth-mode",
         "--tt-cpu", "--tt-memory", "--db-cpu", "--db-memory", "--redis-cpu", "--redis-memory",
     };
 
-    public static readonly IReadOnlySet<string> BoolFlags = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    private static readonly IReadOnlySet<string> DeployBoolFlags = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
         "--dry-run", "--verbose",
     };
 
-    public const string HelpText = """
-        使い方: timetracker-cli [deploy] [オプション]
+    private static readonly IReadOnlySet<string> DeleteValueOptions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "--subscription", "--resource-group", "--app-name", "--auth-mode",
+    };
 
-        必須:
+    private static readonly IReadOnlySet<string> DeleteBoolFlags = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "--dry-run", "--verbose", "--include-untagged", "--yes",
+    };
+
+    private static readonly IReadOnlyDictionary<string, CliCommand> Commands = new Dictionary<string, CliCommand>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["deploy"] = CliCommand.Deploy,
+        ["delete"] = CliCommand.Delete,
+    };
+
+    /// <summary>いずれかのサブコマンドで値を取るオプション。</summary>
+    public static readonly IReadOnlySet<string> ValueOptions =
+        new HashSet<string>(DeployValueOptions.Concat(DeleteValueOptions), StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>いずれかのサブコマンドの true/false のフラグ。</summary>
+    public static readonly IReadOnlySet<string> BoolFlags =
+        new HashSet<string>(DeployBoolFlags.Concat(DeleteBoolFlags), StringComparer.OrdinalIgnoreCase);
+
+    public const string HelpText = """
+        使い方:
+          timetracker-cli [deploy] [オプション]  Timetracker を Azure Container Apps にデプロイ（--dry-run でローカル用のファイルを生成）
+          timetracker-cli delete [オプション]    deploy で作成したリソースを削除
+
+        deploy の必須:
           --subscription <ID>         Azure サブスクリプション ID（--dry-run 時は不要）
           --resource-group <名前>     リソースグループ名（存在しなければ作成。--dry-run 時は不要）
           --db-password <値>          DB パスワード
           --tracker-password <値>     Timetracker アプリパスワード
 
-        任意:
+        deploy の任意:
           --location <リージョン>     既定: japaneast
           --app-name <名前>           既定: timetracker
           --db-type <種別>            postgresql | sqlserver（既定: postgresql）
@@ -43,6 +76,16 @@ public sealed class CliArgs
           --verbose [true|false]      詳細ログを出力
           -h, --help                  このヘルプを表示
 
+        delete のオプション:
+          --subscription <ID>         Azure サブスクリプション ID（必須）
+          --resource-group <名前>     リソースグループ名（必須。リソースグループ自体は削除しません）
+          --app-name <名前>           既定: timetracker
+          --auth-mode <モード>        deploy と同じ
+          --include-untagged [true|false] 管理タグの無いリソースも削除の対象にする
+          --dry-run [true|false]      削除計画を表示するだけで、削除しない
+          --yes [true|false]          確認の入力（アプリ名）を省略する
+          --verbose [true|false]      詳細ログを出力
+
         値が "--" で始まる場合は --option=value 形式で指定してください。
         """;
 
@@ -50,10 +93,13 @@ public sealed class CliArgs
 
     public bool IsHelp { get; }
 
-    private CliArgs(Dictionary<string, string> values, bool isHelp)
+    public CliCommand Command { get; }
+
+    private CliArgs(Dictionary<string, string> values, bool isHelp, CliCommand command)
     {
         _values = values;
         IsHelp = isHelp;
+        Command = command;
     }
 
     /// <exception cref="ArgumentException">未知のオプション・値の不足・不正な値の場合</exception>
@@ -61,6 +107,7 @@ public sealed class CliArgs
     {
         var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var isHelp = false;
+        var command = CliCommand.Deploy;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -74,8 +121,8 @@ public sealed class CliArgs
 
             if (!a.StartsWith("--"))
             {
-                // 先頭の "deploy" サブコマンドのみ許可
-                if (i == 0 && a.Equals("deploy", StringComparison.OrdinalIgnoreCase))
+                // サブコマンドは先頭のみ（省略時は deploy）
+                if (i == 0 && Commands.TryGetValue(a, out command))
                     continue;
                 throw new ArgumentException($"不明な引数です: '{a}'。--help で使い方を確認してください。");
             }
@@ -89,7 +136,11 @@ public sealed class CliArgs
                 inlineValue = a[(eq + 1)..];
             }
 
-            if (BoolFlags.Contains(name))
+            var (valueOptions, boolFlags) = command == CliCommand.Delete
+                ? (DeleteValueOptions, DeleteBoolFlags)
+                : (DeployValueOptions, DeployBoolFlags);
+
+            if (boolFlags.Contains(name))
             {
                 if (inlineValue != null)
                 {
@@ -106,8 +157,13 @@ public sealed class CliArgs
                 continue;
             }
 
-            if (!ValueOptions.Contains(name))
+            if (!valueOptions.Contains(name))
+            {
+                if (ValueOptions.Contains(name) || BoolFlags.Contains(name))
+                    throw new ArgumentException(
+                        $"オプション '{name}' は {command.ToString().ToLowerInvariant()} では使えません。--help で使い方を確認してください。");
                 throw new ArgumentException($"不明なオプションです: '{name}'。--help で使い方を確認してください。");
+            }
 
             if (inlineValue != null)
             {
@@ -123,7 +179,7 @@ public sealed class CliArgs
             }
         }
 
-        return new CliArgs(values, isHelp);
+        return new CliArgs(values, isHelp, command);
     }
 
     private static bool IsBoolLiteral(string s) =>

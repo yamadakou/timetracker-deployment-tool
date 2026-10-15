@@ -167,7 +167,7 @@ public sealed class CliApplicationTests : IDisposable
     {
         var gateway = new Mock<IAzureDeploymentGateway>();
         var env = new Mock<ContainerAppManagedEnvironmentResource>().Object;
-        gateway.Setup(g => g.EnsureContainerAppEnvAsync("sub", "rg", "myapp-env", "japaneast", It.IsAny<CancellationToken>()))
+        gateway.Setup(g => g.EnsureContainerAppEnvAsync("sub", "rg", "myapp", "japaneast", It.IsAny<CancellationToken>()))
             .ReturnsAsync(env);
         gateway.Setup(g => g.CreateOrUpdateContainerAppAsync("sub", "rg", "myapp", "japaneast", It.IsAny<DeployOptions>(), env, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ContainerAppsDeployment("myapp-tt", "myapp-db", "myapp-redis", null));

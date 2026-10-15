@@ -14,6 +14,7 @@ Timetracker（DockerHub の `densocreate/timetracker` イメージ）を、選�
 - timetracker コンテナイメージのバージョン（タグ）をオプションで指定可能
 - コンテナのスペック（CPU/メモリ）を各コンテナ個別にオプション指定可能
 - スケール構成は不可（各コンテナとも 1 台）
+- 本ツールでデプロイしたリソースの削除（`delete` コマンド。リソースグループは削除しません）
 
 将来の GUI 化（デスクトップ/ウェブ）に備え、ドメイン層（Timetracker.Domain）とコントローラー層（Timetracker.Controller.Cli）を分離しています。
 
@@ -57,6 +58,20 @@ Timetracker（DockerHub の `densocreate/timetracker` イメージ）を、選�
    - **`{アプリ名}-db`**: データベース（PostgreSQL または SQL Server、内部専用、TCP接続）
    - **`{アプリ名}-redis`**: Redis キャッシュ（内部専用、TCP接続）
 
+**管理タグ**:
+
+本ツールは、作成したリソースに次のタグを付けます。[削除](#リソースの削除delete)の際は、名前が一致し、かつこのタグが付いているリソースだけを削除します（同じリソースグループに同じ名前の別のリソースがあっても、誤って削除しないため）。
+
+| タグのキー | 値 |
+|---|---|
+| `managed-by` | `timetracker-deployment-tool` |
+| `tt-app-name` | アプリ名（`--app-name`） |
+
+- 3 つの Container Apps には、作成時・更新時とも付けます。更新時は、利用者が付けた他のタグを残したまま管理タグを追加します
+- Container Apps Environment には、新規作成時だけ付けます（既存の Environment は変更しないため）
+- タグは誤って削除しないための目印で、セキュリティ上の制限ではありません（削除できるかどうかは Azure の RBAC で決まります）
+- 本ツールで作成したリソースは、タグで一覧できます（`az resource list` では `--tag` と `--resource-group` を同時に指定できないため、リソースグループは `--query` で絞り込みます）: `az resource list --tag managed-by=timetracker-deployment-tool --query "[?resourceGroup=='<RG名>'].{name:name, type:type}" -o table`
+
 **重要な注意事項**:
 - DB および Redis は **コンテナ** として Container Apps 内で実行されます
 - Azure Database for PostgreSQL、Azure SQL Database などの PaaS データベースリソースは作成されません
@@ -70,13 +85,13 @@ Timetracker（DockerHub の `densocreate/timetracker` イメージ）を、選�
 | ロール（割り当てるスコープ） | 本ツールでできること | 推奨用途 |
 |--------|------|----------|
 | **Contributor**（サブスクリプション） | すべての操作。リソースグループが存在しなければ作成する。[リソースプロバイダーの登録](#azure-リソースプロバイダーの登録)（事前準備）も自分で行える | 通常利用での推奨 |
-| **Contributor**（リソースグループ） | 事前に作成したリソースグループへのデプロイ。リソースグループの作成はできない。リソースプロバイダーの登録（事前準備）もできないため管理者に依頼する | 権限を絞りたい場合の推奨 |
+| **Contributor**（リソースグループ） | 事前に作成したリソースグループへのデプロイと削除。リソースグループの作成はできない。リソースプロバイダーの登録（事前準備）もできないため管理者に依頼する | 権限を絞りたい場合の推奨 |
 | **Owner**（サブスクリプションまたはリソースグループ） | Contributor と同じ（加えてロール割り当ての管理も可能だが、本ツールでは不要） | Contributor を使えない場合 |
 
 > [!WARNING]
 > **Container Apps Contributor（Container Apps 共同作成者）だけでは本ツールを使えません。** このロールには、本ツールが使う次の権限が含まれていないためです。
 > - `Microsoft.Resources/subscriptions/resourceGroups/read` / `write`（リソースグループの存在確認・作成。本ツールは最初にこの確認を行います）
-> - `Microsoft.App/managedEnvironments/write`（Container Apps Environment の作成）
+> - `Microsoft.App/managedEnvironments/write` / `delete`（Container Apps Environment の作成・削除）
 
 本ツールが行う操作と必要な権限:
 
@@ -86,6 +101,15 @@ Timetracker（DockerHub の `densocreate/timetracker` イメージ）を、選�
 | リソースグループの作成（存在しない場合） | `Microsoft.Resources/subscriptions/resourceGroups/write` | サブスクリプション |
 | Container Apps Environment の確認・作成 | `Microsoft.App/managedEnvironments/read` / `write` | リソースグループ |
 | Container App（DB / Redis / Timetracker）の確認・作成・更新 | `Microsoft.App/containerApps/read` / `write`、`Microsoft.App/managedEnvironments/join/action` | リソースグループ |
+| Container App の削除（`delete`） | `Microsoft.App/containerApps/delete` | リソースグループ |
+| Container Apps Environment の削除（`delete`） | `Microsoft.App/managedEnvironments/delete` | リソースグループ |
+| 権限の事前確認（下記） | `Microsoft.Authorization/permissions/read`（自分の権限の一覧。通常どのロールでも可） | リソースグループ |
+
+**権限の事前確認**: `deploy` と `delete` は、Azure のリソースを変更する前に、上の表の権限が実行する ID にあるかを確認します。不足していれば、不足している権限を表示して何も変更せずに終了します（途中で権限エラーになり、一部のリソースだけが作成・削除された状態になるのを防ぐため）。既存のリソースの更新・削除は、リソースグループでの権限に加えて、そのリソースに割り当てられたロールでも判定します（例: リソースグループでは閲覧者で、各 Container App と Environment に共同作成者が割り当てられている場合）。新しく作成するリソースには、リソースグループでの権限が必要です。次の場合は確認をせずに続行します（`--verbose` で理由を表示します）。
+- リソースグループがまだ存在しない場合（権限の一覧はリソースグループ単位でしか取得できないため。作成する権限が無ければ最初の手順で失敗し、リソースは作成されません）
+- 権限の一覧を取得できなかった場合
+
+なお、この確認には拒否割り当てや Azure Policy による拒否は反映されません。これらで拒否された場合は、実行時のエラーとして表示されます。
 
 本ツールはリソースプロバイダーの登録を**行いません**。[次節](#azure-リソースプロバイダーの登録)の Azure CLI コマンドで、利用者または管理者が事前に登録してください。登録には `*/register/action`（例: `Microsoft.App/register/action`）の権限がサブスクリプションのスコープで必要です。
 
@@ -399,7 +423,64 @@ az provider show --namespace Microsoft.OperationalInsights --query "registration
    - DB（PostgreSQL のデータベース）はセットアップウィザードが作成します。ツールは事前に作成しません
    - SQL Server でサンプルデータベースを作成する場合、SQL Server がアプリイメージ内のバックアップファイルを読めるよう、生成される compose では共有ボリューム `ttsample` を両コンテナにマウントしています
 
+### リソースの削除（delete）
+`deploy` で作成したリソースを削除します。**リソースグループは削除しません**（他のリソースを巻き込まないため。不要であればポータルや `az group delete` で削除してください）。
+
+1. **削除計画の確認**（何も変更しません）
+   ```powershell
+   timetracker-cli.exe delete `
+     --subscription "<SUBSCRIPTION_ID>" `
+     --resource-group "rg-tt-demo" `
+     --app-name "timetracker" `
+     --dry-run
+   ```
+   出力例:
+   ```
+   [INFO] 削除計画（リソースグループ rg-tt-demo は削除しません）
+   [INFO]   削除する     timetracker-tt (Container App)
+   [INFO]   削除する     timetracker-redis (Container App)
+   [INFO]   削除する     timetracker-db (Container App)
+   [INFO]   削除する     timetracker-env (Environment)
+   [WARN] DB アプリを削除すると DB のデータはすべて失われます。
+   [WARN] Dry-run のため削除は行いません。
+   ```
+
+2. **削除**（確認のため、アプリ名の入力を求めます。`--yes` で省略できます）
+   ```powershell
+   timetracker-cli.exe delete --subscription "<SUBSCRIPTION_ID>" --resource-group "rg-tt-demo" --app-name "timetracker"
+   ```
+   `{アプリ名}-tt` → `-redis` → `-db` → `-env` の順に削除します。途中で失敗した場合は、もう一度実行すると残りを削除します（既に削除済みのものは飛ばします）。
+   Container Apps Environment の削除は、完了まで十数分かかることがあります。
+
+削除の対象になる条件:
+- 名前が `{アプリ名}-tt` / `-redis` / `-db` / `-env` で、かつ[管理タグ](#作成される-azure-リソース)が付いているもの
+- Environment は、その中に削除しない Container App（管理タグの無いもの、本ツール以外で作成したものなど）が残る場合は削除しません
+
+管理タグの無いリソース（管理タグを付けるようになる前のバージョンで作成したものなど）は、既定では削除しません。次のどちらかで対応してください。
+- 削除計画で対象を確認したうえで、`--include-untagged` を付けて削除する
+- 先に Azure CLI で管理タグを付けてから削除する
+  ```bash
+  az tag update --resource-id <リソース ID> --operation merge \
+    --tags managed-by=timetracker-deployment-tool tt-app-name=<アプリ名>
+  ```
+
+逆に、特定の環境を削除から守りたい場合は、ポータル等で `managed-by` タグを外してください。
+
+`delete` のオプション:
+- `--subscription` (必須): Azure サブスクリプション ID
+- `--resource-group` (必須): リソースグループ名
+- `--app-name` (任意): アプリ名（省略時は `timetracker`）
+- `--auth-mode` (任意): 認証モード（`deploy` と同じ）
+- `--include-untagged` (任意): 管理タグの無いリソースも削除の対象にする（別のアプリ名や別のツールの管理タグ（例: `managed-by=terraform`）が付いているものは、指定しても削除しません）
+- `--dry-run` (任意): 削除計画を表示するだけで、削除しない
+- `--yes` (任意): 確認の入力（アプリ名）を省略する
+- `--verbose` (任意): 詳細ログを出力
+
+`deploy` 専用のオプション（`--db-password` など）を `delete` に指定した場合、また `delete` 専用のオプションを `deploy` に指定した場合はエラーになります。
+
 ### コマンドパラメータの説明一覧
+以下は `deploy`（サブコマンドを省略した場合も `deploy`）のオプションです。`delete` のオプションは[リソースの削除（delete）](#リソースの削除delete)を参照してください。
+
 - `--subscription` (必須。`--dry-run` 時は不要): Azure サブスクリプション ID
 - `--resource-group` (必須。`--dry-run` 時は不要): リソースグループ名（存在しなければ作成）
 - `--location` (任意): リージョン（省略時は `japaneast`）
@@ -535,9 +616,10 @@ dotnet publish .\src\Timetracker.Controller.Cli\Timetracker.Controller.Cli.cspro
 
 ### 設計概要
 - ドメイン層（Timetracker.Domain）
-  - パラメータモデル（DeployOptions）、既定値（Defaults）と既定値の適用（DeployOptionsResolver）、検証、リソース名の規則（ResourceNaming）、Compose/.env生成（Dry-run用）
+  - パラメータモデル（DeployOptions）、既定値（Defaults）と既定値の適用（DeployOptionsResolver）、検証、リソース名の規則（ResourceNaming）、管理タグ（ManagedTags）、権限の判定（PermissionEvaluator）、Compose/.env生成（Dry-run用）
 - アプリケーション層（Timetracker.Application）
   - デプロイ手順の実行（DeploymentRunner: リソースグループ → Environment → DB / Redis / Timetracker）と結果（DeploymentResult）
+  - 削除計画の作成と削除の実行（DeletionPlanner / DeletionRunner）、権限の事前確認（PermissionChecker / DeploymentPlanner）
 - インフラストラクチャ層（Timetracker.Infrastructure.Azure）
   - Azure SDK 実行（AzureSdkExecutor / IAzureDeploymentGateway）、Container Apps のコンテナ仕様生成（ContainerAppSpecBuilder）、認証（CredentialFactory）
 - コントローラー層（Timetracker.Controller.Cli）

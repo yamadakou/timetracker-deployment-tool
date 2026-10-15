@@ -103,7 +103,7 @@ public class AzureSdkExecutorTests
         envs.Setup(c => c.GetIfExistsAsync("app-env", It.IsAny<CancellationToken>())).ReturnsAsync(Found(ExistingEnvironment("eastus").Object));
 
         var sut = new AzureSdkExecutor(new SimpleLogger(false), arm.Object);
-        var act = () => sut.EnsureContainerAppEnvAsync(SubscriptionId, RgName, "app-env", "japaneast", TestContext.Current.CancellationToken);
+        var act = () => sut.EnsureContainerAppEnvAsync(SubscriptionId, RgName, "app", "japaneast", TestContext.Current.CancellationToken);
 
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*app-env*eastus*japaneast*");
     }
@@ -116,7 +116,7 @@ public class AzureSdkExecutorTests
         envs.Setup(c => c.GetIfExistsAsync("app-env", It.IsAny<CancellationToken>())).ReturnsAsync(Found(existing.Object));
 
         var sut = new AzureSdkExecutor(new SimpleLogger(false), arm.Object);
-        var result = await sut.EnsureContainerAppEnvAsync(SubscriptionId, RgName, "app-env", "JapanEast", TestContext.Current.CancellationToken);
+        var result = await sut.EnsureContainerAppEnvAsync(SubscriptionId, RgName, "app", "JapanEast", TestContext.Current.CancellationToken);
 
         result.Should().BeSameAs(existing.Object);
         envs.Verify(c => c.CreateOrUpdateAsync(It.IsAny<WaitUntil>(), It.IsAny<string>(), It.IsAny<ContainerAppManagedEnvironmentData>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -134,7 +134,7 @@ public class AzureSdkExecutorTests
             .ReturnsAsync(op.Object);
 
         var sut = new AzureSdkExecutor(new SimpleLogger(false), arm.Object);
-        var result = await sut.EnsureContainerAppEnvAsync(SubscriptionId, RgName, "app-env", "japaneast", TestContext.Current.CancellationToken);
+        var result = await sut.EnsureContainerAppEnvAsync(SubscriptionId, RgName, "app", "japaneast", TestContext.Current.CancellationToken);
 
         result.Should().BeSameAs(created.Object);
     }
@@ -195,7 +195,10 @@ public class AzureSdkExecutorTests
     private static Mock<ContainerAppCollection> SetupCreateOrUpdate(string? ttFqdn, out Mock<ArmClient> arm, bool ttWithConfiguration = true)
     {
         (arm, var apps) = SetupContainerApps();
-        apps.Setup(c => c.GetIfExistsAsync("app-db", It.IsAny<CancellationToken>())).ReturnsAsync(NotFound<ContainerAppResource>());
+        foreach (var name in new[] { "app-db", "app-redis", "app-tt" })
+        {
+            apps.Setup(c => c.GetIfExistsAsync(name, It.IsAny<CancellationToken>())).ReturnsAsync(NotFound<ContainerAppResource>());
+        }
         foreach (var (name, fqdn) in new[] { ("app-db", (string?)null), ("app-redis", null), ("app-tt", ttFqdn) })
         {
             var op = new Mock<ArmOperation<ContainerAppResource>>();
