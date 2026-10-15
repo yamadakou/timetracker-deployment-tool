@@ -38,6 +38,15 @@ public static class ManagedTags
         && TryGet(tags, ManagedByKey, out var managedBy) && string.Equals(managedBy, ManagedByValue, StringComparison.OrdinalIgnoreCase)
         && TryGet(tags, AppNameKey, out var taggedApp) && string.Equals(taggedApp, appName, StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// 別のアプリ名、または本ツール以外の管理タグ（同じキーで値が異なるもの）が付いているか。
+    /// 他の利用者やツールが管理しているリソースとみなし、--include-untagged でも削除の対象にしない。
+    /// </summary>
+    public static bool HasOtherOwner(IReadOnlyDictionary<string, string>? tags, string appName) =>
+        tags != null
+        && ((TryGet(tags, ManagedByKey, out var managedBy) && !string.Equals(managedBy, ManagedByValue, StringComparison.OrdinalIgnoreCase))
+            || (TryGet(tags, AppNameKey, out var taggedApp) && !string.Equals(taggedApp, appName, StringComparison.OrdinalIgnoreCase)));
+
     // Azure のタグ名は大文字小文字を区別しない
     private static bool TryGet(IReadOnlyDictionary<string, string> tags, string key, out string? value)
     {

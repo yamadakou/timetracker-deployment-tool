@@ -52,11 +52,13 @@ timetracker-cli delete --subscription <ID> --resource-group <RG> [--app-name <�
 - リソースグループ内の Container App の一覧を 1 回取得し、そこから `{app}-tt` / `{app}-redis` / `{app}-db` を探す
 - Container App:
   - 存在しない → 対象外（「存在しません」）
-  - 管理タグあり、または `--include-untagged` → 削除する
+  - 管理タグあり → 削除する
+  - 別のアプリ名、または本ツール以外の管理タグ（`managed-by` / `tt-app-name` のキーがあり値が異なる。例: `managed-by=terraform`）がある → 削除しない（`--include-untagged` でも対象にしない。他の利用者やツールが管理しているため）
+  - 管理タグがなく `--include-untagged` → 削除する（本ツールのタグの一部だけが残っているものを含む）
   - それ以外 → 削除しない（「管理タグがありません（--include-untagged で対象にできます）」）
 - Environment（`{app}-env`）:
   - 存在しない → 対象外
-  - 管理タグがなく、`--include-untagged` もない → 削除しない
+  - Container App と同じ規則で、管理タグによって削除しないとなった → 削除しない
   - リソースグループ内に、この Environment に属していて**削除しない** Container App があれば → 削除しない（「Environment 内に削除しない Container App（名前）が残るため」）
   - それ以外 → 削除する
 - 制約: 他のリソースグループにあって同じ Environment に属する Container App は確認しない（本ツールは同じリソースグループに作るため）。その場合は Azure 側で Environment の削除が失敗し、エラーとして表示される

@@ -114,7 +114,7 @@ public class DeletionPlannerTests
     public async Task Should_Include_Untagged_Resources_When_Requested()
     {
         App("demo-tt", NoTags);
-        App("demo-db", ManagedTags.For("other")); // 別のアプリ名のタグ
+        App("demo-db", new Dictionary<string, string> { ["managed-by"] = "timetracker-deployment-tool" }); // tt-app-name だけが外された
         Environment(NoTags);
 
         var plan = await Plan(includeUntagged: true);
@@ -123,6 +123,25 @@ public class DeletionPlannerTests
         Target(plan, "demo-db").WillDelete.Should().BeTrue();
         Target(plan, "demo-redis").Exists.Should().BeFalse();
         Target(plan, "demo-env").WillDelete.Should().BeTrue();
+        plan.HasUnmanaged.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Should_Not_Include_Resources_Managed_By_Others_Even_When_Untagged_Are_Included()
+    {
+        App("demo-tt", Managed);
+        App("demo-db", ManagedTags.For("other"));                                       // 別のアプリ名のタグ
+        App("demo-redis", new Dictionary<string, string> { ["managed-by"] = "terraform" }); // 別のツールの管理タグ
+        Environment(Managed);
+
+        var plan = await Plan(includeUntagged: true);
+
+        Target(plan, "demo-tt").WillDelete.Should().BeTrue();
+        Target(plan, "demo-db").Should().Be(
+            new DeletionTarget("demo-db", DeletionResourceKind.ContainerApp, true, false, false, DeletionPlanner.OtherOwnerReason));
+        Target(plan, "demo-redis").Reason.Should().Be(DeletionPlanner.OtherOwnerReason);
+        Target(plan, "demo-env").WillDelete.Should().BeFalse(); // 削除しないアプリが残る
+        // --include-untagged で対象にできるものは無い
         plan.HasUnmanaged.Should().BeFalse();
     }
 

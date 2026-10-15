@@ -25,6 +25,6 @@ public sealed record DeletionPlan(
     /// <summary>DB アプリを削除するか（DB のデータが失われる）。</summary>
     public bool DeletesDb => Targets.Any(t => t.WillDelete && t.Name == ResourceNaming.DbApp(AppName));
 
-    /// <summary>管理タグが無いため削除しない対象があるか。</summary>
-    public bool HasUnmanaged => Targets.Any(t => t.Exists && !t.Managed && !t.WillDelete);
+    /// <summary>管理タグが無いため削除しない対象があるか（--include-untagged で対象にできる）。</summary>
+    public bool HasUnmanaged => Targets.Any(t => t.Reason == DeletionPlanner.UnmanagedReason);
 }

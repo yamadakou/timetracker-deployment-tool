@@ -471,7 +471,7 @@ az provider show --namespace Microsoft.OperationalInsights --query "registration
 - `--resource-group` (必須): リソースグループ名
 - `--app-name` (任意): アプリ名（省略時は `timetracker`）
 - `--auth-mode` (任意): 認証モード（`deploy` と同じ）
-- `--include-untagged` (任意): 管理タグの無いリソースも削除の対象にする
+- `--include-untagged` (任意): 管理タグの無いリソースも削除の対象にする（別のアプリ名や別のツールの管理タグ（例: `managed-by=terraform`）が付いているものは、指定しても削除しません）
 - `--dry-run` (任意): 削除計画を表示するだけで、削除しない
 - `--yes` (任意): 確認の入力（アプリ名）を省略する
 - `--verbose` (任意): 詳細ログを出力

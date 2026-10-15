@@ -59,4 +59,24 @@ public class ManagedTagsTests
     {
         ManagedTags.IsManaged(tags, "demo").Should().Be(expected);
     }
+
+    public static IEnumerable<object?[]> HasOtherOwnerCases()
+    {
+        yield return new object?[] { null, false };
+        yield return new object?[] { new Dictionary<string, string> { ["owner"] = "alice" }, false };
+        // 本ツールのタグの一部だけが残っているものは、他の管理者がいるとはみなさない
+        yield return new object?[] { new Dictionary<string, string> { ["managed-by"] = "timetracker-deployment-tool" }, false };
+        yield return new object?[] { new Dictionary<string, string> { ["TT-APP-NAME"] = "Demo" }, false };
+        yield return new object?[] { new Dictionary<string, string> { ["managed-by"] = "timetracker-deployment-tool", ["tt-app-name"] = "demo" }, false };
+        yield return new object?[] { new Dictionary<string, string> { ["managed-by"] = "terraform" }, true };
+        yield return new object?[] { new Dictionary<string, string> { ["tt-app-name"] = "other" }, true };
+        yield return new object?[] { new Dictionary<string, string> { ["managed-by"] = "timetracker-deployment-tool", ["tt-app-name"] = "other" }, true };
+    }
+
+    [Theory]
+    [MemberData(nameof(HasOtherOwnerCases))]
+    public void HasOtherOwner_Should_Detect_Management_Tags_Of_Others(Dictionary<string, string>? tags, bool expected)
+    {
+        ManagedTags.HasOtherOwner(tags, "demo").Should().Be(expected);
+    }
 }
