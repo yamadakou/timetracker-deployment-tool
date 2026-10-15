@@ -1,0 +1,55 @@
+name: System Test
+
+# 本物の Azure に対するシステムテスト。所要時間 20 分前後で料金が発生するため、PR ごとには実行せず、
+# リリース前などに手動で実行する。準備（OIDC 用のアプリ登録・変数・シークレット）は docs/SYSTEM_TESTS.md を参照。
+on:
+  workflow_dispatch:
+
+# 権限不足のシナリオは共有のリソースグループ（rg-ttst-limited）を使うため、同時に 1 つだけ実行する
+concurrency:
+  group: system-test
+  cancel-in-progress: false
+
+permissions:
+  id-token: write   # Azure への OIDC ログイン
+  contents: read
+
+jobs:
+  system-test:
+    runs-on: ubuntu-latest
+    environment: systemtest
+    timeout-minutes: 75
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 10.0.x
+
+    - name: Azure login (OIDC)
+      uses: azure/login@v2
+      with:
+        client-id: ${{ vars.AZURE_CLIENT_ID }}
+        tenant-id: ${{ vars.AZURE_TENANT_ID }}
+        subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+    - name: System test
+      env:
+        TT_SYSTEMTEST_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+        TT_SYSTEMTEST_LOCATION: ${{ vars.TT_SYSTEMTEST_LOCATION || 'japaneast' }}
+        TT_SYSTEMTEST_LIMITED_RESOURCE_GROUP: ${{ vars.TT_SYSTEMTEST_LIMITED_RESOURCE_GROUP || 'rg-ttst-limited' }}
+        TT_SYSTEMTEST_LIMITED_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+        TT_SYSTEMTEST_LIMITED_CLIENT_ID: ${{ vars.TT_SYSTEMTEST_LIMITED_CLIENT_ID }}
+        TT_SYSTEMTEST_LIMITED_CLIENT_SECRET: ${{ secrets.TT_SYSTEMTEST_LIMITED_CLIENT_SECRET }}
+      run: >
+        dotnet test --project tests/Timetracker.SystemTests --
+        --output detailed --report-xunit-trx --results-directory=TestResults
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: system-test-results
+        path: TestResults

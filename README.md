@@ -614,6 +614,10 @@ dotnet publish .\src\Timetracker.Controller.Cli\Timetracker.Controller.Cli.cspro
 ```
 注意: Timetracker.Domain / Timetracker.Application / Timetracker.Infrastructure.Azure / Timetracker.Common はクラスライブラリ（実行可能ファイルを生成しない）であり、SelfContained/SingleFile オプション付きの publish 対象ではありません。必要な成果物は CLI プロジェクトの publish で生成される単一ファイル EXE のみです。ライブラリ側で配布形態が必要になった場合は `dotnet pack` による NuGet パッケージ化等を検討してください。
 
+### テスト
+- 単体テスト: `dotnet test Timetracker.sln`（Azure には接続しません）
+- システムテスト（本物の Azure に対するテスト。料金が発生します）: 準備と実行方法は [docs/SYSTEM_TESTS.md](docs/SYSTEM_TESTS.md) を参照。ローカルでは `scripts/run-system-tests.ps1`（または `.sh`）、CI では GitHub Actions の **System Test** ワークフローを手動で実行します
+
 ### 設計概要
 - ドメイン層（Timetracker.Domain）
   - パラメータモデル（DeployOptions）、既定値（Defaults）と既定値の適用（DeployOptionsResolver）、検証、リソース名の規則（ResourceNaming）、管理タグ（ManagedTags）、権限の判定（PermissionEvaluator）、Compose/.env生成（Dry-run用）
