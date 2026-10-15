@@ -1,6 +1,6 @@
 # MCP ツール設計案（Timetracker.Controller.Mcp）
 
-- ステータス: 第 4.2 版。Phase 0〜2 は main にマージ済み。Phase 3a を `MCP-Tool` ブランチで実装した（8.2）
+- ステータス: 第 4.3 版。Phase 0〜2 は main にマージ済み。Phase 3a・3b を `MCP-Tool` ブランチで実装した（8.2）
 - 対象ブランチ: `MCP-Tool`
 - 前提: `main`（a32cc3d, v0.6 系 / .NET 10）時点のコード
 
@@ -13,6 +13,7 @@
 | 4 | README の RBAC 記載との整合を確認した結果を反映。必要な Azure 権限の章（4.13）を追加。計画ツールで権限を事前に確認する（4.7・4.12・4.13）。`server` 方式は RG 単位の権限・RG の事前作成を前提に変更（4.11）。Entra ID のアプリロールと Azure RBAC の区別を明記。stdio の既定の認証モードを `azure-cli` に変更。README の誤り（Container Apps Contributor）は `docs/fix-rbac-requirements` ブランチで先に修正（1.3） |
 | 4.1 | Phase 0（`refactor/shared-layer`）の実施結果を 8.3 に追記。R5 は `feature/cli-delete` に移した |
 | 4.2 | Phase 1（PR #22）・Phase 2（PR #23）のマージを反映。Phase 3a の実施結果を 8.2 に追記（詳細設計は `docs/design/mcp-phase3a.md`） |
+| 4.3 | Phase 3b の実施結果を 8.2 に追記（詳細設計は `docs/design/mcp-phase3b.md`）。進捗の通知（`notifications/progress`）は送らず、`get_job_status` のポーリングで完結させることにした |
 
 ---
 
@@ -782,6 +783,13 @@ README の「必要な RBAC ロールと権限」（`docs/fix-rbac-requirements`
 - サブスクリプションの一覧は Infrastructure の `AzureSubscriptionDirectory` で読む。資格情報は使うときに作る（`sp-env` の環境変数が足りない場合なども、ツールの結果として返すため）
 - MCP は Application をまだ参照しない（Phase 3a のツールでは使わないため。Phase 3b で参照する）
 - 確認: 単体テストとプロトコル結合テスト（ビルドした `timetracker-mcp` を SDK のクライアントで stdio 接続）、MCP Inspector（CLI モード）での `tools/list` と `tools/call`、Claude Code（`claude mcp list` で接続を確認）。`generate_compose` で生成したファイルで `docker compose up` し、Timetracker のセットアップ画面が表示されることを確認した
+
+**実施結果（Phase 3b）**: 詳細設計は `docs/design/mcp-phase3b.md`。
+- `plan_deployment` / `start_deployment` / `get_job_status` / `list_jobs` / `get_deployment_info` を追加した（ツールは 9 つ）。MCP は Application を参照するようにした
+- Application に、計画（`DeploymentPlanner.PlanAsync`。作成・既存の利用・更新（DB はデータ消失）、ブロッカー、警告、権限の事前確認）、計画ストア（`IPlanStore`。15 分で期限切れ、一度だけ使える、呼び出し元ごと）、ジョブ管理（`JobManager`。同じ対象（サブスクリプション・リソースグループ・アプリ名）の同時実行を拒否する）、状態の読み取り（`DeploymentInspector`）を追加した。CLI の挙動は変えていない
+- `start_deployment` は、実行の直前に計画を作り直し、実行できない・操作が変わった場合は始めずにエラーを返す。DB を更新する計画では `acknowledge_data_loss=true` が必要
+- 進捗の通知は送らない（ジョブはツールの呼び出しが終わった後に進むため。詳細設計 6.2）。`get_job_status` が手順・ログの差分・デバイスコードの案内を返す
+- 確認: 単体テスト（計画の各規則・再確認・計画ストア・ジョブ・各ツールの分岐）とプロトコル結合テスト。分岐網羅率は Program.cs を除き 100%
 
 ### 8.3 共有層のリファクタリング内容（Phase 0）
 | # | 変更 | 対応する課題 |

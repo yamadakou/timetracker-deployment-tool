@@ -187,7 +187,8 @@ public class AzureSdkExecutor : IAzureDeploymentGateway
         if (!existing.HasValue)
             return null;
         var env = existing.Value!;
-        return new ManagedEnvironmentInfo(env.Id.ToString(), env.Data.Name, env.Data.Location.Name, new Dictionary<string, string>(env.Data.Tags));
+        return new ManagedEnvironmentInfo(
+            env.Id.ToString(), env.Data.Name, env.Data.Location.Name, new Dictionary<string, string>(env.Data.Tags), env.Data.ProvisioningState?.ToString());
     }
 
     public async Task<IReadOnlyList<ContainerAppInfo>> ListContainerAppsAsync(
@@ -198,6 +199,27 @@ public class AzureSdkExecutor : IAzureDeploymentGateway
         {
             var environmentId = app.Data.EnvironmentId ?? app.Data.ManagedEnvironmentId;
             result.Add(new ContainerAppInfo(app.Data.Name, environmentId?.ToString(), new Dictionary<string, string>(app.Data.Tags)));
+        }
+        return result;
+    }
+
+    public async Task<IReadOnlyList<ContainerAppDetails>> ListContainerAppDetailsAsync(
+        string subscriptionId, string rgName, CancellationToken cancellationToken = default)
+    {
+        var result = new List<ContainerAppDetails>();
+        await foreach (var app in ResourceGroup(subscriptionId, rgName).GetContainerApps().GetAllAsync(cancellationToken))
+        {
+            var container = app.Data.Template?.Containers.FirstOrDefault();
+            result.Add(new ContainerAppDetails(
+                app.Data.Name,
+                app.Data.ProvisioningState?.ToString(),
+                app.Data.RunningStatus?.ToString(),
+                container?.Image,
+                container?.Resources?.Cpu,
+                container?.Resources?.Memory,
+                app.Data.LatestRevisionName,
+                app.Data.Configuration?.Ingress?.Fqdn,
+                new Dictionary<string, string>(app.Data.Tags)));
         }
         return result;
     }

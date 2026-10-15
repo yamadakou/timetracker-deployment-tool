@@ -15,6 +15,7 @@
     <PackageReference Include="ModelContextProtocol" Version="2.2.0" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Timetracker.Application\Timetracker.Application.csproj" />
     <ProjectReference Include="..\Timetracker.Infrastructure.Azure\Timetracker.Infrastructure.Azure.csproj" />
     <ProjectReference Include="..\Timetracker.Domain\Timetracker.Domain.csproj" />
     <ProjectReference Include="..\Timetracker.Common\Timetracker.Common.csproj" />

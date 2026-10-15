@@ -629,7 +629,7 @@ dotnet publish .\src\Timetracker.Controller.Cli\Timetracker.Controller.Cli.cspro
 - コントローラー層（Timetracker.Controller.Cli）
   - CLIの入出力、オプション解析（CliArgs）
 - コントローラー層（Timetracker.Controller.Mcp、開発中）
-  - MCP サーバー（`timetracker-mcp`、stdio）。現在のツールは設定の確認（`get_deployment_options`）、検証（`validate_deployment`）、Dry-run（`generate_compose`）、サブスクリプションの一覧（`list_subscriptions`）。Azure へのデプロイ・削除のツールと利用者向けの説明は今後追加します（設計は `MCP-Tool` ブランチの [docs/MCP_TOOL_DESIGN.md](docs/MCP_TOOL_DESIGN.md)、[docs/design/mcp-phase3a.md](docs/design/mcp-phase3a.md)）
+  - MCP サーバー（`timetracker-mcp`、stdio）。現在のツールは設定の確認（`get_deployment_options`）、検証（`validate_deployment`）、Dry-run（`generate_compose`）、サブスクリプションの一覧（`list_subscriptions`）、Azure へのデプロイ（計画の `plan_deployment` → 実行の `start_deployment`。実行は非同期ジョブで、`get_job_status` / `list_jobs` で確認）、デプロイ済みの環境の状態（`get_deployment_info`）。削除のツールと利用者向けの説明は今後追加します（設計は `MCP-Tool` ブランチの [docs/MCP_TOOL_DESIGN.md](docs/MCP_TOOL_DESIGN.md)、[docs/design/mcp-phase3a.md](docs/design/mcp-phase3a.md)、[docs/design/mcp-phase3b.md](docs/design/mcp-phase3b.md)）
 - 共通（Timetracker.Common）
   - ロガー（IDeploymentLogger / SimpleLogger）などのユーティリティ
 

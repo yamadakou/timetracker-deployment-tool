@@ -15,6 +15,12 @@ internal static class ServerInstructions
         - 設定を決めたら validate_deployment で検証し、errors があれば利用者と相談して直してください。warnings は利用者に伝えてください。
         - ローカルの Docker で試す場合は generate_compose（Dry-run）で docker-compose.yml と .env を作ります。output_dir は利用者に確認した絶対パスにしてください。
         - SQL Server を Azure で使う場合はサンプル DB を作れません。Timetracker のメモリは 3Gi 以上を推奨します。
-        - この版では Azure へのデプロイと削除のツールはまだありません。必要な場合は CLI（timetracker-cli deploy / delete）を案内してください。
+        - Azure へのデプロイは、必ず次の順に行ってください。
+          1. plan_deployment で計画を作る（Azure は変更しない）。
+          2. 結果の actions・warnings・blockers を利用者に示し、実行してよいか確認する。requires_data_loss_ack が true の場合は、
+             DB のデータがすべて消えることを伝え、利用者が明示的に同意した場合だけ start_deployment に acknowledge_data_loss=true を指定する。
+          3. start_deployment に plan_id を渡して始める。その後は get_job_status を 15〜30 秒の間隔で呼び、結果（Timetracker の URL）を伝える。
+        - デプロイ済みの環境の状態や URL は get_deployment_info で確認できます。
+        - この版では Azure から削除するツールはまだありません。必要な場合は CLI（timetracker-cli delete）を案内してください。
         """;
 }

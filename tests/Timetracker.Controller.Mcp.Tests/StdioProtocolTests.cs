@@ -62,12 +62,16 @@ public sealed class StdioProtocolTests : IAsyncLifetime
     {
         var tools = (await _client.ListToolsAsync(cancellationToken: Ct)).ToDictionary(t => t.Name, t => t.ProtocolTool);
 
-        tools.Keys.Should().BeEquivalentTo("get_deployment_options", "validate_deployment", "generate_compose", "list_subscriptions");
+        tools.Keys.Should().BeEquivalentTo(
+            "get_deployment_options", "validate_deployment", "generate_compose", "list_subscriptions",
+            "plan_deployment", "start_deployment", "get_job_status", "list_jobs", "get_deployment_info");
         var validateArgs = tools["validate_deployment"].InputSchema.GetProperty("properties").EnumerateObject().Select(p => p.Name);
         validateArgs.Should().Contain(["target", "resource_group", "app_name", "tt_memory_gi", "redis_cpu"]);
         tools["generate_compose"].InputSchema.GetProperty("required").EnumerateArray().Select(e => e.GetString()).Should().Equal("output_dir");
         tools["validate_deployment"].OutputSchema!.Value.GetProperty("properties").TryGetProperty("resource_names", out _).Should().BeTrue();
         tools["list_subscriptions"].Annotations!.OpenWorldHint.Should().BeTrue();
+        tools["start_deployment"].InputSchema.GetProperty("required").EnumerateArray().Select(e => e.GetString()).Should().Equal("plan_id");
+        tools["start_deployment"].Annotations!.DestructiveHint.Should().BeTrue();
     }
 
     [Fact]

@@ -7,6 +7,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Protocol;
+using Timetracker.Application.Jobs;
+using Timetracker.Common;
 using Timetracker.Controller.Mcp.Tools;
 using Timetracker.Infrastructure.Azure;
 
@@ -57,6 +59,15 @@ public static class McpServerHost
             return new AzureSubscriptionDirectory(new ArmClient(CredentialFactory.Create(settings.AuthMode, logger)));
         });
 
+        // 計画とジョブはプロセス内のメモリに置く（stdio ではサーバーの終了で消える）
+        builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddSingleton<ICallerContext, LocalCallerContext>();
+        builder.Services.AddSingleton<IPlanStore>(sp => new InMemoryPlanStore(sp.GetRequiredService<TimeProvider>()));
+        builder.Services.AddSingleton<IJobStore, InMemoryJobStore>();
+        builder.Services.AddSingleton<JobManager>();
+        builder.Services.AddSingleton<Func<IDeploymentLogger, IAzureDeploymentGateway>>(_ =>
+            logger => new AzureSdkExecutor(logger, CredentialFactory.Create(settings.AuthMode, logger)));
+
         builder.Services
             .AddMcpServer(o =>
             {
@@ -64,7 +75,8 @@ public static class McpServerHost
                 o.ServerInstructions = ServerInstructions.Text;
             })
             .WithStdioServerTransport()
-            .WithTools<DeploymentTools>(JsonOptions);
+            .WithTools<DeploymentTools>(JsonOptions)
+            .WithTools<DeploymentJobTools>(JsonOptions);
 
         return builder.Build();
     }

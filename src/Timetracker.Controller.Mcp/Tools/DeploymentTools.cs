@@ -1,6 +1,4 @@
 using System.ComponentModel;
-using Azure;
-using Azure.Identity;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol;
 using ModelContextProtocol.Server;
@@ -19,7 +17,7 @@ public sealed class DeploymentTools
 {
     public const string ComposeFileName = "docker-compose.yml";
     public const string EnvFileName = ".env";
-    public const string MaskedPassword = "********";
+    public const string MaskedPassword = ToolSupport.MaskedPassword;
 
     internal static readonly IReadOnlyList<string> Constraints =
     [
@@ -28,16 +26,6 @@ public sealed class DeploymentTools
         "Azure 上の SQL Server 構成ではサンプル DB を作成できません（Timetracker のセットアップで空の DB を選択してください）。",
         "Timetracker のメモリが 2Gi 以下だと、サンプル DB の作成が OutOfMemory で失敗することがあります。",
     ];
-
-    // 認証に失敗したときの対処（認証モードごと）
-    private static readonly IReadOnlyDictionary<string, string> AuthHints = new Dictionary<string, string>
-    {
-        ["azure-cli"] = "az login でサインインしてから、もう一度試してください。",
-        ["default"] = "az login などでサインインしてから、もう一度試してください（DefaultAzureCredential が使える資格情報が見つかりませんでした）。",
-        ["sp-env"] = "サーバーの環境変数 AZURE_TENANT_ID / AZURE_CLIENT_ID / AZURE_CLIENT_SECRET を確認してください。",
-        ["device-code"] = "サーバーのログ（stderr）に表示されるコードで、ブラウザーからサインインしてください。",
-        ["managed-identity"] = "マネージド ID が使える Azure 上の環境で実行しているか確認してください。",
-    };
 
     private readonly McpServerSettings _settings;
     private readonly Func<ISubscriptionDirectory> _subscriptionDirectory;
@@ -112,15 +100,14 @@ public sealed class DeploymentTools
         if (targetError != null)
             errors.Add(targetError);
         errors.AddRange(DeploymentValidator.GetErrors(resolved.Options, validationTarget));
-        errors.AddRange(PasswordHints(resolved));
+        errors.AddRange(ToolSupport.PasswordHints(resolved));
         var o = resolved.Options;
         return new ValidationResult(
             Valid: errors.Count == 0,
             Errors: errors,
             Warnings: DeploymentAdvisor.GetWarnings(o, validationTarget),
-            Resolved: ToResolvedSettings(resolved),
-            ResourceNames: new ResourceNames(
-                ResourceNaming.Environment(o.AppName), ResourceNaming.TimetrackerApp(o.AppName), ResourceNaming.DbApp(o.AppName), ResourceNaming.RedisApp(o.AppName)));
+            Resolved: ToolSupport.ToResolvedSettings(resolved),
+            ResourceNames: ToolSupport.ToResourceNames(o.AppName));
     }
 
     [McpServerTool(Name = "generate_compose", Title = "ローカル用の docker-compose.yml と .env の生成（Dry-run）",
@@ -152,7 +139,7 @@ public sealed class DeploymentTools
             DbPassword = db_password, TrackerPassword = tracker_password,
             TtCpu = tt_cpu, TtMemoryGi = tt_memory_gi, DbCpu = db_cpu, DbMemoryGi = db_memory_gi, RedisCpu = redis_cpu, RedisMemoryGi = redis_memory_gi,
         }.Resolve(_settings);
-        var errors = DeploymentValidator.GetErrors(resolved.Options, ValidationTarget.Compose).Concat(PasswordHints(resolved)).ToList();
+        var errors = DeploymentValidator.GetErrors(resolved.Options, ValidationTarget.Compose).Concat(ToolSupport.PasswordHints(resolved)).ToList();
         if (errors.Count > 0)
             throw new McpException("設定に誤りがあるため、ファイルを生成しませんでした:\n- " + string.Join("\n- ", errors));
 
@@ -195,25 +182,7 @@ public sealed class DeploymentTools
                  "利用者にデプロイ先のサブスクリプションを選んでもらうときに使う。")]
     public async Task<SubscriptionsResult> ListSubscriptions(CancellationToken cancellationToken = default)
     {
-        IReadOnlyList<SubscriptionInfo> subscriptions;
-        try
-        {
-            subscriptions = await _subscriptionDirectory().ListAsync(cancellationToken);
-        }
-        catch (AuthenticationFailedException ex)
-        {
-            _logger.LogWarning(ex, "Azure の認証に失敗しました");
-            throw new McpException($"Azure の認証に失敗しました（認証モード: {_settings.AuthMode}）。{AuthHints[_settings.AuthMode]}");
-        }
-        catch (RequestFailedException ex)
-        {
-            throw new McpException($"Azure がエラーを返しました（{ex.Status} {ex.ErrorCode}）: {ex.Message}");
-        }
-        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
-        {
-            // 資格情報を作れない場合（sp-env で環境変数が足りないなど）。メッセージに秘密情報は含まれない
-            throw new McpException(ex.Message);
-        }
+        var subscriptions = await ToolSupport.CallAzureAsync(_settings, _logger, () => _subscriptionDirectory().ListAsync(cancellationToken));
 
         return new SubscriptionsResult(
             _settings.AuthMode,
@@ -227,31 +196,6 @@ public sealed class DeploymentTools
             "compose" => (ValidationTarget.Compose, null),
             _ => (ValidationTarget.Azure, $"target '{target}' は無効です。azure または compose を指定してください。"),
         };
-
-    // パスワードが無い場合、値を会話に出さずに済む方法（サーバーの環境変数）を案内する
-    private static IEnumerable<string> PasswordHints(ResolvedParameters resolved)
-    {
-        if (resolved.DbPasswordSource == PasswordSource.None)
-            yield return "db_password が未設定です。サーバーの環境変数 TT_MCP_DB_PASSWORD で設定するか（推奨。値が会話に残らない）、引数で指定してください。";
-        if (resolved.TrackerPasswordSource == PasswordSource.None)
-            yield return "tracker_password が未設定です。サーバーの環境変数 TT_MCP_TRACKER_PASSWORD で設定するか（推奨。値が会話に残らない）、引数で指定してください。";
-    }
-
-    private static string Mask(PasswordSource source) => source switch
-    {
-        PasswordSource.Argument => $"{MaskedPassword}（引数）",
-        PasswordSource.Environment => $"{MaskedPassword}（環境変数）",
-        _ => "（未設定）",
-    };
-
-    private static ResolvedSettings ToResolvedSettings(ResolvedParameters resolved)
-    {
-        var o = resolved.Options;
-        return new ResolvedSettings(
-            o.Subscription, o.ResourceGroup, o.Location, o.AppName, o.DbType, o.DbName, o.TimetrackerTag,
-            Mask(resolved.DbPasswordSource), Mask(resolved.TrackerPasswordSource),
-            o.TimetrackerCpu, o.TimetrackerMemoryGi, o.DbCpu, o.DbMemoryGi, o.RedisCpu, o.RedisMemoryGi);
-    }
 
     // 出力先は絶対パスに限り、TT_MCP_OUTPUT_ROOT があればその配下に限る（".." を含むパスは正規化してから判定する）
     private string ResolveOutputDirectory(string outputDir)
