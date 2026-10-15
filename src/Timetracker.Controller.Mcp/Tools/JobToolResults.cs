@@ -52,6 +52,7 @@ public sealed record JobStatusResult(
     IReadOnlyList<JobLogInfo> Logs,
     int NextLogOffset,
     DeploymentJobResult? Result,
+    DeletionJobResult? DeletionResult,
     string? Error,
     string? DeviceCodeMessage);
 
@@ -80,3 +81,25 @@ public sealed record EnvironmentState(string Name, string Location, string? Prov
 public sealed record ContainerAppState(
     string Name, string? ProvisioningState, string? RunningStatus, string? Image, double? Cpu, string? Memory,
     string? LatestRevision, string? Fqdn, bool Managed);
+
+/// <summary>
+/// plan_deletion の結果。<see cref="PlanId"/> は、ブロッカーがある場合や削除するものが無い場合は null（理由は <see cref="Note"/>）。
+/// </summary>
+public sealed record DeletionPlanResult(
+    string? PlanId,
+    DateTimeOffset? ExpiresAt,
+    IReadOnlyList<string> Blockers,
+    IdentityInfo Identity,
+    PermissionCheckInfo PermissionCheck,
+    IReadOnlyList<DeletionTargetInfo> Targets,
+    IReadOnlyList<string> Kept,
+    IReadOnlyList<string> Warnings,
+    bool DeletesDb,
+    string? ConfirmationRequired,
+    string? Note);
+
+/// <summary>削除計画の対象。<see cref="Resource"/> は container_app / environment。<see cref="Reason"/> は削除しない理由。</summary>
+public sealed record DeletionTargetInfo(string Name, string Resource, bool Exists, bool Managed, bool WillDelete, string? Reason);
+
+/// <summary>削除のジョブが成功したときの結果。<see cref="AlreadyDeleted"/> は計画の後に既に無かったもの。</summary>
+public sealed record DeletionJobResult(string ResourceGroup, IReadOnlyList<string> Deleted, IReadOnlyList<string> AlreadyDeleted, string KeptResourceGroup);

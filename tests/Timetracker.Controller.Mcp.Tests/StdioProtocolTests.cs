@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 using FluentAssertions;
+using ModelContextProtocol;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
 using Xunit;
@@ -64,7 +65,7 @@ public sealed class StdioProtocolTests : IAsyncLifetime
 
         tools.Keys.Should().BeEquivalentTo(
             "get_deployment_options", "validate_deployment", "generate_compose", "list_subscriptions",
-            "plan_deployment", "start_deployment", "get_job_status", "list_jobs", "get_deployment_info");
+            "plan_deployment", "start_deployment", "get_job_status", "list_jobs", "get_deployment_info", "plan_deletion", "start_deletion");
         var validateArgs = tools["validate_deployment"].InputSchema.GetProperty("properties").EnumerateObject().Select(p => p.Name);
         validateArgs.Should().Contain(["target", "resource_group", "app_name", "tt_memory_gi", "redis_cpu"]);
         tools["generate_compose"].InputSchema.GetProperty("required").EnumerateArray().Select(e => e.GetString()).Should().Equal("output_dir");
@@ -72,6 +73,38 @@ public sealed class StdioProtocolTests : IAsyncLifetime
         tools["list_subscriptions"].Annotations!.OpenWorldHint.Should().BeTrue();
         tools["start_deployment"].InputSchema.GetProperty("required").EnumerateArray().Select(e => e.GetString()).Should().Equal("plan_id");
         tools["start_deployment"].Annotations!.DestructiveHint.Should().BeTrue();
+        tools["start_deletion"].InputSchema.GetProperty("required").EnumerateArray().Select(e => e.GetString())
+            .Should().BeEquivalentTo("plan_id", "confirm_app_name");
+    }
+
+    [Fact]
+    public async Task Resources_Should_List_And_Read_The_Documents_And_Reject_Invalid_Deployment_Uris()
+    {
+        var resources = await _client.ListResourcesAsync(cancellationToken: Ct);
+        var templates = await _client.ListResourceTemplatesAsync(cancellationToken: Ct);
+        var constraints = await _client.ReadResourceAsync("timetracker://docs/constraints", cancellationToken: Ct);
+        var invalid = () => _client.ReadResourceAsync("timetracker://deployments/sub/rg/Bad--Name", cancellationToken: Ct);
+
+        resources.Select(r => r.Uri).Should().BeEquivalentTo("timetracker://docs/constraints", "timetracker://docs/rbac");
+        templates.Select(t => t.UriTemplate).Should().Equal("timetracker://deployments/{subscription}/{resource_group}/{app_name}");
+        var text = constraints.Contents.OfType<TextResourceContents>().Single();
+        text.MimeType.Should().Be("text/markdown");
+        text.Text.Should().Contain("検証環境");
+        // アプリ名の誤りは Azure を読まずにエラーになる
+        await invalid.Should().ThrowAsync<McpException>();
+    }
+
+    [Fact]
+    public async Task Prompts_Should_List_And_Render_With_Arguments()
+    {
+        var prompts = await _client.ListPromptsAsync(cancellationToken: Ct);
+        var delete = await _client.GetPromptAsync("delete-timetracker", new Dictionary<string, object?> { ["app_name"] = "demo" }, cancellationToken: Ct);
+
+        prompts.Select(p => p.Name).Should().BeEquivalentTo("deploy-timetracker", "local-dry-run", "delete-timetracker");
+        prompts.Single(p => p.Name == "delete-timetracker").ProtocolPrompt.Arguments!.Select(a => a.Name).Should().Equal("app_name");
+        var message = delete.Messages.Should().ContainSingle().Subject;
+        message.Role.Should().Be(Role.User);
+        ((TextContentBlock)message.Content).Text.Should().Contain("「demo」").And.Contain("confirm_app_name");
     }
 
     [Fact]

@@ -22,7 +22,7 @@ public sealed class DeploymentJobTools
     public const string PollHint = "get_job_status を 15〜30 秒の間隔で呼び、status が succeeded または failed になるまで待ってください。";
 
     // Azure を操作する ID の説明（認証モードごと）
-    private static readonly IReadOnlyDictionary<string, string> IdentityDisplays = new Dictionary<string, string>
+    internal static readonly IReadOnlyDictionary<string, string> IdentityDisplays = new Dictionary<string, string>
     {
         ["azure-cli"] = "az login でサインインしているアカウント",
         ["default"] = "DefaultAzureCredential が見つけた資格情報",
@@ -118,13 +118,13 @@ public sealed class DeploymentJobTools
         [Description("DB のデータが消えるおそれがあることに利用者が同意したか（requires_data_loss_ack=true の計画では必須）")] bool acknowledge_data_loss = false,
         CancellationToken cancellationToken = default)
     {
-        var plan = RequirePlan(_plans.Find<DeploymentPlan>(plan_id, _caller.CallerId), plan_id);
+        var plan = RequirePlan(_plans.Find<DeploymentPlan>(plan_id, _caller.CallerId), plan_id, "plan_deployment");
         // 同意が無い場合は計画を使用済みにしない（同意を得て、同じ計画で実行し直せるように）
         if (plan.RequiresDataLossAck && !acknowledge_data_loss)
             throw new McpException(
                 "この計画は既存の DB アプリを更新します。設定が変わると DB コンテナが再起動し、DB のデータは失われます。利用者が同意した場合だけ、" +
                 "acknowledge_data_loss=true を指定して実行してください。");
-        plan = RequirePlan(_plans.Take<DeploymentPlan>(plan_id, _caller.CallerId), plan_id);
+        plan = RequirePlan(_plans.Take<DeploymentPlan>(plan_id, _caller.CallerId), plan_id, "plan_deployment");
 
         // 計画の後に Azure の状態が変わっていないかを、実行の直前にもう一度確かめる
         var current = await PlanAsync(plan.Options, cancellationToken);
@@ -150,10 +150,11 @@ public sealed class DeploymentJobTools
 
     [McpServerTool(Name = "get_job_status", Title = "ジョブの状態",
         ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("デプロイのジョブの状態（running / succeeded / failed）、実行中の手順、ログ、結果（成功時は Timetracker の URL）、" +
-                 "エラーを返す。log_offset に前回の next_log_offset を渡すと、続きのログだけを返す。")]
+    [Description("デプロイ・削除のジョブの状態（running / succeeded / failed）、実行中の手順、ログ、結果（デプロイの成功時は result に " +
+                 "Timetracker の URL、削除の成功時は deletion_result に削除したリソース）、エラーを返す。" +
+                 "log_offset に前回の next_log_offset を渡すと、続きのログだけを返す。")]
     public JobStatusResult GetJobStatus(
-        [Description("start_deployment が返した job_id")] string job_id,
+        [Description("start_deployment または start_deletion が返した job_id")] string job_id,
         [Description("この位置から後のログを返す（既定 0。前回の next_log_offset を渡す）")] int log_offset = 0)
     {
         var job = _jobs.Get(job_id, _caller.CallerId)
@@ -167,6 +168,7 @@ public sealed class DeploymentJobTools
             s.Result is DeploymentResult r
                 ? new DeploymentJobResult(r.ResourceGroup, r.EnvironmentName, r.TimetrackerAppName, r.DbAppName, r.RedisAppName, r.TimetrackerUrl)
                 : null,
+            s.Result as DeletionJobResult,
             s.Error,
             s.DeviceCodeMessage);
     }
@@ -200,12 +202,7 @@ public sealed class DeploymentJobTools
         [Description("アプリ名（既定 timetracker）")] string? app_name = null,
         CancellationToken cancellationToken = default)
     {
-        var o = new DeploymentParameters { Subscription = subscription, ResourceGroup = resource_group, AppName = app_name }.Resolve(_settings).Options;
-        var missing = new[] { (o.Subscription, "subscription"), (o.ResourceGroup, "resource_group") }.Where(p => p.Item1.Length == 0).Select(p => p.Item2).ToList();
-        if (missing.Count > 0)
-            throw new McpException($"{string.Join(" と ", missing)} を指定してください（サーバーの既定値も設定されていません）。");
-        if (AppNameValidator.GetError(o.AppName) is { } appNameError)
-            throw new McpException(appNameError);
+        var o = ToolSupport.ResolveTarget(_settings, subscription, resource_group, app_name);
 
         var info = await ToolSupport.CallAzureAsync(_settings, _logger, () =>
             new DeploymentInspector(_gatewayFactory(new McpDeploymentLogger(_logger))).InspectAsync(o.Subscription, o.ResourceGroup, o.AppName, cancellationToken));
@@ -224,15 +221,15 @@ public sealed class DeploymentJobTools
         ToolSupport.CallAzureAsync(_settings, _logger, () =>
             new DeploymentPlanner(_gatewayFactory(new McpDeploymentLogger(_logger))).PlanAsync(options, cancellationToken));
 
-    // 存在しない・期限切れ・使用済み・ほかの呼び出し元の計画は、実行できない理由と次の手順を返す
-    private static DeploymentPlan RequirePlan(PlanLookup<DeploymentPlan> lookup, string planId) => lookup.Status switch
+    // 存在しない・期限切れ・使用済み・ほかの呼び出し元・種類の違う計画は、実行できない理由と次の手順を返す
+    internal static TPlan RequirePlan<TPlan>(PlanLookup<TPlan> lookup, string planId, string planTool) where TPlan : class => lookup.Status switch
     {
         PlanLookupStatus.Found => lookup.Plan!,
-        PlanLookupStatus.Expired => throw new McpException($"計画 '{planId}' の有効期限（15 分）が切れました。plan_deployment で計画を作り直してください。"),
-        _ => throw new McpException($"計画 '{planId}' が見つかりません（使用済みか、サーバーが再起動されました）。plan_deployment で計画を作り直してください。"),
+        PlanLookupStatus.Expired => throw new McpException($"計画 '{planId}' の有効期限（15 分）が切れました。{planTool} で計画を作り直してください。"),
+        _ => throw new McpException($"計画 '{planId}' が見つかりません（使用済みか、サーバーが再起動されました）。{planTool} で計画を作り直してください。"),
     };
 
-    private static PermissionCheckInfo ToPermissionCheckInfo(PermissionCheckResult result) => new(
+    internal static PermissionCheckInfo ToPermissionCheckInfo(PermissionCheckResult result) => new(
         result.Status switch
         {
             PermissionCheckStatus.Ok => "ok",
@@ -270,7 +267,7 @@ public sealed class DeploymentJobTools
     };
 
     // Progress<T> は SynchronizationContext 経由で非同期に通知するため、手順の順に記録できるよう同期的に呼ぶ
-    private sealed class ActionProgress<T>(Action<T> report) : IProgress<T>
+    internal sealed class ActionProgress<T>(Action<T> report) : IProgress<T>
     {
         public void Report(T value) => report(value);
     }

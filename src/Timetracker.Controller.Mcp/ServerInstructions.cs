@@ -21,6 +21,11 @@ internal static class ServerInstructions
              既存の DB アプリを更新するため、設定が変わると DB コンテナが再起動して DB のデータが消えることを伝え、利用者が明示的に同意した場合だけ start_deployment に acknowledge_data_loss=true を指定する。
           3. start_deployment に plan_id を渡して始める。その後は get_job_status を 15〜30 秒の間隔で呼び、結果（Timetracker の URL）を伝える。
         - デプロイ済みの環境の状態や URL は get_deployment_info で確認できます。
-        - この版では Azure から削除するツールはまだありません。必要な場合は CLI（timetracker-cli delete）を案内してください。
+        - Azure から削除する場合も、必ず次の順に行ってください。
+          1. plan_deletion で計画を作る（Azure は変更しない）。
+          2. 結果の targets・kept・warnings・blockers を利用者に示す。リソースグループは削除しないこと、DB アプリを削除すると DB のデータがすべて失われることを伝える。
+          3. 削除してよいか確認し、利用者にアプリ名を入力してもらい、その値を start_deletion の confirm_app_name に渡す（利用者の入力なしに計画のアプリ名をそのまま渡さない）。
+          4. get_job_status を 15〜30 秒の間隔で呼び、結果を伝える。
+        - 注意事項は timetracker://docs/constraints、必要な権限は timetracker://docs/rbac（Resources）でも読めます。
         """;
 }

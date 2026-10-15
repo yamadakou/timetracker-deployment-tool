@@ -46,6 +46,21 @@ internal static class ToolSupport
         }
     }
 
+    /// <summary>
+    /// 既存の環境を読む・削除するツールの対象（サブスクリプション・リソースグループ・アプリ名）を決める。
+    /// サーバーの既定値も無い場合や、アプリ名が無効な場合は、Azure を読まずにツールのエラーにする。
+    /// </summary>
+    public static DeployOptions ResolveTarget(McpServerSettings settings, string? subscription, string? resourceGroup, string? appName)
+    {
+        var o = new DeploymentParameters { Subscription = subscription, ResourceGroup = resourceGroup, AppName = appName }.Resolve(settings).Options;
+        var missing = new[] { (o.Subscription, "subscription"), (o.ResourceGroup, "resource_group") }.Where(p => p.Item1.Length == 0).Select(p => p.Item2).ToList();
+        if (missing.Count > 0)
+            throw new McpException($"{string.Join(" と ", missing)} を指定してください（サーバーの既定値も設定されていません）。");
+        if (AppNameValidator.GetError(o.AppName) is { } appNameError)
+            throw new McpException(appNameError);
+        return o;
+    }
+
     /// <summary>パスワードが無い場合に、値を会話に出さずに済む方法（サーバーの環境変数）を案内する。</summary>
     public static IEnumerable<string> PasswordHints(ResolvedParameters resolved)
     {

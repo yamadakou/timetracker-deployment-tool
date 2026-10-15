@@ -1,0 +1,99 @@
+using System.ComponentModel;
+using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
+using ModelContextProtocol.Server;
+using Timetracker.Controller.Mcp.Tools;
+
+namespace Timetracker.Controller.Mcp.Resources;
+
+/// <summary>
+/// MCP の Resources（全体設計 5.2）。注意事項と必要な権限の文書（README の要約。配布物に README を含めないためサーバーに埋め込む）と、
+/// デプロイ済みの環境の状態（get_deployment_info と同じ内容）を返す。
+/// </summary>
+[McpServerResourceType]
+public sealed class TimetrackerResources
+{
+    public const string ConstraintsUri = "timetracker://docs/constraints";
+    public const string RbacUri = "timetracker://docs/rbac";
+    public const string DeploymentUriTemplate = "timetracker://deployments/{subscription}/{resource_group}/{app_name}";
+
+    public const string Constraints = """
+        # 本ツールの目的と注意事項
+
+        本ツールは、Timetracker の **検証環境（評価・動作確認・デモ用途）を手早く構築するための支援ツール** です。本番環境の構築は対象外です。
+
+        | 項目 | 内容 |
+        |---|---|
+        | Azure 上の DB データは永続化されない | DB はボリュームを持たないコンテナとして動作します。DB コンテナが再起動すると（設定を変えた再デプロイ、リビジョンの更新、Azure 基盤のメンテナンスなど）、DB のデータは失われます。残したいデータは事前にエクスポートしてください。ローカルの docker-compose（generate_compose）は名前付きボリュームを使うため、再起動してもデータは残ります（docker compose down -v で消えます） |
+        | SQL Server は Developer エディション | db_type=sqlserver では MSSQL_PID=Developer で起動します。開発・テスト用途に限られ、本番環境では使えません |
+        | SQL Server ＋ Azure ではサンプル DB を作成できない | サンプル DB を使う場合は PostgreSQL（既定）を使ってください。SQL Server では、セットアップウィザードで「空のデータベースを作成する」を選んでください（ローカルの docker-compose では SQL Server でもサンプル DB を作成できます） |
+        | Timetracker のメモリ | 3Gi 以上を推奨します |
+        | スケールは 1 台固定 | 各コンテナとも 1 台で動作し、冗長化・スケールアウトは行いません |
+        | 機密情報の取り扱い | generate_compose で生成する .env には DB パスワードなどが平文で書かれます。共有やリポジトリへのコミットは避けてください。Azure 上ではパスワードを Container Apps の secret として登録します |
+        | 不要になった環境の削除 | plan_deletion / start_deletion で、本ツールが作ったリソース（Container App と Environment）を削除できます。リソースグループは削除しません。課金を完全に止めるには、ほかのリソースを巻き込まないことを確かめてから、リソースグループごと削除してください（例: az group delete --name <リソースグループ名>） |
+        """;
+
+    public const string Rbac = """
+        # 必要な RBAC ロールと権限
+
+        Azure を操作する ID（サーバーの認証モードの資格情報）には、次のいずれかのロールの割り当てが必要です。
+
+        | ロール（割り当てるスコープ） | できること |
+        |---|---|
+        | Contributor（サブスクリプション） | すべての操作。リソースグループが無ければ作成する。リソースプロバイダーの登録も自分で行える（通常の推奨） |
+        | Contributor（リソースグループ） | 事前に作成したリソースグループへのデプロイと削除。リソースグループの作成とリソースプロバイダーの登録は管理者に依頼する（権限を絞りたい場合の推奨） |
+        | Owner（サブスクリプションまたはリソースグループ） | Contributor と同じ |
+
+        **Container Apps Contributor（Container Apps 共同作成者）だけでは使えません。** Microsoft.Resources/subscriptions/resourceGroups/read / write と Microsoft.App/managedEnvironments/write / delete が含まれないためです。
+
+        | 操作 | 必要な権限（Action） |
+        |---|---|
+        | リソースグループの存在確認 | Microsoft.Resources/subscriptions/resourceGroups/read |
+        | リソースグループの作成（無い場合。スコープはサブスクリプション） | Microsoft.Resources/subscriptions/resourceGroups/write |
+        | Container Apps Environment の確認・作成 | Microsoft.App/managedEnvironments/read / write |
+        | Container App の確認・作成・更新 | Microsoft.App/containerApps/read / write、Microsoft.App/managedEnvironments/join/action |
+        | Container App の削除 | Microsoft.App/containerApps/delete |
+        | Container Apps Environment の削除 | Microsoft.App/managedEnvironments/delete |
+        | 権限の事前確認 | Microsoft.Authorization/permissions/read（通常どのロールでも可） |
+
+        plan_deployment / plan_deletion は、上の権限があるかを事前に確認し、不足していれば blockers に返します（リソースグループがまだ無い場合などは確認できず、warnings に理由を返します）。拒否割り当てや Azure Policy による拒否は、この確認には反映されません。
+
+        ## リソースプロバイダーの登録
+
+        本ツールはリソースプロバイダーの登録を行いません。初めて Container Apps を使うサブスクリプションでは、事前に登録してください（サブスクリプションのスコープでの Contributor または Owner が必要）。
+
+        - Microsoft.App（必須）
+        - Microsoft.OperationalInsights（必須。Container Apps Environment が使用）
+        - Microsoft.Web（任意）
+
+        ```bash
+        az provider register --namespace Microsoft.App
+        az provider register --namespace Microsoft.OperationalInsights
+        az provider show --namespace Microsoft.App --query "registrationState"
+        ```
+        """;
+
+    private readonly IServiceProvider _services;
+
+    public TimetrackerResources(IServiceProvider services)
+    {
+        _services = services;
+    }
+
+    [McpServerResource(UriTemplate = ConstraintsUri, Name = "constraints", Title = "本ツールの目的と注意事項", MimeType = "text/markdown")]
+    [Description("検証環境向けであること、DB のデータが永続化されないこと、SQL Server の制約、削除の範囲などの注意事項。")]
+    public static string GetConstraints() => Constraints;
+
+    [McpServerResource(UriTemplate = RbacUri, Name = "rbac", Title = "必要な RBAC ロールと権限", MimeType = "text/markdown")]
+    [Description("Azure を操作する ID に必要なロール・権限と、リソースプロバイダーの登録手順。")]
+    public static string GetRbac() => Rbac;
+
+    [McpServerResource(UriTemplate = DeploymentUriTemplate, Name = "deployment", Title = "デプロイ済みの環境の状態", MimeType = "application/json")]
+    [Description("get_deployment_info と同じ内容（Environment と各 Container App の状態、管理タグの有無、Timetracker の URL）。")]
+    public async Task<string> GetDeployment(string subscription, string resource_group, string app_name, CancellationToken cancellationToken)
+    {
+        var tools = ActivatorUtilities.CreateInstance<DeploymentJobTools>(_services);
+        var info = await tools.GetDeploymentInfo(subscription, resource_group, app_name, cancellationToken);
+        return JsonSerializer.Serialize(info, McpServerHost.JsonOptions);
+    }
+}

@@ -33,7 +33,7 @@ public class McpServerHostTests
 
         tools.Keys.Should().BeEquivalentTo(
             "get_deployment_options", "validate_deployment", "generate_compose", "list_subscriptions",
-            "plan_deployment", "start_deployment", "get_job_status", "list_jobs", "get_deployment_info");
+            "plan_deployment", "start_deployment", "get_job_status", "list_jobs", "get_deployment_info", "plan_deletion", "start_deletion");
         var annotations = tools.ToDictionary(t => t.Key, t => (
             t.Value.Annotations!.ReadOnlyHint, t.Value.Annotations.DestructiveHint, t.Value.Annotations.IdempotentHint, t.Value.Annotations.OpenWorldHint));
         annotations["get_deployment_options"].Should().Be((true, false, true, false));
@@ -45,7 +45,13 @@ public class McpServerHostTests
         annotations["get_job_status"].Should().Be((true, false, true, false));
         annotations["list_jobs"].Should().Be((true, false, true, false));
         annotations["get_deployment_info"].Should().Be((true, false, true, true));
+        annotations["plan_deletion"].Should().Be((true, false, true, true));
+        annotations["start_deletion"].Should().Be((false, true, false, true));
         tools.Values.Should().OnlyContain(t => t.OutputSchema != null);
+        host.Services.GetServices<McpServerResource>().Select(r => r.ProtocolResourceTemplate.UriTemplate).Should().BeEquivalentTo(
+            "timetracker://docs/constraints", "timetracker://docs/rbac", "timetracker://deployments/{subscription}/{resource_group}/{app_name}");
+        host.Services.GetServices<McpServerPrompt>().Select(p => p.ProtocolPrompt.Name).Should().BeEquivalentTo(
+            "deploy-timetracker", "local-dry-run", "delete-timetracker");
         host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("x").IsEnabled(LogLevel.Debug).Should().Be(verbose);
     }
 

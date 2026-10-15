@@ -9,6 +9,8 @@ using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Protocol;
 using Timetracker.Application.Jobs;
 using Timetracker.Common;
+using Timetracker.Controller.Mcp.Prompts;
+using Timetracker.Controller.Mcp.Resources;
 using Timetracker.Controller.Mcp.Tools;
 using Timetracker.Infrastructure.Azure;
 
@@ -76,7 +78,10 @@ public static class McpServerHost
             })
             .WithStdioServerTransport()
             .WithTools<DeploymentTools>(JsonOptions)
-            .WithTools<DeploymentJobTools>(JsonOptions);
+            .WithTools<DeploymentJobTools>(JsonOptions)
+            .WithTools<DeletionJobTools>(JsonOptions)
+            .WithResources<TimetrackerResources>()
+            .WithPrompts<TimetrackerPrompts>(JsonOptions);
 
         return builder.Build();
     }
