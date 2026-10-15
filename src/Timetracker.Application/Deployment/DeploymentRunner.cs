@@ -30,7 +30,7 @@ public sealed class DeploymentRunner
 
         var envName = ResourceNaming.Environment(opts.AppName);
         progress?.Report(new DeploymentProgress(DeploymentStep.Environment, 2, TotalSteps, $"Container Apps Environment {envName}"));
-        var env = await _gateway.EnsureContainerAppEnvAsync(opts.Subscription, opts.ResourceGroup, envName, opts.Location, cancellationToken);
+        var env = await _gateway.EnsureContainerAppEnvAsync(opts.Subscription, opts.ResourceGroup, opts.AppName, opts.Location, cancellationToken);
 
         progress?.Report(new DeploymentProgress(DeploymentStep.ContainerApps, 3, TotalSteps, "Container Apps（DB / Redis / Timetracker）"));
         var apps = await _gateway.CreateOrUpdateContainerAppAsync(

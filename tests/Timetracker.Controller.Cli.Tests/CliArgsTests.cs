@@ -154,4 +154,64 @@ public class CliArgsTests
         var act = () => CliArgs.Parse(new[] { "--tt-cpu", value }).GetDouble("--tt-cpu", 0.75);
         act.Should().Throw<ArgumentException>().WithMessage("*--tt-cpu*");
     }
+
+    [Theory]
+    [InlineData(new string[0], CliCommand.Deploy)]
+    [InlineData(new[] { "deploy" }, CliCommand.Deploy)]
+    [InlineData(new[] { "delete" }, CliCommand.Delete)]
+    [InlineData(new[] { "DELETE" }, CliCommand.Delete)]
+    public void Parse_Should_Read_Command(string[] args, CliCommand expected)
+    {
+        CliArgs.Parse(args).Command.Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData("0")]       // 数値は列挙値として解釈しない
+    [InlineData("destroy")]
+    public void Parse_Should_Reject_Unknown_Command(string command)
+    {
+        var act = () => CliArgs.Parse(new[] { command });
+        act.Should().Throw<ArgumentException>().WithMessage($"*{command}*");
+    }
+
+    [Fact]
+    public void Parse_Should_Reject_Command_After_Options()
+    {
+        var act = () => CliArgs.Parse(new[] { "--subscription", "sub", "delete" });
+        act.Should().Throw<ArgumentException>().WithMessage("*delete*");
+    }
+
+    [Fact]
+    public void Parse_Should_Read_Delete_Options()
+    {
+        var cli = CliArgs.Parse(new[]
+        {
+            "delete", "--subscription", "sub", "--resource-group", "rg", "--app-name", "demo", "--auth-mode", "azure-cli",
+            "--include-untagged", "--yes", "--dry-run", "false", "--verbose",
+        });
+
+        cli.Get("--subscription").Should().Be("sub");
+        cli.Get("--app-name").Should().Be("demo");
+        cli.GetBool("--include-untagged").Should().BeTrue();
+        cli.GetBool("--yes").Should().BeTrue();
+        cli.GetBool("--dry-run").Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("delete", "--db-password", "delete")]
+    [InlineData("delete", "--tt-cpu", "delete")]
+    [InlineData("deploy", "--yes", "deploy")]
+    [InlineData("deploy", "--include-untagged", "deploy")]
+    public void Parse_Should_Reject_Option_Of_Other_Command(string command, string option, string expectedCommand)
+    {
+        var act = () => CliArgs.Parse(new[] { command, option, "x" });
+        act.Should().Throw<ArgumentException>().WithMessage($"*'{option}' は {expectedCommand} では使えません*");
+    }
+
+    [Fact]
+    public void Parse_Should_Reject_Unknown_Option_For_Delete()
+    {
+        var act = () => CliArgs.Parse(new[] { "delete", "--unknown", "x" });
+        act.Should().Throw<ArgumentException>().WithMessage("*不明なオプション*--unknown*");
+    }
 }
