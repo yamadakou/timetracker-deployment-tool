@@ -188,14 +188,25 @@ public static class ComposeGenerator
         };
     }
 
-    public static void Validate(DeployOptions o)
+    /// <summary>Azure へのデプロイ用の検証。<see cref="ValidateForCompose"/> の内容に加え、subscription / resource-group を必須とする。</summary>
+    /// <exception cref="ArgumentException">設定が不正な場合</exception>
+    public static void Validate(DeployOptions o) => Validate(o, requireAzure: true);
+
+    /// <summary>Dry-run（docker-compose.yml / .env の生成）用の検証。Azure を使わないため subscription / resource-group は不要。</summary>
+    /// <exception cref="ArgumentException">設定が不正な場合</exception>
+    public static void ValidateForCompose(DeployOptions o) => Validate(o, requireAzure: false);
+
+    private static void Validate(DeployOptions o, bool requireAzure)
     {
         if (o.DbType is not ("postgresql" or "sqlserver"))
             throw new ArgumentException("db-type は postgresql または sqlserver を指定してください。");
-        if (string.IsNullOrWhiteSpace(o.Subscription))
-            throw new ArgumentException("subscription は必須です。");
-        if (string.IsNullOrWhiteSpace(o.ResourceGroup))
-            throw new ArgumentException("resource-group は必須です。");
+        if (requireAzure)
+        {
+            if (string.IsNullOrWhiteSpace(o.Subscription))
+                throw new ArgumentException("subscription は必須です。");
+            if (string.IsNullOrWhiteSpace(o.ResourceGroup))
+                throw new ArgumentException("resource-group は必須です。");
+        }
         // CLI は引数の解析時に確認済みだが、他のフロントエンドから呼ばれた場合も Azure に送る前に止める
         var appNameError = AppNameValidator.GetError(o.AppName);
         if (appNameError != null)
