@@ -73,9 +73,9 @@ public class AzureSdkExecutorInventoryTests
         return app;
     }
 
-    private static Mock<ContainerAppManagedEnvironmentResource> Env(string tags = "{}")
+    private static Mock<ContainerAppManagedEnvironmentResource> Env(string tags = "{}", string properties = "{}")
     {
-        var json = $$"""{ "name": "app-env", "location": "japaneast", "tags": {{tags}}, "properties": {} }""";
+        var json = $$"""{ "name": "app-env", "location": "japaneast", "tags": {{tags}}, "properties": {{properties}} }""";
         var env = new Mock<ContainerAppManagedEnvironmentResource>();
         env.SetupGet(e => e.HasData).Returns(true);
         env.SetupGet(e => e.Id).Returns(new ResourceIdentifier(EnvId));
@@ -111,7 +111,44 @@ public class AzureSdkExecutorInventoryTests
         env.Name.Should().Be("app-env");
         env.Location.Should().Be("japaneast");
         env.Tags.Should().Equal(new Dictionary<string, string> { ["owner"] = "alice" });
+        env.ProvisioningState.Should().BeNull();
         (await Sut().GetEnvironmentAsync(SubscriptionId, RgName, "missing", Ct)).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetEnvironment_Should_Return_The_Provisioning_State()
+    {
+        _envs.Setup(c => c.GetIfExistsAsync("app-env", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Found(Env(properties: """{ "provisioningState": "Succeeded" }""").Object));
+
+        (await Sut().GetEnvironmentAsync(SubscriptionId, RgName, "app-env", Ct))!.ProvisioningState.Should().Be("Succeeded");
+    }
+
+    [Fact]
+    public async Task ListContainerAppDetails_Should_Return_State_Image_Resources_And_Fqdn()
+    {
+        _apps.Setup(c => c.GetAllAsync(It.IsAny<CancellationToken>())).Returns(Pageable(
+            App("app-tt", """
+                {
+                  "provisioningState": "Succeeded", "runningStatus": "Running", "latestRevisionName": "app-tt--rev1",
+                  "configuration": { "ingress": { "fqdn": "app-tt.example.io" } },
+                  "template": { "containers": [ { "name": "timetracker", "image": "densocreate/timetracker:11.0.1-linux-postgres",
+                                                  "resources": { "cpu": 1.5, "memory": "3Gi" } } ] }
+                }
+                """, """{ "owner": "alice" }""").Object,
+            // 作成中などで値がまだ無い場合
+            App("app-new").Object,
+            App("app-db", """{ "configuration": {}, "template": { "containers": [ { "name": "db", "image": "postgres:16" } ] } }""").Object,
+            App("app-empty", """{ "template": { "containers": [] } }""").Object));
+
+        var apps = await Sut().ListContainerAppDetailsAsync(SubscriptionId, RgName, Ct);
+
+        apps[0].Should().BeEquivalentTo(new ContainerAppDetails(
+            "app-tt", "Succeeded", "Running", "densocreate/timetracker:11.0.1-linux-postgres", 1.5, "3Gi", "app-tt--rev1", "app-tt.example.io",
+            new Dictionary<string, string> { ["owner"] = "alice" }));
+        apps[1].Should().BeEquivalentTo(new ContainerAppDetails("app-new", null, null, null, null, null, null, null, new Dictionary<string, string>()));
+        (apps[2].Image, apps[2].Cpu, apps[2].Memory, apps[2].Fqdn).Should().Be(("postgres:16", null, null, null));
+        apps[3].Image.Should().BeNull();
     }
 
     [Fact]

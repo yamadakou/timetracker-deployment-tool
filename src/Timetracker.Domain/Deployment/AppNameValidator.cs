@@ -29,7 +29,10 @@ public static partial class AppNameValidator
     // - For 2+ chars: matches [a-z] followed by optional middle chars and final [a-z0-9]
     private static readonly Regex ValidPattern = CreateValidPattern();
 
-    [GeneratedRegex(@"^[a-z]([a-z0-9-]*[a-z0-9])?$", RegexOptions.Compiled)]
+    /// <summary>使える文字と先頭・末尾の規則（長さと連続するハイフンは別に確認する）。</summary>
+    public const string Pattern = @"^[a-z]([a-z0-9-]*[a-z0-9])?$";
+
+    [GeneratedRegex(Pattern, RegexOptions.Compiled)]
     private static partial Regex CreateValidPattern();
 
     /// <summary>
