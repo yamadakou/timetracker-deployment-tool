@@ -71,6 +71,30 @@ public class CliArgsTests
     }
 
     [Fact]
+    public void Parse_Should_Reject_Missing_Value_At_End_Of_Arguments()
+    {
+        var act = () => CliArgs.Parse(new[] { "--resource-group", "rg", "--subscription" });
+        act.Should().Throw<ArgumentException>().WithMessage("*--subscription*");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Get_Should_Return_Null_For_Blank_Value(string value)
+    {
+        var cli = CliArgs.Parse(new[] { $"--location={value}" });
+
+        cli.Get("--location").Should().BeNull();
+        cli.Get("--location", "japaneast").Should().Be("japaneast");
+    }
+
+    [Fact]
+    public void GetDouble_Should_Return_Null_When_Not_Specified()
+    {
+        CliArgs.Parse(Array.Empty<string>()).GetDouble("--tt-cpu").Should().BeNull();
+    }
+
+    [Fact]
     public void Parse_Should_Reject_Invalid_Bool_Value_With_Equals()
     {
         var act = () => CliArgs.Parse(new[] { "--dry-run=yes" });

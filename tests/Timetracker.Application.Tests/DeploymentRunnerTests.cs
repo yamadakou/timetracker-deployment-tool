@@ -59,12 +59,22 @@ public class DeploymentRunnerTests
         reported.Should().OnlyContain(p => p.Total == 3);
     }
 
-    [Fact]
-    public async Task Should_Not_Call_Azure_When_Options_Are_Invalid()
+    public static IEnumerable<object[]> InvalidOptions()
     {
+        yield return new object[] { (Action<DeployOptions>)(o => o.DbPassword = "short") };
+        yield return new object[] { (Action<DeployOptions>)(o => o.AppName = "bad_name") };
+        yield return new object[] { (Action<DeployOptions>)(o => o.TimetrackerCpu = -1) };
+        yield return new object[] { (Action<DeployOptions>)(o => o.RedisMemoryGi = double.NaN) };
+    }
+
+    [Theory]
+    [MemberData(nameof(InvalidOptions))]
+    public async Task Should_Not_Call_Azure_When_Options_Are_Invalid(Action<DeployOptions> mutate)
+    {
+        // Strict: どのメソッドが呼ばれても失敗する
         var gateway = new Mock<IAzureDeploymentGateway>(MockBehavior.Strict);
         var invalid = Options();
-        invalid.DbPassword = "short";
+        mutate(invalid);
 
         var act = () => new DeploymentRunner(gateway.Object).RunAsync(invalid, cancellationToken: TestContext.Current.CancellationToken);
 

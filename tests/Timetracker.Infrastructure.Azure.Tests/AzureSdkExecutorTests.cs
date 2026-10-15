@@ -181,24 +181,25 @@ public class AzureSdkExecutorTests
 
     // name・fqdn は読み取り専用のため、Azure の応答と同じ JSON から作る
     // （ArmAppContainersModelFactory.ContainerAppIngressConfiguration は stickySessionsAffinity 省略時に例外になる）
-    private static ContainerAppResource CreatedApp(string name, string? fqdn = null)
+    private static ContainerAppResource CreatedApp(string name, string? fqdn = null, bool withConfiguration = true)
     {
         var ingress = fqdn == null ? "" : $$""", "ingress": { "fqdn": "{{fqdn}}" }""";
-        var json = $$"""{ "name": "{{name}}", "location": "japaneast", "properties": { "configuration": { "activeRevisionsMode": "Single"{{ingress}} } } }""";
+        var properties = withConfiguration ? $$"""{ "configuration": { "activeRevisionsMode": "Single"{{ingress}} } }""" : "{}";
+        var json = $$"""{ "name": "{{name}}", "location": "japaneast", "properties": {{properties}} }""";
         var app = new Mock<ContainerAppResource>();
         app.SetupGet(a => a.HasData).Returns(true);
         app.SetupGet(a => a.Data).Returns(ModelReaderWriter.Read<ContainerAppData>(BinaryData.FromString(json))!);
         return app.Object;
     }
 
-    private static Mock<ContainerAppCollection> SetupCreateOrUpdate(string? ttFqdn, out Mock<ArmClient> arm)
+    private static Mock<ContainerAppCollection> SetupCreateOrUpdate(string? ttFqdn, out Mock<ArmClient> arm, bool ttWithConfiguration = true)
     {
         (arm, var apps) = SetupContainerApps();
         apps.Setup(c => c.GetIfExistsAsync("app-db", It.IsAny<CancellationToken>())).ReturnsAsync(NotFound<ContainerAppResource>());
         foreach (var (name, fqdn) in new[] { ("app-db", (string?)null), ("app-redis", null), ("app-tt", ttFqdn) })
         {
             var op = new Mock<ArmOperation<ContainerAppResource>>();
-            op.SetupGet(o => o.Value).Returns(CreatedApp(name, fqdn));
+            op.SetupGet(o => o.Value).Returns(CreatedApp(name, fqdn, name != "app-tt" || ttWithConfiguration));
             apps.Setup(c => c.CreateOrUpdateAsync(WaitUntil.Completed, name, It.IsAny<ContainerAppData>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(op.Object);
         }
@@ -249,5 +250,28 @@ public class AzureSdkExecutorTests
 
         result.TimetrackerUrl.Should().BeNull();
         output.ToString().Should().Contain("[WARN]").And.Contain("FQDN");
+    }
+
+    [Fact]
+    public async Task CreateOrUpdateContainerApp_Should_Return_Null_Endpoint_When_Configuration_Is_Not_Returned()
+    {
+        SetupCreateOrUpdate(ttFqdn: null, out var arm, ttWithConfiguration: false);
+        var output = new StringWriter();
+
+        var sut = new AzureSdkExecutor(new SimpleLogger(false, output), arm.Object);
+        var result = await sut.CreateOrUpdateContainerAppAsync(
+            SubscriptionId, RgName, "app", "japaneast", Options(), Environment(), TestContext.Current.CancellationToken);
+
+        result.TimetrackerUrl.Should().BeNull();
+        output.ToString().Should().Contain("[WARN]").And.Contain("FQDN");
+    }
+
+    [Fact]
+    public void Constructor_Should_Accept_Credential()
+    {
+        // ArmClient の作成だけで、Azure には接続しない
+        var act = () => new AzureSdkExecutor(new SimpleLogger(false, new StringWriter()), new Mock<TokenCredential>().Object);
+
+        act.Should().NotThrow();
     }
 }

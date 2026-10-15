@@ -67,13 +67,17 @@ public static class CredentialFactory
         logger.Verbose("DeviceCodeCredential を使用します（デバイスコード認証）");
         return new DeviceCodeCredential(new DeviceCodeCredentialOptions
         {
-            DeviceCodeCallback = (code, cancellation) =>
-            {
-                logger.Info($"デバイスコード認証: {code.Message}");
-                return Task.CompletedTask;
-            }
+            DeviceCodeCallback = DeviceCodeCallback(logger)
         });
     }
+
+    /// <summary>デバイスコード認証の案内（サインイン用の URL とコード）をログに出すコールバック。</summary>
+    internal static Func<DeviceCodeInfo, CancellationToken, Task> DeviceCodeCallback(IDeploymentLogger logger) =>
+        (code, cancellation) =>
+        {
+            logger.Info($"デバイスコード認証: {code.Message}");
+            return Task.CompletedTask;
+        };
 
     private static TokenCredential CreateManagedIdentityCredential(IDeploymentLogger logger)
     {
