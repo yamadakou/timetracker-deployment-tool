@@ -45,7 +45,7 @@ jobs:
         TT_SYSTEMTEST_LIMITED_CLIENT_SECRET: ${{ secrets.TT_SYSTEMTEST_LIMITED_CLIENT_SECRET }}
       run: >
         dotnet test --project tests/Timetracker.SystemTests --
-        --output detailed --report-xunit-trx --results-directory TestResults
+        --output detailed --report-xunit-trx --results-directory=TestResults
 
     - name: Upload test results
       if: always()

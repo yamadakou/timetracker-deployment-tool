@@ -43,6 +43,8 @@ if ($LimitedClientId) {
 }
 
 Write-Host "システムテストを実行します（20 分前後かかり、Azure Container Apps の料金が発生します）。"
+# --results-directory は "=" でつなぐ（既存のディレクトリをスペース区切りで渡すと、dotnet test がプロジェクトの指定と誤解する）
+$results = Join-Path $repo "TestResults/system"
 dotnet test --project (Join-Path $repo "tests/Timetracker.SystemTests") -- `
-    --output detailed --report-xunit-trx --results-directory (Join-Path $repo "TestResults/system")
+    --output detailed --report-xunit-trx "--results-directory=$results"
 exit $LASTEXITCODE
