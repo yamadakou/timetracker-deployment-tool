@@ -6,7 +6,7 @@ using FluentAssertions;
 using Timetracker.Domain.Deployment;
 using Xunit;
 
-namespace Timetracker.Controller.Cli.Tests;
+namespace Timetracker.Infrastructure.Azure.Tests;
 
 public class ContainerAppSpecBuilderTests
 {

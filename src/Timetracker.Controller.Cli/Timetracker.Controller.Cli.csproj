@@ -7,11 +7,8 @@
     <AssemblyName>timetracker-cli</AssemblyName>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Azure.Identity" Version="1.21.0" />
-    <PackageReference Include="Azure.ResourceManager" Version="1.14.0" />
-    <PackageReference Include="Azure.ResourceManager.AppContainers" Version="1.6.0" />
-  </ItemGroup>
-  <ItemGroup>
+    <ProjectReference Include="..\Timetracker.Application\Timetracker.Application.csproj" />
+    <ProjectReference Include="..\Timetracker.Infrastructure.Azure\Timetracker.Infrastructure.Azure.csproj" />
     <ProjectReference Include="..\Timetracker.Domain\Timetracker.Domain.csproj" />
     <ProjectReference Include="..\Timetracker.Common\Timetracker.Common.csproj" />
   </ItemGroup>

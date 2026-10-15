@@ -9,9 +9,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="FluentAssertions" Version="8.11.0" />
-    <PackageReference Include="Moq" Version="4.21.0" />
     <PackageReference Include="xunit.v3" Version="4.0.2" />
-    <PackageReference Include="YamlDotNet" Version="18.1.0" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Timetracker.Controller.Cli\Timetracker.Controller.Cli.csproj" />

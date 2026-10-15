@@ -4,7 +4,7 @@ using Azure.ResourceManager.AppContainers;
 using Azure.ResourceManager.AppContainers.Models;
 using Timetracker.Domain.Deployment;
 
-namespace Timetracker.Controller.Cli;
+namespace Timetracker.Infrastructure.Azure;
 
 /// <summary>
 /// Timetracker / DB / Redis の各 Container App の定義（ContainerAppData）を組み立てる。

@@ -1,6 +1,8 @@
+using Timetracker.Application.Deployment;
 using Timetracker.Common;
 using Timetracker.Controller.Cli;
 using Timetracker.Domain.Deployment;
+using Timetracker.Infrastructure.Azure;
 
 CliArgs cli;
 try
@@ -19,44 +21,41 @@ if (cli.IsHelp)
     return 0;
 }
 
-string GetOpt(string name, string defaultValue) => cli.Get(name, defaultValue);
-bool GetBool(string name) => cli.GetBool(name);
-
-// 必須オプション取得 (subscription / resource-group / db-password / tracker-password)
-var subscription    = GetOpt("--subscription",  string.Empty);
-var resourceGroup   = GetOpt("--resource-group", string.Empty);
-var dbPassword      = GetOpt("--db-password",   string.Empty);
-var trackerPassword = GetOpt("--tracker-password", string.Empty);
-
-if (string.IsNullOrWhiteSpace(subscription) ||
-    string.IsNullOrWhiteSpace(resourceGroup) ||
-    string.IsNullOrWhiteSpace(dbPassword) ||
-    string.IsNullOrWhiteSpace(trackerPassword))
+// 必須オプション (subscription / resource-group / db-password / tracker-password)
+if (string.IsNullOrWhiteSpace(cli.Get("--subscription")) ||
+    string.IsNullOrWhiteSpace(cli.Get("--resource-group")) ||
+    string.IsNullOrWhiteSpace(cli.Get("--db-password")) ||
+    string.IsNullOrWhiteSpace(cli.Get("--tracker-password")))
 {
     Console.Error.WriteLine("[ERROR] 必須パラメータ不足: --subscription --resource-group --db-password --tracker-password を指定してください。（--help で使い方を表示）");
     return 1;
 }
 
-var location        = GetOpt("--location", Defaults.DefaultLocation);
-var rawAppName      = GetOpt("--app-name", Defaults.DefaultAppName);
-var normalizedAppName = rawAppName.ToLowerInvariant();
-var dbType          = GetOpt("--db-type", "postgresql");
-var dbName          = GetOpt("--db-name", Defaults.DbName);
-var ttTag           = GetOpt("--tt-tag", Defaults.GetDefaultTimetrackerTag(dbType)); // 未指定時は DB 種別に合わせる
-var dryRun          = GetBool("--dry-run");
-var verbose         = GetBool("--verbose");
-var authMode        = GetOpt("--auth-mode", "default");
-
-// デフォルト CPU/メモリは要件値に合わせる（未指定時のみ適用）
-double ttCpu, ttMem, dbCpu, dbMem, redisCpu, redisMem;
+// 未指定のオプションは null のまま渡し、既定値は DeployOptionsResolver で適用する
+DeployInput input;
 try
 {
-    ttCpu    = cli.GetDouble("--tt-cpu", Defaults.TimetrackerCpu);
-    ttMem    = cli.GetDouble("--tt-memory", Defaults.TimetrackerMemoryGi);
-    dbCpu    = cli.GetDouble("--db-cpu", Defaults.DbCpu);
-    dbMem    = cli.GetDouble("--db-memory", Defaults.DbMemoryGi);
-    redisCpu = cli.GetDouble("--redis-cpu", Defaults.RedisCpu);
-    redisMem = cli.GetDouble("--redis-memory", Defaults.RedisMemoryGi);
+    input = new DeployInput
+    {
+        Subscription        = cli.Get("--subscription"),
+        ResourceGroup       = cli.Get("--resource-group"),
+        Location            = cli.Get("--location"),
+        AppName             = cli.Get("--app-name"),
+        DbType              = cli.Get("--db-type"),
+        DbName              = cli.Get("--db-name"),
+        DbPassword          = cli.Get("--db-password"),
+        TrackerPassword     = cli.Get("--tracker-password"),
+        TimetrackerTag      = cli.Get("--tt-tag"),
+        AuthMode            = cli.Get("--auth-mode"),
+        TimetrackerCpu      = cli.GetDouble("--tt-cpu"),
+        TimetrackerMemoryGi = cli.GetDouble("--tt-memory"),
+        DbCpu               = cli.GetDouble("--db-cpu"),
+        DbMemoryGi          = cli.GetDouble("--db-memory"),
+        RedisCpu            = cli.GetDouble("--redis-cpu"),
+        RedisMemoryGi       = cli.GetDouble("--redis-memory"),
+        DryRun              = cli.GetBool("--dry-run"),
+        Verbose             = cli.GetBool("--verbose"),
+    };
 }
 catch (ArgumentException ex)
 {
@@ -64,37 +63,18 @@ catch (ArgumentException ex)
     return 1;
 }
 
-var appNameError = AppNameValidator.GetError(normalizedAppName);
+var opts = DeployOptionsResolver.Resolve(input);
+
+var appNameError = AppNameValidator.GetError(opts.AppName);
 if (appNameError != null)
 {
+    var rawAppName = input.AppName ?? Defaults.DefaultAppName;
     Console.Error.WriteLine($"[ERROR] アプリ名 '{rawAppName}' は無効です: {appNameError}");
     Console.Error.WriteLine("  - 英小文字 (a-z)、数字 (0-9)、ハイフン (-) のみ使用可能");
     Console.Error.WriteLine("  - 英小文字で始まる/終わる必要があります（終端は英小文字または数字）");
     Console.Error.WriteLine($"  - 連続するハイフン '--' は不可 / 長さ {AppNameValidator.MinLength}〜{AppNameValidator.MaxLength} 文字");
     return 1;
 }
-
-var opts = new DeployOptions
-{
-    Subscription        = subscription,
-    ResourceGroup       = resourceGroup,
-    Location            = location,
-    AppName             = normalizedAppName,
-    DbType              = dbType,
-    DbPassword          = dbPassword,
-    DbName              = dbName,
-    TrackerPassword     = trackerPassword,
-    TimetrackerTag      = ttTag,
-    DryRun              = dryRun,
-    TimetrackerCpu      = ttCpu,
-    TimetrackerMemoryGi = ttMem,
-    DbCpu               = dbCpu,
-    DbMemoryGi          = dbMem,
-    RedisCpu            = redisCpu,
-    RedisMemoryGi       = redisMem,
-    Verbose             = verbose,
-    AuthMode            = authMode
-};
 
 var log = new SimpleLogger(opts.Verbose);
 try
@@ -115,10 +95,8 @@ try
     }
 
     var credential = CredentialFactory.Create(opts.AuthMode, log);
-    var sdk = new AzureSdkExecutor(log, credential);
-    await sdk.EnsureResourceGroupAsync(opts.Subscription, opts.ResourceGroup, opts.Location);
-    var env = await sdk.EnsureContainerAppEnvAsync(opts.Subscription, opts.ResourceGroup, $"{opts.AppName}-env", opts.Location);
-    await sdk.CreateOrUpdateContainerAppAsync(opts.Subscription, opts.ResourceGroup, opts.AppName, opts.Location, opts, env);
+    var runner = new DeploymentRunner(new AzureSdkExecutor(log, credential));
+    await runner.RunAsync(opts);
     log.Success("Container Apps デプロイ完了");
     return 0;
 }

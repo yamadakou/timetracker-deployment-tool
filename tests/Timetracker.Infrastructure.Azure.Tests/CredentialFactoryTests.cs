@@ -1,10 +1,10 @@
 using Azure.Identity;
 using FluentAssertions;
 using Timetracker.Common;
-using Timetracker.Controller.Cli;
+using Timetracker.Infrastructure.Azure;
 using Xunit;
 
-namespace Timetracker.Controller.Cli.Tests;
+namespace Timetracker.Infrastructure.Azure.Tests;
 
 public class CredentialFactoryTests
 {

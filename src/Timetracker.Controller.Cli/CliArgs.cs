@@ -134,8 +134,11 @@ public sealed class CliArgs
             ? value.ToLowerInvariant()
             : throw new ArgumentException($"オプション '{name}' の値は true または false で指定してください: '{value}'");
 
-    public string Get(string name, string defaultValue) =>
-        _values.TryGetValue(name, out var v) && !string.IsNullOrWhiteSpace(v) ? v : defaultValue;
+    /// <summary>オプションの値を取得する。未指定または空白の場合は null。</summary>
+    public string? Get(string name) =>
+        _values.TryGetValue(name, out var v) && !string.IsNullOrWhiteSpace(v) ? v : null;
+
+    public string Get(string name, string defaultValue) => Get(name) ?? defaultValue;
 
     public bool GetBool(string name) => _values.TryGetValue(name, out var v) && v == "true";
 
@@ -144,10 +147,14 @@ public sealed class CliArgs
     /// （小数点がカンマのロケールで "0.75" が 75 と解釈されるのを防ぐ）。
     /// </summary>
     /// <exception cref="ArgumentException">数値として解釈できない、または 0 以下の場合</exception>
-    public double GetDouble(string name, double defaultValue)
+    public double GetDouble(string name, double defaultValue) => GetDouble(name) ?? defaultValue;
+
+    /// <summary><see cref="GetDouble(string, double)"/> と同じ。未指定または空白の場合は null。</summary>
+    /// <exception cref="ArgumentException">数値として解釈できない、または 0 以下の場合</exception>
+    public double? GetDouble(string name)
     {
         if (!_values.TryGetValue(name, out var v) || string.IsNullOrWhiteSpace(v))
-            return defaultValue;
+            return null;
 
         if (double.TryParse(v, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var d) && d > 0)
             return d;
