@@ -77,8 +77,6 @@ Timetracker（DockerHub の `densocreate/timetracker` イメージ）を、選�
 > **Container Apps Contributor（Container Apps 共同作成者）だけでは本ツールを使えません。** このロールには、本ツールが使う次の権限が含まれていないためです。
 > - `Microsoft.Resources/subscriptions/resourceGroups/read` / `write`（リソースグループの存在確認・作成。本ツールは最初にこの確認を行います）
 > - `Microsoft.App/managedEnvironments/write`（Container Apps Environment の作成）
->
-> 以前の README では最小権限の選択肢として記載していましたが、誤りでした。
 
 本ツールが行う操作と必要な権限:
 
