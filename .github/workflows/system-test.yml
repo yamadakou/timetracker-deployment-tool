@@ -51,6 +51,8 @@ jobs:
         TT_SYSTEMTEST_LIMITED_CLIENT_ID: ${{ vars.TT_SYSTEMTEST_LIMITED_CLIENT_ID }}
         TT_SYSTEMTEST_LIMITED_CLIENT_SECRET: ${{ secrets.TT_SYSTEMTEST_LIMITED_CLIENT_SECRET }}
         TT_E2E_LICENSE_KEY: ${{ secrets.TT_E2E_LICENSE_KEY }}
+        TT_E2E_SAMPLE_LOGIN: ${{ secrets.TT_E2E_SAMPLE_LOGIN }}
+        TT_E2E_SAMPLE_PASSWORD: ${{ secrets.TT_E2E_SAMPLE_PASSWORD }}
       run: >
         dotnet test --project tests/Timetracker.SystemTests --
         --filter-not-class Timetracker.SystemTests.E2E.LocalComposeSetupTests

@@ -4,14 +4,14 @@
 
 - 環境変数 `TT_SYSTEMTEST_SUBSCRIPTION_ID` が無い場合はスキップされます。通常の `dotnet test Timetracker.sln` や PR の CI では実行されません
 - **料金が発生します**（Azure Container Apps。1 回 20〜40 分）。リリース前などに実行してください
-- Timetracker のライセンスキー（環境変数 `TT_E2E_LICENSE_KEY`）がある場合は、ブラウザー（Playwright）でセットアップウィザードを操作し、サンプルデータベースの作成と管理ユーザーでのログインまで確認します（Azure 上と、ローカルの docker compose 上）。無い場合はその確認だけを省略します
+- Timetracker のライセンスキーとサンプルデータベースのユーザー（環境変数 `TT_E2E_LICENSE_KEY` / `TT_E2E_SAMPLE_LOGIN` / `TT_E2E_SAMPLE_PASSWORD`）がある場合は、ブラウザー（Playwright）でセットアップウィザードを操作し、サンプルデータベースの作成と、そのユーザーでのログインまで確認します（Azure 上と、ローカルの docker compose 上）。無い場合はその確認だけを省略します
 - テスト用のリソースは、テストの最後に削除します（下記「後片付け」）
 
 ## シナリオ
 | テスト | 内容 |
 |---|---|
-| `DeploymentLifecycleTests` | 実行ごとに専用のリソースグループを作り、次を順に確認する。① デプロイすると 4 つのリソースに管理タグが付き、Timetracker が HTTP で応答する（ライセンスキーがあれば、続けてセットアップウィザードでサンプルデータベースを作り、管理ユーザーでログインできる） ② 手で付けたタグが再デプロイ後も残る ③ DB アプリの管理タグを外すと、DB アプリと Environment が削除の対象外になる（`--include-untagged` で対象になる） ④ 確認の入力が一致しなければ中止する ⑤ 管理タグがあるものだけ削除される ⑥ 残りを削除してもリソースグループは残る ⑦ 再実行しても失敗しない |
-| `LocalComposeSetupTests` | CLI の Dry-run で作った docker-compose.yml でローカルに起動し、セットアップウィザードでサンプルデータベースを作って、管理ユーザーでログインできることを確かめる（PostgreSQL と SQL Server）。Azure は使わない。ライセンスキーが無い場合と、Docker が使えない場合はスキップする。ポート 8080 を使う |
+| `DeploymentLifecycleTests` | 実行ごとに専用のリソースグループを作り、次を順に確認する。① デプロイすると 4 つのリソースに管理タグが付き、Timetracker が HTTP で応答する（E2E の設定があれば、続けてセットアップウィザードでサンプルデータベースを作り、ログインできる） ② 手で付けたタグが再デプロイ後も残る ③ DB アプリの管理タグを外すと、DB アプリと Environment が削除の対象外になる（`--include-untagged` で対象になる） ④ 確認の入力が一致しなければ中止する ⑤ 管理タグがあるものだけ削除される ⑥ 残りを削除してもリソースグループは残る ⑦ 再実行しても失敗しない |
+| `LocalComposeSetupTests` | CLI の Dry-run で作った docker-compose.yml でローカルに起動し、セットアップウィザードでサンプルデータベースを作って、サンプルデータベースのユーザーでログインできることを確かめる（PostgreSQL と SQL Server）。Azure は使わない。E2E の設定が無い場合と、Docker が使えない場合はスキップする。ポート 8080 を使う |
 | `LimitedPermissionTests` | 権限の少ないサービスプリンシパルで、権限の事前確認が Azure の実際の挙動と合っていることを確認する。① Environment の新規作成が必要なデプロイは止まり、何も作成しない ② 既存の Environment への Container App の更新は成功する（`containerApps/*/write` で `containerApps/write` が許可される） ③ Environment の削除権限が無いため、削除は止まり何も削除しない |
 
 権限の少ないサービスプリンシパルの設定が無い場合、`LimitedPermissionTests` はスキップされます。
@@ -56,11 +56,19 @@ az role assignment create --assignee <appId> --role Contributor --scope /subscri
 
 必要に応じて、Environment に承認者（Required reviewers）を設定すると、実行前に承認を求められます（料金が発生するため推奨）。
 
-### 3. ライセンスキー（セットアップウィザードとログインの確認）
-Timetracker のライセンスキー（評価用など）を、GitHub のリポジトリの Settings → Secrets and variables → Actions → **Repository secrets** に `TT_E2E_LICENSE_KEY` として登録します。PR の CI（`ci.yml` の `e2e-local`。Environment を使わない）と System Test の両方で使うため、Environment ではなくリポジトリのシークレットにします。
-- キーはチャットやリポジトリに書かないでください。テストはキーとライセンス情報の画面の内容を出力しません
+### 3. ライセンスキーとサンプルデータベースのユーザー（セットアップウィザードとログインの確認）
+GitHub のリポジトリの Settings → Secrets and variables → Actions → **Repository secrets** に、次を登録します。PR の CI（`ci.yml` の `e2e-local`。Environment を使わない）と System Test の両方で使うため、Environment ではなくリポジトリのシークレットにします。
+
+| 名前 | 値 |
+|---|---|
+| `TT_E2E_LICENSE_KEY` | Timetracker のライセンスキー（評価用など） |
+| `TT_E2E_SAMPLE_LOGIN` | サンプルデータベースに入っているユーザーのログイン名（サンプルデータベースを作る場合、ウィザードで管理ユーザーは登録しないため） |
+| `TT_E2E_SAMPLE_PASSWORD` | そのユーザーのパスワード |
+
+- 値はチャットやリポジトリに書かないでください。テストはこれらの値と、ライセンス情報・実行の確認の画面の内容を出力しません
+- 3 つのうち 1 つでも無ければ、確認はスキップされます
 - フォークからの PR ではシークレットが渡されないため、確認はスキップされます
-- ローカルで実行する場合は、環境変数 `TT_E2E_LICENSE_KEY` に設定します（スクリプトが Playwright のブラウザーを入れます。macOS / Linux では PowerShell（`pwsh`）が必要です）
+- ローカルで実行する場合は、同じ名前の環境変数に設定します（スクリプトが Playwright のブラウザーを入れます。macOS / Linux では PowerShell（`pwsh`）が必要です）
 
 ## 実行方法
 ### ローカル（半自動: サインインだけ手動）
@@ -94,7 +102,7 @@ GitHub の Actions → **System Test** → Run workflow で実行します（`wo
 | `TT_SYSTEMTEST_LOCATION` | – | `japaneast` | |
 | `TT_SYSTEMTEST_LIMITED_RESOURCE_GROUP` | – | `rg-ttst-limited` | |
 | `TT_SYSTEMTEST_LIMITED_TENANT_ID` / `_CLIENT_ID` / `_CLIENT_SECRET` | – | – | 無ければ `LimitedPermissionTests` をスキップ |
-| `TT_E2E_LICENSE_KEY` | – | – | Timetracker のライセンスキー。無ければセットアップウィザードとログインの確認をスキップ（`LocalComposeSetupTests` は `TT_SYSTEMTEST_SUBSCRIPTION_ID` が無くても、これがあれば実行する） |
+| `TT_E2E_LICENSE_KEY` / `TT_E2E_SAMPLE_LOGIN` / `TT_E2E_SAMPLE_PASSWORD` | – | – | ライセンスキーと、サンプルデータベースのユーザー。そろっていなければセットアップウィザードとログインの確認をスキップ（`LocalComposeSetupTests` は `TT_SYSTEMTEST_SUBSCRIPTION_ID` が無くても、これらがあれば実行する） |
 | `TT_E2E_CHROMIUM_PATH` | – | – | 使う Chromium の実行ファイル（`playwright install` で入れたものを使わない場合） |
 
 Azure への接続は、実行環境の Azure CLI のログイン（`az login`、CI では `azure/login`）を使います（CLI は `--auth-mode azure-cli`）。

@@ -8,8 +8,8 @@ namespace Timetracker.SystemTests.E2E;
 
 /// <summary>
 /// CLI の Dry-run で生成した docker-compose.yml でローカルに起動し、セットアップウィザードでサンプルデータベースを作って、
-/// 管理ユーザーでログインできることを確かめる（PostgreSQL と SQL Server）。
-/// TT_E2E_LICENSE_KEY が無い場合と、Docker（docker compose）が使えない場合はスキップする。ポート 8080 を使うため、1 件ずつ実行する。
+/// サンプルデータベースのユーザーでログインできることを確かめる（PostgreSQL と SQL Server）。
+/// E2E の設定（E2ESettings）が無い場合と、Docker（docker compose）が使えない場合はスキップする。ポート 8080 を使うため、1 件ずつ実行する。
 /// </summary>
 public sealed class LocalComposeSetupTests
 {
@@ -21,7 +21,7 @@ public sealed class LocalComposeSetupTests
     [InlineData("sqlserver")]
     public async Task Sample_Database_Setup_And_Login_Should_Succeed(string dbType)
     {
-        var licenseKey = E2ESettings.RequireLicenseKey();
+        var (licenseKey, user) = E2ESettings.Require();
         Assert.SkipUnless(await DockerComposeAvailableAsync(), "docker compose が使えないためスキップします。");
         var ct = TestContext.Current.CancellationToken;
 
@@ -44,10 +44,9 @@ public sealed class LocalComposeSetupTests
             await using var browser = await TimetrackerSetupWizard.LaunchBrowserAsync(playwright);
             var page = await browser.NewPageAsync(new() { Locale = "ja-JP" });
             var wizard = new TimetrackerSetupWizard(page);
-            var admin = E2ESettings.NewAdmin();
 
-            await wizard.RunAsync("http://localhost:8080", licenseKey, admin, sampleDatabase: true, SetupTimeout);
-            var home = await wizard.LoginFromCompletionAsync(admin);
+            await wizard.CreateSampleDatabaseAsync("http://localhost:8080", licenseKey, SetupTimeout);
+            var home = await wizard.LoginFromCompletionAsync(user);
 
             home.Should().NotBeNullOrWhiteSpace();
         }

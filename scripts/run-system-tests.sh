@@ -35,7 +35,7 @@ fi
 
 # global.json（Microsoft.Testing.Platform を使う設定）を読むため、リポジトリのディレクトリで実行する
 cd "$repo"
-# セットアップウィザードとログインの確認は、ライセンスキー（環境変数 TT_E2E_LICENSE_KEY）がある場合だけ行う。使うブラウザーを入れる（PowerShell が必要）
+# セットアップウィザードとログインの確認は、ライセンスキー（環境変数 TT_E2E_LICENSE_KEY）とサンプルデータベースのユーザー（TT_E2E_SAMPLE_LOGIN / TT_E2E_SAMPLE_PASSWORD）がある場合だけ行う。使うブラウザーを入れる（PowerShell が必要）
 if [ -n "${TT_E2E_LICENSE_KEY:-}" ]; then
   dotnet build "$repo/tests/Timetracker.SystemTests"
   pwsh "$repo/tests/Timetracker.SystemTests/bin/Debug/net10.0/playwright.ps1" install chromium

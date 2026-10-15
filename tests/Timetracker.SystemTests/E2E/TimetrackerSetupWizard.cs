@@ -4,14 +4,15 @@ using Xunit;
 
 namespace Timetracker.SystemTests.E2E;
 
-/// <summary>セットアップウィザードで作る管理ユーザー（セットアップ後のログインにも使う）。</summary>
-public sealed record AdminUser(string LoginName, string DisplayName, string Password);
+/// <summary>ログインするユーザー（サンプルデータベースに入っているユーザー）。</summary>
+public sealed record LoginUser(string LoginName, string Password);
 
 /// <summary>
 /// Timetracker のセットアップウィザード（/setup）とログインを、ブラウザー（Playwright）で操作する。
 /// 画面は ExtJS で作られていて要素の ID が自動生成されるため、表示されている文言とラベルで要素を探す。
-/// ウィザードの流れ: セットアップの開始 → ライセンスキーの入力 → ライセンス情報の確認 → データベースの作成方法
-/// → 管理ユーザーの登録 → 実行の確認 → 実行中 → セットアップの完了（または セットアップエラー）。
+/// サンプルデータベースを作る場合のウィザードの流れ: セットアップの開始 → ライセンスキーの入力 → ライセンス情報の確認
+/// → データベースの作成方法 → 実行の確認 → 実行中 → セットアップの完了（または セットアップエラー）。
+/// サンプルデータベースにはユーザーが入っているため、空のデータベースの場合にある「管理ユーザーの登録」の画面は出ない。
 /// </summary>
 public sealed class TimetrackerSetupWizard
 {
@@ -27,11 +28,10 @@ public sealed class TimetrackerSetupWizard
         playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions { ExecutablePath = E2ESettings.ChromiumPath });
 
     /// <summary>
-    /// ウィザードを最後まで進め、データベースを作る。ライセンスの確認画面の内容（組織情報など）はテストの出力に出さない。
+    /// ウィザードを最後まで進め、サンプルデータベースを作る。ライセンスの確認画面と実行の確認画面の内容（組織情報など）はテストの出力に出さない。
     /// </summary>
-    /// <param name="sampleDatabase">true でサンプルデータベース、false で空のデータベースを作る</param>
     /// <param name="setupTimeout">「実行」から完了までの待ち時間の上限（サンプル DB の作成は数分かかる）</param>
-    public async Task RunAsync(string baseUrl, string licenseKey, AdminUser admin, bool sampleDatabase, TimeSpan setupTimeout)
+    public async Task CreateSampleDatabaseAsync(string baseUrl, string licenseKey, TimeSpan setupTimeout)
     {
         await _page.GotoAsync($"{baseUrl.TrimEnd('/')}/setup");
         await ExpectStepAsync("セットアップの開始");
@@ -45,15 +45,7 @@ public sealed class TimetrackerSetupWizard
         await ClickButtonAsync("次へ");
 
         await ExpectStepAsync("データベースの作成方法");
-        await _page.GetByText(sampleDatabase ? "サンプルデータベースを作成する" : "空のデータベースを作成する", new() { Exact = true })
-            .Filter(new() { Visible = true }).ClickAsync();
-        await ClickButtonAsync("次へ");
-
-        await ExpectStepAsync("管理ユーザーの登録");
-        await _page.GetByLabel("ログイン名:").FillAsync(admin.LoginName);
-        await _page.GetByLabel("名前:").FillAsync(admin.DisplayName);
-        await _page.GetByLabel("パスワード:", new() { Exact = true }).FillAsync(admin.Password);
-        await _page.GetByLabel("パスワードの確認:").FillAsync(admin.Password);
+        await _page.GetByText("サンプルデータベースを作成する", new() { Exact = true }).Filter(new() { Visible = true }).ClickAsync();
         await ClickButtonAsync("次へ");
 
         await ExpectStepAsync("実行の確認");
@@ -65,19 +57,19 @@ public sealed class TimetrackerSetupWizard
         await done.Or(failed).WaitForAsync(new() { Timeout = (float)setupTimeout.TotalMilliseconds });
         if (await failed.IsVisibleAsync())
             Assert.Fail($"セットアップエラーになりました: {await VisibleTextAsync()}");
-        Log($"セットアップが完了しました（{(sampleDatabase ? "サンプルデータベース" : "空のデータベース")}）");
+        Log("セットアップが完了しました（サンプルデータベース）");
     }
 
-    /// <summary>完了画面の「管理画面へ移動」から、管理ユーザーでログインする。ログインできたら、ログイン後の画面の文言を返す。</summary>
-    public async Task<string> LoginFromCompletionAsync(AdminUser admin)
+    /// <summary>完了画面の「管理画面へ移動」から、指定したユーザーでログインする。ログインできたら、ログイン後の画面の文言を返す。</summary>
+    public async Task<string> LoginFromCompletionAsync(LoginUser user)
     {
         await ClickButtonAsync("管理画面へ移動");
         var password = _page.Locator("input[type=password]:visible");
         await password.First.WaitForAsync(new() { Timeout = 120_000 });
         Log($"ログイン画面: {_page.Url}");
 
-        await _page.Locator("input[type=text]:visible, input:not([type]):visible").First.FillAsync(admin.LoginName);
-        await password.First.FillAsync(admin.Password);
+        await _page.Locator("input[type=text]:visible, input:not([type]):visible").First.FillAsync(user.LoginName);
+        await password.First.FillAsync(user.Password);
         await password.First.PressAsync("Enter");
 
         // ログインできればパスワードの入力欄が消える（失敗すればログイン画面のまま、エラーが表示される）

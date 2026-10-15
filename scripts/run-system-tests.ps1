@@ -52,7 +52,7 @@ try {
         Write-Warning "-LimitedClientId が無いため、権限不足のシナリオはスキップします。"
     }
 
-    # セットアップウィザードとログインの確認は、ライセンスキー（環境変数 TT_E2E_LICENSE_KEY）がある場合だけ行う。使うブラウザーを入れる
+    # セットアップウィザードとログインの確認は、ライセンスキー（環境変数 TT_E2E_LICENSE_KEY）とサンプルデータベースのユーザー（TT_E2E_SAMPLE_LOGIN / TT_E2E_SAMPLE_PASSWORD）がある場合だけ行う。使うブラウザーを入れる
     if ($env:TT_E2E_LICENSE_KEY) {
         dotnet build (Join-Path $repo "tests/Timetracker.SystemTests")
         if ($LASTEXITCODE -ne 0) { throw "ビルドに失敗しました。" }
