@@ -81,6 +81,7 @@ tests/Timetracker.Controller.Mcp.Tests/  (新規) ツールの単体テストと
   - 検証エラー（`target=compose` で検証。全エラーをメッセージに含める）
   - `output_dir` が無い・絶対パスでない
   - `TT_MCP_OUTPUT_ROOT` の配下でない（`..` を含むパスは正規化してから判定する）
+  - `TT_MCP_OUTPUT_ROOT` を設定した場合に、ルートより下の既存の階層か、書き込む `docker-compose.yml` / `.env` がシンボリックリンク（Windows ではジャンクションも）である（リンクの先はルートの外かもしれないため。ルート自体はリンクでもよい）
   - `docker-compose.yml` か `.env` が既にあり、`overwrite` が false
 - `output_dir` が存在しなければ作成する
 - 結果: `compose_path`、`env_path`、`compose_content`（秘密情報を含まない）、`warnings`、`next_steps`。**`.env` の内容は返さない**

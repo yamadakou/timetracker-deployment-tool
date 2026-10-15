@@ -250,6 +250,37 @@ public sealed class DeploymentToolsTests : IDisposable
     }
 
     [Fact]
+    public void GenerateCompose_Should_Reject_Links_That_Lead_Outside_The_Output_Root()
+    {
+        var root = Path.Combine(_root, "root");
+        var outside = Path.Combine(_root, "outside");
+        Directory.CreateDirectory(root);
+        Directory.CreateDirectory(outside);
+        var linkedDir = Path.Combine(root, "linked");
+        var realDir = Path.Combine(root, "real");
+        Directory.CreateDirectory(realDir);
+        var linkedEnv = Path.Combine(realDir, ".env");
+        try
+        {
+            Directory.CreateSymbolicLink(linkedDir, outside);
+            File.CreateSymbolicLink(linkedEnv, Path.Combine(outside, "stolen.env"));
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+        {
+            Assert.Skip($"シンボリックリンクを作れない環境です: {ex.Message}");
+        }
+        var tools = ComposeTools(root);
+
+        var throughDir = () => tools.GenerateCompose(Path.Combine(linkedDir, "sub"));
+        var throughFile = () => tools.GenerateCompose(realDir, overwrite: true);
+
+        throughDir.Should().Throw<McpException>().WithMessage($"{linkedDir} はシンボリックリンク*");
+        throughFile.Should().Throw<McpException>().WithMessage($"{linkedEnv} はシンボリックリンク*");
+        Directory.EnumerateFileSystemEntries(outside).Should().BeEmpty();
+        File.Exists(Path.Combine(realDir, "docker-compose.yml")).Should().BeFalse();
+    }
+
+    [Fact]
     public void GenerateCompose_Should_Allow_Everything_Under_A_File_System_Root()
     {
         var fileSystemRoot = Path.GetPathRoot(_root)!;

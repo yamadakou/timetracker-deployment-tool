@@ -296,7 +296,7 @@ flowchart TB
   - 返すのはファイルのパス、`docker-compose.yml` の内容（秘密情報を含まない）、次の手順（`docker compose up -d`、`http://localhost:8080`）
   - `.env` は**内容を返さない**（パスワードを含むため）。パスだけ返す
   - 既存ファイルがあり `overwrite=false` の場合はエラーにする（以前の `.env` を上書きで失わないため）
-  - `TT_MCP_OUTPUT_ROOT` を設定した場合は、その配下以外への書き込みを拒否する
+  - `TT_MCP_OUTPUT_ROOT` を設定した場合は、その配下以外への書き込みを拒否する（配下にあるシンボリックリンク・ジャンクションを経由した書き込みも拒否する）
 - HTTP:
   - サーバーのファイルシステムには書かない。`docker-compose.yml` の内容と、パスワード部分をプレースホルダー（`DB_PASSWORD="<DB パスワードを設定>"`）にした `.env` の内容を返す
   - パスワードが引数で渡されていても `.env` には埋め込まない（応答として会話に再度出さないため）
@@ -353,7 +353,7 @@ DB を再デプロイするとデータが消えるため、**計画（読み取
   4. `JobManager` がバックグラウンドで `DeploymentRunner.RunAsync` を開始し、すぐに `job_id` を返す
 - 出力: `{ "job_id": "job_...", "kind": "deploy", "status": "running", "poll_hint": "get_job_status を 15〜30 秒間隔で呼んでください" }`
 - 計画は一度実行したら無効にする（同じ計画で 2 回実行できない）
-- クライアントが進捗トークン（`progressToken`）を送ってきた場合は、ステップごとに `notifications/progress` も送る（ポーリングだけでも完結するようにし、通知は補助扱い）
+- 進捗の通知（`notifications/progress`）は送らない。`get_job_status` のポーリングで完結させる（第 4.3 版で決定。理由は `docs/design/mcp-phase3b.md` の 6.2）
 
 > 将来: MCP 仕様の Tasks（長時間処理の標準化。2025-11-25 版では実験的な機能）が C# SDK と主要クライアントで安定したら、`start_*` + `get_job_status` から移行するか検討する。ジョブ管理は Application に閉じているので、MCP 側の変更だけで済む。
 
@@ -772,7 +772,7 @@ README の「必要な RBAC ロールと権限」（`docs/fix-rbac-requirements`
 | フェーズ | 内容 | 完了条件 |
 |---|---|---|
 | Phase 3a（`MCP-Tool`） | `Timetracker.Controller.Mcp` の新設（stdio）。`get_deployment_options` / `validate_deployment` / `generate_compose` / `list_subscriptions` | MCP Inspector と Claude Code で呼び出せる。生成したファイルで `docker compose up` が成功する |
-| Phase 3b（`MCP-Tool`） | `plan_deployment` / `start_deployment` / `get_job_status` / `list_jobs` / `get_deployment_info`、ジョブ管理、進捗通知 | Azure で新規デプロイと再デプロイ（データ消失の確認あり）が成功し、URL が返る |
+| Phase 3b（`MCP-Tool`） | `plan_deployment` / `start_deployment` / `get_job_status` / `list_jobs` / `get_deployment_info`、ジョブ管理（進捗は `get_job_status` で返す） | Azure で新規デプロイと再デプロイ（データ消失の確認あり）が成功し、URL が返る |
 | Phase 3c（`MCP-Tool`） | `plan_deletion` / `start_deletion`、instructions、Resources / Prompts、配布（release.yml）、README の MCP の章 | Release に MCP の配布物が出る。リリース前確認（6.1）を完了 |
 | Phase 4（`feature/mcp-http`） | HTTP トランスポート、呼び出し元の認証（Entra ID・アプリロール）、`server` / `user` の両方式の資格情報プロバイダー（4.11）、Dockerfile とコンテナイメージ | Container Apps 上の MCP サーバーに OAuth 対応のクライアントから接続し、両方式でそれぞれ一連のシナリオが成功する。範囲外のリソースグループへの `server` 方式の操作が拒否される |
 
@@ -790,6 +790,7 @@ README の「必要な RBAC ロールと権限」（`docs/fix-rbac-requirements`
 - `start_deployment` は、実行の直前に計画を作り直し、実行できない・操作が変わった場合は始めずにエラーを返す。DB を更新する計画では `acknowledge_data_loss=true` が必要
 - 進捗の通知は送らない（ジョブはツールの呼び出しが終わった後に進むため。詳細設計 6.2）。`get_job_status` が手順・ログの差分・デバイスコードの案内を返す
 - 確認: 単体テスト（計画の各規則・再確認・計画ストア・ジョブ・各ツールの分岐）とプロトコル結合テスト。分岐網羅率は Program.cs を除き 100%
+- Azure（japaneast、`azure-cli` 認証）での確認: SDK のクライアントから stdio で接続し、ツールだけで次を行った。`list_subscriptions` の成功（Phase 3a で残した確認）、`get_deployment_info`（デプロイ前は `exists: false`）、`plan_deployment`（新規。すべて create、リソースグループが無いため権限は not_checked）→ `start_deployment` → `get_job_status`（約 2 分 20 秒で succeeded、URL が返り、アクセスするとセットアップ画面に転送される）、`get_deployment_info`（3 つのアプリが Running、管理タグあり）、`plan_deployment`（再デプロイ。DB は update・data_loss、`requires_data_loss_ack: true`、権限は ok）→ 同意なしの `start_deployment` が拒否される → 同意ありで succeeded（約 50 秒）→ 使用済みの plan_id が拒否される、`list_jobs`（2 件）。結果・ログにパスワードが含まれないことも確認した。後片付けは CLI の `delete` で行った
 
 ### 8.3 共有層のリファクタリング内容（Phase 0）
 | # | 変更 | 対応する課題 |

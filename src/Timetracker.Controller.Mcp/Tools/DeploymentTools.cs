@@ -209,6 +209,26 @@ public sealed class DeploymentTools
             && directory != root
             && !directory.StartsWith(Path.EndsInDirectorySeparator(root) ? root : root + Path.DirectorySeparatorChar, StringComparison.Ordinal))
             throw new McpException($"output_dir は {root} の配下を指定してください（サーバーの設定 TT_MCP_OUTPUT_ROOT で制限されています）: {directory}");
+        if (_settings.OutputRoot is { } limit)
+            RejectLinksUnder(limit, directory);
         return directory;
+    }
+
+    // パスの文字列だけでは、配下にある既存のシンボリックリンク・ジャンクションの先（TT_MCP_OUTPUT_ROOT の外）へ書き込めてしまう。
+    // そのため、ルートより下の各階層と、書き込むファイルがリンクでないことを確かめる（ルート自体はリンクでもよい）
+    private static void RejectLinksUnder(string root, string directory)
+    {
+        var relative = Path.GetRelativePath(root, directory);
+        var current = root;
+        var paths = new List<string>();
+        if (relative != ".")
+            foreach (var part in relative.Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries))
+                paths.Add(current = Path.Combine(current, part));
+        paths.Add(Path.Combine(directory, ComposeFileName));
+        paths.Add(Path.Combine(directory, EnvFileName));
+
+        foreach (var path in paths)
+            if (new FileInfo(path).LinkTarget is not null)
+                throw new McpException($"{path} はシンボリックリンク（またはジャンクション）のため、書き込みませんでした（TT_MCP_OUTPUT_ROOT の外に書き込まないため）。");
     }
 }
