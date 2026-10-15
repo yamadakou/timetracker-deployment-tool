@@ -65,22 +65,51 @@ Timetracker（DockerHub の `densocreate/timetracker` イメージ）を、選�
 
 ### 必要な RBAC ロールと権限
 
-本ツールを実行するユーザーまたはサービスプリンシパルには、以下のいずれかのロールが必要です：
+本ツールを実行するユーザー、サービスプリンシパル、またはマネージド ID には、次のいずれかのロール割り当てが必要です。
 
-| ロール | 説明 | 推奨用途 |
+| ロール（割り当てるスコープ） | 本ツールでできること | 推奨用途 |
 |--------|------|----------|
-| **Owner** | サブスクリプションまたはリソースグループの完全な管理権限 | 開発・テスト環境 |
-| **Contributor** | リソースの作成・変更・削除が可能（RBACの管理は不可） | 通常利用での推奨ロール |
-| **Container Apps Contributor** | Container Apps リソースの管理に特化 | 最小権限の原則に基づく運用 |
+| **Contributor**（サブスクリプション） | すべての操作。リソースグループが存在しなければ作成し、リソースプロバイダーの登録も行える | 通常利用での推奨 |
+| **Contributor**（リソースグループ） | 事前に作成したリソースグループへのデプロイ。リソースグループの作成とリソースプロバイダーの登録はできない | 権限を絞りたい場合の推奨 |
+| **Owner**（サブスクリプションまたはリソースグループ） | Contributor と同じ（加えてロール割り当ての管理も可能だが、本ツールでは不要） | Contributor を使えない場合 |
+
+> [!WARNING]
+> **Container Apps Contributor（Container Apps 共同作成者）だけでは本ツールを使えません。** このロールには、本ツールが使う次の権限が含まれていないためです。
+> - `Microsoft.Resources/subscriptions/resourceGroups/read` / `write`（リソースグループの存在確認・作成。本ツールは最初にこの確認を行います）
+> - `Microsoft.App/managedEnvironments/write`（Container Apps Environment の作成）
+>
+> 以前の README では最小権限の選択肢として記載していましたが、誤りでした。
+
+本ツールが行う操作と必要な権限:
+
+| 操作 | 必要な権限（Action） | 必要なスコープ |
+|---|---|---|
+| リソースグループの存在確認 | `Microsoft.Resources/subscriptions/resourceGroups/read` | リソースグループ |
+| リソースグループの作成（存在しない場合） | `Microsoft.Resources/subscriptions/resourceGroups/write` | サブスクリプション |
+| Container Apps Environment の確認・作成 | `Microsoft.App/managedEnvironments/read` / `write` | リソースグループ |
+| Container App（DB / Redis / Timetracker）の確認・作成・更新 | `Microsoft.App/containerApps/read` / `write`、`Microsoft.App/managedEnvironments/join/action` | リソースグループ |
+| リソースプロバイダーの登録（初回のみ。[次節](#azure-リソースプロバイダーの登録)） | `Microsoft.App/register/action` など（`*/register/action`） | サブスクリプション |
+
+リソースグループのスコープで Contributor を割り当てる場合は、次の作業をサブスクリプションの管理者に事前に依頼してください。
+- リソースグループの作成（`az group create --name <RG名> --location japaneast`）
+- リソースプロバイダーの登録（[次節](#azure-リソースプロバイダーの登録)）
+
+ロール割り当ての例（リソースグループのスコープ）:
+```bash
+az role assignment create \
+  --assignee <ユーザー / サービスプリンシパル / マネージド ID のオブジェクト ID> \
+  --role Contributor \
+  --scope /subscriptions/<SUBSCRIPTION_ID>/resourceGroups/<RG名>
+```
 
 **参考リンク**:
 - [Azure RBAC の概要](https://learn.microsoft.com/ja-jp/azure/role-based-access-control/overview)
 - [Azure 組み込みロール](https://learn.microsoft.com/ja-jp/azure/role-based-access-control/built-in-roles)
-- [Container Apps 共同作成者ロール](https://learn.microsoft.com/ja-jp/azure/role-based-access-control/built-in-roles#container-apps-contributor)
+- [Container Apps 共同作成者ロール](https://learn.microsoft.com/ja-jp/azure/role-based-access-control/built-in-roles#container-apps-contributor)（本ツールには権限が不足します）
 
 ### Azure リソースプロバイダーの登録
 
-Container Apps を初めて使用する場合、以下のリソースプロバイダーをサブスクリプションに登録する必要があります：
+Container Apps を初めて使用する場合、以下のリソースプロバイダーをサブスクリプションに登録する必要があります。登録にはサブスクリプションのスコープでの権限（Contributor または Owner）が必要です。リソースグループのスコープの権限しかない場合は、サブスクリプションの管理者に登録を依頼してください。
 
 - **Microsoft.App** (必須): Azure Container Apps
 - **Microsoft.OperationalInsights** (必須): Container Apps Environment が使用
@@ -122,7 +151,7 @@ az provider show --namespace Microsoft.OperationalInsights --query "registration
 ##### 前提環境
 - 環境変数、Managed Identity、Azure CLI、Visual Studio など、複数の認証方法を自動的に試行
 - 開発環境や CI/CD パイプラインで推奨される認証モード
-- 必要な RBAC ロール: Owner、Contributor、または Container Apps Contributor
+- 必要な RBAC ロール: [必要な RBAC ロールと権限](#必要な-rbac-ロールと権限) を参照
 - 参考: [DefaultAzureCredential](https://learn.microsoft.com/ja-jp/dotnet/api/azure.identity.defaultazurecredential)
 
 ##### 利用方法（事前準備含む）
@@ -161,7 +190,7 @@ az provider show --namespace Microsoft.OperationalInsights --query "registration
 - Azure CLI がインストールされていること
 - 事前に `az login` でログイン済みであること
 - ローカル開発環境での利用に最適
-- 必要な RBAC ロール: Owner、Contributor、または Container Apps Contributor
+- 必要な RBAC ロール: [必要な RBAC ロールと権限](#必要な-rbac-ロールと権限) を参照
 
 ##### 利用方法（事前準備含む）
 
@@ -204,7 +233,7 @@ az provider show --namespace Microsoft.OperationalInsights --query "registration
 - サービスプリンシパルが作成されていること
 - 環境変数 `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` が設定されていること（いずれかが未設定の場合はエラーで停止します）
 - CI/CD パイプライン（GitHub Actions、Azure DevOps など）での利用に最適
-- 必要な RBAC ロール: サービスプリンシパルに Owner、Contributor、または Container Apps Contributor ロールを付与
+- 必要な RBAC ロール: サービスプリンシパルに [必要な RBAC ロールと権限](#必要な-rbac-ロールと権限) のロールを付与
 - 参考: [Service Principal](https://learn.microsoft.com/ja-jp/azure/active-directory/develop/app-objects-and-service-principals)
 
 ##### 利用方法（事前準備含む）
@@ -256,7 +285,7 @@ az provider show --namespace Microsoft.OperationalInsights --query "registration
 - Web ブラウザが利用可能であること
 - インタラクティブにログインする必要がある環境での利用に適している
 - ヘッドレス環境や SSH 接続での利用に最適
-- 必要な RBAC ロール: ログインするユーザーに Owner、Contributor、または Container Apps Contributor ロールを付与
+- 必要な RBAC ロール: ログインするユーザーに [必要な RBAC ロールと権限](#必要な-rbac-ロールと権限) のロールを付与
 
 ##### 利用方法（事前準備含む）
 
@@ -292,7 +321,7 @@ az provider show --namespace Microsoft.OperationalInsights --query "registration
 - Azure VM、Azure App Service、Azure Container Instances、または Azure Functions 上で実行
 - 実行環境に Managed Identity が有効化されていること
 - Azure 上で実行する場合の推奨認証モード（認証情報の管理が不要）
-- 必要な RBAC ロール: Managed Identity に Owner、Contributor、または Container Apps Contributor ロールを付与
+- 必要な RBAC ロール: Managed Identity に [必要な RBAC ロールと権限](#必要な-rbac-ロールと権限) のロールを付与
 - 参考: [Managed Identity](https://learn.microsoft.com/ja-jp/azure/active-directory/managed-identities-azure-resources/overview)
 
 ##### 利用方法（事前準備含む）
@@ -475,7 +504,7 @@ timetracker-cli.exe deploy `
 
 - **Q: 認証エラーが発生します**  
   A: 
-  1. 適切な RBAC ロール（Owner、Contributor、Container Apps Contributor）が付与されているか確認
+  1. 適切な RBAC ロール（Contributor または Owner。[必要な RBAC ロールと権限](#必要な-rbac-ロールと権限) を参照）が付与されているか確認。Container Apps Contributor だけでは権限が不足します
   2. `--auth-mode` を明示的に指定してみる
   3. `--verbose` オプションで詳細ログを確認
   4. リソースプロバイダー（Microsoft.App, Microsoft.OperationalInsights）が登録されているか確認
