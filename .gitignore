@@ -56,3 +56,6 @@ nunit-*.xml
 # CLI generated files (dry-run output)
 docker-compose.yml
 .env
+
+# システムテストの結果（scripts/run-system-tests.*）
+TestResults/
