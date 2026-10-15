@@ -21,8 +21,8 @@ public static class PermissionEvaluator
     }
 
     // "/*/" は 0 階層にも一致させる（例: containerApps/*/write は containerApps/write にも一致）。
-    // Azure の判定と厳密に同じかを確認できていないため、許可側に倒す（事前確認が誤って処理を止めないように。
-    // 実際に権限が無ければ Azure 側でエラーになる）
+    // Azure 上で、Container Apps Contributor と Reader だけの ID が Container App を更新できることを確認済み。
+    // 判定に迷う場合も許可側に倒す（事前確認が誤って処理を止めないように。実際に権限が無ければ Azure 側でエラーになる）
     internal static bool Matches(string pattern, string action)
     {
         var regex = Regex.Escape(pattern).Replace(@"/\*/", "/(.*/)?").Replace(@"\*", ".*");

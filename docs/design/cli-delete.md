@@ -83,7 +83,7 @@ timetracker-cli delete --subscription <ID> --resource-group <RG> [--app-name <�
 ### 4.1 方法
 - `GetAzurePermissionsForResourceGroupsAsync`（Permissions - List For Resource Group）で、実行する ID のリソースグループでの `actions` / `notActions` を取得する
 - 必要な権限ごとに、Domain の `PermissionEvaluator` で判定する。いずれかの権限セットで `actions` に一致し、かつ同じセットの `notActions` に一致しなければ「あり」。ワイルドカード `*` は任意の文字列に一致する。大文字小文字は区別しない
-- `/*/` は 0 階層にも一致させる（例: `containerApps/*/write` は `containerApps/write` にも一致）。Azure の判定と厳密に同じかを確認できていないため、事前確認が誤って処理を止めないよう許可側に倒す。実際に権限が無ければ Azure 側でエラーになる
+- `/*/` は 0 階層にも一致させる（例: `containerApps/*/write` は `containerApps/write` にも一致）。Azure 上で、Reader と Container Apps Contributor だけを持つサービスプリンシパルが Container App を更新できる（`containerApps/*/write` で `containerApps/write` が許可される）ことを確認した。判定に迷う場合も、事前確認が誤って処理を止めないよう許可側に倒す
 - リソースグループが存在しない場合は確認できない（リソースグループより上のスコープで一覧を取得する API がない）。この場合は「確認できなかった」として処理を続ける。デプロイでは最初の手順がリソースグループの作成なので、権限がなければそこで失敗し、リソースは何も作られない
 - 一覧の取得自体に失敗した場合も「確認できなかった」とし、警告を出して処理を続ける
 - 制約: 拒否割り当てや Azure Policy による拒否は反映されない（実行時のエラーとして表示される）
