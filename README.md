@@ -69,8 +69,8 @@ Timetracker（DockerHub の `densocreate/timetracker` イメージ）を、選�
 
 | ロール（割り当てるスコープ） | 本ツールでできること | 推奨用途 |
 |--------|------|----------|
-| **Contributor**（サブスクリプション） | すべての操作。リソースグループが存在しなければ作成し、リソースプロバイダーの登録も行える | 通常利用での推奨 |
-| **Contributor**（リソースグループ） | 事前に作成したリソースグループへのデプロイ。リソースグループの作成とリソースプロバイダーの登録はできない | 権限を絞りたい場合の推奨 |
+| **Contributor**（サブスクリプション） | すべての操作。リソースグループが存在しなければ作成する。[リソースプロバイダーの登録](#azure-リソースプロバイダーの登録)（事前準備）も自分で行える | 通常利用での推奨 |
+| **Contributor**（リソースグループ） | 事前に作成したリソースグループへのデプロイ。リソースグループの作成はできない。リソースプロバイダーの登録（事前準備）もできないため管理者に依頼する | 権限を絞りたい場合の推奨 |
 | **Owner**（サブスクリプションまたはリソースグループ） | Contributor と同じ（加えてロール割り当ての管理も可能だが、本ツールでは不要） | Contributor を使えない場合 |
 
 > [!WARNING]
@@ -88,7 +88,8 @@ Timetracker（DockerHub の `densocreate/timetracker` イメージ）を、選�
 | リソースグループの作成（存在しない場合） | `Microsoft.Resources/subscriptions/resourceGroups/write` | サブスクリプション |
 | Container Apps Environment の確認・作成 | `Microsoft.App/managedEnvironments/read` / `write` | リソースグループ |
 | Container App（DB / Redis / Timetracker）の確認・作成・更新 | `Microsoft.App/containerApps/read` / `write`、`Microsoft.App/managedEnvironments/join/action` | リソースグループ |
-| リソースプロバイダーの登録（初回のみ。[次節](#azure-リソースプロバイダーの登録)） | `Microsoft.App/register/action` など（`*/register/action`） | サブスクリプション |
+
+本ツールはリソースプロバイダーの登録を**行いません**。[次節](#azure-リソースプロバイダーの登録)の Azure CLI コマンドで、利用者または管理者が事前に登録してください。登録には `*/register/action`（例: `Microsoft.App/register/action`）の権限がサブスクリプションのスコープで必要です。
 
 リソースグループのスコープで Contributor を割り当てる場合は、次の作業をサブスクリプションの管理者に事前に依頼してください。
 - リソースグループの作成（`az group create --name <RG名> --location japaneast`）
@@ -109,7 +110,7 @@ az role assignment create \
 
 ### Azure リソースプロバイダーの登録
 
-Container Apps を初めて使用する場合、以下のリソースプロバイダーをサブスクリプションに登録する必要があります。登録にはサブスクリプションのスコープでの権限（Contributor または Owner）が必要です。リソースグループのスコープの権限しかない場合は、サブスクリプションの管理者に登録を依頼してください。
+Container Apps を初めて使用する場合、以下のリソースプロバイダーをサブスクリプションに登録する必要があります。本ツールは登録を行わないため、ツールを実行する前に以下のコマンドで登録してください。登録にはサブスクリプションのスコープでの権限（Contributor または Owner）が必要です。リソースグループのスコープの権限しかない場合は、サブスクリプションの管理者に登録を依頼してください。
 
 - **Microsoft.App** (必須): Azure Container Apps
 - **Microsoft.OperationalInsights** (必須): Container Apps Environment が使用
