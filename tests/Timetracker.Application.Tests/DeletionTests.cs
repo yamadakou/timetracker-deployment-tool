@@ -27,6 +27,8 @@ public class DeletionPlannerTests
         _gateway.Setup(g => g.GetResourceGroupAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync(new ResourceGroupInfo("rg", "japaneast"));
         _gateway.Setup(g => g.ListContainerAppsAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync(() => _apps);
         _gateway.Setup(g => g.GetPermissionsAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync([new PermissionSet(["*"], [])]);
+        _gateway.Setup(g => g.GetResourcePermissionsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
     }
 
     private void App(string name, IReadOnlyDictionary<string, string> tags, string? envId = EnvId) => _apps.Add(new ContainerAppInfo(name, envId, tags));
@@ -112,7 +114,7 @@ public class DeletionPlannerTests
     public async Task Should_Include_Untagged_Resources_When_Requested()
     {
         App("demo-tt", NoTags);
-        App("demo-db", ManagedTags.For("other")); // 別のアプリ名のタグ
+        App("demo-db", new Dictionary<string, string> { ["managed-by"] = "timetracker-deployment-tool" }); // tt-app-name だけが外された
         Environment(NoTags);
 
         var plan = await Plan(includeUntagged: true);
@@ -121,6 +123,25 @@ public class DeletionPlannerTests
         Target(plan, "demo-db").WillDelete.Should().BeTrue();
         Target(plan, "demo-redis").Exists.Should().BeFalse();
         Target(plan, "demo-env").WillDelete.Should().BeTrue();
+        plan.HasUnmanaged.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Should_Not_Include_Resources_Managed_By_Others_Even_When_Untagged_Are_Included()
+    {
+        App("demo-tt", Managed);
+        App("demo-db", ManagedTags.For("other"));                                       // 別のアプリ名のタグ
+        App("demo-redis", new Dictionary<string, string> { ["managed-by"] = "terraform" }); // 別のツールの管理タグ
+        Environment(Managed);
+
+        var plan = await Plan(includeUntagged: true);
+
+        Target(plan, "demo-tt").WillDelete.Should().BeTrue();
+        Target(plan, "demo-db").Should().Be(
+            new DeletionTarget("demo-db", DeletionResourceKind.ContainerApp, true, false, false, DeletionPlanner.OtherOwnerReason));
+        Target(plan, "demo-redis").Reason.Should().Be(DeletionPlanner.OtherOwnerReason);
+        Target(plan, "demo-env").WillDelete.Should().BeFalse(); // 削除しないアプリが残る
+        // --include-untagged で対象にできるものは無い
         plan.HasUnmanaged.Should().BeFalse();
     }
 
@@ -186,64 +207,183 @@ public class DeletionPlannerTests
 
         plan.PermissionCheck.MissingActions.Should().Equal(AzurePermissions.EnvironmentDelete);
     }
+
+    [Fact]
+    public async Task Should_Allow_Deletes_Granted_On_The_Resources()
+    {
+        // リソースグループでは Reader、削除する各リソースには Contributor が割り当てられている
+        AllManaged();
+        _gateway.Setup(g => g.GetPermissionsAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync([new PermissionSet(["*/read"], [])]);
+        _gateway.Setup(g => g.GetResourcePermissionsAsync("sub", "rg", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new PermissionSet(["*"], [])]);
+
+        var plan = await Plan();
+
+        plan.PermissionCheck.Should().Be(PermissionCheckResult.Ok);
+        _gateway.Verify(g => g.GetResourcePermissionsAsync("sub", "rg", "containerApps", "demo-db", It.IsAny<CancellationToken>()), Times.Once);
+        _gateway.Verify(g => g.GetResourcePermissionsAsync("sub", "rg", "managedEnvironments", "demo-env", It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Should_Keep_Include_Untagged_In_The_Plan()
+    {
+        (await Plan()).IncludeUntagged.Should().BeFalse();
+        (await Plan(includeUntagged: true)).IncludeUntagged.Should().BeTrue();
+    }
 }
 
 public class DeletionRunnerTests
 {
+    private const string EnvId = "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.App/managedEnvironments/demo-env";
+
     private readonly Mock<IAzureDeploymentGateway> _gateway = new(MockBehavior.Strict);
+    // Azure の現在の状態。削除するとここから消える
+    private readonly List<ContainerAppInfo> _apps = [];
+    private ManagedEnvironmentInfo? _env;
+    private readonly List<string> _deleted = [];
 
-    private static DeletionPlan Plan(params DeletionTarget[] targets) => new("sub", "rg", "demo", targets, PermissionCheckResult.Ok);
+    private static IReadOnlyDictionary<string, string> Managed => ManagedTags.For("demo");
+    private static IReadOnlyDictionary<string, string> NoTags => new Dictionary<string, string>();
 
-    private static DeletionTarget Delete(string name, DeletionResourceKind kind) => new(name, kind, true, true, true, null);
+    private static CancellationToken Ct => TestContext.Current.CancellationToken;
+
+    public DeletionRunnerTests()
+    {
+        _gateway.Setup(g => g.GetResourceGroupAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync(new ResourceGroupInfo("rg", "japaneast"));
+        _gateway.Setup(g => g.ListContainerAppsAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync(() => _apps.ToList());
+        _gateway.Setup(g => g.GetEnvironmentAsync("sub", "rg", "demo-env", It.IsAny<CancellationToken>())).ReturnsAsync(() => _env);
+        _gateway.Setup(g => g.DeleteContainerAppAsync("sub", "rg", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string _, string _, string name, CancellationToken _) =>
+            {
+                _deleted.Add(name);
+                return _apps.RemoveAll(a => a.Name == name) > 0;
+            });
+        _gateway.Setup(g => g.DeleteEnvironmentAsync("sub", "rg", "demo-env", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() =>
+            {
+                _deleted.Add("demo-env");
+                _env = null;
+                return true;
+            });
+    }
+
+    private void App(string name, IReadOnlyDictionary<string, string> tags, string? envId = EnvId) => _apps.Add(new ContainerAppInfo(name, envId, tags));
+
+    private void AllManaged()
+    {
+        App("demo-tt", Managed);
+        App("demo-redis", Managed);
+        App("demo-db", Managed);
+        _env = new ManagedEnvironmentInfo(EnvId, "demo-env", "japaneast", Managed);
+    }
+
+    private static DeletionTarget Delete(string name, DeletionResourceKind kind, bool managed = true) => new(name, kind, true, managed, true, null);
+
+    private static DeletionPlan Plan(bool includeUntagged, params DeletionTarget[] targets) =>
+        new("sub", "rg", "demo", targets, PermissionCheckResult.Ok, includeUntagged);
+
+    private static DeletionPlan AllPlan(bool includeUntagged = false) => Plan(includeUntagged,
+        Delete("demo-tt", DeletionResourceKind.ContainerApp),
+        Delete("demo-redis", DeletionResourceKind.ContainerApp),
+        Delete("demo-db", DeletionResourceKind.ContainerApp),
+        Delete("demo-env", DeletionResourceKind.Environment));
 
     [Fact]
     public async Task Should_Delete_Planned_Targets_In_Order_And_Report_Already_Deleted()
     {
-        var calls = new List<string>();
-        using var cts = new CancellationTokenSource();
-        _gateway.Setup(g => g.DeleteContainerAppAsync("sub", "rg", It.IsAny<string>(), cts.Token))
-            .Callback<string, string, string, CancellationToken>((_, _, name, _) => calls.Add(name))
-            .ReturnsAsync((string _, string _, string name, CancellationToken _) => name != "demo-redis");
-        _gateway.Setup(g => g.DeleteEnvironmentAsync("sub", "rg", "demo-env", cts.Token))
-            .Callback(() => calls.Add("demo-env")).ReturnsAsync(true);
+        AllManaged();
+        _apps.RemoveAll(a => a.Name == "demo-redis"); // 計画の作成後に削除された
         var reported = new List<string>();
 
-        var results = await new DeletionRunner(_gateway.Object).RunAsync(
-            Plan(
-                Delete("demo-tt", DeletionResourceKind.ContainerApp),
-                Delete("demo-redis", DeletionResourceKind.ContainerApp),
-                new DeletionTarget("demo-db", DeletionResourceKind.ContainerApp, true, false, false, DeletionPlanner.UnmanagedReason),
-                Delete("demo-env", DeletionResourceKind.Environment)),
-            new SyncProgress(t => reported.Add(t.Name)),
-            cts.Token);
+        var results = await new DeletionRunner(_gateway.Object).RunAsync(AllPlan(), new SyncProgress(t => reported.Add(t.Name)), Ct);
 
-        calls.Should().Equal("demo-tt", "demo-redis", "demo-env");
-        reported.Should().Equal("demo-tt", "demo-redis", "demo-env");
+        _deleted.Should().Equal("demo-tt", "demo-db", "demo-env");
+        reported.Should().Equal("demo-tt", "demo-db", "demo-env");
         results.Should().Equal(
             new DeletionResult("demo-tt", DeletionResourceKind.ContainerApp, true),
-            new DeletionResult("demo-redis", DeletionResourceKind.ContainerApp, false), // 計画の作成後に既に削除されていた
+            new DeletionResult("demo-redis", DeletionResourceKind.ContainerApp, false),
+            new DeletionResult("demo-db", DeletionResourceKind.ContainerApp, true),
             new DeletionResult("demo-env", DeletionResourceKind.Environment, true));
     }
 
     [Fact]
-    public async Task Should_Delete_Without_Progress()
+    public async Task Should_Report_Already_Deleted_When_It_Disappears_Just_Before_Deletion()
     {
-        _gateway.Setup(g => g.DeleteEnvironmentAsync("sub", "rg", "demo-env", It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        AllManaged();
+        _gateway.Setup(g => g.DeleteEnvironmentAsync("sub", "rg", "demo-env", It.IsAny<CancellationToken>())).ReturnsAsync(false);
+
+        var results = await new DeletionRunner(_gateway.Object).RunAsync(AllPlan(), cancellationToken: Ct);
+
+        results.Last().Should().Be(new DeletionResult("demo-env", DeletionResourceKind.Environment, false));
+    }
+
+    [Fact]
+    public async Task Should_Skip_Targets_Not_Planned_For_Deletion()
+    {
+        App("demo-db", NoTags);
 
         var results = await new DeletionRunner(_gateway.Object).RunAsync(
-            Plan(Delete("demo-env", DeletionResourceKind.Environment)), cancellationToken: TestContext.Current.CancellationToken);
+            Plan(false, new DeletionTarget("demo-db", DeletionResourceKind.ContainerApp, true, false, false, DeletionPlanner.UnmanagedReason)),
+            cancellationToken: Ct);
+
+        results.Should().BeEmpty();
+        _deleted.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Should_Stop_When_Tags_Were_Removed_After_Planning()
+    {
+        AllManaged();
+        _apps[2] = _apps[2] with { Tags = NoTags }; // 確認の入力を待つ間に DB アプリの管理タグが外された
+
+        var act = () => new DeletionRunner(_gateway.Object).RunAsync(AllPlan(), cancellationToken: Ct);
+
+        (await act.Should().ThrowAsync<InvalidOperationException>()).WithMessage($"*demo-db*{DeletionPlanner.UnmanagedReason}*");
+        _deleted.Should().Equal("demo-tt", "demo-redis");
+    }
+
+    [Fact]
+    public async Task Should_Stop_When_Replaced_By_An_Untagged_Resource_With_The_Same_Name()
+    {
+        // 計画の作成後に、Timetracker アプリが管理タグの無い同じ名前のアプリに置き換えられた
+        App("demo-tt", NoTags);
+
+        var act = () => new DeletionRunner(_gateway.Object).RunAsync(
+            Plan(false, Delete("demo-tt", DeletionResourceKind.ContainerApp)), cancellationToken: Ct);
+
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*demo-tt*");
+        _deleted.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Should_Delete_Untagged_Resources_When_The_Plan_Includes_Them()
+    {
+        App("demo-tt", NoTags);
+
+        var results = await new DeletionRunner(_gateway.Object).RunAsync(
+            Plan(true, Delete("demo-tt", DeletionResourceKind.ContainerApp, managed: false)), cancellationToken: Ct);
 
         results.Should().ContainSingle().Which.Deleted.Should().BeTrue();
     }
 
     [Fact]
-    public async Task Should_Do_Nothing_When_Nothing_Is_Planned()
+    public async Task Should_Keep_Environment_When_An_App_Was_Added_To_It_During_Deletion()
     {
-        var results = await new DeletionRunner(_gateway.Object).RunAsync(
-            Plan(new DeletionTarget("demo-tt", DeletionResourceKind.ContainerApp, false, false, false, DeletionPlanner.NotFoundReason)),
-            cancellationToken: TestContext.Current.CancellationToken);
+        AllManaged();
+        // DB アプリの削除中に、別のアプリが同じ Environment に作られた
+        _gateway.Setup(g => g.DeleteContainerAppAsync("sub", "rg", "demo-db", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() =>
+            {
+                _deleted.Add("demo-db");
+                _apps.RemoveAll(a => a.Name == "demo-db");
+                App("someone-else", NoTags);
+                return true;
+            });
 
-        results.Should().BeEmpty();
+        var act = () => new DeletionRunner(_gateway.Object).RunAsync(AllPlan(), cancellationToken: Ct);
+
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*demo-env*someone-else*");
+        _deleted.Should().Equal("demo-tt", "demo-redis", "demo-db");
     }
 
     private sealed class SyncProgress(Action<DeletionTarget> report) : IProgress<DeletionTarget>

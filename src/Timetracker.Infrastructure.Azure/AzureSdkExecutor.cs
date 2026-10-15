@@ -229,4 +229,16 @@ public class AzureSdkExecutor : IAzureDeploymentGateway
         }
         return result;
     }
+
+    public async Task<IReadOnlyList<PermissionSet>> GetResourcePermissionsAsync(
+        string subscriptionId, string rgName, string resourceType, string name, CancellationToken cancellationToken = default)
+    {
+        var result = new List<PermissionSet>();
+        await foreach (var p in ResourceGroup(subscriptionId, rgName)
+                           .GetAzurePermissionsForResourcesAsync("Microsoft.App", "", resourceType, name, cancellationToken))
+        {
+            result.Add(new PermissionSet(p.Actions.ToList(), p.NotActions.ToList()));
+        }
+        return result;
+    }
 }

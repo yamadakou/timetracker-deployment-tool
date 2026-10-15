@@ -43,6 +43,13 @@ public interface IAzureDeploymentGateway
 
     /// <summary>実行している ID が、リソースグループで持つ権限の一覧。</summary>
     Task<IReadOnlyList<PermissionSet>> GetPermissionsAsync(string subscriptionId, string rgName, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 実行している ID が、リソースグループ内の既存のリソース（Microsoft.App の <paramref name="resourceType"/> と名前）で持つ権限の一覧
+    /// （リソースに割り当てられたロールと、上位のスコープから継承したロールを含む）。
+    /// </summary>
+    Task<IReadOnlyList<PermissionSet>> GetResourcePermissionsAsync(
+        string subscriptionId, string rgName, string resourceType, string name, CancellationToken cancellationToken = default);
 }
 
 /// <summary>作成・更新した Container App の名前と、Timetracker のエンドポイント URL（取得できなければ null）。</summary>
