@@ -170,6 +170,19 @@ public class AzureSdkExecutorInventoryTests
     }
 
     [Fact]
+    public async Task GetResourcePermissions_Should_Read_Permissions_On_The_Resource()
+    {
+        var permission = new RoleDefinitionPermission();
+        permission.Actions.Add("Microsoft.App/containerApps/*");
+        _authorization.Setup(a => a.GetAzurePermissionsForResourcesAsync("Microsoft.App", "", "containerApps", "app-db", It.IsAny<CancellationToken>()))
+            .Returns(Pageable(permission));
+
+        var permissions = await Sut().GetResourcePermissionsAsync(SubscriptionId, RgName, "containerApps", "app-db", Ct);
+
+        permissions.Should().ContainSingle().Which.Should().BeEquivalentTo(new PermissionSet(["Microsoft.App/containerApps/*"], []));
+    }
+
+    [Fact]
     public async Task CreateOrUpdateContainerApp_Should_Add_Managed_Tags_And_Keep_Existing_Tags()
     {
         var sent = new Dictionary<string, ContainerAppData>();

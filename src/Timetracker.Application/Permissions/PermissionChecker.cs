@@ -21,9 +21,22 @@ public sealed record PermissionCheckResult(PermissionCheckStatus Status, IReadOn
     public static PermissionCheckResult NotChecked(string note) => new(PermissionCheckStatus.NotChecked, [], note);
 }
 
+/// <summary>既存のリソース（Microsoft.App の種類と名前）。</summary>
+public sealed record TargetResource(string Type, string Name)
+{
+    public static TargetResource ContainerApp(string name) => new("containerApps", name);
+
+    public static TargetResource Environment(string name) => new("managedEnvironments", name);
+}
+
+/// <summary>必要な権限 1 件。<see cref="Resource"/> は操作する既存のリソース（作成する場合は null）。</summary>
+public sealed record PermissionRequirement(string Action, TargetResource? Resource = null);
+
 /// <summary>
-/// 実行する ID がリソースグループで必要な権限を持っているかを、操作の前に確認する
+/// 実行する ID が必要な権限を持っているかを、操作の前に確認する
 /// （途中で権限エラーになり、一部のリソースだけが作成・削除された状態が残るのを防ぐ）。
+/// まずリソースグループでの権限で判定し、許可されていない操作は、既存のリソースに対するものであれば
+/// そのリソースでの権限（リソースに割り当てられたロールを含む）でも判定する。
 /// 拒否割り当てや Azure Policy による拒否は反映されないため、確認を通っても実行時に失敗することはある。
 /// </summary>
 public sealed class PermissionChecker
@@ -36,22 +49,55 @@ public sealed class PermissionChecker
     }
 
     public async Task<PermissionCheckResult> CheckAsync(
-        string subscriptionId, string rgName, IReadOnlyCollection<string> actions, CancellationToken cancellationToken = default)
+        string subscriptionId, string rgName, IReadOnlyCollection<PermissionRequirement> requirements, CancellationToken cancellationToken = default)
     {
-        IReadOnlyList<PermissionSet> permissions;
+        IReadOnlyList<PermissionSet> rgPermissions;
         try
         {
-            permissions = await _gateway.GetPermissionsAsync(subscriptionId, rgName, cancellationToken);
+            rgPermissions = await _gateway.GetPermissionsAsync(subscriptionId, rgName, cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             // 確認できないことを理由に止めない（実際の操作で権限が無ければ Azure 側でエラーになる）
-            return PermissionCheckResult.NotChecked($"権限の一覧を取得できませんでした: {ex.Message}");
+            return NotChecked(ex);
         }
 
-        var missing = PermissionEvaluator.Missing(permissions, actions);
+        var resourcePermissions = new Dictionary<TargetResource, IReadOnlyList<PermissionSet>>();
+        var missing = new List<string>();
+        foreach (var requirement in requirements)
+        {
+            if (PermissionEvaluator.IsAllowed(rgPermissions, requirement.Action))
+                continue;
+
+            // リソースグループでは許可されていなくても、リソースに割り当てられたロールで許可されていることがある
+            if (requirement.Resource is { } resource)
+            {
+                if (!resourcePermissions.TryGetValue(resource, out var permissions))
+                {
+                    try
+                    {
+                        permissions = await _gateway.GetResourcePermissionsAsync(
+                            subscriptionId, rgName, resource.Type, resource.Name, cancellationToken);
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        return NotChecked(ex);
+                    }
+                    resourcePermissions[resource] = permissions;
+                }
+                if (PermissionEvaluator.IsAllowed(permissions, requirement.Action))
+                    continue;
+            }
+
+            if (!missing.Contains(requirement.Action))
+                missing.Add(requirement.Action);
+        }
+
         return missing.Count == 0
             ? PermissionCheckResult.Ok
             : new PermissionCheckResult(PermissionCheckStatus.Missing, missing, null);
     }
+
+    private static PermissionCheckResult NotChecked(Exception ex) =>
+        PermissionCheckResult.NotChecked($"権限の一覧を取得できませんでした: {ex.Message}");
 }

@@ -66,6 +66,9 @@ timetracker-cli delete --subscription <ID> --resource-group <RG> [--app-name <�
 ### 3.4 削除の実行
 - 計画で「削除する」となったものだけを、上の順に削除する
 - 計画の作成後に削除されていたものは、何もせず成功扱いにする（もう一度実行しても同じ結果になる）
+- 各リソースを削除する直前に、現在の状態に 3.3 と同じ規則（`--include-untagged` の指定も計画と同じ）を当てはめて確かめ直す。確認の入力を待つ間や、前のリソースの削除中（Environment の削除は 10 分以上かかる）に状態が変わることがあるため
+  - 存在しなくなっていれば、成功扱い（既に削除されていた）
+  - 削除の対象でなくなっていれば（管理タグが外された、管理タグの無い同じ名前のリソースに置き換えられた、Environment 内に削除しない Container App が加わったなど）、そこで中止してエラーを表示する（終了コード 1）
 - 途中で失敗した場合は、そこで止めてエラーを表示する（終了コード 1）。もう一度実行すれば、残りが削除される
 
 ### 3.5 表示例
@@ -82,6 +85,7 @@ timetracker-cli delete --subscription <ID> --resource-group <RG> [--app-name <�
 ## 4. 権限の事前確認
 ### 4.1 方法
 - `GetAzurePermissionsForResourceGroupsAsync`（Permissions - List For Resource Group）で、実行する ID のリソースグループでの `actions` / `notActions` を取得する
+- 既存のリソースに対する操作（更新・削除）で、リソースグループでの権限では許可されないものは、そのリソースの権限の一覧（Permissions - List For Resource。リソースに割り当てられたロールと継承したロールを含む）でも判定する。リソースグループでは Reader で、個々のリソースに Contributor が割り当てられている ID を誤って止めないため。新しく作成するリソースは、リソースグループでの権限で判定する
 - 必要な権限ごとに、Domain の `PermissionEvaluator` で判定する。いずれかの権限セットで `actions` に一致し、かつ同じセットの `notActions` に一致しなければ「あり」。ワイルドカード `*` は任意の文字列に一致する。大文字小文字は区別しない
 - `/*/` は 0 階層にも一致させる（例: `containerApps/*/write` は `containerApps/write` にも一致）。Azure 上で、Reader と Container Apps Contributor だけを持つサービスプリンシパルが Container App を更新できる（`containerApps/*/write` で `containerApps/write` が許可される）ことを確認した。判定に迷う場合も、事前確認が誤って処理を止めないよう許可側に倒す
 - リソースグループが存在しない場合は確認できない（リソースグループより上のスコープで一覧を取得する API がない）。この場合は「確認できなかった」として処理を続ける。デプロイでは最初の手順がリソースグループの作成なので、権限がなければそこで失敗し、リソースは何も作られない

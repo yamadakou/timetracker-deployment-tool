@@ -24,14 +24,31 @@ public sealed class DeletionPlanner
     public async Task<DeletionPlan> PlanAsync(
         string subscriptionId, string rgName, string appName, bool includeUntagged, CancellationToken cancellationToken = default)
     {
+        var targets = await PlanTargetsAsync(subscriptionId, rgName, appName, includeUntagged, cancellationToken);
+
+        var requirements = targets.Where(t => t.WillDelete)
+            .Select(t => t.Kind == DeletionResourceKind.ContainerApp
+                ? new PermissionRequirement(AzurePermissions.ContainerAppDelete, TargetResource.ContainerApp(t.Name))
+                : new PermissionRequirement(AzurePermissions.EnvironmentDelete, TargetResource.Environment(t.Name)))
+            .ToList();
+        var permissionCheck = requirements.Count == 0
+            ? PermissionCheckResult.Ok
+            : await new PermissionChecker(_gateway).CheckAsync(subscriptionId, rgName, requirements, cancellationToken);
+
+        return new DeletionPlan(subscriptionId, rgName, appName, targets, permissionCheck, includeUntagged);
+    }
+
+    /// <summary>現在の Azure の状態から、各対象を削除するかを決める（権限は確認しない）。</summary>
+    public async Task<IReadOnlyList<DeletionTarget>> PlanTargetsAsync(
+        string subscriptionId, string rgName, string appName, bool includeUntagged, CancellationToken cancellationToken = default)
+    {
         var appNames = new[] { ResourceNaming.TimetrackerApp(appName), ResourceNaming.RedisApp(appName), ResourceNaming.DbApp(appName) };
         var envName = ResourceNaming.Environment(appName);
 
         if (await _gateway.GetResourceGroupAsync(subscriptionId, rgName, cancellationToken) == null)
         {
-            var notFound = appNames.Select(n => NotFound(n, DeletionResourceKind.ContainerApp))
+            return appNames.Select(n => NotFound(n, DeletionResourceKind.ContainerApp))
                 .Append(NotFound(envName, DeletionResourceKind.Environment)).ToList();
-            return new DeletionPlan(subscriptionId, rgName, appName, notFound, PermissionCheckResult.Ok);
         }
 
         var existingApps = await _gateway.ListContainerAppsAsync(subscriptionId, rgName, cancellationToken);
@@ -46,17 +63,7 @@ public sealed class DeletionPlanner
 
         var env = await _gateway.GetEnvironmentAsync(subscriptionId, rgName, envName, cancellationToken);
         targets.Add(env == null ? NotFound(envName, DeletionResourceKind.Environment) : PlanEnvironment(env, appName, includeUntagged, existingApps, targets));
-
-        var actions = new List<string>();
-        if (targets.Any(t => t.WillDelete && t.Kind == DeletionResourceKind.ContainerApp))
-            actions.Add(AzurePermissions.ContainerAppDelete);
-        if (targets.Any(t => t.WillDelete && t.Kind == DeletionResourceKind.Environment))
-            actions.Add(AzurePermissions.EnvironmentDelete);
-        var permissionCheck = actions.Count == 0
-            ? PermissionCheckResult.Ok
-            : await new PermissionChecker(_gateway).CheckAsync(subscriptionId, rgName, actions, cancellationToken);
-
-        return new DeletionPlan(subscriptionId, rgName, appName, targets, permissionCheck);
+        return targets;
     }
 
     // Environment は、中に削除しない Container App が残ると削除できないため、その場合は削除しない
