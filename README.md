@@ -620,7 +620,7 @@ dotnet publish .\src\Timetracker.Controller.Cli\Timetracker.Controller.Cli.cspro
 
 ### 設計概要
 - ドメイン層（Timetracker.Domain）
-  - パラメータモデル（DeployOptions）、既定値（Defaults）と既定値の適用（DeployOptionsResolver）、検証、リソース名の規則（ResourceNaming）、管理タグ（ManagedTags）、権限の判定（PermissionEvaluator）、Compose/.env生成（Dry-run用）
+  - パラメータモデル（DeployOptions）、既定値（Defaults）と既定値の適用（DeployOptionsResolver）、検証（DeploymentValidator。すべてのエラーを列挙する）と警告（DeploymentAdvisor）、リソース名の規則（ResourceNaming）、管理タグ（ManagedTags）、権限の判定（PermissionEvaluator）、Compose/.env生成（Dry-run用）
 - アプリケーション層（Timetracker.Application）
   - デプロイ手順の実行（DeploymentRunner: リソースグループ → Environment → DB / Redis / Timetracker）と結果（DeploymentResult）
   - 削除計画の作成と削除の実行（DeletionPlanner / DeletionRunner）、権限の事前確認（PermissionChecker / DeploymentPlanner）
@@ -628,6 +628,8 @@ dotnet publish .\src\Timetracker.Controller.Cli\Timetracker.Controller.Cli.cspro
   - Azure SDK 実行（AzureSdkExecutor / IAzureDeploymentGateway）、Container Apps のコンテナ仕様生成（ContainerAppSpecBuilder）、認証（CredentialFactory）
 - コントローラー層（Timetracker.Controller.Cli）
   - CLIの入出力、オプション解析（CliArgs）
+- コントローラー層（Timetracker.Controller.Mcp、開発中）
+  - MCP サーバー（`timetracker-mcp`、stdio）。現在のツールは設定の確認（`get_deployment_options`）、検証（`validate_deployment`）、Dry-run（`generate_compose`）、サブスクリプションの一覧（`list_subscriptions`）。Azure へのデプロイ・削除のツールと利用者向けの説明は今後追加します（設計は `MCP-Tool` ブランチの [docs/MCP_TOOL_DESIGN.md](docs/MCP_TOOL_DESIGN.md)、[docs/design/mcp-phase3a.md](docs/design/mcp-phase3a.md)）
 - 共通（Timetracker.Common）
   - ロガー（IDeploymentLogger / SimpleLogger）などのユーティリティ
 

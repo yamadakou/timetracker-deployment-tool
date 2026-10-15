@@ -9,6 +9,9 @@ namespace Timetracker.Infrastructure.Azure;
 /// </summary>
 public static class CredentialFactory
 {
+    /// <summary>指定できる認証モード。</summary>
+    public static readonly IReadOnlyList<string> AuthModes = ["default", "azure-cli", "sp-env", "device-code", "managed-identity"];
+
     /// <summary>
     /// Creates a TokenCredential based on the specified authentication mode.
     /// </summary>

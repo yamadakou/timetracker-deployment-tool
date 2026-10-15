@@ -1,6 +1,6 @@
 # MCP ツール設計案（Timetracker.Controller.Mcp）
 
-- ステータス: 設計案 第 4.1 版（オーナー回答を反映。コード変更はまだ行っていない）
+- ステータス: 第 4.2 版。Phase 0〜2 は main にマージ済み。Phase 3a を `MCP-Tool` ブランチで実装した（8.2）
 - 対象ブランチ: `MCP-Tool`
 - 前提: `main`（a32cc3d, v0.6 系 / .NET 10）時点のコード
 
@@ -12,6 +12,7 @@
 | 3 | オーナー回答を反映。ブランチをフェーズごとに分ける（1.3）。管理タグの説明と運用イメージを追加（4.12）。HTTP 公開時はサーバーの ID と利用者本人の権限の両方に対応する（4.11）。配布形態は stdio を単一ファイル EXE、HTTP をコンテナイメージに決定 |
 | 4 | README の RBAC 記載との整合を確認した結果を反映。必要な Azure 権限の章（4.13）を追加。計画ツールで権限を事前に確認する（4.7・4.12・4.13）。`server` 方式は RG 単位の権限・RG の事前作成を前提に変更（4.11）。Entra ID のアプリロールと Azure RBAC の区別を明記。stdio の既定の認証モードを `azure-cli` に変更。README の誤り（Container Apps Contributor）は `docs/fix-rbac-requirements` ブランチで先に修正（1.3） |
 | 4.1 | Phase 0（`refactor/shared-layer`）の実施結果を 8.3 に追記。R5 は `feature/cli-delete` に移した |
+| 4.2 | Phase 1（PR #22）・Phase 2（PR #23）のマージを反映。Phase 3a の実施結果を 8.2 に追記（詳細設計は `docs/design/mcp-phase3a.md`） |
 
 ---
 
@@ -63,7 +64,7 @@ flowchart LR
 - 2 と 3 はどちらも検証処理と `CliArgs` を変更するため、並行させず 2 → 3 の順に進める（競合を避けるため）
 - 各ブランチでは次の作業をひとまとまりで行う: **詳細設計の追記 → 実装 → テスト → README の更新 → レビュー指摘表（`docs/REVIEW_ISSUES.md`）への記録**
 - 詳細設計は、この設計書の該当する章に追記するか、内容が多ければ `docs/design/<ブランチの内容>.md` に分ける。この設計書は全体設計として残し、各ブランチで決まったことを反映する
-- `MCP-Tool` ブランチは今はこの設計書だけを持つ。Phase 3 に入るときに main（①〜③ を含む）を取り込んでから実装を始める
+- `MCP-Tool` ブランチは、Phase 3 に入るときに main（①〜③ を含む）を取り込んでから実装を始めた（Phase 3a の実施結果は 8.2）
 
 ---
 
@@ -773,6 +774,14 @@ README の「必要な RBAC ロールと権限」（`docs/fix-rbac-requirements`
 | Phase 3b（`MCP-Tool`） | `plan_deployment` / `start_deployment` / `get_job_status` / `list_jobs` / `get_deployment_info`、ジョブ管理、進捗通知 | Azure で新規デプロイと再デプロイ（データ消失の確認あり）が成功し、URL が返る |
 | Phase 3c（`MCP-Tool`） | `plan_deletion` / `start_deletion`、instructions、Resources / Prompts、配布（release.yml）、README の MCP の章 | Release に MCP の配布物が出る。リリース前確認（6.1）を完了 |
 | Phase 4（`feature/mcp-http`） | HTTP トランスポート、呼び出し元の認証（Entra ID・アプリロール）、`server` / `user` の両方式の資格情報プロバイダー（4.11）、Dockerfile とコンテナイメージ | Container Apps 上の MCP サーバーに OAuth 対応のクライアントから接続し、両方式でそれぞれ一連のシナリオが成功する。範囲外のリソースグループへの `server` 方式の操作が拒否される |
+
+**実施結果（Phase 3a）**: 詳細設計は `docs/design/mcp-phase3a.md`。
+- `Timetracker.Controller.Mcp`（`timetracker-mcp`）を新設した。SDK は `ModelContextProtocol` 2.2.0。ログはすべて stderr に出し、stdout は JSON-RPC だけにした
+- 4 つのツールの結果は `structuredContent`（snake_case）と同じ内容のテキストで返す。入力の誤りは、`validate_deployment` では `valid: false`、`generate_compose` / `list_subscriptions` では `isError: true` で返す
+- Domain に `DeploymentValidator`（全エラーの列挙）と `DeploymentAdvisor`（警告）を追加した。`ComposeGenerator.Validate` は `DeploymentValidator` の最初のエラーを投げるようにし、CLI の挙動とメッセージは変えていない
+- サブスクリプションの一覧は Infrastructure の `AzureSubscriptionDirectory` で読む。資格情報は使うときに作る（`sp-env` の環境変数が足りない場合なども、ツールの結果として返すため）
+- MCP は Application をまだ参照しない（Phase 3a のツールでは使わないため。Phase 3b で参照する）
+- 確認: 単体テストとプロトコル結合テスト（ビルドした `timetracker-mcp` を SDK のクライアントで stdio 接続）、MCP Inspector（CLI モード）での `tools/list` と `tools/call`、Claude Code（`claude mcp list` で接続を確認）。`generate_compose` で生成したファイルで `docker compose up` し、Timetracker のセットアップ画面が表示されることを確認した
 
 ### 8.3 共有層のリファクタリング内容（Phase 0）
 | # | 変更 | 対応する課題 |

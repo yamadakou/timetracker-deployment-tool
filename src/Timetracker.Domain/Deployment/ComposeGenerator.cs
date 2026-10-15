@@ -170,12 +170,6 @@ public static class ComposeGenerator
         return password.Length >= 8 && categories >= 3;
     }
 
-    private static void RequirePositive(double value, string name)
-    {
-        if (!double.IsFinite(value) || value <= 0)
-            throw new ArgumentException($"{name} には正の数値を指定してください: {value.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
-    }
-
     // timetracker イメージのタグが DB 種別向けのものか（例: postgresql → *-postgres、sqlserver → *-mssql）
     internal static bool TagMatchesDbType(string dbType, string tag)
     {
@@ -196,45 +190,11 @@ public static class ComposeGenerator
     /// <exception cref="ArgumentException">設定が不正な場合</exception>
     public static void ValidateForCompose(DeployOptions o) => Validate(o, requireAzure: false);
 
+    // 全エラーのうち最初のものを返す（CLI は従来どおり最初のエラーだけを表示する）
     private static void Validate(DeployOptions o, bool requireAzure)
     {
-        if (o.DbType is not ("postgresql" or "sqlserver"))
-            throw new ArgumentException("db-type は postgresql または sqlserver を指定してください。");
-        if (requireAzure)
-        {
-            if (string.IsNullOrWhiteSpace(o.Subscription))
-                throw new ArgumentException("subscription は必須です。");
-            if (string.IsNullOrWhiteSpace(o.ResourceGroup))
-                throw new ArgumentException("resource-group は必須です。");
-        }
-        // CLI は引数の解析時に確認済みだが、他のフロントエンドから呼ばれた場合も Azure に送る前に止める
-        var appNameError = AppNameValidator.GetError(o.AppName);
-        if (appNameError != null)
-            throw new ArgumentException(appNameError);
-        RequirePositive(o.TimetrackerCpu, "tt-cpu");
-        RequirePositive(o.TimetrackerMemoryGi, "tt-memory");
-        RequirePositive(o.DbCpu, "db-cpu");
-        RequirePositive(o.DbMemoryGi, "db-memory");
-        RequirePositive(o.RedisCpu, "redis-cpu");
-        RequirePositive(o.RedisMemoryGi, "redis-memory");
-        if (string.IsNullOrWhiteSpace(o.TrackerPassword) || o.TrackerPassword.Length < 8)
-            throw new ArgumentException("tracker-password が不足または短すぎます。");
-        if (string.IsNullOrWhiteSpace(o.DbPassword) || o.DbPassword.Length < 8)
-            throw new ArgumentException("db-password が不足または短すぎます。");
-        if (o.DbType == "sqlserver" && !MeetsSqlServerPasswordPolicy(o.DbPassword))
-            throw new ArgumentException(
-                "db-password が SQL Server のパスワード要件を満たしていません。英大文字・英小文字・数字・記号のうち 3 種類以上を含めてください" +
-                "（要件を満たさない場合 SQL Server コンテナが起動しません）。");
-        if (string.IsNullOrWhiteSpace(o.TimetrackerTag))
-            throw new ArgumentException("tt-tag（timetracker イメージタグ）が空です。例: 11.0.1-linux-postgres, 11.0.1-linux-mssql など。");
-
-        // db-type と tt-tag の組み合わせ検証
-        if (!TagMatchesDbType(o.DbType, o.TimetrackerTag))
-        {
-            throw new ArgumentException(
-                $"不適切な組み合わせ: db-type='{o.DbType}' と tt-tag='{o.TimetrackerTag}' は対応していません。" +
-                " DB 種別に合致するタグを指定してください (例: postgresql → 11.0.1-linux-postgres / sqlserver → 11.0.1-linux-mssql)。" +
-                " タグ一覧: https://hub.docker.com/r/densocreate/timetracker/tags");
-        }
+        var errors = DeploymentValidator.GetErrors(o, requireAzure ? ValidationTarget.Azure : ValidationTarget.Compose);
+        if (errors.Count > 0)
+            throw new ArgumentException(errors[0]);
     }
 }
