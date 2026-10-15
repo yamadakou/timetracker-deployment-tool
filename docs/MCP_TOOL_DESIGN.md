@@ -1,6 +1,6 @@
 # MCP ツール設計案（Timetracker.Controller.Mcp）
 
-- ステータス: 設計案 第 2 版（オーナー回答を反映。コード変更はまだ行っていない）
+- ステータス: 設計案 第 3 版（オーナー回答を反映。コード変更はまだ行っていない）
 - 対象ブランチ: `MCP-Tool`
 - 前提: `main`（a32cc3d, v0.6 系 / .NET 10）時点のコード
 
@@ -9,6 +9,7 @@
 |---|---|
 | 1 | 初版 |
 | 2 | オーナー回答を反映。パスワードは引数と環境変数の両方を受け付け、環境変数を推奨する。デプロイは非同期ジョブにする。削除ツールを追加する（CLI に先に実装）。Dry-run では subscription / resource_group を不要にする（CLI に先に実装）。HTTP 公開と WebAPI フロントエンドを見据えた構成にする。動作確認クライアントの方針と配布形態の比較を追加 |
+| 3 | オーナー回答を反映。ブランチをフェーズごとに分ける（1.3）。管理タグの説明と運用イメージを追加（4.12）。HTTP 公開時はサーバーの ID と利用者本人の権限の両方に対応する（4.11）。配布形態は stdio を単一ファイル EXE、HTTP をコンテナイメージに決定 |
 
 ---
 
@@ -35,17 +36,30 @@ README の「将来の GUI 化に備えドメイン層とコントローラー�
 | 本番環境構築 | 対象外（ツールの目的「検証環境の構築支援」は変えない） |
 | スケール設定・永続ボリューム等の新機能 | 対象外 |
 
-### 1.3 ブランチと実施順
-オーナー方針に従い、CLI 側の変更を別ブランチで MCP より先に行う。
+### 1.3 ブランチと実施順【決定: フェーズごとにブランチを分ける】
+オーナー方針に従い、フェーズごとにブランチを分ける。まず共有層を切り出し（挙動は変えない）、その後に挙動を変える変更（Dry-run の緩和、削除機能、MCP、HTTP 公開）をそれぞれ別ブランチで行う。各ブランチは PR で main にマージしてから、次のブランチを main から作る。
+
+| 順 | ブランチ名（案） | フェーズ | 内容 | 前提 |
+|---|---|---|---|---|
+| 1 | `refactor/shared-layer` | Phase 0 | 共有層の切り出し（8.3）。**挙動は変えない** | – |
+| 2 | `feature/cli-dryrun-optional-azure` | Phase 1 | Dry-run で subscription / resource-group を不要にする（4.5） | 1 |
+| 3 | `feature/cli-delete` | Phase 2 | 管理タグの付与と CLI の `delete` コマンド（4.12） | 1（2 の後を推奨） |
+| 4 | `MCP-Tool` | Phase 3 | MCP サーバー（stdio）。デプロイ・削除のツールを含む | 3 |
+| 5 | `feature/mcp-http` | Phase 4 | HTTP 公開、呼び出し元の認証、Azure の権限方式（4.11）、コンテナイメージ | 4 |
 
 ```mermaid
 flowchart LR
-  A["① CLI ブランチ（別ブランチ）<br/>Phase 0: 共有層の切り出し<br/>Phase 1: Dry-run 必須項目の緩和<br/>Phase 2: delete コマンド"] -->|main へマージ| M[(main)]
-  M -->|main を取り込む| B["② MCP-Tool ブランチ<br/>Phase 3: MCP（stdio）<br/>Phase 4: MCP（HTTP）"]
+  B1["① refactor/shared-layer<br/>共有層の切り出し"] --> M1[(main)]
+  M1 --> B2["② feature/cli-dryrun-optional-azure<br/>Dry-run の緩和"] --> M2[(main)]
+  M2 --> B3["③ feature/cli-delete<br/>管理タグ + delete"] --> M3[(main)]
+  M3 --> B4["④ MCP-Tool<br/>MCP（stdio）"] --> M4[(main)]
+  M4 --> B5["⑤ feature/mcp-http<br/>HTTP 公開"] --> M5[(main)]
 ```
 
-- CLI ブランチは 1 本にまとめても、Phase ごとに分けてもよい（7 章 R-1）
-- MCP-Tool ブランチは、現時点ではこの設計書だけを持つ。実装を始める前に main を取り込む
+- 2 と 3 はどちらも検証処理と `CliArgs` を変更するため、並行させず 2 → 3 の順に進める（競合を避けるため）
+- 各ブランチでは次の作業をひとまとまりで行う: **詳細設計の追記 → 実装 → テスト → README の更新 → レビュー指摘表（`docs/REVIEW_ISSUES.md`）への記録**
+- 詳細設計は、この設計書の該当する章に追記するか、内容が多ければ `docs/design/<ブランチの内容>.md` に分ける。この設計書は全体設計として残し、各ブランチで決まったことを反映する
+- `MCP-Tool` ブランチは今はこの設計書だけを持つ。Phase 3 に入るときに main（①〜③ を含む）を取り込んでから実装を始める
 
 ---
 
@@ -167,7 +181,7 @@ flowchart TB
 | 設定 | 環境変数 | 既定 | stdio | HTTP | 説明 |
 |---|---|---|---|---|---|
 | トランスポート | `--transport` 引数 | `stdio` | – | – | `stdio` / `http` |
-| 認証モード | `TT_MCP_AUTH_MODE` | `default` | ✔ | ✔（4.11） | `default` / `azure-cli` / `sp-env` / `device-code` / `managed-identity`（`CredentialFactory` をそのまま使用）。HTTP では加えて `on-behalf-of` |
+| 認証モード | `TT_MCP_AUTH_MODE` | `default` | ✔ | –（4.11） | `default` / `azure-cli` / `sp-env` / `device-code` / `managed-identity`（`CredentialFactory` をそのまま使用）。HTTP では使わず、4.11 の設定を使う |
 | 既定サブスクリプション | `TT_MCP_DEFAULT_SUBSCRIPTION` | なし | ✔ | ✔ | ツール引数を省略したときに使う |
 | 既定リソースグループ | `TT_MCP_DEFAULT_RESOURCE_GROUP` | なし | ✔ | ✔ | 同上 |
 | DB パスワード | `TT_MCP_DB_PASSWORD` | なし | ✔ | **無視** | 4.10 |
@@ -379,15 +393,53 @@ DB を再デプロイするとデータが消えるため、**計画（読み取
 
 ### 4.11 HTTP 公開時の Azure 資格情報
 
-stdio では利用者の PC の資格情報（`az login` 等）をそのまま使う。HTTP では、だれの権限で Azure を操作するかを決める必要がある。`IAzureCredentialProvider.GetCredential(ICallerContext)` で抽象化し、どちらの方式にも対応できるようにしておく。
+【決定: 両方の方式に対応する】
 
-| 方式 | 内容 | メリット | デメリット |
+stdio では利用者の PC の資格情報（`az login` 等）をそのまま使う。HTTP では、だれの権限で Azure を操作するかを決める必要がある。次の 2 方式の**両方に対応**し、どちらを使えるかはサーバーの設定で決める。
+
+| 方式 | 内容 | 向いている場面 | 注意点 |
 |---|---|---|---|
-| H1: サーバーの ID（`managed-identity` / `sp-env`） | MCP サーバーのマネージド ID の権限で操作する。だれが使えるかは Entra ID のアプリロールで制御する | 構成が簡単。利用者が Azure の権限を持っていなくてよい | 全員が同じ権限になる。Azure の操作ログ上は全員サーバーの ID に見える（だれの操作かはサーバーのログで追う） |
-| H2: 利用者本人の権限（`on-behalf-of`） | 利用者のトークンを OBO フローで ARM 用のトークンに交換して操作する | 利用者自身の RBAC がそのまま効く。Azure の操作ログに本人が残る | Entra ID アプリ登録・同意の設定が必要。クライアントが MCP の OAuth に対応している必要がある |
+| `server`: サーバーの ID | MCP サーバーのマネージド ID（またはサービスプリンシパル）の権限で Azure を操作する | 利用者に Azure の権限を配らずに、決まったサブスクリプション・リソースグループへ検証環境を作らせたい | 全員が同じ権限になる。Azure の操作ログ（アクティビティログ）には全員サーバーの ID として残るため、だれの操作かはサーバー側のログで追う |
+| `user`: 利用者本人の権限 | 利用者のサインイン時のトークンを、OBO（On-Behalf-Of）フローで Azure 管理 API 用のトークンに交換して操作する | 利用者が自分の権限の範囲で操作する。権限のないサブスクリプションには作れない | Entra ID のアプリ登録と、Azure 管理 API への委任アクセス許可（管理者の同意）が必要 |
 
-- 推奨: 社内の限られたメンバーで使うなら H1 から始め、利用者ごとに権限を分けたくなったら H2 を追加する。どちらにするかは Phase 4 の着手時に決める（7 章 R-3）
-- HTTP では、計画・ジョブの作成者をトークンの `oid` で記録し、本人のものだけ実行・参照できるようにする（3.4）
+#### サーバーの設定
+| 設定 | 値 | 説明 |
+|---|---|---|
+| `TT_MCP_HTTP__IDENTITY_MODES` | `server` / `user` / `server,user` | 使える方式 |
+| `TT_MCP_HTTP__DEFAULT_IDENTITY_MODE` | `server` / `user` | 両方使える場合の既定 |
+| `TT_MCP_HTTP__SERVER_IDENTITY` | `managed-identity` / `sp-env` | `server` 方式で使う資格情報（`CredentialFactory` を利用） |
+| `TT_MCP_HTTP__SERVER_ALLOWED_SCOPES` | 例: `/subscriptions/<ID>/resourceGroups/rg-tt-*` | `server` 方式で操作してよい範囲（サブスクリプション・リソースグループ名のパターン）。サーバーの ID は権限が広くなりがちなため、範囲外への操作は計画の段階で拒否する |
+
+#### だれがどちらを使えるか（Entra ID のアプリロール）
+| アプリロール | 使える方式 |
+|---|---|
+| `Timetracker.Deploy.User` | `user` のみ（本人の Azure 権限で操作） |
+| `Timetracker.Deploy.Server` | `server`（と、`user` が有効なら `user`） |
+| どちらもない | ツールを使えない（`get_deployment_options` など、Azure を操作しないものだけ使える） |
+
+#### 方式の選び方（両方が有効な場合）
+- `list_subscriptions` / `plan_deployment` / `plan_deletion` / `get_deployment_info` に任意の引数 `azure_identity`（`server` | `user`）を追加する。省略すると既定の方式を使う
+- 4.0 で「認証方式をツールの引数にしない」としたのは、会話の途中で気付かないうちに切り替わるのを防ぐため。この引数は次の条件で安全を保つ:
+  - 使える方式とアプリロールの範囲でしか選べない（範囲外ならエラー）
+  - **計画に方式を記録し、計画の結果に「サーバーの ID で実行します」などと必ず表示する**。ユーザーはそれを見て確認してから実行する
+  - `start_*` は計画に記録された方式で実行する（`start_*` では指定できない）
+- stdio では `azure_identity` は使わない（指定してもエラー）
+
+#### 実装の構成
+```mermaid
+flowchart LR
+  REQ["HTTP リクエスト<br/>(Entra ID のアクセストークン)"] --> AUTH["トークン検証<br/>ICallerContext（oid・ロール・トークン）"]
+  AUTH --> SEL["IdentityModeSelector<br/>方式の決定・範囲チェック"]
+  SEL -->|server| SP["ServerCredentialProvider<br/>ManagedIdentityCredential など"]
+  SEL -->|user| OBO["UserCredentialProvider<br/>OnBehalfOfCredential"]
+  SP --> GW["IAzureDeploymentGateway"]
+  OBO --> GW
+```
+- `IAzureCredentialProvider.GetCredential(ICallerContext, IdentityMode)` で抽象化し、Application はどちらの方式かを意識しない。CLI と stdio は従来どおり `CredentialFactory` を使う実装（`ProcessCredentialProvider`）を渡す
+- `user` 方式の OBO では、MCP サーバーのアプリ登録にクライアント資格情報が必要になる。シークレットを持たないよう、サーバーのマネージド ID をフェデレーション資格情報として使う方式を優先する
+- `user` 方式のジョブは、`start_*` を受けた時点の利用者のトークンで資格情報を作り、ジョブが終わるまで持ち続ける。デプロイは 10 分程度で終わるため、トークンの有効期限（通常 1 時間程度）内に収まる。収まらない場合はエラーとして記録し、再実行を促す
+- 計画・ジョブには作成者（トークンの `oid`）と方式を記録し、本人のものだけ実行・参照できるようにする（3.4）
+- 将来の WebAPI フロントエンドも同じ仕組み（トークン検証 → 方式の決定 → 資格情報プロバイダー）を使う
 
 ### 4.12 `plan_deletion` / `start_deletion`【決定: 削除ツールを作る。CLI に先に実装する】
 
@@ -396,11 +448,92 @@ stdio では利用者の PC の資格情報（`az login` 等）をそのまま�
 - **リソースグループは削除しない**（ユーザーが作った他のリソースを巻き込まないため）。リソースグループの削除はポータルや `az group delete` で行うよう案内する
 - Container Apps Environment が自動で作った関連リソース（あれば）は Azure 側の挙動に任せる
 
-#### 本ツールが作ったリソースかの判別（CLI ブランチで先に入れる）
-現状、作成するリソースに目印がない。名前だけで判断すると、同じ名前の別のリソースを消すおそれがある。そこで:
-- デプロイ時に、Environment と各 Container App にタグ `managed-by=timetracker-deployment-tool`、`tt-app-name={app}` を付ける（`ContainerAppSpecBuilder` で設定）
-- 削除は、名前が一致し、**かつタグが付いているもの**だけを対象にする
-- タグがない（この変更より前に作った）リソースは、計画の中で「タグなし」と示し、`include_untagged=true` を明示した場合だけ対象にする
+#### 本ツールが作ったリソースかの判別（管理タグ。CLI ブランチで先に入れる）
+
+##### タグとは
+Azure のほぼすべてのリソースには、**タグ**（`キー=値` の形の名札）を付けられる。タグはリソースの動作や料金には影響せず、ポータルのリソース一覧に表示したり、絞り込みや集計に使ったりするための情報である。
+
+##### 「管理タグで判定する」の意味
+現状、本ツールが作ったリソースには目印がなく、**名前**（`timetracker-db` など）でしか見分けられない。名前だけで削除対象を決めると、同じリソースグループに偶然同じ名前のリソース（別の人が手作業で作ったもの、別のツールで作ったもの）があった場合に、それを削除してしまう。
+
+そこで、本ツールがリソースを作るときに次のタグを付け、削除のときは「**名前が一致し、かつこのタグが付いているもの**」だけを削除する。これを「管理タグで判定する」と呼んでいる。
+
+| タグのキー | 値の例 | 意味 |
+|---|---|---|
+| `managed-by` | `timetracker-deployment-tool` | 本ツールが作った（管理している）リソースであること |
+| `tt-app-name` | `timetracker` | どのアプリ名（`--app-name`）の一式に属するか |
+| `tt-tool-version` | `0.7.0` | 最後にデプロイしたツールのバージョン（問い合わせ時の調査用。判定には使わない） |
+
+- 付ける対象: Environment（`{app}-env`）と 3 つの Container App（`{app}-db` / `{app}-redis` / `{app}-tt`）。**リソースグループには付けない**（利用者が用意したものを使うことがあり、削除もしないため）
+- 判定に使うのは `managed-by` と `tt-app-name` の 2 つ。`tt-app-name` が削除しようとしているアプリ名と一致することも確認する
+- タグは誤って削除しないための**目印**であり、セキュリティ上の境界ではない（リソースの書き込み権限があればだれでも変更できる）。削除できるかどうかは、従来どおり Azure の RBAC で決まる
+
+##### デプロイ時の動き
+| 状況 | 動き |
+|---|---|
+| Container App を新規作成 | 管理タグを付けて作成する |
+| Container App を更新（再デプロイ） | 既存のタグを読み取り、**利用者が付けた他のタグを残したまま**管理タグを追加・更新する。※現在の実装は更新時にタグを送っていないため、利用者が付けたタグが消える可能性がある。この機会に併せて直す |
+| Environment を新規作成 | 管理タグを付けて作成する |
+| Environment が既にある | 現在の方針（既存の Environment は変更しない）を守り、タグも付けない。タグのない Environment の扱いは下の「運用イメージ」の C を参照 |
+
+##### 運用イメージ
+**A. 通常の利用（タグ導入後のバージョンで作った環境を消す）**
+```powershell
+# 1. デプロイ（管理タグが自動で付く）
+timetracker-cli deploy --subscription <ID> --resource-group rg-tt-verify --app-name demo1 ...
+
+# 2. 削除対象の確認（何も変更しない）
+timetracker-cli delete --subscription <ID> --resource-group rg-tt-verify --app-name demo1 --dry-run
+```
+```
+[INFO] 削除計画（リソースグループ rg-tt-verify は削除しません）
+  削除する   demo1-tt     (Container App)  管理タグあり
+  削除する   demo1-redis  (Container App)  管理タグあり
+  削除する   demo1-db     (Container App)  管理タグあり  ※DB のデータは失われます
+  削除する   demo1-env    (Environment)    管理タグあり
+```
+```powershell
+# 3. 削除（確認のためアプリ名の入力を求める）
+timetracker-cli delete --subscription <ID> --resource-group rg-tt-verify --app-name demo1
+```
+MCP では、`plan_deletion` が同じ内容を返し、LLM がそれを示してユーザーの同意を得てから `start_deletion` を呼ぶ。
+
+**B. 同じリソースグループに、同じ名前の別リソースがある**
+例: 別の担当者がポータルで `demo1-db` という Container App を手作業で作っていた。
+```
+  削除する   demo1-tt     (Container App)  管理タグあり
+  削除する   demo1-redis  (Container App)  管理タグあり
+  削除しない demo1-db     (Container App)  管理タグなし（本ツールが作ったものと確認できません）
+  削除しない demo1-env    (Environment)    中に削除しない Container App（demo1-db）が残るため
+```
+→ 名前だけで判定していたら消えていた `demo1-db` が守られる。
+
+**C. タグ導入前のバージョンで作った環境を消す**
+既存の環境にはタグがないため、既定では何も削除されない。次のどちらかで対応する。
+1. タグがないことを承知の上で、`--include-untagged`（MCP では `include_untagged=true`）を付けて削除する。計画の表示で「管理タグなし」と示されるので、対象が正しいかを確認してから実行する
+2. 先に Azure CLI でタグを付けてから、通常どおり削除する
+   ```powershell
+   az tag update --resource-id <リソース ID> --operation merge `
+     --tags managed-by=timetracker-deployment-tool tt-app-name=demo1
+   ```
+
+**D. 特定の環境を削除から守りたい**
+`managed-by` タグをポータルで外す（または値を変える）と、本ツールの削除対象から外れる。デモ用に残しておきたい環境を、誤った削除操作から守る手段として使える。
+
+**E. 本ツールで作った環境を一覧したい**
+タグで絞り込める。ポータルのリソース一覧で「タグ: managed-by = timetracker-deployment-tool」のフィルターを使うか、次のコマンドを使う。
+```powershell
+az resource list --resource-group rg-tt-verify --tag managed-by=timetracker-deployment-tool -o table
+```
+Azure のコスト分析でもタグごとに費用を集計できるため、「本ツールで作った検証環境にいくらかかっているか」も確認できる。
+
+##### 名前だけで判定する方式との比較
+| | 管理タグで判定（推奨） | 名前だけで判定 |
+|---|---|---|
+| 同じ名前の別リソースを消す危険 | なし（B） | あり |
+| タグ導入前の環境 | 明示的な指定が必要（C） | そのまま消せる |
+| 削除から守る手段 | タグを外せばよい（D） | なし |
+| 実装 | デプロイ時のタグ付与と、更新時のタグの引き継ぎが必要 | 不要 |
 
 #### `plan_deletion`
 - 入力: `subscription`、`resource_group`、`app_name`、`include_untagged`（bool, 既定 false）
@@ -542,35 +675,35 @@ timetracker-cli delete --subscription <ID> --resource-group <RG> --app-name time
 | Q4 | Dry-run での subscription / resource_group | MCP では不要。CLI も別ブランチで先に不要にする |
 | Q5 | 動作確認のクライアント | 開発中は Claude Code + MCP Inspector。リリース前に利用者のクライアントで確認する（6.1） |
 | Q6 | リモート公開 | HTTP で公開できる設計にする（3.3・3.4・4.11）。WebAPI フロントエンドと Application を共有する |
-| Q7 | 配布形態 | 6.2 の比較を基に決めていただく（推奨: stdio は (a)、HTTP は (c)） |
+| Q7 | 配布形態 | stdio は (a) 単一ファイルの EXE（GitHub Release）、HTTP 公開は (c) コンテナイメージ（6.2） |
+| R-1 | ブランチの分け方 | フェーズごとに分ける（1.3）。共有層の切り出しの後、Dry-run の緩和、削除機能、MCP、HTTP 公開をそれぞれ別ブランチで、詳細設計・実装・テストまで行う |
+| R-2 | 削除対象の判定 | 管理タグで判定する（4.12）。タグがない既存環境は明示的に指定した場合だけ対象にする |
+| R-3 | HTTP 公開時の Azure の権限 | サーバーの ID と利用者本人の権限の両方に対応する。使える方式はサーバーの設定とアプリロールで決める（4.11） |
 
 ### 7.2 残課題（決めていただきたい事項）
 | # | 論点 | 案 | 推奨 |
 |---|---|---|---|
-| R-1 | CLI ブランチの分け方 | (a) Phase 0〜2 を 1 本で / (b) Phase ごとに分ける | (b)。Phase 0 はファイルの移動が多くレビューしにくいため、挙動の変更（Phase 1・2）と分ける |
-| R-2 | 削除で使う管理タグ | (a) タグを付けて、タグ付きのものだけ削除（タグなしは明示指定で対象にする） / (b) 名前だけで判断する | (a)。既存の環境に影響しないよう、タグを付けるのは次回のデプロイから |
-| R-3 | HTTP の Azure 資格情報 | H1（サーバーの ID） / H2（利用者本人の権限） | Phase 4 の着手時に決める。まずは H1 |
-| R-4 | 配布形態（Q7） | 6.2 | stdio は (a)、HTTP は (c) |
 | R-5 | WebAPI を MCP と同じホストに置くか | 同居 / 別ホスト | WebAPI の設計時に決める（どちらにもできる構成にしておく） |
+| R-6 | `server` 方式で操作してよい範囲（`TT_MCP_HTTP__SERVER_ALLOWED_SCOPES`） | 運用するサブスクリプション・リソースグループの命名 | Phase 4 の着手時に決める |
 
 ---
 
 ## 8. 実装フェーズ案
 
-### 8.1 CLI ブランチ（MCP より先に行う）
+### 8.1 CLI 側のブランチ（MCP より先に行う。ブランチ名は 1.3）
 | フェーズ | 内容 | 完了条件 |
 |---|---|---|
-| Phase 0 | 共有層の切り出し（8.3 の R1〜R7）。**CLI の挙動は変えない** | 既存テストが全件成功。CI が成功。`--help` と Dry-run の出力が変更前と同じ |
-| Phase 1 | Dry-run の必須項目を緩和（Azure 用の検証を分ける。4.5） | `--dry-run` で subscription / resource-group を省略して compose が生成できる。Azure へのデプロイでは引き続き必須 |
-| Phase 2 | 管理タグの付与と `delete` サブコマンド（4.12） | Azure（japaneast）で、デプロイ → `delete --dry-run` → `delete` が成功し、リソースグループが残る。タグなしのリソースが既定で対象外になる |
+| Phase 0（`refactor/shared-layer`） | 共有層の切り出し（8.3 の R1〜R7）。**CLI の挙動は変えない** | 既存テストが全件成功。CI が成功。`--help` と Dry-run の出力が変更前と同じ |
+| Phase 1（`feature/cli-dryrun-optional-azure`） | Dry-run の必須項目を緩和（Azure 用の検証を分ける。4.5） | `--dry-run` で subscription / resource-group を省略して compose が生成できる。Azure へのデプロイでは引き続き必須 |
+| Phase 2（`feature/cli-delete`） | 管理タグの付与（更新時は既存タグを引き継ぐ）と `delete` サブコマンド（4.12） | Azure（japaneast）で、デプロイ → `delete --dry-run` → `delete` が成功し、リソースグループが残る。運用イメージの A〜D（4.12）がそのとおりに動く |
 
-### 8.2 MCP-Tool ブランチ（main を取り込んでから）
+### 8.2 MCP のブランチ（main を取り込んでから）
 | フェーズ | 内容 | 完了条件 |
 |---|---|---|
-| Phase 3a | `Timetracker.Controller.Mcp` の新設（stdio）。`get_deployment_options` / `validate_deployment` / `generate_compose` / `list_subscriptions` | MCP Inspector と Claude Code で呼び出せる。生成したファイルで `docker compose up` が成功する |
-| Phase 3b | `plan_deployment` / `start_deployment` / `get_job_status` / `list_jobs` / `get_deployment_info`、ジョブ管理、進捗通知 | Azure で新規デプロイと再デプロイ（データ消失の確認あり）が成功し、URL が返る |
-| Phase 3c | `plan_deletion` / `start_deletion`、instructions、Resources / Prompts、配布（release.yml）、README の MCP の章 | Release に MCP の配布物が出る。リリース前確認（6.1）を完了 |
-| Phase 4 | HTTP トランスポート、呼び出し元の認証（Entra ID）、資格情報プロバイダー（H1/H2）、Dockerfile | Container Apps 上の MCP サーバーに OAuth 対応のクライアントから接続し、一連のシナリオが成功する |
+| Phase 3a（`MCP-Tool`） | `Timetracker.Controller.Mcp` の新設（stdio）。`get_deployment_options` / `validate_deployment` / `generate_compose` / `list_subscriptions` | MCP Inspector と Claude Code で呼び出せる。生成したファイルで `docker compose up` が成功する |
+| Phase 3b（`MCP-Tool`） | `plan_deployment` / `start_deployment` / `get_job_status` / `list_jobs` / `get_deployment_info`、ジョブ管理、進捗通知 | Azure で新規デプロイと再デプロイ（データ消失の確認あり）が成功し、URL が返る |
+| Phase 3c（`MCP-Tool`） | `plan_deletion` / `start_deletion`、instructions、Resources / Prompts、配布（release.yml）、README の MCP の章 | Release に MCP の配布物が出る。リリース前確認（6.1）を完了 |
+| Phase 4（`feature/mcp-http`） | HTTP トランスポート、呼び出し元の認証（Entra ID・アプリロール）、`server` / `user` の両方式の資格情報プロバイダー（4.11）、Dockerfile とコンテナイメージ | Container Apps 上の MCP サーバーに OAuth 対応のクライアントから接続し、両方式でそれぞれ一連のシナリオが成功する。範囲外のリソースグループへの `server` 方式の操作が拒否される |
 
 ### 8.3 共有層のリファクタリング内容（Phase 0）
 | # | 変更 | 対応する課題 |
