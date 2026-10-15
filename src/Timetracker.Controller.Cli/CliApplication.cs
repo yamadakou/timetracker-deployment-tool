@@ -51,13 +51,14 @@ public static class CliApplication
             return 0;
         }
 
-        // 必須オプション (subscription / resource-group / db-password / tracker-password)
-        if (string.IsNullOrWhiteSpace(cli.Get("--subscription")) ||
-            string.IsNullOrWhiteSpace(cli.Get("--resource-group")) ||
-            string.IsNullOrWhiteSpace(cli.Get("--db-password")) ||
-            string.IsNullOrWhiteSpace(cli.Get("--tracker-password")))
+        // 必須オプション。Dry-run は Azure を使わないため subscription / resource-group は不要
+        var requiredOptions = cli.GetBool("--dry-run")
+            ? new[] { "--db-password", "--tracker-password" }
+            : new[] { "--subscription", "--resource-group", "--db-password", "--tracker-password" };
+        var missingOptions = requiredOptions.Where(name => cli.Get(name) == null).ToList();
+        if (missingOptions.Count > 0)
         {
-            err.WriteLine("[ERROR] 必須パラメータ不足: --subscription --resource-group --db-password --tracker-password を指定してください。（--help で使い方を表示）");
+            err.WriteLine($"[ERROR] 必須パラメータ不足: {string.Join(" ", missingOptions)} を指定してください。（--help で使い方を表示）");
             return 1;
         }
 
@@ -109,11 +110,10 @@ public static class CliApplication
         var log = new SimpleLogger(opts.Verbose, outputWriter, errorWriter);
         try
         {
-            ComposeGenerator.Validate(opts);
-            log.Info("検証 OK");
-
             if (opts.DryRun)
             {
+                ComposeGenerator.ValidateForCompose(opts);
+                log.Info("検証 OK");
                 var compose = ComposeGenerator.GenerateCompose(opts);
                 await File.WriteAllTextAsync(Path.Combine(workingDirectory, opts.OutputCompose), compose);
                 log.Info($"Compose 生成: {opts.OutputCompose}");
@@ -124,6 +124,8 @@ public static class CliApplication
                 return 0;
             }
 
+            ComposeGenerator.Validate(opts);
+            log.Info("検証 OK");
             var runner = new DeploymentRunner((gatewayFactory ?? DefaultGatewayFactory)(opts, log));
             await runner.RunAsync(opts);
             log.Success("Container Apps デプロイ完了");

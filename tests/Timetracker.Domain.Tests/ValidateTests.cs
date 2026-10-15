@@ -177,3 +177,57 @@ public class ValidateResourceSpecTests
         act.Should().NotThrow();
     }
 }
+
+public class ValidateForComposeTests
+{
+    private static DeployOptions CreateOptions() => new()
+    {
+        Subscription = "sub",
+        ResourceGroup = "rg",
+        DbPassword = "Passw0rd!x",
+        TrackerPassword = "Passw0rd!y",
+    };
+
+    [Theory]
+    [InlineData("", "")]
+    [InlineData(" ", "rg")]
+    [InlineData("sub", "")]
+    public void Should_Not_Require_Subscription_And_Resource_Group(string subscription, string resourceGroup)
+    {
+        var o = CreateOptions();
+        o.Subscription = subscription;
+        o.ResourceGroup = resourceGroup;
+
+        var compose = () => ComposeGenerator.ValidateForCompose(o);
+        var azure = () => ComposeGenerator.Validate(o);
+
+        compose.Should().NotThrow();
+        azure.Should().Throw<ArgumentException>();
+    }
+
+    public static IEnumerable<object[]> InvalidCases()
+    {
+        yield return new object[] { (Action<DeployOptions>)(o => o.DbType = "mysql"), "*db-type*" };
+        yield return new object[] { (Action<DeployOptions>)(o => o.AppName = "bad_name"), "*bad_name*" };
+        yield return new object[] { (Action<DeployOptions>)(o => o.TimetrackerCpu = 0), "*tt-cpu*" };
+        yield return new object[] { (Action<DeployOptions>)(o => o.TrackerPassword = "short"), "*tracker-password*" };
+        yield return new object[] { (Action<DeployOptions>)(o => o.DbPassword = "short"), "*db-password*" };
+        yield return new object[] { (Action<DeployOptions>)(o => { o.DbType = "sqlserver"; o.TimetrackerTag = "11.0.1-linux-mssql"; o.DbPassword = "password"; }), "*SQL Server*" };
+        yield return new object[] { (Action<DeployOptions>)(o => o.TimetrackerTag = ""), "*tt-tag*" };
+        yield return new object[] { (Action<DeployOptions>)(o => o.TimetrackerTag = "11.0.1-linux-mssql"), "*不適切な組み合わせ*" };
+    }
+
+    [Theory]
+    [MemberData(nameof(InvalidCases))]
+    public void Should_Check_Everything_Except_Azure_Settings(Action<DeployOptions> mutate, string expectedMessage)
+    {
+        var o = CreateOptions();
+        o.Subscription = "";
+        o.ResourceGroup = "";
+        mutate(o);
+
+        var act = () => ComposeGenerator.ValidateForCompose(o);
+
+        act.Should().Throw<ArgumentException>().WithMessage(expectedMessage);
+    }
+}

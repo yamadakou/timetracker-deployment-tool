@@ -24,8 +24,8 @@ public sealed class CliArgs
         使い方: timetracker-cli [deploy] [オプション]
 
         必須:
-          --subscription <ID>         Azure サブスクリプション ID
-          --resource-group <名前>     リソースグループ名（存在しなければ作成）
+          --subscription <ID>         Azure サブスクリプション ID（--dry-run 時は不要）
+          --resource-group <名前>     リソースグループ名（存在しなければ作成。--dry-run 時は不要）
           --db-password <値>          DB パスワード
           --tracker-password <値>     Timetracker アプリパスワード
 

@@ -62,7 +62,61 @@ public sealed class CliApplicationTests : IDisposable
         var code = await Run(args);
 
         code.Should().Be(1);
-        _err.ToString().Should().Contain("必須パラメータ不足");
+        // 足りないオプションだけを表示する
+        var message = _err.ToString();
+        message.Should().Contain("必須パラメータ不足").And.Contain(missing);
+        foreach (var other in Required.Where((_, i) => i % 2 == 0 && i != index))
+        {
+            message.Should().NotContain(other);
+        }
+    }
+
+    [Fact]
+    public async Task Should_List_All_Missing_Required_Options()
+    {
+        var code = await Run(Array.Empty<string>());
+
+        code.Should().Be(1);
+        _err.ToString().Should().Contain("--subscription --resource-group --db-password --tracker-password");
+    }
+
+    [Theory]
+    [InlineData("--db-password")]
+    [InlineData("--tracker-password")]
+    public async Task DryRun_Should_Still_Require_Passwords(string missing)
+    {
+        var args = new[] { "--db-password", "DbPassw0rd!", "--tracker-password", "TrackerPass!", "--dry-run" };
+        var index = Array.IndexOf(args, missing);
+
+        var code = await Run(args.Where((_, i) => i != index && i != index + 1).ToArray());
+
+        code.Should().Be(1);
+        _err.ToString().Should().Contain("必須パラメータ不足").And.Contain(missing)
+            .And.NotContain("--subscription").And.NotContain("--resource-group");
+    }
+
+    [Fact]
+    public async Task DryRun_Should_Not_Require_Subscription_And_Resource_Group()
+    {
+        var code = await Run(new[] { "--db-password", "DbPassw0rd!", "--tracker-password", "TrackerPass!", "--dry-run" });
+
+        code.Should().Be(0);
+        var opts = DeployOptionsResolver.Resolve(new DeployInput { DbPassword = "DbPassw0rd!", TrackerPassword = "TrackerPass!" });
+        File.ReadAllText(Path.Combine(_dir, "docker-compose.yml")).Should().Be(ComposeGenerator.GenerateCompose(opts));
+        File.ReadAllText(Path.Combine(_dir, ".env")).Should().Be(ComposeGenerator.GenerateEnv(opts));
+    }
+
+    [Fact]
+    public async Task DryRun_Should_Fail_When_Validation_Fails()
+    {
+        var code = await Run(new[]
+        {
+            "--db-type", "sqlserver", "--db-password", "password", "--tracker-password", "TrackerPass!", "--dry-run",
+        });
+
+        code.Should().Be(1);
+        _err.ToString().Should().Contain("SQL Server のパスワード要件");
+        File.Exists(Path.Combine(_dir, "docker-compose.yml")).Should().BeFalse();
     }
 
     [Fact]
