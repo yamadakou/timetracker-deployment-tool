@@ -533,15 +533,21 @@ dotnet build .\Timetracker.sln
 dotnet publish .\src\Timetracker.Controller.Cli\Timetracker.Controller.Cli.csproj -c Release -r win-x64 `
   -p:PublishSingleFile=true -p:SelfContained=true -p:UseAppHost=true
 ```
-注意: Timetracker.Domain はクラスライブラリ（実行可能ファイルを生成しない）であり、SelfContained/SingleFile オプション付きの publish 対象ではありません。必要な成果物は CLI プロジェクトの publish で生成される単一ファイル EXE のみです。ライブラリ側で配布形態が必要になった場合は `dotnet pack` による NuGet パッケージ化等を検討してください。
+注意: Timetracker.Domain / Timetracker.Application / Timetracker.Infrastructure.Azure / Timetracker.Common はクラスライブラリ（実行可能ファイルを生成しない）であり、SelfContained/SingleFile オプション付きの publish 対象ではありません。必要な成果物は CLI プロジェクトの publish で生成される単一ファイル EXE のみです。ライブラリ側で配布形態が必要になった場合は `dotnet pack` による NuGet パッケージ化等を検討してください。
 
 ### 設計概要
 - ドメイン層（Timetracker.Domain）
-  - パラメータモデル、デフォルト、検証、Compose/.env生成（Dry-run用）、Container Apps のコンテナ仕様生成
+  - パラメータモデル（DeployOptions）、既定値（Defaults）と既定値の適用（DeployOptionsResolver）、検証、リソース名の規則（ResourceNaming）、Compose/.env生成（Dry-run用）
+- アプリケーション層（Timetracker.Application）
+  - デプロイ手順の実行（DeploymentRunner: リソースグループ → Environment → DB / Redis / Timetracker）と結果（DeploymentResult）
+- インフラストラクチャ層（Timetracker.Infrastructure.Azure）
+  - Azure SDK 実行（AzureSdkExecutor / IAzureDeploymentGateway）、Container Apps のコンテナ仕様生成（ContainerAppSpecBuilder）、認証（CredentialFactory）
 - コントローラー層（Timetracker.Controller.Cli）
-  - CLIの入出力、オプション解析（CliArgs）、Azure SDK 実行（ArmClient）
+  - CLIの入出力、オプション解析（CliArgs）
 - 共通（Timetracker.Common）
-  - ロガーなどのユーティリティ
+  - ロガー（IDeploymentLogger / SimpleLogger）などのユーティリティ
+
+依存の向きは「コントローラー層 → アプリケーション層 → インフラストラクチャ層 → ドメイン層」です。CLI 以外のフロントエンド（MCP サーバーなど）を追加する場合も、アプリケーション層以下を共有します。
 
 生成する Container Apps の構成は常に以下の3コンテナを含みます。
 - `timetracker`（`densocreate/timetracker` イメージ）

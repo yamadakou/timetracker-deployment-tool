@@ -1,10 +1,10 @@
 using Azure.Identity;
 using FluentAssertions;
 using Timetracker.Common;
-using Timetracker.Controller.Cli;
+using Timetracker.Infrastructure.Azure;
 using Xunit;
 
-namespace Timetracker.Controller.Cli.Tests;
+namespace Timetracker.Infrastructure.Azure.Tests;
 
 public class CredentialFactoryTests
 {
@@ -116,5 +116,16 @@ public class CredentialFactoryTests
         var action = () => CredentialFactory.Create(authMode, logger);
         action.Should().Throw<ArgumentException>()
             .WithMessage("*不明な認証モード*");
+    }
+
+    [Fact]
+    public async Task DeviceCodeCallback_Should_Show_Sign_In_Message()
+    {
+        var output = new StringWriter();
+        var callback = CredentialFactory.DeviceCodeCallback(new SimpleLogger(false, output, new StringWriter()));
+
+        await callback(default, TestContext.Current.CancellationToken);
+
+        output.ToString().Should().Contain("[INFO] デバイスコード認証:");
     }
 }

@@ -160,7 +160,7 @@ public static class ComposeGenerator
     }
 
     // SQL Server の SA パスワード要件: 8 文字以上で、英大文字・英小文字・数字・記号のうち 3 種類以上を含む
-    private static bool MeetsSqlServerPasswordPolicy(string password)
+    internal static bool MeetsSqlServerPasswordPolicy(string password)
     {
         var categories = 0;
         if (password.Any(char.IsAsciiLetterUpper)) categories++;
@@ -168,6 +168,24 @@ public static class ComposeGenerator
         if (password.Any(char.IsAsciiDigit)) categories++;
         if (password.Any(c => !char.IsAsciiLetterOrDigit(c))) categories++;
         return password.Length >= 8 && categories >= 3;
+    }
+
+    private static void RequirePositive(double value, string name)
+    {
+        if (!double.IsFinite(value) || value <= 0)
+            throw new ArgumentException($"{name} には正の数値を指定してください: {value.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
+    }
+
+    // timetracker イメージのタグが DB 種別向けのものか（例: postgresql → *-postgres、sqlserver → *-mssql）
+    internal static bool TagMatchesDbType(string dbType, string tag)
+    {
+        var tagLower = tag.ToLowerInvariant();
+        return dbType switch
+        {
+            "postgresql" => tagLower.Contains("postgres"),
+            "sqlserver" => tagLower.Contains("mssql") || tagLower.Contains("sqlserver"),
+            _ => false
+        };
     }
 
     public static void Validate(DeployOptions o)
@@ -178,6 +196,16 @@ public static class ComposeGenerator
             throw new ArgumentException("subscription は必須です。");
         if (string.IsNullOrWhiteSpace(o.ResourceGroup))
             throw new ArgumentException("resource-group は必須です。");
+        // CLI は引数の解析時に確認済みだが、他のフロントエンドから呼ばれた場合も Azure に送る前に止める
+        var appNameError = AppNameValidator.GetError(o.AppName);
+        if (appNameError != null)
+            throw new ArgumentException(appNameError);
+        RequirePositive(o.TimetrackerCpu, "tt-cpu");
+        RequirePositive(o.TimetrackerMemoryGi, "tt-memory");
+        RequirePositive(o.DbCpu, "db-cpu");
+        RequirePositive(o.DbMemoryGi, "db-memory");
+        RequirePositive(o.RedisCpu, "redis-cpu");
+        RequirePositive(o.RedisMemoryGi, "redis-memory");
         if (string.IsNullOrWhiteSpace(o.TrackerPassword) || o.TrackerPassword.Length < 8)
             throw new ArgumentException("tracker-password が不足または短すぎます。");
         if (string.IsNullOrWhiteSpace(o.DbPassword) || o.DbPassword.Length < 8)
@@ -190,14 +218,7 @@ public static class ComposeGenerator
             throw new ArgumentException("tt-tag（timetracker イメージタグ）が空です。例: 11.0.1-linux-postgres, 11.0.1-linux-mssql など。");
 
         // db-type と tt-tag の組み合わせ検証
-        var tagLower = o.TimetrackerTag.ToLowerInvariant();
-        bool tagMatchesDb = o.DbType switch
-        {
-            "postgresql" => tagLower.Contains("postgres"),
-            "sqlserver" => tagLower.Contains("mssql") || tagLower.Contains("sqlserver"),
-            _ => false
-        };
-        if (!tagMatchesDb)
+        if (!TagMatchesDbType(o.DbType, o.TimetrackerTag))
         {
             throw new ArgumentException(
                 $"不適切な組み合わせ: db-type='{o.DbType}' と tt-tag='{o.TimetrackerTag}' は対応していません。" +
