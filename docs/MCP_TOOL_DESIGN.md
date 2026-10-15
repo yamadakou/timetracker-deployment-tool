@@ -799,7 +799,9 @@ README の「必要な RBAC ロールと権限」（`docs/fix-rbac-requirements`
 - Resources（`timetracker://docs/constraints`、`timetracker://docs/rbac`、`timetracker://deployments/{subscription}/{resource_group}/{app_name}`）と Prompts（`deploy-timetracker`、`local-dry-run`、`delete-timetracker`）を追加した。文書はサーバーに埋め込み、README の主な記述が含まれることをテストで確かめる
 - release.yml で `timetracker-mcp-vX.Y.Z.zip`（win-x64 の単一ファイル EXE）を CLI の zip と並べて Release に載せる。同じ `dotnet publish` で EXE ができることを確認した（約 86MB）。実際の Release は次のリリースで確認する
 - README に「MCP サーバー（AI アシスタントから使う）」の章を追加した（ツール、安全策、導入、環境変数、Claude Code / VS Code / Claude Desktop の設定例）
-- 確認: 単体テストとプロトコル結合テスト（Resources / Prompts を含む）。分岐網羅率は Program.cs を除き 100%。Azure での確認は実施中
+- 確認: 単体テストとプロトコル結合テスト（Resources / Prompts を含む）。分岐網羅率は Program.cs を除き 100%
+- Azure（japaneast、`azure-cli` 認証）での確認: SDK のクライアントから stdio で接続し、Resources / Prompts の一覧、`plan_deployment` → `start_deployment`（約 2 分 30 秒で成功）、デプロイの Resource（`timetracker://deployments/...`。`exists: true` と URL）、`plan_deletion`（4 つとも削除の対象、リソースグループは kept、DB の警告、権限は ok）→ アプリ名の不一致の `start_deletion` が拒否される → 一致で成功（約 12 分。Environment の削除に時間がかかる）、`deletion_result` に 4 つ、`get_deployment_info` で `exists: false`、もう一度 `plan_deletion` で「削除するリソースはありません」（plan_id は null）を確認した。結果・ログにパスワードが含まれないことも確認した
+- 未確認: リリース前確認（6.1）のうち VS Code（GitHub Copilot）での確認（この環境では動かせないため、オーナーに依頼する）。Release の配布物は次のリリースで確認する
 
 ### 8.3 共有層のリファクタリング内容（Phase 0）
 | # | 変更 | 対応する課題 |
