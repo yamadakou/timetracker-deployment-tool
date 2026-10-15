@@ -70,7 +70,7 @@ Timetracker（DockerHub の `densocreate/timetracker` イメージ）を、選�
 - 3 つの Container Apps には、作成時・更新時とも付けます。更新時は、利用者が付けた他のタグを残したまま管理タグを追加します
 - Container Apps Environment には、新規作成時だけ付けます（既存の Environment は変更しないため）
 - タグは誤って削除しないための目印で、セキュリティ上の制限ではありません（削除できるかどうかは Azure の RBAC で決まります）
-- 本ツールで作成したリソースは、タグで一覧できます: `az resource list --resource-group <RG名> --tag managed-by=timetracker-deployment-tool -o table`
+- 本ツールで作成したリソースは、タグで一覧できます（`az resource list` では `--tag` と `--resource-group` を同時に指定できないため、リソースグループは `--query` で絞り込みます）: `az resource list --tag managed-by=timetracker-deployment-tool --query "[?resourceGroup=='<RG名>'].{name:name, type:type}" -o table`
 
 **重要な注意事項**:
 - DB および Redis は **コンテナ** として Container Apps 内で実行されます
@@ -450,6 +450,7 @@ az provider show --namespace Microsoft.OperationalInsights --query "registration
    timetracker-cli.exe delete --subscription "<SUBSCRIPTION_ID>" --resource-group "rg-tt-demo" --app-name "timetracker"
    ```
    `{アプリ名}-tt` → `-redis` → `-db` → `-env` の順に削除します。途中で失敗した場合は、もう一度実行すると残りを削除します（既に削除済みのものは飛ばします）。
+   Container Apps Environment の削除は、完了まで十数分かかることがあります。
 
 削除の対象になる条件:
 - 名前が `{アプリ名}-tt` / `-redis` / `-db` / `-env` で、かつ[管理タグ](#作成される-azure-リソース)が付いているもの
