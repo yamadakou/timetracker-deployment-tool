@@ -79,7 +79,8 @@ public sealed class DeploymentPlanner
             var dataLoss = exists && name == ResourceNaming.DbApp(opts.AppName);
             operations.Add(new PlannedOperation(PlannedResourceKind.ContainerApp, name, exists ? PlannedAction.Update : PlannedAction.Create, dataLoss));
             if (dataLoss)
-                warnings.Add($"DB アプリ '{name}' は既に存在します。更新すると DB コンテナが再起動し、DB のデータはすべて失われます。");
+                warnings.Add($"DB アプリ '{name}' は既に存在します。設定が変わると DB コンテナが再起動し、" +
+                             "永続ボリュームを設定していないため DB のデータは失われます。必要に応じて事前にバックアップしてください。");
         }
 
         var permissions = await CheckPermissionsAsync(opts, existingApps, env != null, cancellationToken);

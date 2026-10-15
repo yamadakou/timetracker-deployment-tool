@@ -79,7 +79,7 @@ public class DeploymentPlannerPlanTests
             Op(PlannedResourceKind.ContainerApp, "demo-tt", PlannedAction.Update));
         plan.RequiresDataLossAck.Should().BeTrue();
         plan.CreatesEnvironment.Should().BeFalse();
-        plan.Warnings.Should().ContainSingle().Which.Should().Contain("DB アプリ 'demo-db' は既に存在します");
+        plan.Warnings.Should().ContainSingle().Which.Should().Contain("DB アプリ 'demo-db' は既に存在します。設定が変わると DB コンテナが再起動し");
         plan.PermissionCheck.Should().Be(PermissionCheckResult.Ok);
         plan.Options.Should().BeSameAs(Opts);
     }

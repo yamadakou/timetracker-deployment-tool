@@ -54,7 +54,7 @@ public sealed class DeploymentJobTools
     [McpServerTool(Name = "plan_deployment", Title = "Azure へのデプロイの計画",
         ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = true, UseStructuredContent = true)]
     [Description("Azure Container Apps へのデプロイの計画を作る（Azure を読むだけで、変更しない）。作成・更新するリソース、" +
-                 "DB のデータが消えるか（requires_data_loss_ack）、警告、権限の確認結果を返す。結果を利用者に示して確認してから、" +
+                 "DB のデータが消えるおそれがあるか（requires_data_loss_ack）、警告、権限の確認結果を返す。結果を利用者に示して確認してから、" +
                  "plan_id を start_deployment に渡す。blockers があると plan_id は null になり、実行できない。計画の有効期限は 15 分。")]
     public async Task<DeploymentPlanResult> PlanDeployment(
         [Description("サブスクリプション ID（省略時はサーバーの既定値 TT_MCP_DEFAULT_SUBSCRIPTION）")] string? subscription = null,
@@ -111,18 +111,18 @@ public sealed class DeploymentJobTools
     [McpServerTool(Name = "start_deployment", Title = "Azure へのデプロイの開始",
         ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = true, UseStructuredContent = true)]
     [Description("plan_deployment の計画に基づいてデプロイを始める（バックグラウンドのジョブ）。すぐに job_id を返すので、" +
-                 "get_job_status で進捗と結果を確認する。計画が requires_data_loss_ack=true の場合は、DB のデータが消えることに" +
+                 "get_job_status で進捗と結果を確認する。計画が requires_data_loss_ack=true の場合は、DB のデータが消えるおそれがあることに" +
                  "利用者が明示的に同意したときだけ acknowledge_data_loss=true を指定する。計画は一度だけ使える。")]
     public async Task<StartJobResult> StartDeployment(
         [Description("plan_deployment が返した plan_id")] string plan_id,
-        [Description("DB のデータが消えることに利用者が同意したか（requires_data_loss_ack=true の計画では必須）")] bool acknowledge_data_loss = false,
+        [Description("DB のデータが消えるおそれがあることに利用者が同意したか（requires_data_loss_ack=true の計画では必須）")] bool acknowledge_data_loss = false,
         CancellationToken cancellationToken = default)
     {
         var plan = RequirePlan(_plans.Find<DeploymentPlan>(plan_id, _caller.CallerId), plan_id);
         // 同意が無い場合は計画を使用済みにしない（同意を得て、同じ計画で実行し直せるように）
         if (plan.RequiresDataLossAck && !acknowledge_data_loss)
             throw new McpException(
-                "この計画は既存の DB アプリを更新するため、DB のデータがすべて失われます。利用者が同意した場合だけ、" +
+                "この計画は既存の DB アプリを更新します。設定が変わると DB コンテナが再起動し、DB のデータは失われます。利用者が同意した場合だけ、" +
                 "acknowledge_data_loss=true を指定して実行してください。");
         plan = RequirePlan(_plans.Take<DeploymentPlan>(plan_id, _caller.CallerId), plan_id);
 

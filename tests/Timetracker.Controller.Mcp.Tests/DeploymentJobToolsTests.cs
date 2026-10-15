@@ -210,7 +210,7 @@ public sealed class DeploymentJobToolsTests
 
         var withoutAck = () => Tools().StartDeployment(plan.PlanId!, cancellationToken: Ct);
 
-        await withoutAck.Should().ThrowAsync<McpException>().WithMessage("*DB のデータがすべて失われます*acknowledge_data_loss=true*");
+        await withoutAck.Should().ThrowAsync<McpException>().WithMessage("*設定が変わると DB コンテナが再起動し、DB のデータは失われます*acknowledge_data_loss=true*");
         var started = await Tools().StartDeployment(plan.PlanId!, acknowledge_data_loss: true, cancellationToken: Ct);
         (await WaitForJob(started.JobId)).Status.Should().Be(JobStatus.Succeeded);
     }

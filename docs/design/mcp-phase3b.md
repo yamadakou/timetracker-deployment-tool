@@ -26,7 +26,7 @@
 | | ある・リージョンが同じ | `use_existing` |
 | | ある・リージョンが違う | **ブロッカー**（CLI と同じメッセージ。実行すると途中で失敗するため） |
 | `-db` / `-redis` / `-tt` | 無い / ある | `create` / `update` |
-| `-db` が既にある | – | `data_loss: true` + 警告。`start_deployment` で `acknowledge_data_loss=true` が必須 |
+| `-db` が既にある | – | `data_loss: true` + 警告（デプロイ時の CLI の警告と同じく「設定が変わると DB コンテナが再起動し、データは失われる」。設定が同じなら新しいリビジョンは作られず再起動しないため、必ず消えるとは書かない）。`start_deployment` で `acknowledge_data_loss=true` が必須 |
 | 権限 | 不足 | **ブロッカー**（不足している権限と、README の該当箇所の案内） |
 | | 確認できない | 警告（理由。処理は止めない。CLI と同じ考え方） |
 
@@ -118,7 +118,7 @@
 
 ### 6.3 instructions
 Phase 3a の内容に、次を加える。
-- デプロイは必ず `plan_deployment` → 結果（actions・warnings）を利用者に示して確認 → `start_deployment` の順に行う。`acknowledge_data_loss` は、DB のデータが消えることに利用者が明示的に同意した場合だけ true にする
+- デプロイは必ず `plan_deployment` → 結果（actions・warnings）を利用者に示して確認 → `start_deployment` の順に行う。`acknowledge_data_loss` は、DB のデータが消えるおそれがあることに利用者が明示的に同意した場合だけ true にする
 - `start_deployment` の後は、`get_job_status` を 15〜30 秒の間隔で呼ぶ
 - 「デプロイと削除のツールはまだ無い」の記述を、削除だけに直す
 
