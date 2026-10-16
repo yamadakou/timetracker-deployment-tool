@@ -33,9 +33,11 @@ internal static class ServerInstructions
     /// HTTP の instructions。stdio との違い（Azure を操作する方式、パスワード、操作できる範囲、generate_compose）を伝える。
     /// 方式の説明は、サーバーで有効な方式（TT_MCP_HTTP__IDENTITY_MODES）に合わせる。
     /// </summary>
-    public static string Http(McpHttpSettings settings) => HttpText.Replace(IdentityPlaceholder, IdentityText(settings));
+    public static string Http(McpHttpSettings settings) =>
+        HttpText.Replace(IdentityPlaceholder, IdentityText(settings).TrimEnd('\r', '\n'));
 
-    private const string IdentityPlaceholder = "{identity}\n";
+    // 改行は含めない（Windows で CRLF でチェックアウトすると、raw 文字列の改行も CRLF になるため）
+    private const string IdentityPlaceholder = "{identity}";
 
     private const string HttpText = """
         Timetracker（DENSO CREATE の工数管理ツール）の検証環境を構築するためのサーバーです（HTTP で共有しているサーバー）。
