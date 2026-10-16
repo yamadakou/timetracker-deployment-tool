@@ -8,6 +8,7 @@ using Timetracker.Controller.Mcp.Tools;
 using Timetracker.Domain.Azure;
 using Timetracker.Domain.Deployment;
 using Timetracker.Infrastructure.Azure;
+using Timetracker.Controller.Mcp.Tests.Http;
 using Xunit;
 
 namespace Timetracker.Controller.Mcp.Tests;
@@ -54,15 +55,15 @@ public sealed class DeletionJobToolsTests
 
     private void App(string name, IReadOnlyDictionary<string, string>? tags = null) => _apps.Add(new ContainerAppInfo(name, EnvId, tags ?? ManagedTags.For("demo")));
 
-    private DeletionJobTools Tools(McpServerSettings? settings = null) => new(
-        settings ?? Settings, new LocalCallerContext(), _plans, _jobs, _ => _gateway.Object, NullLogger<DeletionJobTools>.Instance);
+    private DeletionJobTools Tools(McpServerSettings? settings = null, IAzureAccessPolicy? policy = null) => new(
+        settings ?? Settings, new LocalCallerContext(), policy ?? new UnrestrictedAccessPolicy(settings ?? Settings), _plans, _jobs, _ => _gateway.Object, NullLogger<DeletionJobTools>.Instance);
 
     private Task<DeletionPlanResult> Plan(bool includeUntagged = false) => Tools().PlanDeletion(app_name: "demo", include_untagged: includeUntagged, cancellationToken: Ct);
 
     private async Task<JobStatusResult> WaitForJob(string jobId)
     {
         await _jobs.Get(jobId, LocalCallerContext.Id)!.Completion;
-        return new DeploymentJobTools(Settings, new LocalCallerContext(), _plans, _jobs, _ => _gateway.Object, NullLogger<DeploymentJobTools>.Instance)
+        return new DeploymentJobTools(Settings, new LocalCallerContext(), new UnrestrictedAccessPolicy(Settings), _plans, _jobs, _ => _gateway.Object, NullLogger<DeploymentJobTools>.Instance)
             .GetJobStatus(jobId);
     }
 
@@ -248,5 +249,45 @@ public sealed class DeletionJobToolsTests
         await act.Should().ThrowAsync<McpException>().WithMessage($"同じ対象（rg / demo）のジョブ {first.JobId} が実行中です*plan_deletion*");
         release.SetResult(true);
         (await WaitForJob(first.JobId)).Status.Should().Be("succeeded");
+    }
+
+    // ---- HTTP（server 方式）
+
+    [Fact]
+    public async Task PlanDeletion_Should_Reject_A_Resource_Group_Out_Of_The_Server_Scope_Without_Reading_Azure()
+    {
+        var settings = HttpTestSupport.Settings(groups: "/subscriptions/sub/resourceGroups/other");
+        var withRole = Tools(settings, HttpTestSupport.Policy(settings));
+        var withoutRole = Tools(settings, HttpTestSupport.Policy(settings, withRole: false));
+
+        await withRole.Invoking(t => t.PlanDeletion(app_name: "demo", cancellationToken: Ct)).Should().ThrowAsync<McpException>()
+            .WithMessage("リソースグループ rg（サブスクリプション sub）は、このサーバーで操作できる範囲にありません。*");
+        await withoutRole.Invoking(t => t.PlanDeletion(app_name: "demo", cancellationToken: Ct)).Should().ThrowAsync<McpException>()
+            .WithMessage("*Timetracker.Deploy.Server*");
+        await withoutRole.Invoking(t => t.StartDeletion("p", "demo", Ct)).Should().ThrowAsync<McpException>().WithMessage("*Timetracker.Deploy.Server*");
+        _gateway.Invocations.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task PlanDeletion_Should_Show_The_Server_Identity()
+    {
+        var settings = HttpTestSupport.Settings();
+
+        var result = await Tools(settings, HttpTestSupport.Policy(settings)).PlanDeletion(app_name: "demo", cancellationToken: Ct);
+
+        result.Identity.AuthMode.Should().Be("server");
+        result.PlanId.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task StartDeletion_Should_Recheck_The_Server_Scope_Just_Before_Running()
+    {
+        var planId = (await Plan()).PlanId!;
+        var settings = HttpTestSupport.Settings(groups: "/subscriptions/sub/resourceGroups/other");
+
+        var act = () => Tools(settings, HttpTestSupport.Policy(settings)).StartDeletion(planId, "demo", Ct);
+
+        await act.Should().ThrowAsync<McpException>().WithMessage("リソースグループ rg（サブスクリプション sub）は、このサーバーで操作できる範囲にありません。*");
+        _deleted.Should().BeEmpty();
     }
 }

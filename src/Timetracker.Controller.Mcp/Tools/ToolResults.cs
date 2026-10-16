@@ -19,9 +19,12 @@ public sealed record DefaultValues(
 public sealed record AppNameRule(int MinLength, int MaxLength, string Pattern, bool NoDoubleHyphen);
 
 /// <summary>サーバーの設定の状態。パスワードは値を返さず、環境変数が設定済みかだけを返す。</summary>
+/// <param name="AllowedResourceGroups">HTTP（server 方式）で操作できるリソースグループ（stdio では null）</param>
+/// <param name="CanCreateResourceGroup">HTTP（server 方式）でリソースグループを作成できるか（stdio では null）</param>
 public sealed record ServerStatus(
     string Transport, string AuthMode, PasswordEnvStatus PasswordEnv,
-    bool DefaultSubscriptionSet, bool DefaultResourceGroupSet, string? OutputRoot);
+    bool DefaultSubscriptionSet, bool DefaultResourceGroupSet, string? OutputRoot,
+    IReadOnlyList<string>? AllowedResourceGroups = null, bool? CanCreateResourceGroup = null);
 
 public sealed record PasswordEnvStatus(bool DbPassword, bool TrackerPassword);
 
@@ -51,3 +54,12 @@ public sealed record ComposeResult(
 public sealed record SubscriptionsResult(string AuthMode, IReadOnlyList<SubscriptionItem> Subscriptions);
 
 public sealed record SubscriptionItem(string SubscriptionId, string DisplayName, string? State, string? TenantId);
+
+/// <summary>HTTP の generate_compose の結果（.env のパスワードはプレースホルダー）。</summary>
+public sealed record ComposeContentResult(
+    string ComposeFileName,
+    string ComposeContent,
+    string EnvFileName,
+    string EnvContent,
+    IReadOnlyList<string> Warnings,
+    IReadOnlyList<string> NextSteps);

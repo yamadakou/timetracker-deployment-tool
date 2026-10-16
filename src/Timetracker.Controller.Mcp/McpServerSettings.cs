@@ -21,11 +21,31 @@ public sealed record McpServerSettings
 
     public bool Verbose { get; init; }
 
-    /// <summary>環境変数から読む。空文字は未設定として扱う。</summary>
+    /// <summary>HTTP で公開する場合の設定（stdio では null）。</summary>
+    public McpHttpSettings? Http { get; init; }
+
+    /// <summary>
+    /// 環境変数（と起動引数 --transport）から読む。空文字は未設定として扱う。
+    /// HTTP では、パスワードと出力先の環境変数は読まない（全利用者で共有になるため。全体設計 4.10）。
+    /// </summary>
     /// <exception cref="ArgumentException">値が不正な場合（起動時にエラーにする）</exception>
-    public static McpServerSettings FromEnvironment(Func<string, string?> getEnvironmentVariable)
+    public static McpServerSettings FromEnvironment(Func<string, string?> getEnvironmentVariable, IReadOnlyList<string>? args = null)
     {
         string? Get(string name) => getEnvironmentVariable(name) is { Length: > 0 } value ? value : null;
+
+        var transport = (TransportArgument(args ?? []) ?? Get("TT_MCP_TRANSPORT") ?? "stdio").ToLowerInvariant();
+        if (transport == "http")
+        {
+            return new McpServerSettings
+            {
+                Http = McpHttpSettings.FromEnvironment(Get),
+                DefaultSubscription = Get("TT_MCP_DEFAULT_SUBSCRIPTION"),
+                DefaultResourceGroup = Get("TT_MCP_DEFAULT_RESOURCE_GROUP"),
+                Verbose = Get("TT_MCP_VERBOSE") is "true" or "1",
+            };
+        }
+        if (transport != "stdio")
+            throw new ArgumentException($"トランスポート '{transport}' は無効です。stdio または http を指定してください。");
 
         var authMode = Get("TT_MCP_AUTH_MODE") ?? DefaultAuthMode;
         if (!CredentialFactory.AuthModes.Contains(authMode.ToLowerInvariant()))
@@ -46,5 +66,16 @@ public sealed record McpServerSettings
             OutputRoot = outputRoot == null ? null : Path.TrimEndingDirectorySeparator(Path.GetFullPath(outputRoot)),
             Verbose = Get("TT_MCP_VERBOSE") is "true" or "1",
         };
+    }
+
+    /// <summary>Azure を操作する資格情報の認証モード（HTTP ではサーバーの ID）。</summary>
+    public string AzureAuthMode => Http?.ServerIdentity ?? AuthMode;
+
+    private static string? TransportArgument(IReadOnlyList<string> args)
+    {
+        var index = args.ToList().IndexOf("--transport");
+        if (index < 0)
+            return null;
+        return index + 1 < args.Count ? args[index + 1] : throw new ArgumentException("--transport の値（stdio または http）を指定してください。");
     }
 }

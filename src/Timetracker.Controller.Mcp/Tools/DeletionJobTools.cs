@@ -22,17 +22,19 @@ public sealed class DeletionJobTools
 
     private readonly McpServerSettings _settings;
     private readonly ICallerContext _caller;
+    private readonly IAzureAccessPolicy _policy;
     private readonly IPlanStore _plans;
     private readonly JobManager _jobs;
     private readonly Func<IDeploymentLogger, IAzureDeploymentGateway> _gatewayFactory;
     private readonly ILogger<DeletionJobTools> _logger;
 
     public DeletionJobTools(
-        McpServerSettings settings, ICallerContext caller, IPlanStore plans, JobManager jobs,
+        McpServerSettings settings, ICallerContext caller, IAzureAccessPolicy policy, IPlanStore plans, JobManager jobs,
         Func<IDeploymentLogger, IAzureDeploymentGateway> gatewayFactory, ILogger<DeletionJobTools> logger)
     {
         _settings = settings;
         _caller = caller;
+        _policy = policy;
         _plans = plans;
         _jobs = jobs;
         _gatewayFactory = gatewayFactory;
@@ -53,7 +55,8 @@ public sealed class DeletionJobTools
                      "別のアプリ・ツールの管理タグがあるものは対象にしない")] bool include_untagged = false,
         CancellationToken cancellationToken = default)
     {
-        var o = ToolSupport.ResolveTarget(_settings, subscription, resource_group, app_name);
+        _policy.RequireAzureAccess();
+        var o = ToolSupport.ResolveTarget(_settings, _policy, subscription, resource_group, app_name);
         var plan = await PlanAsync(o.Subscription, o.ResourceGroup, o.AppName, include_untagged, cancellationToken);
 
         var blockers = Blockers(plan);
@@ -71,7 +74,7 @@ public sealed class DeletionJobTools
             PlanId: saved?.PlanId,
             ExpiresAt: saved?.ExpiresAt,
             Blockers: blockers,
-            Identity: new IdentityInfo(_settings.AuthMode, DeploymentJobTools.IdentityDisplays[_settings.AuthMode]),
+            Identity: _policy.Identity,
             PermissionCheck: DeploymentJobTools.ToPermissionCheckInfo(plan.PermissionCheck),
             Targets: plan.Targets.Select(ToTargetInfo).ToList(),
             Kept: [$"resource_group: {o.ResourceGroup}（削除しません。不要であれば Azure ポータルや az group delete で削除してください）"],
@@ -91,6 +94,7 @@ public sealed class DeletionJobTools
         [Description("確認のためのアプリ名（計画のアプリ名と完全に一致すること）")] string confirm_app_name,
         CancellationToken cancellationToken = default)
     {
+        _policy.RequireAzureAccess();
         var plan = DeploymentJobTools.RequirePlan(_plans.Find<DeletionPlan>(plan_id, _caller.CallerId), plan_id, "plan_deletion");
         // 一致しない場合は計画を使用済みにしない（利用者に確認して、同じ計画で実行し直せるように）
         if (confirm_app_name != plan.AppName)
@@ -99,7 +103,9 @@ public sealed class DeletionJobTools
                 "削除してよいかとアプリ名を利用者に確認してください。");
         plan = DeploymentJobTools.RequirePlan(_plans.Take<DeletionPlan>(plan_id, _caller.CallerId), plan_id, "plan_deletion");
 
-        // 計画の後に Azure の状態が変わっていないかを、実行の直前にもう一度確かめる
+        // 操作してよい範囲（サーバーの設定）と、計画の後に Azure の状態が変わっていないかを、実行の直前にもう一度確かめる
+        if (_policy.ResourceGroupBlocker(plan.Subscription, plan.ResourceGroup) is { } outOfScope)
+            throw new McpException(outOfScope);
         var current = await PlanAsync(plan.Subscription, plan.ResourceGroup, plan.AppName, plan.IncludeUntagged, cancellationToken);
         var blockers = Blockers(current);
         if (blockers.Count > 0)

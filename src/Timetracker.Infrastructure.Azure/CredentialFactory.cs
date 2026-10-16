@@ -82,9 +82,21 @@ public static class CredentialFactory
             return Task.CompletedTask;
         };
 
-    private static TokenCredential CreateManagedIdentityCredential(IDeploymentLogger logger)
+    private static TokenCredential CreateManagedIdentityCredential(IDeploymentLogger logger) =>
+        CreateManagedIdentityCredential(logger, Environment.GetEnvironmentVariable("AZURE_CLIENT_ID"));
+
+    /// <summary>
+    /// 環境変数 AZURE_CLIENT_ID があればユーザー割り当て、無ければシステム割り当てのマネージド ID を使う
+    /// （Container Apps などで、ユーザー割り当ての ID を割り当てた場合）。
+    /// </summary>
+    internal static TokenCredential CreateManagedIdentityCredential(IDeploymentLogger logger, string? clientId)
     {
-        logger.Verbose("ManagedIdentityCredential を使用します");
-        return new ManagedIdentityCredential(ManagedIdentityId.SystemAssigned);
+        if (string.IsNullOrWhiteSpace(clientId))
+        {
+            logger.Verbose("ManagedIdentityCredential を使用します（システム割り当て）");
+            return new ManagedIdentityCredential(ManagedIdentityId.SystemAssigned);
+        }
+        logger.Verbose($"ManagedIdentityCredential を使用します（ユーザー割り当て: {clientId}）");
+        return new ManagedIdentityCredential(ManagedIdentityId.FromUserAssignedClientId(clientId));
     }
 }

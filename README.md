@@ -342,8 +342,8 @@ az provider show --namespace Microsoft.OperationalInsights --query "registration
 #### 認証モード: `managed-identity` (ManagedIdentityCredential)
 
 ##### 前提環境
-- Azure VM、Azure App Service、Azure Container Instances、または Azure Functions 上で実行
-- 実行環境に Managed Identity が有効化されていること
+- Azure VM、Azure App Service、Azure Container Instances、Azure Container Apps、または Azure Functions 上で実行
+- 実行環境に Managed Identity が有効化されていること（環境変数 `AZURE_CLIENT_ID` があればそのクライアント ID のユーザー割り当て Managed Identity、無ければシステム割り当て Managed Identity を使います）
 - Azure 上で実行する場合の推奨認証モード（認証情報の管理が不要）
 - 必要な RBAC ロール: Managed Identity に [必要な RBAC ロールと権限](#必要な-rbac-ロールと権限) のロールを付与
 - 参考: [Managed Identity](https://learn.microsoft.com/ja-jp/azure/active-directory/managed-identities-azure-resources/overview)
@@ -594,6 +594,10 @@ claude mcp add timetracker `
 - 「rg-tt-demo の Timetracker を削除してください」→ `plan_deletion` の結果（削除するもの・残すもの）が示されるので、確認してアプリ名を入力します
 
 計画とジョブはサーバーのプロセスの中にだけ保存されます。アシスタントを再起動すると消えますが、Azure の状態は `get_deployment_info` でいつでも確認できます。
+
+#### HTTP で共有する（開発中）
+
+チームで 1 つのサーバーを共有できるよう、HTTP（Streamable HTTP）で動かすコンテナイメージ（`ghcr.io/yamadakou/timetracker-mcp`）を用意しています。呼び出し元は Microsoft Entra ID のアクセストークンで認証し、Azure はサーバーのマネージド ID で、許可したリソースグループだけを操作します。Azure Container Apps への配置とアプリ登録の手順は今後追加します（設定と動作は [docs/design/mcp-phase4a.md](docs/design/mcp-phase4a.md)）。
 
 ### コマンドパラメータの説明一覧
 以下は `deploy`（サブコマンドを省略した場合も `deploy`）のオプションです。`delete` のオプションは[リソースの削除（delete）](#リソースの削除delete)を参照してください。

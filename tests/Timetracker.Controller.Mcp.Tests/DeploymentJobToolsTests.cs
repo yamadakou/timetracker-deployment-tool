@@ -11,6 +11,7 @@ using Timetracker.Controller.Mcp.Tools;
 using Timetracker.Domain.Azure;
 using Timetracker.Domain.Deployment;
 using Timetracker.Infrastructure.Azure;
+using Timetracker.Controller.Mcp.Tests.Http;
 using Xunit;
 
 namespace Timetracker.Controller.Mcp.Tests;
@@ -53,8 +54,8 @@ public sealed class DeploymentJobToolsTests
             .ReturnsAsync([]);
     }
 
-    private DeploymentJobTools Tools(McpServerSettings? settings = null) => new(
-        settings ?? Settings, new LocalCallerContext(), _plans, _jobs,
+    private DeploymentJobTools Tools(McpServerSettings? settings = null, IAzureAccessPolicy? policy = null) => new(
+        settings ?? Settings, new LocalCallerContext(), policy ?? new UnrestrictedAccessPolicy(settings ?? Settings), _plans, _jobs,
         logger => { _gatewayLoggers.Add(logger); return _gateway.Object; },
         NullLogger<DeploymentJobTools>.Instance);
 
@@ -377,5 +378,93 @@ public sealed class DeploymentJobToolsTests
         await noTarget.Should().ThrowAsync<McpException>().WithMessage("subscription と resource_group を指定してください*");
         await noResourceGroup.Should().ThrowAsync<McpException>().WithMessage("resource_group を指定してください*");
         await badName.Should().ThrowAsync<McpException>().WithMessage("アプリ名 '-bad'*");
+    }
+
+    // ---- HTTP（server 方式）
+
+    [Fact]
+    public async Task PlanDeployment_Should_Block_A_Resource_Group_Out_Of_The_Server_Scope_Without_Reading_Azure()
+    {
+        var settings = HttpTestSupport.Settings(groups: "/subscriptions/sub/resourceGroups/other");
+
+        var result = await Tools(settings, HttpTestSupport.Policy(settings)).PlanDeployment(
+            app_name: "demo", db_password: DbPassword, tracker_password: TrackerPassword, cancellationToken: Ct);
+
+        result.PlanId.Should().BeNull();
+        result.Blockers.Should().ContainSingle().Which.Should().StartWith("リソースグループ rg（サブスクリプション sub）は、このサーバーで操作できる範囲にありません。");
+        result.Identity.Should().Be(new IdentityInfo("server", "MCP サーバーのマネージド ID（server 方式）"));
+        result.PermissionCheck.Status.Should().Be("not_checked");
+        _gateway.Invocations.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PlanDeployment_Should_Block_A_Missing_Resource_Group_Unless_The_Server_Can_Create_It(bool canCreate)
+    {
+        _gateway.Setup(g => g.GetResourceGroupAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync((ResourceGroupInfo?)null);
+        var settings = HttpTestSupport.Settings(canCreate);
+
+        var result = await Tools(settings, HttpTestSupport.Policy(settings)).PlanDeployment(
+            app_name: "demo", db_password: DbPassword, tracker_password: TrackerPassword, cancellationToken: Ct);
+
+        if (canCreate)
+        {
+            result.PlanId.Should().NotBeNull();
+            result.Blockers.Should().BeEmpty();
+        }
+        else
+        {
+            result.PlanId.Should().BeNull();
+            result.Blockers.Should().Equal(string.Format(DeploymentJobTools.CannotCreateResourceGroup, "rg"));
+        }
+    }
+
+    [Fact]
+    public async Task PlanDeployment_Should_Ask_For_Password_Arguments_Over_Http()
+    {
+        var settings = HttpTestSupport.Settings();
+
+        var result = await Tools(settings, HttpTestSupport.Policy(settings)).PlanDeployment(app_name: "demo", cancellationToken: Ct);
+
+        result.Blockers.Should().Contain(b => b.StartsWith("db_password が未設定です。引数で指定してください（HTTP"))
+            .And.Contain(b => b.StartsWith("tracker_password が未設定です。引数で指定してください（HTTP"));
+    }
+
+    [Fact]
+    public async Task Azure_Tools_Should_Require_The_Server_Role()
+    {
+        var settings = HttpTestSupport.Settings();
+        var tools = Tools(settings, HttpTestSupport.Policy(settings, withRole: false));
+
+        await tools.Invoking(t => t.PlanDeployment(cancellationToken: Ct)).Should().ThrowAsync<McpException>().WithMessage("*Timetracker.Deploy.Server*");
+        await tools.Invoking(t => t.StartDeployment("p", cancellationToken: Ct)).Should().ThrowAsync<McpException>().WithMessage("*Timetracker.Deploy.Server*");
+        await tools.Invoking(t => t.GetDeploymentInfo(cancellationToken: Ct)).Should().ThrowAsync<McpException>().WithMessage("*Timetracker.Deploy.Server*");
+        _gateway.Invocations.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task StartDeployment_Should_Recheck_The_Server_Scope_Just_Before_Running()
+    {
+        ExistingResourceGroup();
+        var planId = (await Plan()).PlanId!;
+        // 計画の後にサーバーの設定が変わり、範囲外になった
+        var settings = HttpTestSupport.Settings(groups: "/subscriptions/sub/resourceGroups/other");
+
+        var act = () => Tools(settings, HttpTestSupport.Policy(settings)).StartDeployment(planId, cancellationToken: Ct);
+
+        (await act.Should().ThrowAsync<McpException>()).Which.Message.Should().StartWith("実行の直前の確認で、実行できない状態になっていました").And.Contain("操作できる範囲にありません");
+        _jobs.List(LocalCallerContext.Id, null).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetDeploymentInfo_Should_Reject_A_Resource_Group_Out_Of_The_Server_Scope()
+    {
+        var settings = HttpTestSupport.Settings();
+
+        var act = () => Tools(settings, HttpTestSupport.Policy(settings)).GetDeploymentInfo(resource_group: "other", cancellationToken: Ct);
+
+        await act.Should().ThrowAsync<McpException>().WithMessage("リソースグループ other（サブスクリプション sub）は、このサーバーで操作できる範囲にありません。*");
+        _gateway.Invocations.Should().BeEmpty();
     }
 }

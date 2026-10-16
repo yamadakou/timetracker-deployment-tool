@@ -8,6 +8,7 @@ using Moq;
 using Timetracker.Controller.Mcp.Tools;
 using Timetracker.Domain.Deployment;
 using Timetracker.Infrastructure.Azure;
+using Timetracker.Controller.Mcp.Tests.Http;
 using Xunit;
 
 namespace Timetracker.Controller.Mcp.Tests;
@@ -26,8 +27,14 @@ public sealed class DeploymentToolsTests : IDisposable
             Directory.Delete(_root, recursive: true);
     }
 
-    private DeploymentTools Tools(McpServerSettings? settings = null, Func<ISubscriptionDirectory>? directory = null) =>
-        new(settings ?? new McpServerSettings(), directory ?? (() => _directory.Object), NullLogger<DeploymentTools>.Instance);
+    private DeploymentTools Tools(McpServerSettings? settings = null, Func<ISubscriptionDirectory>? directory = null, IAzureAccessPolicy? policy = null)
+    {
+        settings ??= new McpServerSettings();
+        return new(settings, policy ?? new UnrestrictedAccessPolicy(settings), directory ?? (() => _directory.Object), NullLogger<DeploymentTools>.Instance);
+    }
+
+    private static ComposeFileTools FileTools(McpServerSettings? settings = null) =>
+        new(settings ?? new McpServerSettings(), NullLogger<ComposeFileTools>.Instance);
 
     private static string Json(object value) => JsonSerializer.Serialize(value, McpServerHost.JsonOptions);
 
@@ -138,8 +145,8 @@ public sealed class DeploymentToolsTests : IDisposable
 
     // ---- generate_compose
 
-    private DeploymentTools ComposeTools(string? outputRoot = null) =>
-        Tools(new McpServerSettings { DbPassword = DbPassword, TrackerPassword = TrackerPassword, OutputRoot = outputRoot });
+    private static ComposeFileTools ComposeTools(string? outputRoot = null) =>
+        FileTools(new McpServerSettings { DbPassword = DbPassword, TrackerPassword = TrackerPassword, OutputRoot = outputRoot });
 
     [Theory]
     [InlineData("postgresql")]
@@ -170,7 +177,7 @@ public sealed class DeploymentToolsTests : IDisposable
     {
         var dir = Path.Combine(_root, "args");
 
-        var result = Tools().GenerateCompose(dir, db_password: "ArgDbPass1!", tracker_password: "ArgTracker1!", tt_memory_gi: 2);
+        var result = FileTools().GenerateCompose(dir, db_password: "ArgDbPass1!", tracker_password: "ArgTracker1!", tt_memory_gi: 2);
 
         File.ReadAllText(result.EnvPath).Should().Contain("DB_PASSWORD=\"ArgDbPass1!\"").And.Contain("TIMETRACKER_PASSWORD=\"ArgTracker1!\"");
         result.Warnings.Should().ContainSingle().Which.Should().Contain("OutOfMemory");
@@ -192,7 +199,7 @@ public sealed class DeploymentToolsTests : IDisposable
     {
         var dir = Path.Combine(_root, "invalid");
 
-        var act = () => Tools().GenerateCompose(dir, db_type: "mysql");
+        var act = () => FileTools().GenerateCompose(dir, db_type: "mysql");
 
         act.Should().Throw<McpException>().WithMessage("設定に誤りがあるため、ファイルを生成しませんでした:*db-type*db_password が未設定です*tracker_password が未設定です*");
         Directory.Exists(dir).Should().BeFalse();
@@ -343,5 +350,71 @@ public sealed class DeploymentToolsTests : IDisposable
         var act = () => tools.ListSubscriptions(TestContext.Current.CancellationToken);
 
         await act.Should().ThrowAsync<McpException>().WithMessage("sp-env モードで必要な環境変数が不足しています。");
+    }
+
+    // ---- HTTP（server 方式）
+
+    [Fact]
+    public void GetDeploymentOptions_Should_Describe_The_Http_Server()
+    {
+        var settings = HttpTestSupport.Settings(canCreate: true);
+
+        var result = Tools(settings, policy: HttpTestSupport.Policy(settings)).GetDeploymentOptions();
+
+        result.Server.Should().BeEquivalentTo(new ServerStatus(
+            "http", "server", new PasswordEnvStatus(false, false), true, true, null, [HttpTestSupport.AllowedGroup], true));
+    }
+
+    [Fact]
+    public void ValidateDeployment_Should_Ask_For_Password_Arguments_Over_Http()
+    {
+        var settings = HttpTestSupport.Settings();
+
+        var result = Tools(settings, policy: HttpTestSupport.Policy(settings)).ValidateDeployment();
+
+        result.Errors.Should().Contain(e => e.Contains("HTTP のサーバーでは、パスワードの環境変数は使えません"));
+    }
+
+    [Fact]
+    public async Task ListSubscriptions_Should_Require_The_Server_Role()
+    {
+        var settings = HttpTestSupport.Settings();
+        _directory.Setup(d => d.ListAsync(It.IsAny<CancellationToken>())).ReturnsAsync([]);
+
+        var denied = () => Tools(settings, policy: HttpTestSupport.Policy(settings, withRole: false)).ListSubscriptions(TestContext.Current.CancellationToken);
+        var allowed = await Tools(settings, policy: HttpTestSupport.Policy(settings)).ListSubscriptions(TestContext.Current.CancellationToken);
+
+        await denied.Should().ThrowAsync<McpException>().WithMessage("*Timetracker.Deploy.Server*");
+        allowed.AuthMode.Should().Be("server");
+    }
+
+    [Theory]
+    [InlineData("postgresql", "DB_PASSWORD に任意のパスワードを設定する")]
+    [InlineData("sqlserver", "SQL Server のパスワード要件")]
+    public void GenerateComposeContent_Should_Return_The_Files_With_Password_Placeholders(string dbType, string passwordRule)
+    {
+        var result = new ComposeContentTools(HttpTestSupport.Settings()).GenerateCompose(app_name: "Demo", db_type: dbType, db_name: "db");
+
+        var expected = DeployOptionsResolver.Resolve(new DeployInput
+        {
+            AppName = "Demo", DbType = dbType, DbName = "db",
+            DbPassword = ComposeContentTools.DbPasswordPlaceholder, TrackerPassword = ComposeContentTools.TrackerPasswordPlaceholder,
+        });
+        result.ComposeFileName.Should().Be("docker-compose.yml");
+        result.EnvFileName.Should().Be(".env");
+        result.ComposeContent.Should().Be(ComposeGenerator.GenerateCompose(expected));
+        result.EnvContent.Should().Be(ComposeGenerator.GenerateEnv(expected))
+            .And.Contain("DB_PASSWORD=\"<DB パスワードを設定>\"").And.Contain("TIMETRACKER_PASSWORD=\"<Timetracker のパスワードを設定>\"");
+        result.Warnings.Should().BeEmpty();
+        result.NextSteps.Should().Contain(s => s.Contains(passwordRule));
+        Json(result).Should().NotContain("Placeholder-Passw0rd");
+    }
+
+    [Fact]
+    public void GenerateComposeContent_Should_Reject_Invalid_Settings()
+    {
+        var act = () => new ComposeContentTools(HttpTestSupport.Settings()).GenerateCompose(db_type: "mysql");
+
+        act.Should().Throw<McpException>().WithMessage("設定に誤りがあるため、生成しませんでした:*");
     }
 }

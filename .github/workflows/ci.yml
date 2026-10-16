@@ -74,3 +74,29 @@ jobs:
       with:
         name: e2e-local-results-${{ matrix.db-type }}
         path: TestResults
+
+  # MCP サーバー（HTTP）のコンテナイメージがビルドでき、起動して /healthz に応答し、トークンなしの /mcp を 401 にすることを確かめる（push はしない）
+  docker-mcp:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Build image
+      run: docker build -t timetracker-mcp:ci .
+
+    - name: Smoke test
+      run: |
+        docker run -d --name ttmcp -p 8080:8080 \
+          -e TT_MCP_HTTP__TENANT_ID=00000000-0000-0000-0000-000000000001 \
+          -e TT_MCP_HTTP__CLIENT_ID=00000000-0000-0000-0000-000000000002 \
+          -e TT_MCP_HTTP__PUBLIC_URL=https://mcp.example.com/mcp \
+          -e TT_MCP_HTTP__SERVER_ALLOWED_RESOURCE_GROUPS=/subscriptions/00000000-0000-0000-0000-000000000003/resourceGroups/rg \
+          timetracker-mcp:ci
+        for i in $(seq 1 30); do curl -sf http://localhost:8080/healthz && break; sleep 1; done
+        test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/healthz)" = 200
+        test "$(curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:8080/mcp -H 'Content-Type: application/json' -d '{}')" = 401
+        test "$(docker exec ttmcp id -u)" != 0
+        docker logs ttmcp
