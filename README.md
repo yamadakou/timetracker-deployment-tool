@@ -554,7 +554,13 @@ claude mcp add timetracker `
 }
 ```
 
-**VS Code**（`.vscode/mcp.json`。パスワードは初回の起動時に入力欄で尋ねられ、ファイルには書かれません）:
+**VS Code**（パスワードは初回の起動時に入力欄で尋ねられ、ファイルには書かれません）:
+
+設定ファイル `mcp.json` は、次のどちらかに置きます。どのフォルダーを開いていても使えるよう、ユーザー単位の設定をおすすめします。
+- **ユーザー単位**: コマンド パレット（`Ctrl+Shift+P`）で **MCP: Open User Configuration** を実行すると開くファイル（Windows の既定では `%APPDATA%\Code\User\mcp.json`。プロファイルを使い分けている場合はプロファイルごとのフォルダー）
+- **ワークスペース単位**: VS Code で開いているフォルダーの直下の `.vscode\mcp.json`（**MCP: Open Workspace Folder MCP Configuration** で開けます）。そのフォルダーを開いたときだけ使われ、ほかのフォルダーを開いているときや、ファイルを置いたフォルダーの親を開いているときは認識されません
+
+既に `mcp.json` がある場合は、ファイルを置き換えずに、既存の `servers` と `inputs` の中に下の `timetracker` と 2 つの入力を追記します。入力の参照は `${input:<id>}`（`input` は単数形）と書きます（[VS Code の MCP 設定のリファレンス](https://code.visualstudio.com/docs/copilot/reference/mcp-configuration)）。保存したあと、拡張機能ビューの「MCP サーバー」または **MCP: List Servers** で `timetracker` を起動します。
 ```json
 {
   "inputs": [
