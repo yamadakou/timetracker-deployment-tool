@@ -4,12 +4,12 @@
 
 CLI と同じ機能を、MCP（Model Context Protocol）に対応した AI アシスタント（Claude Code、VS Code の GitHub Copilot、Claude Desktop など）から、対話しながら使えます。
 
-MCP サーバーには次の 2 つの形態があります。現在提供しているのは stdio 版だけです。
+MCP サーバーには次の 2 つの形態があります。現在提供しているのは stdio 版だけで、HTTP 版は開発中です。
 
 | 形態 | 状況 | 動く場所 | 向いている使い方 |
 |---|---|---|---|
 | [stdio 版](#stdio-版) | 提供中 | 利用者の PC（アシスタントが `timetracker-mcp.exe` を子プロセスとして起動し、標準入出力で通信） | 自分の Azure の権限（`az login` など）で、自分の PC から使う |
-| [HTTP 版](#http-版予定) | **予定（未提供）** | Azure Container Apps などのサーバー（アシスタントは URL で接続） | チームで 1 つのサーバーを共有し、決まったリソースグループに検証環境を作る |
+| [HTTP 版](#http-版開発中) | **開発中（未提供）** | Azure Container Apps などのサーバー（アシスタントは URL で接続） | チームで 1 つのサーバーを共有し、決まったリソースグループに検証環境を作る |
 
 ## stdio 版
 
@@ -133,36 +133,52 @@ claude mcp add timetracker `
 
 計画とジョブはサーバーのプロセスの中にだけ保存されます。アシスタントを再起動すると消えますが、Azure の状態は `get_deployment_info` でいつでも確認できます。
 
-## HTTP 版（予定）
+## HTTP 版（開発中）
 
 > [!NOTE]
-> HTTP 版はまだ提供していません。ここでは、利用を検討できるよう予定している仕組みの概要だけを示します。導入の手順と設定例は、提供時（[設計書](MCP_TOOL_DESIGN.md)の Phase 4）にこの節に追記します。内容は提供までに変わることがあります。
+> HTTP 版は開発中で、まだ提供していません。サーバーの本体（HTTP トランスポート、Entra ID による呼び出し元の認証、`server` 方式）とコンテナイメージはできていますが、Azure Container Apps への配置、Entra ID のアプリ登録、アシスタントからの接続の手順は、確認が済んでからこの節に追記します。内容は提供までに変わることがあります。
+
+### 開発の段階
+
+| 段階 | 内容 | 状況 |
+|---|---|---|
+| 4a | HTTP トランスポート、Entra ID のアクセストークンの検証、アプリロール、呼び出し元ごとの計画・ジョブ、`server` 方式（許可したリソースグループだけ）、HTTP 用の `generate_compose`、コンテナイメージ | 実装済み（自動テストとローカルの Docker で確認） |
+| 4b | `user` 方式（利用者本人の権限）と、方式を選ぶ引数 | 予定 |
+| 4c | Azure Container Apps への配置、Entra ID のアプリ登録、アシスタントからの接続の手順 | 予定 |
 
 ### stdio 版との違い
 
-| 項目 | stdio 版 | HTTP 版（予定） |
+| 項目 | stdio 版 | HTTP 版 |
 |---|---|---|
-| 配布形態 | 単一ファイルの EXE（GitHub Releases の zip） | コンテナイメージ。Azure Container Apps などに配置する |
-| アシスタントの接続 | 子プロセスとして起動する（`command` にパスを指定） | URL で接続する（例: `https://<サーバー>/mcp`。Streamable HTTP） |
-| 利用者の認証 | 不要（PC の利用者がそのまま使う） | **必須**。Microsoft Entra ID でサインインする（アシスタントが OAuth に対応している必要があります） |
-| Azure を操作する権限 | 利用者の PC の資格情報（`TT_MCP_AUTH_MODE`） | サーバーの設定で、次のどちらか、または両方を使えるようにする<br/>・`server`: サーバーのマネージド ID の権限（管理者が許可したリソースグループだけ）<br/>・`user`: 利用者本人の権限（サインインしたトークンを使う） |
-| だれが使えるか | PC の利用者 | Entra ID のアプリロールで決める（`user` 方式だけ使える人、`server` 方式も使える人） |
-| パスワードの渡し方 | 環境変数（推奨）または引数 | 引数だけ（サーバーの環境変数は全員で共有になるため使わない）。通信は HTTPS |
-| `generate_compose`（Dry-run） | 利用者の PC にファイルを書き出す | ファイルは書き出さず、内容を返す（パスワードはプレースホルダー） |
-| 計画・ジョブ | サーバーのプロセスの中だけに保存 | 同じ。作成した本人だけが実行・参照できる |
+| 配布形態 | 単一ファイルの EXE（GitHub Releases の zip） | コンテナイメージ `ghcr.io/yamadakou/timetracker-mcp`（リリースのタグで公開）。Azure Container Apps などに配置する |
+| アシスタントの接続 | 子プロセスとして起動する（`command` にパスを指定） | URL で接続する（`https://<サーバー>/mcp`。Streamable HTTP）。TLS は前段（Container Apps のイングレスなど）で終端し、コンテナはポート 8080 で待ち受ける |
+| 利用者の認証 | 不要（PC の利用者がそのまま使う） | **必須**。Microsoft Entra ID のアクセストークン（スコープ `Mcp.Access`）で認証する。Entra ID は動的クライアント登録に対応していないため、アシスタントには事前に登録したクライアント ID を設定する |
+| Azure を操作する権限 | 利用者の PC の資格情報（`TT_MCP_AUTH_MODE`） | `server` 方式: サーバーのマネージド ID（またはサービスプリンシパル）の権限で、管理者が許可したリソースグループだけを操作する。`user` 方式（利用者本人の権限）は 4b で追加する |
+| だれが使えるか | PC の利用者 | Entra ID のアプリロールで決める。`Timetracker.Deploy.Server` があればすべてのツール、無ければ Azure を操作しないツール（`get_deployment_options` / `validate_deployment` / `generate_compose`）と文書だけ |
+| パスワードの渡し方 | 環境変数（推奨）または引数 | 引数だけ（サーバーの環境変数は全員で共有になるため読まない） |
+| `generate_compose`（Dry-run） | 利用者の PC にファイルを書き出す | ファイルは書き出さず、`docker-compose.yml` と `.env` の内容を返す（パスワードはプレースホルダー） |
+| 計画・ジョブ | サーバーのプロセスの中だけに保存 | 同じ。利用者ごとに分かれ、作成した本人だけが実行・参照できる。レプリカは 1 つに固定する |
 
 ツール・安全策（計画 → 確認 → 実行、削除時のアプリ名の確認など）は stdio 版と同じです。
 
-### `server` 方式の前提（予定）
+### サーバーの設定（環境変数）
 
-- 管理者が、検証環境を作るリソースグループを事前に作成し、サーバーの設定に許可するリソースグループとして登録します。許可していないリソースグループへの操作は、計画の段階で拒否します
+| 環境変数 | 必須 | 説明 |
+|---|---|---|
+| `TT_MCP_HTTP__TENANT_ID` | ✔ | Entra ID のテナント ID |
+| `TT_MCP_HTTP__CLIENT_ID` | ✔ | MCP サーバーのアプリ登録のクライアント ID |
+| `TT_MCP_HTTP__PUBLIC_URL` | ✔ | 公開する MCP のエンドポイントの URL（`https://…/mcp`） |
+| `TT_MCP_HTTP__SERVER_ALLOWED_RESOURCE_GROUPS` | ✔ | 操作してよいリソースグループ（`/subscriptions/<ID>/resourceGroups/<名前>` のカンマ区切り） |
+| `TT_MCP_HTTP__SERVER_IDENTITY` | – | `server` 方式で使う資格情報。`managed-identity`（既定）/ `sp-env`。ユーザー割り当てのマネージド ID は `AZURE_CLIENT_ID` でクライアント ID を指定する |
+| `TT_MCP_HTTP__SERVER_CAN_CREATE_RESOURCE_GROUP` | – | 許可したリソースグループが無いときに作成してよいか。既定 `false` |
+
+必須の設定が無い、または値が不正な場合、サーバーは理由を出して起動を止めます。`TT_MCP_AUTH_MODE` と、パスワードの環境変数（`TT_MCP_DB_PASSWORD` / `TT_MCP_TRACKER_PASSWORD`）は HTTP 版では使いません。
+
+### `server` 方式の前提
+
+- 管理者が、検証環境を作るリソースグループを事前に作成し、`TT_MCP_HTTP__SERVER_ALLOWED_RESOURCE_GROUPS` に登録します。許可していないリソースグループへの操作は、Azure を読む前に拒否します
 - サーバーのマネージド ID には、そのリソースグループのスコープで Contributor を割り当てます。リソースプロバイダーの登録も管理者が事前に行います
-- Azure のアクティビティログには、すべてサーバーの ID の操作として残ります。だれの操作かは、サーバーのログで確認します
+- 計画の結果には「サーバーの ID（マネージド ID）で実行します」と表示されます
+- Azure のアクティビティログには、すべてサーバーの ID の操作として残ります。だれの操作かは、サーバーのログ（利用者のユーザー名と ID を記録）で確認します
 
-### `user` 方式の前提（予定）
-
-- 利用者本人に、CLI を自分で実行する場合と同じロールが必要です（[必要な RBAC ロールと権限](../README.md#必要な-rbac-ロールと権限)）
-- MCP サーバーの Entra ID アプリ登録に、Azure Service Management の委任アクセス許可を追加し、テナント管理者の同意を得ておく必要があります
-- 条件付きアクセス（MFA の要求など）によっては、再サインインを求められることがあります
-
-詳しい設計は [MCP ツール設計書](MCP_TOOL_DESIGN.md)の「3.3 MCP サーバーの実行形態」「4.10 秘密情報（パスワード）の扱い」「4.11 HTTP 公開時の Azure 資格情報」を参照してください。
+詳しい設計は [HTTP 版の詳細設計（Phase 4a）](design/mcp-phase4a.md)と、[MCP ツール設計書](MCP_TOOL_DESIGN.md)の「3.3 MCP サーバーの実行形態」「4.10 秘密情報（パスワード）の扱い」「4.11 HTTP 公開時の Azure 資格情報」を参照してください。
