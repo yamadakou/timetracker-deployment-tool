@@ -25,6 +25,7 @@ public sealed class DeletionJobToolsTests
     private readonly InMemoryPlanStore _plans;
     private readonly JobManager _jobs;
     private readonly List<string> _deleted = [];
+    private readonly List<Azure.Core.TokenCredential> _credentials = [];
     private IReadOnlyList<PermissionSet> _permissions = [new PermissionSet(["*"], [])];
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
@@ -56,14 +57,20 @@ public sealed class DeletionJobToolsTests
     private void App(string name, IReadOnlyDictionary<string, string>? tags = null) => _apps.Add(new ContainerAppInfo(name, EnvId, tags ?? ManagedTags.For("demo")));
 
     private DeletionJobTools Tools(McpServerSettings? settings = null, IAzureAccessPolicy? policy = null) => new(
-        settings ?? Settings, new LocalCallerContext(), policy ?? new UnrestrictedAccessPolicy(settings ?? Settings), _plans, _jobs, _ => _gateway.Object, NullLogger<DeletionJobTools>.Instance);
+        settings ?? Settings, new LocalCallerContext(), policy ?? new UnrestrictedAccessPolicy(settings ?? Settings), _plans, _jobs,
+        (_, credential) =>
+        {
+            _credentials.Add(credential);
+            return _gateway.Object;
+        },
+        NullLogger<DeletionJobTools>.Instance);
 
     private Task<DeletionPlanResult> Plan(bool includeUntagged = false) => Tools().PlanDeletion(app_name: "demo", include_untagged: includeUntagged, cancellationToken: Ct);
 
     private async Task<JobStatusResult> WaitForJob(string jobId)
     {
         await _jobs.Get(jobId, LocalCallerContext.Id)!.Completion;
-        return new DeploymentJobTools(Settings, new LocalCallerContext(), new UnrestrictedAccessPolicy(Settings), _plans, _jobs, _ => _gateway.Object, NullLogger<DeploymentJobTools>.Instance)
+        return new DeploymentJobTools(Settings, new LocalCallerContext(), new UnrestrictedAccessPolicy(Settings), _plans, _jobs, (_, _) => _gateway.Object, NullLogger<DeploymentJobTools>.Instance)
             .GetJobStatus(jobId);
     }
 
@@ -261,7 +268,7 @@ public sealed class DeletionJobToolsTests
         var withoutRole = Tools(settings, HttpTestSupport.Policy(settings, withRole: false));
 
         await withRole.Invoking(t => t.PlanDeletion(app_name: "demo", cancellationToken: Ct)).Should().ThrowAsync<McpException>()
-            .WithMessage("リソースグループ rg（サブスクリプション sub）は、このサーバーで操作できる範囲にありません。*");
+            .WithMessage("リソースグループ rg（サブスクリプション sub）は、このサーバーで server 方式で操作できる範囲にありません。*");
         await withoutRole.Invoking(t => t.PlanDeletion(app_name: "demo", cancellationToken: Ct)).Should().ThrowAsync<McpException>()
             .WithMessage("*Timetracker.Deploy.Server*");
         await withoutRole.Invoking(t => t.StartDeletion("p", "demo", Ct)).Should().ThrowAsync<McpException>().WithMessage("*Timetracker.Deploy.Server*");
@@ -282,12 +289,34 @@ public sealed class DeletionJobToolsTests
     [Fact]
     public async Task StartDeletion_Should_Recheck_The_Server_Scope_Just_Before_Running()
     {
-        var planId = (await Plan()).PlanId!;
+        var original = HttpTestSupport.Settings();
+        var planId = (await Tools(original, HttpTestSupport.Policy(original)).PlanDeletion(app_name: "demo", cancellationToken: Ct)).PlanId!;
         var settings = HttpTestSupport.Settings(groups: "/subscriptions/sub/resourceGroups/other");
 
         var act = () => Tools(settings, HttpTestSupport.Policy(settings)).StartDeletion(planId, "demo", Ct);
 
-        await act.Should().ThrowAsync<McpException>().WithMessage("リソースグループ rg（サブスクリプション sub）は、このサーバーで操作できる範囲にありません。*");
+        await act.Should().ThrowAsync<McpException>().WithMessage("リソースグループ rg（サブスクリプション sub）は、このサーバーで server 方式で操作できる範囲にありません。*");
         _deleted.Should().BeEmpty();
+    }
+
+    // ---- HTTP（user 方式。詳細設計 Phase 4b）
+
+    [Fact]
+    public async Task Deletion_Should_Run_With_The_Mode_Recorded_In_The_Plan()
+    {
+        // server 方式の範囲（other）の外でも、user 方式なら本人の権限で削除できる
+        var settings = HttpTestSupport.Settings(groups: "/subscriptions/sub/resourceGroups/other", modes: "server,user");
+        var policy = HttpTestSupport.PolicyWithToken(settings, roles: HttpAccessPolicy.UserRole);
+
+        var plan = await Tools(settings, policy).PlanDeletion(app_name: "demo", cancellationToken: Ct);
+        var lostRole = () => Tools(settings, HttpTestSupport.PolicyWithToken(settings)).StartDeletion(plan.PlanId!, "demo", Ct);
+        await lostRole.Should().ThrowAsync<McpException>().WithMessage("このツールを使うには*");
+        var started = await Tools(settings, policy).StartDeletion(plan.PlanId!, "demo", Ct);
+        var status = await WaitForJob(started.JobId);
+
+        plan.Identity.AuthMode.Should().Be("user");
+        status.Status.Should().Be("succeeded");
+        _deleted.Should().Equal("demo-tt", "demo-redis", "demo-db", "demo-env");
+        _credentials.Should().NotBeEmpty().And.AllBeOfType<Azure.Identity.OnBehalfOfCredential>();
     }
 }

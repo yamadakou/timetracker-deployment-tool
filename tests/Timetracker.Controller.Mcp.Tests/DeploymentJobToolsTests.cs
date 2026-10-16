@@ -41,6 +41,7 @@ public sealed class DeploymentJobToolsTests
     private readonly InMemoryPlanStore _plans;
     private readonly JobManager _jobs;
     private readonly List<IDeploymentLogger> _gatewayLoggers = [];
+    private readonly List<Azure.Core.TokenCredential> _credentials = [];
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
@@ -56,7 +57,12 @@ public sealed class DeploymentJobToolsTests
 
     private DeploymentJobTools Tools(McpServerSettings? settings = null, IAzureAccessPolicy? policy = null) => new(
         settings ?? Settings, new LocalCallerContext(), policy ?? new UnrestrictedAccessPolicy(settings ?? Settings), _plans, _jobs,
-        logger => { _gatewayLoggers.Add(logger); return _gateway.Object; },
+        (logger, credential) =>
+        {
+            _gatewayLoggers.Add(logger);
+            _credentials.Add(credential);
+            return _gateway.Object;
+        },
         NullLogger<DeploymentJobTools>.Instance);
 
     private static string Json(object value) => JsonSerializer.Serialize(value, McpServerHost.JsonOptions);
@@ -391,7 +397,7 @@ public sealed class DeploymentJobToolsTests
             app_name: "demo", db_password: DbPassword, tracker_password: TrackerPassword, cancellationToken: Ct);
 
         result.PlanId.Should().BeNull();
-        result.Blockers.Should().ContainSingle().Which.Should().StartWith("リソースグループ rg（サブスクリプション sub）は、このサーバーで操作できる範囲にありません。");
+        result.Blockers.Should().ContainSingle().Which.Should().StartWith("リソースグループ rg（サブスクリプション sub）は、このサーバーで server 方式で操作できる範囲にありません。");
         result.Identity.Should().Be(new IdentityInfo("server", "MCP サーバーのマネージド ID（server 方式）"));
         result.PermissionCheck.Status.Should().Be("not_checked");
         _gateway.Invocations.Should().BeEmpty();
@@ -447,7 +453,9 @@ public sealed class DeploymentJobToolsTests
     public async Task StartDeployment_Should_Recheck_The_Server_Scope_Just_Before_Running()
     {
         ExistingResourceGroup();
-        var planId = (await Plan()).PlanId!;
+        var original = HttpTestSupport.Settings();
+        var planId = (await Tools(original, HttpTestSupport.Policy(original))
+            .PlanDeployment(app_name: "demo", db_password: "Passw0rd!", tracker_password: "Passw0rd!", cancellationToken: Ct)).PlanId!;
         // 計画の後にサーバーの設定が変わり、範囲外になった
         var settings = HttpTestSupport.Settings(groups: "/subscriptions/sub/resourceGroups/other");
 
@@ -464,7 +472,85 @@ public sealed class DeploymentJobToolsTests
 
         var act = () => Tools(settings, HttpTestSupport.Policy(settings)).GetDeploymentInfo(resource_group: "other", cancellationToken: Ct);
 
-        await act.Should().ThrowAsync<McpException>().WithMessage("リソースグループ other（サブスクリプション sub）は、このサーバーで操作できる範囲にありません。*");
+        await act.Should().ThrowAsync<McpException>().WithMessage("リソースグループ other（サブスクリプション sub）は、このサーバーで server 方式で操作できる範囲にありません。*");
         _gateway.Invocations.Should().BeEmpty();
+    }
+
+    // ---- HTTP（user 方式。詳細設計 Phase 4b）
+
+    private static readonly McpServerSettings BothModes = HttpTestSupport.Settings(groups: "/subscriptions/sub/resourceGroups/other", modes: "server,user");
+
+    private Task<DeploymentPlanResult> PlanAsUser(HttpAccessPolicy policy) => Tools(BothModes, policy).PlanDeployment(
+        app_name: "demo", db_password: DbPassword, tracker_password: TrackerPassword, azure_identity: "user", cancellationToken: Ct);
+
+    [Fact]
+    public async Task PlanDeployment_Should_Use_The_Callers_Own_Permissions_In_The_User_Mode()
+    {
+        ExistingResourceGroup();
+
+        // server 方式の範囲（other）の外でも、user 方式なら本人の権限で計画できる
+        var result = await PlanAsUser(HttpTestSupport.PolicyWithToken(BothModes, roles: HttpAccessPolicy.UserRole));
+
+        result.PlanId.Should().NotBeNull();
+        result.Blockers.Should().BeEmpty();
+        result.Identity.Should().Be(new IdentityInfo("user", "サインインした利用者本人の権限（user 方式）"));
+        _credentials.Should().NotBeEmpty().And.AllBeOfType<OnBehalfOfCredential>();
+    }
+
+    [Fact]
+    public async Task StartDeployment_Should_Run_With_The_Mode_Recorded_In_The_Plan()
+    {
+        ExistingResourceGroup();
+        var policy = HttpTestSupport.PolicyWithToken(BothModes, roles: HttpAccessPolicy.ServerRole);
+        var planId = (await PlanAsUser(policy)).PlanId!;
+        _credentials.Clear();
+
+        var started = await Tools(BothModes, policy).StartDeployment(planId, cancellationToken: Ct);
+        await WaitForJob(started.JobId);
+
+        // 実行の直前の確認とジョブのどちらも、計画の方式（user）の資格情報で操作する
+        _credentials.Should().HaveCountGreaterThanOrEqualTo(2).And.AllBeOfType<OnBehalfOfCredential>();
+    }
+
+    [Fact]
+    public async Task StartDeployment_Should_Recheck_The_Role_For_The_Planned_Mode()
+    {
+        ExistingResourceGroup();
+        var settings = HttpTestSupport.Settings(modes: "server,user");
+        var planId = (await Tools(settings, HttpTestSupport.PolicyWithToken(settings, roles: HttpAccessPolicy.ServerRole)).PlanDeployment(
+            app_name: "demo", db_password: DbPassword, tracker_password: TrackerPassword, cancellationToken: Ct)).PlanId!;
+
+        // 計画の後に Timetracker.Deploy.Server のロールが外れた（user 方式は使える）
+        var act = () => Tools(settings, HttpTestSupport.PolicyWithToken(settings, roles: HttpAccessPolicy.UserRole)).StartDeployment(planId, cancellationToken: Ct);
+
+        await act.Should().ThrowAsync<McpException>().WithMessage("server 方式を使うには、MCP サーバーのアプリロール Timetracker.Deploy.Server が必要です（使える方式: user）。");
+        // 計画は使用済みにしない
+        _plans.Find<IdentityPlan<Timetracker.Application.Deployment.DeploymentPlan>>(planId, LocalCallerContext.Id).Status.Should().Be(PlanLookupStatus.Found);
+        _jobs.List(LocalCallerContext.Id, null).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task User_Mode_Should_Explain_How_To_Recover_From_A_Token_Exchange_Failure()
+    {
+        _gateway.Setup(g => g.GetResourceGroupAsync("sub", "rg", It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new AuthenticationFailedException("AADSTS65001: consent required"));
+
+        var act = () => PlanAsUser(HttpTestSupport.PolicyWithToken(BothModes, roles: HttpAccessPolicy.UserRole));
+
+        await act.Should().ThrowAsync<McpException>().WithMessage($"Azure の認証に失敗しました（user 方式（利用者本人の権限））。{HttpAccessPolicy.UserAuthHint}");
+    }
+
+    [Fact]
+    public async Task GetDeploymentInfo_Should_Accept_The_Azure_Identity()
+    {
+        _gateway.Setup(g => g.ListContainerAppDetailsAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync([]);
+
+        var info = await Tools(BothModes, HttpTestSupport.PolicyWithToken(BothModes, roles: HttpAccessPolicy.UserRole))
+            .GetDeploymentInfo(app_name: "demo", azure_identity: "user", cancellationToken: Ct);
+        var stdio = () => Tools().GetDeploymentInfo(app_name: "demo", azure_identity: "user", cancellationToken: Ct);
+
+        info.AppName.Should().Be("demo");
+        _credentials.Should().ContainSingle().Which.Should().BeOfType<OnBehalfOfCredential>();
+        await stdio.Should().ThrowAsync<McpException>().WithMessage("azure_identity は HTTP のサーバーでだけ指定できます*");
     }
 }

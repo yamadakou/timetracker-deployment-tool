@@ -1,3 +1,4 @@
+using Azure.Core;
 using Azure.Identity;
 using FluentAssertions;
 using Moq;
@@ -144,5 +145,34 @@ public class CredentialFactoryTests
         await callback(default, TestContext.Current.CancellationToken);
 
         output.ToString().Should().Contain("[INFO] デバイスコード認証:");
+    }
+
+    [Fact]
+    public void CreateOnBehalfOf_Should_Use_The_Client_Secret_Or_The_Managed_Identity()
+    {
+        var output = new StringWriter();
+        var logger = new SimpleLogger(verbose: true, output, new StringWriter());
+
+        // 作るだけでは Entra ID に接続しない
+        CredentialFactory.CreateOnBehalfOf("tenant", "client", "secret", "user-token", logger).Should().BeOfType<OnBehalfOfCredential>();
+        CredentialFactory.CreateOnBehalfOf("tenant", "client", null, "user-token", logger).Should().BeOfType<OnBehalfOfCredential>();
+
+        output.ToString().Should().Contain("OnBehalfOfCredential を使用します（クライアントシークレット）")
+            .And.Contain("OnBehalfOfCredential を使用します（マネージド ID のフェデレーション資格情報）")
+            .And.NotContain("secret").And.NotContain("user-token");
+    }
+
+    [Fact]
+    public async Task ClientAssertion_Should_Return_The_Managed_Identity_Token_For_The_Token_Exchange()
+    {
+        var managedIdentity = new Mock<TokenCredential>();
+        managedIdentity
+            .Setup(c => c.GetTokenAsync(It.Is<TokenRequestContext>(r => r.Scopes.SequenceEqual(new[] { CredentialFactory.TokenExchangeScope })), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AccessToken("mi-token", DateTimeOffset.UtcNow.AddHours(1)));
+
+        var assertion = await CredentialFactory.ClientAssertion(managedIdentity.Object)(TestContext.Current.CancellationToken);
+
+        assertion.Should().Be("mi-token");
+        CredentialFactory.TokenExchangeScope.Should().Be("api://AzureADTokenExchange/.default");
     }
 }

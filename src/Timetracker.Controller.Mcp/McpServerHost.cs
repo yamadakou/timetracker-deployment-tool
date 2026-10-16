@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
+using Azure.Core;
 using Azure.ResourceManager;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -104,7 +105,7 @@ public static class McpServerHost
         AddServices(builder.Services, settings);
         builder.Services.AddHttpContextAccessor();
         builder.Services.AddSingleton<ICallerContext, HttpCallerContext>();
-        builder.Services.AddSingleton<IAzureAccessPolicy, ServerAccessPolicy>();
+        builder.Services.AddSingleton<IAzureAccessPolicy, HttpAccessPolicy>();
 
         builder.Services
             .AddAuthentication(o =>
@@ -150,7 +151,7 @@ public static class McpServerHost
             o.KnownProxies.Clear();
         });
 
-        AddMcp(builder.Services, settings, ServerInstructions.HttpText)
+        AddMcp(builder.Services, settings, ServerInstructions.Http(http))
             .WithHttpTransport(o => o.Stateless = true)
             .WithTools<ComposeContentTools>(JsonOptions);
 
@@ -176,19 +177,16 @@ public static class McpServerHost
     private static void AddServices(IServiceCollection services, McpServerSettings settings)
     {
         services.AddSingleton(settings);
-        services.AddSingleton<Func<ISubscriptionDirectory>>(sp => () =>
-        {
-            var logger = new McpDeploymentLogger(sp.GetRequiredService<ILoggerFactory>().CreateLogger("Timetracker.Azure"));
-            return new AzureSubscriptionDirectory(new ArmClient(CredentialFactory.Create(settings.AzureAuthMode, logger)));
-        });
+        // 資格情報は、ツールが方式（IAzureAccessPolicy）に応じて作って渡す
+        services.AddSingleton<Func<TokenCredential, ISubscriptionDirectory>>(_ => credential => new AzureSubscriptionDirectory(new ArmClient(credential)));
 
         // 計画とジョブはプロセス内のメモリに置く（サーバーの終了で消える。HTTP ではレプリカを 1 に固定する）
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<IPlanStore>(sp => new InMemoryPlanStore(sp.GetRequiredService<TimeProvider>()));
         services.AddSingleton<IJobStore, InMemoryJobStore>();
         services.AddSingleton<JobManager>();
-        services.AddSingleton<Func<IDeploymentLogger, IAzureDeploymentGateway>>(_ =>
-            logger => new AzureSdkExecutor(logger, CredentialFactory.Create(settings.AzureAuthMode, logger)));
+        services.AddSingleton<Func<IDeploymentLogger, TokenCredential, IAzureDeploymentGateway>>(_ =>
+            (logger, credential) => new AzureSdkExecutor(logger, credential));
     }
 
     // generate_compose 以外のツールと、Resources・Prompts

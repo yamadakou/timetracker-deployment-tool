@@ -68,9 +68,6 @@ public sealed record McpServerSettings
         };
     }
 
-    /// <summary>Azure を操作する資格情報の認証モード（HTTP ではサーバーの ID）。</summary>
-    public string AzureAuthMode => Http?.ServerIdentity ?? AuthMode;
-
     private static string? TransportArgument(IReadOnlyList<string> args)
     {
         var index = args.ToList().IndexOf("--transport");

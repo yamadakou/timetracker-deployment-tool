@@ -1,3 +1,4 @@
+using Azure.Core;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
@@ -37,6 +38,7 @@ public sealed class HttpServerTests : IAsyncLifetime
 
     private readonly Mock<IAzureDeploymentGateway> _gateway = new();
     private readonly LogCollector _logs = new();
+    private readonly System.Collections.Concurrent.ConcurrentBag<TokenCredential> _credentials = [];
     private WebApplication _app = null!;
     private HttpClient _http = null!;
 
@@ -54,11 +56,16 @@ public sealed class HttpServerTests : IAsyncLifetime
                 It.IsAny<ContainerAppManagedEnvironmentResource>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ContainerAppsDeployment("demo-tt", "demo-db", "demo-redis", "https://demo-tt.example.io"));
 
-        _app = McpServerHost.BuildHttp([], HttpTestSupport.Settings(), builder =>
+        // server 方式（既定）と user 方式の両方を有効にする
+        _app = McpServerHost.BuildHttp([], HttpTestSupport.Settings(modes: "server,user"), builder =>
         {
             builder.WebHost.UseTestServer();
             builder.Logging.AddProvider(_logs);
-            builder.Services.AddSingleton<Func<IDeploymentLogger, IAzureDeploymentGateway>>(_ => _ => _gateway.Object);
+            builder.Services.AddSingleton<Func<IDeploymentLogger, TokenCredential, IAzureDeploymentGateway>>(_ => (_, credential) =>
+            {
+                _credentials.Add(credential);
+                return _gateway.Object;
+            });
             builder.Services.Configure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, o =>
             {
                 o.Configuration = new OpenIdConnectConfiguration { Issuer = HttpTestSupport.Http().Issuer };
@@ -174,7 +181,7 @@ public sealed class HttpServerTests : IAsyncLifetime
     [InlineData("Mcp.AccessX")]
     public async Task Mcp_Should_Return_403_Without_The_Mcp_Access_Scope(string? scope)
     {
-        var response = await PostInitializeAsync(Token(roles: [ServerAccessPolicy.ServerRole], audience: HttpTestSupport.ClientId, scope: scope));
+        var response = await PostInitializeAsync(Token(roles: [HttpAccessPolicy.ServerRole], audience: HttpTestSupport.ClientId, scope: scope));
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
@@ -222,14 +229,14 @@ public sealed class HttpServerTests : IAsyncLifetime
         // Azure を読むツールはロールが必要
         var denied = await client.CallToolAsync("list_subscriptions", cancellationToken: Ct);
         denied.IsError.Should().BeTrue();
-        Text(denied).Should().Contain(ServerAccessPolicy.ServerRole);
+        Text(denied).Should().Contain(HttpAccessPolicy.ServerRole);
     }
 
     [Fact]
     public async Task Plans_Should_Be_Limited_To_The_Allowed_Resource_Groups_And_To_The_Caller()
     {
-        await using var userA = await ConnectAsync(Token("user-a", [ServerAccessPolicy.ServerRole]));
-        await using var userB = await ConnectAsync(Token("user-b", [ServerAccessPolicy.ServerRole]));
+        await using var userA = await ConnectAsync(Token("user-a", [HttpAccessPolicy.ServerRole]));
+        await using var userB = await ConnectAsync(Token("user-b", [HttpAccessPolicy.ServerRole]));
         var passwords = new Dictionary<string, object?> { ["app_name"] = "demo", ["db_password"] = "DbPassw0rd!x", ["tracker_password"] = "TrackerPass!y" };
 
         var outOfScope = Structured(await userA.CallToolAsync("plan_deployment",
@@ -251,10 +258,35 @@ public sealed class HttpServerTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task User_Role_Should_Plan_With_The_Callers_Own_Permissions()
+    {
+        var token = Token("user-a", [HttpAccessPolicy.UserRole]);
+        await using var client = await ConnectAsync(token);
+        var arguments = new Dictionary<string, object?>
+        {
+            ["app_name"] = "demo", ["resource_group"] = "other", ["db_password"] = "DbPassw0rd!x", ["tracker_password"] = "TrackerPass!y",
+        };
+
+        var options = Structured(await client.CallToolAsync("get_deployment_options", cancellationToken: Ct)).GetProperty("server");
+        // azure_identity を省略しても、使える user 方式になる（server 方式の範囲の外も、本人の権限で計画できる）
+        var plan = Structured(await client.CallToolAsync("plan_deployment", arguments, cancellationToken: Ct));
+        var asServer = await client.CallToolAsync("plan_deployment", new Dictionary<string, object?>(arguments) { ["azure_identity"] = "server" }, cancellationToken: Ct);
+
+        options.GetProperty("auth_mode").GetString().Should().Be("user");
+        options.GetProperty("caller_identity_modes").EnumerateArray().Select(m => m.GetString()).Should().Equal("user");
+        client.ServerInstructions.Should().Contain("azure_identity");
+        plan.GetProperty("identity").GetProperty("auth_mode").GetString().Should().Be("user");
+        plan.GetProperty("plan_id").GetString().Should().NotBeNull(plan.ToString());
+        _credentials.Should().NotBeEmpty().And.AllBeOfType<Azure.Identity.OnBehalfOfCredential>();
+        asServer.IsError.Should().BeTrue();
+        Text(asServer).Should().Contain($"server 方式を使うには、MCP サーバーのアプリロール {HttpAccessPolicy.ServerRole} が必要です");
+    }
+
+    [Fact]
     public async Task Jobs_Should_Be_Followed_By_The_Caller_That_Started_Them()
     {
-        await using var userA = await ConnectAsync(Token("user-a", [ServerAccessPolicy.ServerRole]));
-        await using var userB = await ConnectAsync(Token("user-b", [ServerAccessPolicy.ServerRole]));
+        await using var userA = await ConnectAsync(Token("user-a", [HttpAccessPolicy.ServerRole]));
+        await using var userB = await ConnectAsync(Token("user-b", [HttpAccessPolicy.ServerRole]));
         var plan = Structured(await userA.CallToolAsync("plan_deployment", new Dictionary<string, object?>
         {
             ["app_name"] = "demo", ["db_password"] = "DbPassw0rd!x", ["tracker_password"] = "TrackerPass!y",
@@ -283,7 +315,7 @@ public sealed class HttpServerTests : IAsyncLifetime
     [Fact]
     public async Task Deployment_Resource_Should_Require_The_Role_And_The_Allowed_Resource_Group()
     {
-        await using var withRole = await ConnectAsync(Token("user-a", [ServerAccessPolicy.ServerRole]));
+        await using var withRole = await ConnectAsync(Token("user-a", [HttpAccessPolicy.ServerRole]));
         await using var withoutRole = await ConnectAsync(Token("user-b"));
 
         var allowed = await withRole.ReadResourceAsync("timetracker://deployments/sub/rg/demo", cancellationToken: Ct);
@@ -292,7 +324,7 @@ public sealed class HttpServerTests : IAsyncLifetime
 
         allowed.Contents.OfType<TextResourceContents>().Single().Text.Should().Contain("\"app_name\":\"demo\"");
         (await outOfScope.Should().ThrowAsync<McpException>()).Which.Message.Should().Contain("操作できる範囲にありません");
-        (await noRole.Should().ThrowAsync<McpException>()).Which.Message.Should().Contain(ServerAccessPolicy.ServerRole);
+        (await noRole.Should().ThrowAsync<McpException>()).Which.Message.Should().Contain(HttpAccessPolicy.ServerRole);
         _gateway.Verify(g => g.GetResourceGroupAsync("sub", "other", It.IsAny<CancellationToken>()), Times.Never);
     }
 

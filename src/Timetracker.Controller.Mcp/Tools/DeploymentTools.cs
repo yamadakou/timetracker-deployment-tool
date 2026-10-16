@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using Azure.Core;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol;
 using ModelContextProtocol.Server;
@@ -19,6 +20,11 @@ public sealed class DeploymentTools
     public const string EnvFileName = ".env";
     public const string MaskedPassword = ToolSupport.MaskedPassword;
 
+    /// <summary>azure_identity 引数の説明（HTTP のサーバーだけで使う）。</summary>
+    internal const string AzureIdentityDescription =
+        "HTTP のサーバーで Azure を操作する方式: server（サーバーの ID）または user（利用者本人の権限）。" +
+        "省略時はサーバーの既定（get_deployment_options の server.auth_mode）。stdio のサーバーでは指定しない";
+
     internal static readonly IReadOnlyList<string> Constraints =
     [
         "検証環境向けのツールです。Azure 上の DB のデータは永続化されません（DB コンテナの再起動・再デプロイ・削除で消えます）。",
@@ -29,12 +35,13 @@ public sealed class DeploymentTools
 
     private readonly McpServerSettings _settings;
     private readonly IAzureAccessPolicy _policy;
-    private readonly Func<ISubscriptionDirectory> _subscriptionDirectory;
+    private readonly Func<TokenCredential, ISubscriptionDirectory> _subscriptionDirectory;
     private readonly ILogger<DeploymentTools> _logger;
 
-    /// <param name="subscriptionDirectory">資格情報の作成に失敗した場合もツールの結果として返せるよう、使うときに作る</param>
+    /// <param name="subscriptionDirectory">資格情報の作成に失敗した場合もツールの結果として返せるよう、方式の資格情報を作ってから作る</param>
     public DeploymentTools(
-        McpServerSettings settings, IAzureAccessPolicy policy, Func<ISubscriptionDirectory> subscriptionDirectory, ILogger<DeploymentTools> logger)
+        McpServerSettings settings, IAzureAccessPolicy policy, Func<TokenCredential, ISubscriptionDirectory> subscriptionDirectory,
+        ILogger<DeploymentTools> logger)
     {
         _settings = settings;
         _policy = policy;
@@ -60,13 +67,15 @@ public sealed class DeploymentTools
         ResourceSuffixes: ResourceNaming.Suffixes,
         Server: new ServerStatus(
             Transport: _settings.Http == null ? "stdio" : "http",
-            AuthMode: _policy.Identity.AuthMode,
+            AuthMode: _policy.DefaultIdentity.AuthMode,
             PasswordEnv: new PasswordEnvStatus(_settings.DbPassword != null, _settings.TrackerPassword != null),
             DefaultSubscriptionSet: _settings.DefaultSubscription != null,
             DefaultResourceGroupSet: _settings.DefaultResourceGroup != null,
             OutputRoot: _settings.OutputRoot,
-            AllowedResourceGroups: _settings.Http?.AllowedResourceGroups.Select(g => g.ToString()).ToList(),
-            CanCreateResourceGroup: _settings.Http == null ? null : _policy.CanCreateResourceGroup),
+            AllowedResourceGroups: _settings.Http is { ServerModeEnabled: true } http ? http.AllowedResourceGroups.Select(g => g.ToString()).ToList() : null,
+            CanCreateResourceGroup: _settings.Http is { ServerModeEnabled: true } ? _settings.Http.CanCreateResourceGroup : null,
+            IdentityModes: _policy.IdentityModes,
+            CallerIdentityModes: _policy.CallerIdentityModes),
         Constraints: Constraints,
         TagListUrl: "https://hub.docker.com/r/densocreate/timetracker/tags");
 
@@ -119,13 +128,16 @@ public sealed class DeploymentTools
         ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = true, UseStructuredContent = true)]
     [Description("Azure を操作する ID（stdio ではサーバーの認証モード TT_MCP_AUTH_MODE の資格情報）で使える Azure サブスクリプションの一覧を返す。" +
                  "利用者にデプロイ先のサブスクリプションを選んでもらうときに使う。")]
-    public async Task<SubscriptionsResult> ListSubscriptions(CancellationToken cancellationToken = default)
+    public async Task<SubscriptionsResult> ListSubscriptions(
+        [Description(AzureIdentityDescription)] string? azure_identity = null,
+        CancellationToken cancellationToken = default)
     {
-        _policy.RequireAzureAccess();
-        var subscriptions = await ToolSupport.CallAzureAsync(_settings, _logger, () => _subscriptionDirectory().ListAsync(cancellationToken));
+        var access = _policy.Resolve(azure_identity);
+        var subscriptions = await ToolSupport.CallAzureAsync(access, _logger, () =>
+            _subscriptionDirectory(access.CreateCredential(new McpDeploymentLogger(_logger))).ListAsync(cancellationToken));
 
         return new SubscriptionsResult(
-            _policy.Identity.AuthMode,
+            access.Identity.AuthMode,
             subscriptions.Select(s => new SubscriptionItem(s.SubscriptionId, s.DisplayName, s.State, s.TenantId)).ToList());
     }
 

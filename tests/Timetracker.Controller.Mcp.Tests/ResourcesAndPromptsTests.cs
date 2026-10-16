@@ -1,3 +1,4 @@
+using Azure.Core;
 using System.Text.Json;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
@@ -42,7 +43,7 @@ public sealed class ResourcesAndPromptsTests
             .AddSingleton<IAzureAccessPolicy, UnrestrictedAccessPolicy>()
             .AddSingleton<IPlanStore>(new InMemoryPlanStore(TimeProvider.System))
             .AddSingleton(new JobManager(new InMemoryJobStore(), TimeProvider.System, NullLogger<JobManager>.Instance))
-            .AddSingleton<Func<IDeploymentLogger, IAzureDeploymentGateway>>(_ => gateway.Object)
+            .AddSingleton<Func<IDeploymentLogger, TokenCredential, IAzureDeploymentGateway>>(_ => (_, _) => gateway.Object)
             .AddSingleton(typeof(ILogger<>), typeof(NullLogger<>))
             .BuildServiceProvider();
         var resources = new TimetrackerResources(services);

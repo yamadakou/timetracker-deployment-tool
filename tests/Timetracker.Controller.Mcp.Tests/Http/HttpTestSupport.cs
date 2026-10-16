@@ -11,19 +11,33 @@ internal static class HttpTestSupport
     public const string PublicUrl = "https://mcp.example.com/mcp";
     public const string AllowedGroup = "/subscriptions/sub/resourceGroups/rg";
 
-    public static McpHttpSettings Http(bool canCreate = false, string groups = AllowedGroup, string identity = "managed-identity") => new()
+    public static McpHttpSettings Http(
+        bool canCreate = false, string groups = AllowedGroup, string identity = "managed-identity",
+        string modes = "server", string? defaultMode = null, string? secret = null) => new()
     {
         TenantId = TenantId, ClientId = ClientId, PublicUrl = new Uri(PublicUrl), ServerIdentity = identity,
         AllowedResourceGroups = McpHttpSettings.FromEnvironment(name => name == "TT_MCP_HTTP__SERVER_ALLOWED_RESOURCE_GROUPS" ? groups : Required(name))
             .AllowedResourceGroups,
         CanCreateResourceGroup = canCreate,
+        IdentityModes = modes.Split(','),
+        DefaultIdentityMode = defaultMode ?? modes.Split(',')[0],
+        UserClientCredential = secret == null ? "managed-identity" : "client-secret",
+        ClientSecret = secret,
     };
 
     /// <summary>HTTP のサーバーの設定（既定のサブスクリプションとリソースグループは sub / rg）。</summary>
-    public static McpServerSettings Settings(bool canCreate = false, string groups = AllowedGroup) => new()
+    public static McpServerSettings Settings(bool canCreate = false, string groups = AllowedGroup, string modes = "server", string? defaultMode = null) => new()
     {
-        Http = Http(canCreate, groups), DefaultSubscription = "sub", DefaultResourceGroup = "rg",
+        Http = Http(canCreate, groups, modes: modes, defaultMode: defaultMode), DefaultSubscription = "sub", DefaultResourceGroup = "rg",
     };
+
+    /// <summary>アクセストークン（Authorization ヘッダー）とロールを持つ呼び出し元のポリシー（user 方式の資格情報を作れる）。</summary>
+    public static HttpAccessPolicy PolicyWithToken(McpServerSettings settings, string token = "user-token", params string[] roles)
+    {
+        var context = new DefaultHttpContext { User = User(roles: roles) };
+        context.Request.Headers.Authorization = $"Bearer {token}";
+        return new HttpAccessPolicy(settings, new FixedAccessor { HttpContext = context });
+    }
 
     public static ClaimsPrincipal User(string oid = "user-a", params string[] roles)
     {
@@ -42,8 +56,8 @@ internal static class HttpTestSupport
     }
 
     /// <summary>サーバーのロールを持つ（<paramref name="withRole"/> が false なら持たない）呼び出し元の server 方式のポリシー。</summary>
-    public static ServerAccessPolicy Policy(McpServerSettings settings, bool withRole = true) =>
-        new(settings, Accessor(withRole ? User(roles: ServerAccessPolicy.ServerRole) : User()));
+    public static HttpAccessPolicy Policy(McpServerSettings settings, bool withRole = true) =>
+        new(settings, Accessor(withRole ? User(roles: HttpAccessPolicy.ServerRole) : User()));
 
     private static string? Required(string name) => name switch
     {

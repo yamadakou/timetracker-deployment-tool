@@ -126,7 +126,7 @@ public class HttpSettingsAndPolicyTests
             settings.DbPassword.Should().BeNull();
             settings.TrackerPassword.Should().BeNull();
             settings.OutputRoot.Should().BeNull();
-            settings.AzureAuthMode.Should().Be("managed-identity");
+            settings.Http!.ServerIdentity.Should().Be("managed-identity");
             settings.DefaultSubscription.Should().Be("sub");
             settings.DefaultResourceGroup.Should().Be("rg");
             settings.Verbose.Should().BeTrue();
@@ -137,7 +137,7 @@ public class HttpSettingsAndPolicyTests
     public void ServerSettings_Should_Use_Stdio_By_Default_Or_Reject_An_Unknown_Transport()
     {
         McpServerSettings.FromEnvironment(_ => null, ["--transport", "stdio"]).Should().Be(new McpServerSettings());
-        new McpServerSettings().AzureAuthMode.Should().Be("azure-cli");
+        new McpServerSettings().AuthMode.Should().Be("azure-cli");
 
         var unknown = () => McpServerSettings.FromEnvironment(_ => null, ["--transport", "sse"]);
         var missing = () => McpServerSettings.FromEnvironment(_ => null, ["--transport"]);
@@ -163,29 +163,39 @@ public class HttpSettingsAndPolicyTests
     {
         var policy = new UnrestrictedAccessPolicy(new McpServerSettings { AuthMode = "sp-env" });
 
-        policy.Identity.Should().Be(new IdentityInfo("sp-env", "環境変数 AZURE_CLIENT_ID のサービスプリンシパル"));
-        policy.CanCreateResourceGroup.Should().BeTrue();
-        policy.ResourceGroupBlocker("any", "any").Should().BeNull();
+        var access = policy.Resolve(null);
+
+        policy.DefaultIdentity.Should().Be(new IdentityInfo("sp-env", "環境変数 AZURE_CLIENT_ID のサービスプリンシパル"));
+        policy.IdentityModes.Should().BeNull();
+        policy.CallerIdentityModes.Should().BeNull();
+        access.Identity.Should().Be(policy.DefaultIdentity);
+        access.Mode.Should().Be("sp-env");
+        access.CanCreateResourceGroup.Should().BeTrue();
+        access.ResourceGroupBlocker("any", "any").Should().BeNull();
+        access.CredentialName.Should().Be("認証モード: sp-env");
+        access.AuthFailureHint.Should().Contain("AZURE_CLIENT_SECRET");
+        policy.ForMode("anything").Should().BeSameAs(access);
         policy.Invoking(p => p.RequireAzureAccess()).Should().NotThrow();
     }
 
     [Theory]
     [InlineData("managed-identity", "MCP サーバーのマネージド ID（server 方式）")]
     [InlineData("sp-env", "MCP サーバーのサービスプリンシパル（server 方式）")]
-    public void ServerAccessPolicy_Should_Show_The_Server_Identity(string identity, string display)
+    public void HttpAccessPolicy_Should_Show_The_Server_Identity(string identity, string display)
     {
         var settings = new McpServerSettings { Http = HttpTestSupport.Http(identity: identity) };
 
-        HttpTestSupport.Policy(settings).Identity.Should().Be(new IdentityInfo("server", display));
+        HttpTestSupport.Policy(settings).DefaultIdentity.Should().Be(new IdentityInfo("server", display));
+        HttpTestSupport.Policy(settings).Resolve(null).CredentialName.Should().Be($"認証モード: {identity}");
     }
 
     [Fact]
-    public void ServerAccessPolicy_Should_Require_The_Server_Role()
+    public void HttpAccessPolicy_Should_Require_The_Server_Role()
     {
         var settings = HttpTestSupport.Settings();
 
         HttpTestSupport.Policy(settings).Invoking(p => p.RequireAzureAccess()).Should().NotThrow();
-        foreach (var policy in new[] { HttpTestSupport.Policy(settings, withRole: false), new ServerAccessPolicy(settings, HttpTestSupport.Accessor(null)) })
+        foreach (var policy in new[] { HttpTestSupport.Policy(settings, withRole: false), new HttpAccessPolicy(settings, HttpTestSupport.Accessor(null)) })
             policy.Invoking(p => p.RequireAzureAccess()).Should().Throw<McpException>()
                 .WithMessage("このツールを使うには、MCP サーバーのアプリロール Timetracker.Deploy.Server が必要です。*");
     }
@@ -193,14 +203,14 @@ public class HttpSettingsAndPolicyTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void ServerAccessPolicy_Should_Allow_Only_The_Configured_Resource_Groups(bool canCreate)
+    public void HttpAccessPolicy_Should_Allow_Only_The_Configured_Resource_Groups(bool canCreate)
     {
-        var policy = HttpTestSupport.Policy(HttpTestSupport.Settings(canCreate, "/subscriptions/sub/resourceGroups/rg,/subscriptions/sub/resourceGroups/rg2"));
+        var policy = HttpTestSupport.Policy(HttpTestSupport.Settings(canCreate, "/subscriptions/sub/resourceGroups/rg,/subscriptions/sub/resourceGroups/rg2")).Resolve(null);
 
         policy.CanCreateResourceGroup.Should().Be(canCreate);
         policy.ResourceGroupBlocker("SUB", "Rg2").Should().BeNull();
         policy.ResourceGroupBlocker("sub", "other").Should().Be(
-            "リソースグループ other（サブスクリプション sub）は、このサーバーで操作できる範囲にありません。" +
+            "リソースグループ other（サブスクリプション sub）は、このサーバーで server 方式で操作できる範囲にありません。" +
             "操作できるのは /subscriptions/sub/resourceGroups/rg, /subscriptions/sub/resourceGroups/rg2 です（TT_MCP_HTTP__SERVER_ALLOWED_RESOURCE_GROUPS）。");
     }
 
@@ -226,7 +236,7 @@ public class HttpSettingsAndPolicyTests
         prompts.DeployTimetracker().Should().Contain("パスワードは引数で渡す必要がある").And.Contain("server.allowed_resource_groups");
         prompts.LocalDryRun("/ignored").Should().Contain("このサーバーはファイルを書き込まない").And.NotContain("/ignored")
             .And.NotContain("validate_deployment に target=compose");
-        ServerInstructions.HttpText.Should().Contain("server 方式").And.Contain(ServerAccessPolicy.ServerRole);
+        ServerInstructions.Http(HttpTestSupport.Http()).Should().Contain("server 方式").And.Contain(HttpAccessPolicy.ServerRole).And.NotContain("{identity}");
     }
 
     // ---- McpServerHost
@@ -239,7 +249,7 @@ public class HttpSettingsAndPolicyTests
 
         stdio.Should().NotBeOfType<WebApplication>();
         stdio.Services.GetRequiredService<IAzureAccessPolicy>().Should().BeOfType<UnrestrictedAccessPolicy>();
-        http.Services.GetRequiredService<IAzureAccessPolicy>().Should().BeOfType<ServerAccessPolicy>();
+        http.Services.GetRequiredService<IAzureAccessPolicy>().Should().BeOfType<HttpAccessPolicy>();
         http.Services.GetRequiredService<ICallerContext>().Should().BeOfType<HttpCallerContext>();
         var tools = http.Services.GetServices<McpServerTool>().ToDictionary(t => t.ProtocolTool.Name, t => t.ProtocolTool);
         tools.Should().HaveCount(11);

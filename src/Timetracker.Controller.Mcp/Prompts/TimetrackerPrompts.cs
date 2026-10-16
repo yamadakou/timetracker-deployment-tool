@@ -34,10 +34,21 @@ public sealed class TimetrackerPrompts
            start_deployment に acknowledge_data_loss=true を指定する。
         6. start_deployment に plan_id を渡し、get_job_status を 15〜30 秒の間隔で呼んで、結果の Timetracker の URL を伝える。
         7. get_deployment_info で状態を確認する。
-        {(_settings.Http == null
-            ? "パスワードは、サーバーの環境変数で設定されていれば利用者に尋ねないこと。"
-            : "パスワードは引数で渡す必要がある（このサーバーではパスワードの環境変数は使えない）。操作できるのは server.allowed_resource_groups のリソースグループだけ。")}
+        {Notes()}
         """;
+
+    // トランスポートと、HTTP で有効な方式ごとの注意
+    private string Notes() => _settings.Http switch
+    {
+        null => "パスワードは、サーバーの環境変数で設定されていれば利用者に尋ねないこと。",
+        { UserModeEnabled: false } =>
+            "パスワードは引数で渡す必要がある（このサーバーではパスワードの環境変数は使えない）。操作できるのは server.allowed_resource_groups のリソースグループだけ。",
+        { ServerModeEnabled: false } =>
+            "パスワードは引数で渡す必要がある（このサーバーではパスワードの環境変数は使えない）。Azure は利用者本人の権限（user 方式）で操作する。",
+        _ =>
+            "パスワードは引数で渡す必要がある（このサーバーではパスワードの環境変数は使えない）。Azure を操作する方式（azure_identity: server または user）を利用者に確認し、" +
+            "server 方式では server.allowed_resource_groups のリソースグループだけを操作できることを伝える。計画の identity も利用者に示す。",
+    };
 
     [McpServerPrompt(Name = "local-dry-run", Title = "ローカルの Docker で試す（Dry-run）")]
     [Description("設定の確認 → 検証 → generate_compose → docker compose up の手順を案内する。Azure は使わない。")]

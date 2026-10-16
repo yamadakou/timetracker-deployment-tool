@@ -1,3 +1,4 @@
+using Azure.Core;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -61,8 +62,8 @@ public class McpServerHostTests
         using var host = McpServerHost.Build([], new McpServerSettings());
 
         // 作成するだけでは Azure に接続しない
-        host.Services.GetRequiredService<Func<ISubscriptionDirectory>>()().Should().BeOfType<AzureSubscriptionDirectory>();
-        host.Services.GetRequiredService<Func<IDeploymentLogger, IAzureDeploymentGateway>>()(Mock.Of<IDeploymentLogger>())
+        host.Services.GetRequiredService<Func<TokenCredential, ISubscriptionDirectory>>()(Mock.Of<TokenCredential>()).Should().BeOfType<AzureSubscriptionDirectory>();
+        host.Services.GetRequiredService<Func<IDeploymentLogger, TokenCredential, IAzureDeploymentGateway>>()(Mock.Of<IDeploymentLogger>(), Mock.Of<TokenCredential>())
             .Should().BeOfType<AzureSdkExecutor>();
         host.Services.GetRequiredService<ICallerContext>().Should().BeOfType<LocalCallerContext>();
         host.Services.GetRequiredService<IPlanStore>().Should().BeOfType<InMemoryPlanStore>();

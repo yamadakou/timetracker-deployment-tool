@@ -12,7 +12,7 @@ internal static class ToolSupport
     public const string MaskedPassword = "********";
 
     // 認証に失敗したときの対処（認証モードごと）
-    private static readonly IReadOnlyDictionary<string, string> AuthHints = new Dictionary<string, string>
+    internal static readonly IReadOnlyDictionary<string, string> AuthHints = new Dictionary<string, string>
     {
         ["azure-cli"] = "az login でサインインしてから、もう一度試してください。",
         ["default"] = "az login などでサインインしてから、もう一度試してください（DefaultAzureCredential が使える資格情報が見つかりませんでした）。",
@@ -24,7 +24,7 @@ internal static class ToolSupport
     /// <summary>
     /// Azure を呼ぶ処理を実行し、よくある失敗（認証・Azure のエラー・資格情報を作れない）を、対処を添えたツールのエラーにする。
     /// </summary>
-    public static async Task<T> CallAzureAsync<T>(McpServerSettings settings, ILogger logger, Func<Task<T>> call)
+    public static async Task<T> CallAzureAsync<T>(AzureAccess access, ILogger logger, Func<Task<T>> call)
     {
         try
         {
@@ -33,7 +33,7 @@ internal static class ToolSupport
         catch (AuthenticationFailedException ex)
         {
             logger.LogWarning(ex, "Azure の認証に失敗しました");
-            throw new McpException($"Azure の認証に失敗しました（認証モード: {settings.AzureAuthMode}）。{AuthHints[settings.AzureAuthMode]}");
+            throw new McpException($"Azure の認証に失敗しました（{access.CredentialName}）。{access.AuthFailureHint}");
         }
         catch (RequestFailedException ex)
         {
@@ -51,7 +51,7 @@ internal static class ToolSupport
     /// サーバーの既定値も無い場合、アプリ名が無効な場合、操作してよい範囲に無い場合は、Azure を読まずにツールのエラーにする。
     /// </summary>
     public static DeployOptions ResolveTarget(
-        McpServerSettings settings, IAzureAccessPolicy policy, string? subscription, string? resourceGroup, string? appName)
+        McpServerSettings settings, AzureAccess access, string? subscription, string? resourceGroup, string? appName)
     {
         var o = new DeploymentParameters { Subscription = subscription, ResourceGroup = resourceGroup, AppName = appName }.Resolve(settings).Options;
         var missing = new[] { (o.Subscription, "subscription"), (o.ResourceGroup, "resource_group") }.Where(p => p.Item1.Length == 0).Select(p => p.Item2).ToList();
@@ -59,7 +59,7 @@ internal static class ToolSupport
             throw new McpException($"{string.Join(" と ", missing)} を指定してください（サーバーの既定値も設定されていません）。");
         if (AppNameValidator.GetError(o.AppName) is { } appNameError)
             throw new McpException(appNameError);
-        if (policy.ResourceGroupBlocker(o.Subscription, o.ResourceGroup) is { } blocker)
+        if (access.ResourceGroupBlocker(o.Subscription, o.ResourceGroup) is { } blocker)
             throw new McpException(blocker);
         return o;
     }
