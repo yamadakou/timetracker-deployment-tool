@@ -2,11 +2,20 @@
 
 [README に戻る](../README.md)
 
-CLI と同じ機能を、MCP（Model Context Protocol）に対応した AI アシスタント（Claude Code、VS Code の GitHub Copilot、Claude Desktop など）から、対話しながら使えます。MCP サーバー `timetracker-mcp.exe` は、アシスタントが子プロセスとして起動し、標準入出力（stdio）で通信します。
+CLI と同じ機能を、MCP（Model Context Protocol）に対応した AI アシスタント（Claude Code、VS Code の GitHub Copilot、Claude Desktop など）から、対話しながら使えます。
 
-前提となる Azure の権限・リソースプロバイダーの登録・認証モードは CLI と共通です。README の[利用者向けマニュアル](../README.md#利用者向けマニュアル)を参照してください。
+MCP サーバーには次の 2 つの形態があります。現在提供しているのは stdio 版だけです。
 
-## できること
+| 形態 | 状況 | 動く場所 | 向いている使い方 |
+|---|---|---|---|
+| [stdio 版](#stdio-版) | 提供中 | 利用者の PC（アシスタントが `timetracker-mcp.exe` を子プロセスとして起動し、標準入出力で通信） | 自分の Azure の権限（`az login` など）で、自分の PC から使う |
+| [HTTP 版](#http-版予定) | **予定（未提供）** | Azure Container Apps などのサーバー（アシスタントは URL で接続） | チームで 1 つのサーバーを共有し、決まったリソースグループに検証環境を作る |
+
+## stdio 版
+
+アシスタントが `timetracker-mcp.exe` を子プロセスとして起動し、標準入出力（stdio）で通信します。Azure の操作には、利用者の PC の資格情報（既定は `az login` のサインイン）を使います。前提となる Azure の権限・リソースプロバイダーの登録・認証モードは CLI と共通です。README の[利用者向けマニュアル](../README.md#利用者向けマニュアル)を参照してください。
+
+### できること
 
 | ツール | 内容 | Azure を変更するか |
 |---|---|---|
@@ -21,7 +30,7 @@ CLI と同じ機能を、MCP（Model Context Protocol）に対応した AI ア�
 
 ほかに、Resources（`timetracker://docs/constraints`: 目的と注意事項、`timetracker://docs/rbac`: 必要な権限、`timetracker://deployments/{subscription}/{resource_group}/{app_name}`: 環境の状態）と、Prompts（`deploy-timetracker`、`local-dry-run`、`delete-timetracker`: 手順の案内）があります。対応していないアシスタントでも、ツールだけで同じことができます。
 
-## 安全策
+### 安全策
 
 アシスタント（LLM）が誤って Azure を変更しないよう、サーバーの側で次のことを強制します。
 - Azure を変更するのは `start_deployment` と `start_deletion` だけです。どちらも、先に `plan_*` で作った計画（`plan_id`。15 分で期限切れ、一度だけ使える）が必要で、計画と違う内容では実行しません。実行の直前に Azure の状態を確かめ直し、計画の後に状態が変わっていれば中止します
@@ -35,13 +44,13 @@ CLI と同じ機能を、MCP（Model Context Protocol）に対応した AI ア�
 - パスワードは、ツールの引数ではなくサーバーの環境変数（`TT_MCP_DB_PASSWORD` / `TT_MCP_TRACKER_PASSWORD`）で渡すことを推奨します。引数で渡すと会話の履歴に残ります
 - 認証モードはサーバーの設定（`TT_MCP_AUTH_MODE`）で決まり、会話の中では変えられません。既定は `azure-cli` です（事前に `az login` が必要で、`az` コマンドがアシスタントから起動されたサーバーの `PATH` にあること）
 
-## 導入
+### 導入
 
 1. [Releases](https://github.com/yamadakou/timetracker-deployment-tool/releases) から `timetracker-mcp-vX.Y.Z.zip` を取得し、任意のフォルダーに展開します（例: `C:\tools\timetracker-mcp\timetracker-mcp.exe`）。.NET のインストールは不要です
 2. Azure を使う場合は、[必要な RBAC ロールと権限](../README.md#必要な-rbac-ロールと権限)と[リソースプロバイダーの登録](../README.md#azure-リソースプロバイダーの登録)を確認し、`az login` でサインインします
 3. 使うアシスタントに、次の例のようにサーバーを登録します
 
-## サーバーの設定（環境変数）
+### サーバーの設定（環境変数）
 
 | 環境変数 | 既定 | 説明 |
 |---|---|---|
@@ -53,7 +62,7 @@ CLI と同じ機能を、MCP（Model Context Protocol）に対応した AI ア�
 | `TT_MCP_OUTPUT_ROOT` | なし | 設定すると、`generate_compose` の出力先をこのフォルダーの配下に限ります（絶対パス） |
 | `TT_MCP_VERBOSE` | `false` | `true` で詳細ログを出します（ログは標準エラー出力に出ます） |
 
-## アシスタントの設定例
+### アシスタントの設定例
 
 **Claude Code**（コマンドで登録する例。`-e` の値は Claude Code の設定ファイルに平文で保存されます）:
 ```powershell
@@ -115,7 +124,7 @@ claude mcp add timetracker `
 }
 ```
 
-## 使い方の例
+### 使い方の例
 
 アシスタントに次のように頼むと、ツールを順に呼びながら進めます（Prompts に対応したアシスタントでは `deploy-timetracker` などを選んでも始められます）。
 - 「Timetracker の検証環境を Azure の rg-tt-demo に PostgreSQL で作ってください」→ 設定の確認と検証 → `plan_deployment` の結果（作成するリソース・警告）が示されるので、確認して実行を指示します → 数分後に Timetracker の URL が返ります
@@ -123,3 +132,37 @@ claude mcp add timetracker `
 - 「rg-tt-demo の Timetracker を削除してください」→ `plan_deletion` の結果（削除するもの・残すもの）が示されるので、確認してアプリ名を入力します
 
 計画とジョブはサーバーのプロセスの中にだけ保存されます。アシスタントを再起動すると消えますが、Azure の状態は `get_deployment_info` でいつでも確認できます。
+
+## HTTP 版（予定）
+
+> [!NOTE]
+> HTTP 版はまだ提供していません。ここでは、利用を検討できるよう予定している仕組みの概要だけを示します。導入の手順と設定例は、提供時（[設計書](MCP_TOOL_DESIGN.md)の Phase 4）にこの節に追記します。内容は提供までに変わることがあります。
+
+### stdio 版との違い
+
+| 項目 | stdio 版 | HTTP 版（予定） |
+|---|---|---|
+| 配布形態 | 単一ファイルの EXE（GitHub Releases の zip） | コンテナイメージ。Azure Container Apps などに配置する |
+| アシスタントの接続 | 子プロセスとして起動する（`command` にパスを指定） | URL で接続する（例: `https://<サーバー>/mcp`。Streamable HTTP） |
+| 利用者の認証 | 不要（PC の利用者がそのまま使う） | **必須**。Microsoft Entra ID でサインインする（アシスタントが OAuth に対応している必要があります） |
+| Azure を操作する権限 | 利用者の PC の資格情報（`TT_MCP_AUTH_MODE`） | サーバーの設定で、次のどちらか、または両方を使えるようにする<br/>・`server`: サーバーのマネージド ID の権限（管理者が許可したリソースグループだけ）<br/>・`user`: 利用者本人の権限（サインインしたトークンを使う） |
+| だれが使えるか | PC の利用者 | Entra ID のアプリロールで決める（`user` 方式だけ使える人、`server` 方式も使える人） |
+| パスワードの渡し方 | 環境変数（推奨）または引数 | 引数だけ（サーバーの環境変数は全員で共有になるため使わない）。通信は HTTPS |
+| `generate_compose`（Dry-run） | 利用者の PC にファイルを書き出す | ファイルは書き出さず、内容を返す（パスワードはプレースホルダー） |
+| 計画・ジョブ | サーバーのプロセスの中だけに保存 | 同じ。作成した本人だけが実行・参照できる |
+
+ツール・安全策（計画 → 確認 → 実行、削除時のアプリ名の確認など）は stdio 版と同じです。
+
+### `server` 方式の前提（予定）
+
+- 管理者が、検証環境を作るリソースグループを事前に作成し、サーバーの設定に許可するリソースグループとして登録します。許可していないリソースグループへの操作は、計画の段階で拒否します
+- サーバーのマネージド ID には、そのリソースグループのスコープで Contributor を割り当てます。リソースプロバイダーの登録も管理者が事前に行います
+- Azure のアクティビティログには、すべてサーバーの ID の操作として残ります。だれの操作かは、サーバーのログで確認します
+
+### `user` 方式の前提（予定）
+
+- 利用者本人に、CLI を自分で実行する場合と同じロールが必要です（[必要な RBAC ロールと権限](../README.md#必要な-rbac-ロールと権限)）
+- MCP サーバーの Entra ID アプリ登録に、Azure Service Management の委任アクセス許可を追加し、テナント管理者の同意を得ておく必要があります
+- 条件付きアクセス（MFA の要求など）によっては、再サインインを求められることがあります
+
+詳しい設計は [MCP ツール設計書](MCP_TOOL_DESIGN.md)の「3.3 MCP サーバーの実行形態」「4.10 秘密情報（パスワード）の扱い」「4.11 HTTP 公開時の Azure 資格情報」を参照してください。

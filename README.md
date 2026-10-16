@@ -481,7 +481,7 @@ az provider show --namespace Microsoft.OperationalInsights --query "registration
 
 ### MCP サーバー（AI アシスタントから使う）
 
-CLI と同じ機能を、MCP（Model Context Protocol）に対応した AI アシスタント（Claude Code、VS Code の GitHub Copilot、Claude Desktop など）から、対話しながら使えます。導入・アシスタントの設定・使い方は [MCP サーバーの利用者向けマニュアル（docs/MCP_SERVER.md）](docs/MCP_SERVER.md) を参照してください。
+CLI と同じ機能を、MCP（Model Context Protocol）に対応した AI アシスタント（Claude Code、VS Code の GitHub Copilot、Claude Desktop など）から、対話しながら使えます。現在は利用者の PC で動く stdio 版を提供しています（チームで共有する HTTP 版は予定）。導入・アシスタントの設定・使い方は [MCP サーバーの利用者向けマニュアル（docs/MCP_SERVER.md）](docs/MCP_SERVER.md) を参照してください。
 
 ### コマンドパラメータの説明一覧
 以下は `deploy`（サブコマンドを省略した場合も `deploy`）のオプションです。`delete` のオプションは[リソースの削除（delete）](#リソースの削除delete)を参照してください。
