@@ -19,6 +19,10 @@ using Moq;
 using Timetracker.Common;
 using Timetracker.Domain.Azure;
 using Timetracker.Infrastructure.Azure;
+using Microsoft.Extensions.Logging;
+using ModelContextProtocol;
+using Azure.ResourceManager.AppContainers;
+using Timetracker.Domain.Deployment;
 using Xunit;
 
 namespace Timetracker.Controller.Mcp.Tests.Http;
@@ -32,6 +36,7 @@ public sealed class HttpServerTests : IAsyncLifetime
     private static readonly RsaSecurityKey SigningKey = new(RSA.Create(2048)) { KeyId = "test-key" };
 
     private readonly Mock<IAzureDeploymentGateway> _gateway = new();
+    private readonly LogCollector _logs = new();
     private WebApplication _app = null!;
     private HttpClient _http = null!;
 
@@ -42,10 +47,17 @@ public sealed class HttpServerTests : IAsyncLifetime
         _gateway.Setup(g => g.GetResourceGroupAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync(new ResourceGroupInfo("rg", "japaneast"));
         _gateway.Setup(g => g.ListContainerAppsAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync([]);
         _gateway.Setup(g => g.GetPermissionsAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync([new PermissionSet(["*"], [])]);
+        _gateway.Setup(g => g.ListContainerAppDetailsAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        _gateway.Setup(g => g.EnsureContainerAppEnvAsync("sub", "rg", "demo", "japaneast", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Mock.Of<ContainerAppManagedEnvironmentResource>());
+        _gateway.Setup(g => g.CreateOrUpdateContainerAppAsync("sub", "rg", "demo", "japaneast", It.IsAny<DeployOptions>(),
+                It.IsAny<ContainerAppManagedEnvironmentResource>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ContainerAppsDeployment("demo-tt", "demo-db", "demo-redis", "https://demo-tt.example.io"));
 
         _app = McpServerHost.BuildHttp([], HttpTestSupport.Settings(), builder =>
         {
             builder.WebHost.UseTestServer();
+            builder.Logging.AddProvider(_logs);
             builder.Services.AddSingleton<Func<IDeploymentLogger, IAzureDeploymentGateway>>(_ => _ => _gateway.Object);
             builder.Services.Configure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, o =>
             {
@@ -214,5 +226,92 @@ public sealed class HttpServerTests : IAsyncLifetime
         other.IsError.Should().BeTrue();
         Text(other).Should().Contain("が見つかりません");
         Structured(await userB.CallToolAsync("list_jobs", cancellationToken: Ct)).GetProperty("jobs").GetArrayLength().Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Jobs_Should_Be_Followed_By_The_Caller_That_Started_Them()
+    {
+        await using var userA = await ConnectAsync(Token("user-a", [ServerAccessPolicy.ServerRole]));
+        await using var userB = await ConnectAsync(Token("user-b", [ServerAccessPolicy.ServerRole]));
+        var plan = Structured(await userA.CallToolAsync("plan_deployment", new Dictionary<string, object?>
+        {
+            ["app_name"] = "demo", ["db_password"] = "DbPassw0rd!x", ["tracker_password"] = "TrackerPass!y",
+        }, cancellationToken: Ct));
+
+        var started = Structured(await userA.CallToolAsync("start_deployment",
+            new Dictionary<string, object?> { ["plan_id"] = plan.GetProperty("plan_id").GetString() }, cancellationToken: Ct));
+        var jobId = started.GetProperty("job_id").GetString();
+
+        // 同じ利用者は、別のリクエスト（ステートレス）でもジョブを追える
+        JsonElement status;
+        do
+        {
+            status = Structured(await userA.CallToolAsync("get_job_status", new Dictionary<string, object?> { ["job_id"] = jobId }, cancellationToken: Ct));
+        } while (status.GetProperty("status").GetString() == "running" && !Ct.IsCancellationRequested);
+        status.GetProperty("status").GetString().Should().Be("succeeded", status.ToString());
+        status.GetProperty("result").GetProperty("endpoint").GetString().Should().Be("https://demo-tt.example.io");
+        Structured(await userA.CallToolAsync("list_jobs", cancellationToken: Ct)).GetProperty("jobs").GetArrayLength().Should().Be(1);
+
+        // ほかの利用者からは見えない
+        var other = await userB.CallToolAsync("get_job_status", new Dictionary<string, object?> { ["job_id"] = jobId }, cancellationToken: Ct);
+        other.IsError.Should().BeTrue();
+        Text(other).Should().Contain($"ジョブ '{jobId}' が見つかりません");
+    }
+
+    [Fact]
+    public async Task Deployment_Resource_Should_Require_The_Role_And_The_Allowed_Resource_Group()
+    {
+        await using var withRole = await ConnectAsync(Token("user-a", [ServerAccessPolicy.ServerRole]));
+        await using var withoutRole = await ConnectAsync(Token("user-b"));
+
+        var allowed = await withRole.ReadResourceAsync("timetracker://deployments/sub/rg/demo", cancellationToken: Ct);
+        var outOfScope = () => withRole.ReadResourceAsync("timetracker://deployments/sub/other/demo", cancellationToken: Ct);
+        var noRole = () => withoutRole.ReadResourceAsync("timetracker://deployments/sub/rg/demo", cancellationToken: Ct);
+
+        allowed.Contents.OfType<TextResourceContents>().Single().Text.Should().Contain("\"app_name\":\"demo\"");
+        (await outOfScope.Should().ThrowAsync<McpException>()).Which.Message.Should().Contain("操作できる範囲にありません");
+        (await noRole.Should().ThrowAsync<McpException>()).Which.Message.Should().Contain(ServerAccessPolicy.ServerRole);
+        _gateway.Verify(g => g.GetResourceGroupAsync("sub", "other", It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Requests_Should_Be_Logged_With_The_Caller()
+    {
+        await using (await ConnectAsync(Token("user-a")))
+        await using (await ConnectAsync(Token("user-b")))
+        {
+        }
+        await _http.GetAsync(McpServerHost.HealthPath, Ct);
+
+        // preferred_username があれば表示名として、無くても tid/oid で、だれの操作かを追える
+        var callers = _logs.Messages.Where(m => m.Contains(McpServerHost.McpPath + ":")).ToList();
+        callers.Should().Contain(m => m.Contains($"user-a@example.com（{HttpTestSupport.TenantId}/user-a）"))
+            .And.Contain(m => m.Contains($"（{HttpTestSupport.TenantId}/user-b）") && !m.Contains("user-b@"));
+        // 認証のないリクエスト（/healthz）は記録しない
+        _logs.Messages.Should().NotContain(m => m.Contains(McpServerHost.HealthPath + ":"));
+    }
+
+    // サーバーのログを集める
+    private sealed class LogCollector : ILoggerProvider
+    {
+        private readonly System.Collections.Concurrent.ConcurrentQueue<string> _messages = new();
+
+        public IReadOnlyList<string> Messages => _messages.ToList();
+
+        public ILogger CreateLogger(string categoryName) => new Collector(_messages);
+
+        public void Dispose()
+        {
+        }
+
+        private sealed class Collector(System.Collections.Concurrent.ConcurrentQueue<string> messages) : ILogger
+        {
+            public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+            public bool IsEnabled(LogLevel logLevel) => true;
+
+            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
+                messages.Enqueue(formatter(state, exception));
+        }
     }
 }
