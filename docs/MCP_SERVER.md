@@ -136,7 +136,7 @@ claude mcp add timetracker `
 ## HTTP 版（開発中）
 
 > [!NOTE]
-> HTTP 版は開発中で、まだ提供していません。サーバーの本体（HTTP トランスポート、Entra ID による呼び出し元の認証、`server` 方式と `user` 方式）とコンテナイメージはできていますが、Azure Container Apps への配置、Entra ID のアプリ登録、アシスタントからの接続の手順は、確認が済んでからこの節に追記します。内容は提供までに変わることがあります。
+> HTTP 版は開発中で、まだ提供していません。サーバーの本体（HTTP トランスポート、Entra ID による呼び出し元の認証、`server` 方式と `user` 方式）とコンテナイメージはできていますが、Azure Container Apps への配置と Entra ID のアプリ登録のスクリプト・手順は用意しましたが、Azure と Entra ID での確認はまだです（下の「導入（確認前の手順）」）。内容は提供までに変わることがあります。
 
 ### 開発の段階
 
@@ -144,7 +144,7 @@ claude mcp add timetracker `
 |---|---|---|
 | 4a | HTTP トランスポート、Entra ID のアクセストークンの検証、アプリロール、呼び出し元ごとの計画・ジョブ、`server` 方式（許可したリソースグループだけ）、HTTP 用の `generate_compose`、コンテナイメージ | 実装済み（自動テストとローカルの Docker で確認） |
 | 4b | `user` 方式（利用者本人の権限）と、方式を選ぶ引数 `azure_identity` | 実装済み（自動テストで確認。Entra ID での実際のトークン交換は 4c で確認） |
-| 4c | Azure Container Apps への配置、Entra ID のアプリ登録、アシスタントからの接続の手順 | 予定 |
+| 4c | Azure Container Apps への配置、Entra ID のアプリ登録、アシスタントからの接続の手順 | 手順書とスクリプトを用意（Azure と Entra ID での確認はこれから） |
 
 ### stdio 版との違い
 
@@ -192,4 +192,23 @@ claude mcp add timetracker `
 - 計画の結果には「サインインした利用者本人の権限（user 方式）」と表示され、Azure のアクティビティログにも本人の操作として残ります
 - 条件付きアクセス（MFA の要求など）によっては、サインインし直すよう求められることがあります
 
-詳しい設計は [HTTP 版の詳細設計（Phase 4a）](design/mcp-phase4a.md)、[`user` 方式の詳細設計（Phase 4b）](design/mcp-phase4b.md)と、[MCP ツール設計書](MCP_TOOL_DESIGN.md)の「3.3 MCP サーバーの実行形態」「4.10 秘密情報（パスワード）の扱い」「4.11 HTTP 公開時の Azure 資格情報」を参照してください。
+### 導入（確認前の手順）
+
+> [!WARNING]
+> まだ Azure と Entra ID で確認していない手順です。確認の結果に合わせて変わります。確認すべき点は [Phase 4c の詳細設計](design/mcp-phase4c.md)の「確認事項」にまとめています。
+
+1. 管理者が、PowerShell 7 と Azure CLI で次を実行します。MCP サーバーを置くリソースグループ、マネージド ID、Entra ID のアプリ登録（サーバー用とクライアント用）、Container Apps の Environment と Container App を作り、`server` 方式なら許可するリソースグループにマネージド ID の Contributor を割り当てます
+   ```powershell
+   ./scripts/deploy-mcp-http.ps1 -SubscriptionId <ID> -ResourceGroup rg-tt-mcp -IdentityModes server,user -AllowedResourceGroups rg-tt-team1
+   ```
+2. 管理者が、利用者にアプリロールを割り当てます
+   ```powershell
+   ./scripts/assign-mcp-role.ps1 -Role Server -UserPrincipalName alice@example.com
+   ```
+3. 利用者が、アシスタントに登録します。Claude Code の例（クライアントのアプリの ID と URL は、手順 1 の出力のもの）:
+   ```powershell
+   claude mcp add --transport http --client-id <クライアントのアプリの appId> --callback-port 8765 timetracker https://<FQDN>/mcp
+   ```
+   追加した後、Claude Code で `/mcp` を開いてサインインします。VS Code の設定例は詳細設計を参照してください
+
+詳しい設計は [HTTP 版の詳細設計（Phase 4a）](design/mcp-phase4a.md)、[`user` 方式の詳細設計（Phase 4b）](design/mcp-phase4b.md)、[配置とアプリ登録の詳細設計（Phase 4c）](design/mcp-phase4c.md)と、[MCP ツール設計書](MCP_TOOL_DESIGN.md)の「3.3 MCP サーバーの実行形態」「4.10 秘密情報（パスワード）の扱い」「4.11 HTTP 公開時の Azure 資格情報」を参照してください。
