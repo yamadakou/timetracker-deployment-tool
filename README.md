@@ -560,7 +560,7 @@ claude mcp add timetracker `
 - **ユーザー単位**: コマンド パレット（`Ctrl+Shift+P`）で **MCP: Open User Configuration** を実行すると開くファイル（Windows の既定では `%APPDATA%\Code\User\mcp.json`。プロファイルを使い分けている場合はプロファイルごとのフォルダー）
 - **ワークスペース単位**: VS Code で開いているフォルダーの直下の `.vscode\mcp.json`（**MCP: Open Workspace Folder MCP Configuration** で開けます）。そのフォルダーを開いたときだけ使われ、ほかのフォルダーを開いているときや、ファイルを置いたフォルダーの親を開いているときは認識されません
 
-既に `mcp.json` がある場合は、ファイルを置き換えずに、既存の `servers` と `inputs` の中に下の `timetracker` と 2 つの入力を追記します。入力の参照は `${input:<id>}`（`input` は単数形）と書きます（[VS Code の MCP 設定のリファレンス](https://code.visualstudio.com/docs/copilot/reference/mcp-configuration)）。保存したあと、拡張機能ビューの「MCP サーバー」または **MCP: List Servers** で `timetracker` を起動します。
+既に `mcp.json` がある場合は、ファイルを置き換えずに、既存の `servers` と `inputs` の中に下の `timetracker` と 2 つの入力を追記します。入力の参照は `${input:<id>}`（`input` は単数形）と書きます（[VS Code の MCP 設定のリファレンス](https://code.visualstudio.com/docs/copilot/reference/mcp-configuration)）。`${input:<id>}` で読み込みエラーになるときは、`<id>` と同じ `id` の入力がトップレベルの `inputs` 配列に無いことがよくある原因です（`inputs` が `servers` の中にある、`inputs` キーが 2 つある、など）。`${inputs:<id>}` などと書くとエラーにはなりませんが、その文字列がそのままパスワードとして使われるので注意してください。保存したあと、拡張機能ビューの「MCP サーバー」または **MCP: List Servers** で `timetracker` を起動します。
 ```json
 {
   "inputs": [
