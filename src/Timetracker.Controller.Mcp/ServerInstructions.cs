@@ -41,6 +41,7 @@ internal static class ServerInstructions
           会話に残ることを利用者に伝えてから尋ねてください。
         - 設定を決めたら validate_deployment で検証し、errors があれば利用者と相談して直してください。warnings は利用者に伝えてください。
         - ローカルの Docker で試す場合は generate_compose で docker-compose.yml と .env の内容を返します（このサーバーはファイルを書き込みません）。
+          設定は generate_compose が検証するため、validate_deployment（パスワードを求める）は不要です。
           利用者に 2 つのファイルを保存してもらい、.env のパスワードのプレースホルダーは利用者自身に置き換えてもらってください。
         - SQL Server を Azure で使う場合はサンプル DB を作れません。Timetracker のメモリは 3Gi 以上を推奨します。
         - Azure へのデプロイは、必ず次の順に行ってください。

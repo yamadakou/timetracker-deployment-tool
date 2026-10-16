@@ -76,12 +76,15 @@ public sealed class HttpServerTests : IAsyncLifetime
     }
 
     private static string Token(
-        string oid = "user-a", string[]? roles = null, string? audience = null, string? issuer = null, SecurityKey? key = null)
+        string oid = "user-a", string[]? roles = null, string? audience = null, string? issuer = null, SecurityKey? key = null,
+        string? scope = "Mcp.Access")
     {
         var claims = new Dictionary<string, object>
         {
-            ["tid"] = HttpTestSupport.TenantId, ["oid"] = oid, ["name"] = oid, ["scp"] = "Mcp.Access",
+            ["tid"] = HttpTestSupport.TenantId, ["oid"] = oid, ["name"] = oid,
         };
+        if (scope != null)
+            claims["scp"] = scope;
         if (oid == "user-a")
             claims["preferred_username"] = $"{oid}@example.com";
         if (roles != null)
@@ -163,6 +166,25 @@ public sealed class HttpServerTests : IAsyncLifetime
 
         var direct = await PostInitializeAsync(null, forwarded: false);
         direct.Headers.WwwAuthenticate.ToString().Should().Contain("resource_metadata=\"http://localhost/.well-known/oauth-protected-resource\"");
+    }
+
+    [Theory]
+    [InlineData(null)]           // ID トークン（対象がクライアント ID で、scp が無い）やアプリのみのトークン
+    [InlineData("User.Read")]
+    [InlineData("Mcp.AccessX")]
+    public async Task Mcp_Should_Return_403_Without_The_Mcp_Access_Scope(string? scope)
+    {
+        var response = await PostInitializeAsync(Token(roles: [ServerAccessPolicy.ServerRole], audience: HttpTestSupport.ClientId, scope: scope));
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Mcp_Should_Accept_The_Scope_Among_Others()
+    {
+        await using var client = await ConnectAsync(Token(scope: "openid Mcp.Access profile"));
+
+        (await client.ListToolsAsync(cancellationToken: Ct)).Should().HaveCount(11);
     }
 
     [Fact]

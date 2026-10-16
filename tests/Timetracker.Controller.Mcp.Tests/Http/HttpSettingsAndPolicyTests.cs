@@ -85,6 +85,19 @@ public class HttpSettingsAndPolicyTests
     }
 
     [Fact]
+    public void HasScope_Should_Find_Mcp_Access_In_The_Scp_Claim()
+    {
+        System.Security.Claims.ClaimsPrincipal User(params string[] scp) =>
+            new(new System.Security.Claims.ClaimsIdentity(scp.Select(s => new System.Security.Claims.Claim("scp", s))));
+
+        McpHttpSettings.HasScope(User("Mcp.Access")).Should().BeTrue();
+        McpHttpSettings.HasScope(User("openid  Mcp.Access")).Should().BeTrue();
+        McpHttpSettings.HasScope(User("openid", "Mcp.Access")).Should().BeTrue();
+        McpHttpSettings.HasScope(User()).Should().BeFalse();
+        McpHttpSettings.HasScope(User("mcp.access Mcp.AccessX")).Should().BeFalse();
+    }
+
+    [Fact]
     public void AllowedResourceGroup_Should_Match_Ignoring_Case()
     {
         var group = new AllowedResourceGroup("Sub", "RG");
@@ -211,7 +224,8 @@ public class HttpSettingsAndPolicyTests
         var prompts = new TimetrackerPrompts(HttpTestSupport.Settings());
 
         prompts.DeployTimetracker().Should().Contain("パスワードは引数で渡す必要がある").And.Contain("server.allowed_resource_groups");
-        prompts.LocalDryRun("/ignored").Should().Contain("このサーバーはファイルを書き込まない").And.NotContain("/ignored");
+        prompts.LocalDryRun("/ignored").Should().Contain("このサーバーはファイルを書き込まない").And.NotContain("/ignored")
+            .And.NotContain("validate_deployment に target=compose");
         ServerInstructions.HttpText.Should().Contain("server 方式").And.Contain(ServerAccessPolicy.ServerRole);
     }
 

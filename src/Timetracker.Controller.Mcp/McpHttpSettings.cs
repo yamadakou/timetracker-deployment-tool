@@ -40,6 +40,10 @@ public sealed partial record McpHttpSettings
 
     public const string ScopeName = "Mcp.Access";
 
+    /// <summary>トークンの scp（委任のスコープ。スペース区切り）に <see cref="ScopeName"/> があるか。ID トークンやアプリのみのトークンには scp が無い。</summary>
+    public static bool HasScope(System.Security.Claims.ClaimsPrincipal user) =>
+        user.FindAll("scp").Any(c => c.Value.Split(' ', StringSplitOptions.RemoveEmptyEntries).Contains(ScopeName));
+
     /// <exception cref="ArgumentException">必須の不足や不正な値</exception>
     public static McpHttpSettings FromEnvironment(Func<string, string?> get)
     {

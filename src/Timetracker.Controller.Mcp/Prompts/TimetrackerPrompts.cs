@@ -49,11 +49,12 @@ public sealed class TimetrackerPrompts
     private const string LocalDryRunContent = """
         Timetracker をローカルの Docker で試します（Azure は使いません）。次の順に進めてください。
         1. get_deployment_options を呼び、既定値を確認する。
-        2. validate_deployment に target=compose を指定して検証し、errors があれば直す（パスワードは不要）。
-        3. generate_compose で docker-compose.yml と .env の内容を生成する（このサーバーはファイルを書き込まない）。
-        4. 利用者に、2 つのファイルを同じディレクトリに保存し、.env のプレースホルダーを自分でパスワードに置き換えるよう案内する
+        2. generate_compose で docker-compose.yml と .env の内容を生成する（このサーバーはファイルを書き込まない）。
+           設定は generate_compose が検証し、パスワードは不要（validate_deployment はパスワードを求めるため、ここでは使わない）。
+           設定に誤りがあればエラーになるので、利用者と相談して直す。
+        3. 利用者に、2 つのファイルを同じディレクトリに保存し、.env のプレースホルダーを自分でパスワードに置き換えるよう案内する
            （パスワードを会話に書かないこと。.env は共有・コミットしないこと）。
-        5. 結果の next_steps のとおり、docker compose up -d を実行して http://localhost:8080 を開くよう案内する。
+        4. 結果の next_steps のとおり、docker compose up -d を実行して http://localhost:8080 を開くよう案内する。
         """;
 
     private static string LocalDryRunToFiles(string? output_dir) => $"""

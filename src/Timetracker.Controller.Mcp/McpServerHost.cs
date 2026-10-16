@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 using Azure.ResourceManager;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -134,7 +135,13 @@ public static class McpServerHost
                     ResourceName = ServerName,
                 };
             });
-        builder.Services.AddAuthorization();
+        // 発行者・対象・署名だけでは、このアプリ登録向けの ID トークンと区別できない。委任のアクセストークンに限るため、
+        // scp（スペース区切り）に Mcp.Access があることを求める（無ければ 403）
+        builder.Services.AddAuthorizationBuilder()
+            .SetDefaultPolicy(new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .RequireAssertion(context => McpHttpSettings.HasScope(context.User))
+                .Build());
         // TLS は前段（Container Apps のイングレス）で終端するため、401 で示すメタデータの URL を、利用者から見た https の URL にする
         builder.Services.Configure<ForwardedHeadersOptions>(o =>
         {

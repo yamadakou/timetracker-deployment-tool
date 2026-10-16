@@ -43,6 +43,8 @@ jobs:
   # MCP サーバー（HTTP）のコンテナイメージを GHCR に push する（ghcr.io/<owner>/timetracker-mcp:<バージョン> と latest）。
   # 初回の push の後、GHCR のパッケージの公開設定（public にするか）は手動で行う
   image:
+    # テスト（release ジョブ）が成功した場合だけ公開する
+    needs: release
     runs-on: ubuntu-latest
     permissions:
       contents: read

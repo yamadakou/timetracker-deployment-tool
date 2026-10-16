@@ -25,6 +25,7 @@
   - 発行者: `https://login.microsoftonline.com/{テナント ID}/v2.0`（v2 のトークン）
   - 対象（audience）: アプリ登録のクライアント ID、または `api://{クライアント ID}`
   - 署名鍵は発行者のメタデータ（OpenID Connect の discovery）から取得する
+  - 委任のスコープ `scp`（スペース区切り）に `Mcp.Access` があることを求める（無ければ 403）。発行者・対象・署名だけでは、このアプリ登録向けの ID トークン（対象がクライアント ID）と区別できないため。アプリのみのトークン（`scp` が無い）も受け付けない
 - トークンが無い・無効な場合は 401 と `WWW-Authenticate: Bearer resource_metadata="…"` を返す。保護リソースのメタデータ（RFC 9728、`/.well-known/oauth-protected-resource`）には、`resource`（`TT_MCP_HTTP__PUBLIC_URL`）、認可サーバー（上の発行者）、スコープ（`api://{クライアント ID}/Mcp.Access`）を載せる。これは SDK の `AddMcp` 認証ハンドラーで返す
 - Entra ID は動的クライアント登録（DCR）に対応していないため、クライアントは事前に登録したクライアント ID を使う（手順は 4c）
 
@@ -84,7 +85,7 @@
 ## 7. コンテナイメージ
 - `Dockerfile`（リポジトリの直下）: `mcr.microsoft.com/dotnet/sdk:10.0` でビルドし、`mcr.microsoft.com/dotnet/aspnet:10.0` で実行する。非 root（`APP_UID`）、ポート 8080、`ENTRYPOINT ["dotnet", "timetracker-mcp.dll", "--transport", "http"]`
 - CI（`ci.yml`）: PR ごとにイメージのビルドだけを確かめる（push しない）
-- リリース（`release.yml`）: タグの push で `ghcr.io/yamadakou/timetracker-mcp:{バージョン}` と `latest` を push する（`packages: write`）。公開の設定（GHCR のパッケージを public にする）は初回だけ手動
+- リリース（`release.yml`）: テスト（`release` ジョブ）が成功した場合だけ、タグの push で `ghcr.io/yamadakou/timetracker-mcp:{バージョン}` と `latest` を push する（`packages: write`）。公開の設定（GHCR のパッケージを public にする）は初回だけ手動
 
 ## 8. テスト
 - C1（分岐網羅）100% を維持する（`Program.cs` の終了処理を除く）
@@ -94,8 +95,8 @@
 - テストの注意: `HttpContextAccessor` は値を static な `AsyncLocal` に置くため、単体テストで呼び出し元ごとに別のインスタンスを作っても、後から設定したものに上書きされる。テストでは独立した実装を使う
 
 ## 9. 確認結果
-- 自動テスト: 全件成功（ソリューション全体 573 件、うち Azure と E2E のシステムテスト 4 件はスキップ）。分岐網羅率は `Program.cs` の終了処理を除き 100%
+- 自動テスト: 全件成功（ソリューション全体 578 件、うち Azure と E2E のシステムテスト 4 件はスキップ）。分岐網羅率は `Program.cs` の終了処理を除き 100%
 - 子プロセス: ビルドした `timetracker-mcp.dll` を `--transport http` で起動し、設定が無ければ終了コード 1 と理由、設定があれば実際の Kestrel で `/healthz` が 200、トークンなしの `/mcp` が 401 になることを確認（Program から起動引数が渡ること）
-- TestServer: トークンなし・対象の違うトークン・発行者の違うトークン・署名の違うトークンが 401 と `resource_metadata` になること、保護リソースのメタデータ、ロールなしで Azure のツールがエラーになること、範囲外のリソースグループが Azure を読まずにブロッカーになること、別の利用者の計画・ジョブが見えないこと、開始したジョブを同じ利用者が別のリクエストで最後まで追えること、デプロイの Resource がロールなし・範囲外で拒否されること、リクエストのログに `preferred_username`（無ければ省略）と `{tid}/{oid}` が出て、認証のないリクエストは出ないことを確認
+- TestServer: トークンなし・対象の違うトークン・発行者の違うトークン・署名の違うトークンが 401 と `resource_metadata` になること、`scp` に `Mcp.Access` が無いトークン（ID トークンを想定したもの、ほかのスコープ、似た名前）が 403 になること、保護リソースのメタデータ、ロールなしで Azure のツールがエラーになること、範囲外のリソースグループが Azure を読まずにブロッカーになること、別の利用者の計画・ジョブが見えないこと、開始したジョブを同じ利用者が別のリクエストで最後まで追えること、デプロイの Resource がロールなし・範囲外で拒否されること、リクエストのログに `preferred_username`（無ければ省略）と `{tid}/{oid}` が出て、認証のないリクエストは出ないことを確認
 - Docker（ローカル）: `aspnet:10.0` のイメージで、非 root（`app`）で起動し、`/healthz` が 200、`X-Forwarded-*` 付きのトークンなしの `/mcp` が 401（`resource_metadata="https://…"`）、必須の設定が無ければ理由を出して終了することを確認。開発環境ではビルド用のコンテナから NuGet に接続できない（プロキシの証明書）ため、ホストで発行した成果物を同じ実行用のステージに載せて確認した。`sdk:10.0` でのビルドは CI で確認する
 - 未確認（4c）: Entra ID の実際のトークン、Container Apps 上での動作、MCP クライアントからの接続
