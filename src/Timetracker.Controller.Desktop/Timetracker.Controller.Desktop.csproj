@@ -13,6 +13,9 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <Platforms>x64;ARM64</Platforms>
     <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
+    <!-- バンドルでは x64 と arm64 をそれぞれビルドするため、プラットフォームに合わせて実行環境を決める（自己完結のビルドに必要） -->
+    <RuntimeIdentifier Condition="'$(Platform)' == 'x64'">win-x64</RuntimeIdentifier>
+    <RuntimeIdentifier Condition="'$(Platform.ToLowerInvariant())' == 'arm64'">win-arm64</RuntimeIdentifier>
     <UseWinUI>true</UseWinUI>
     <EnableMsixTooling>true</EnableMsixTooling>
     <!-- パッケージの言語（マニフェストの Resource は x-generate にして、ビルドがこの言語で生成する） -->
