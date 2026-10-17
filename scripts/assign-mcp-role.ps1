@@ -35,13 +35,20 @@ if ([string]::IsNullOrEmpty($UserPrincipalName) -eq [string]::IsNullOrEmpty($Gro
 $serverName = "Timetracker MCP ($Name)"
 $appId = Invoke-Az ad app list --display-name $serverName --query "[0].appId" --output tsv
 if (-not $appId) { throw "アプリ登録「$serverName」が見つかりません。先に scripts/deploy-mcp-http.ps1 を実行してください。" }
-$value = "Timetracker.Deploy.$Role"
+# ValidateSet は大文字小文字を区別せずに受け付けるため、登録したロールの値（大文字小文字を区別して比べる）に合わせる
+$value = if ($Role -eq "Server") { "Timetracker.Deploy.Server" } else { "Timetracker.Deploy.User" }
 $roleId = Invoke-Az ad app show --id $appId --query "appRoles[?value=='$value'].id | [0]" --output tsv
 $spId = Invoke-Az ad sp show --id $appId --query id --output tsv
 $principalId = if ($UserPrincipalName) { Invoke-Az ad user show --id $UserPrincipalName --query id --output tsv } else { $GroupObjectId }
 
-$existing = Invoke-Az rest --method GET --uri "https://graph.microsoft.com/v1.0/servicePrincipals/$spId/appRoleAssignedTo" `
-    --query "value[?principalId=='$principalId' && appRoleId=='$roleId'].id | [0]" --output tsv
+# 割り当ての一覧はページに分かれて返るため、@odata.nextLink をたどってすべて確かめる
+$existing = $false
+$uri = "https://graph.microsoft.com/v1.0/servicePrincipals/$spId/appRoleAssignedTo"
+while ($uri -and -not $existing) {
+    $page = (Invoke-Az rest --method GET --uri $uri --output json) | ConvertFrom-Json
+    $existing = [bool]($page.value | Where-Object { $_.principalId -eq $principalId -and $_.appRoleId -eq $roleId })
+    $uri = $page.'@odata.nextLink'
+}
 if ($existing) {
     Write-Host "既に $value が割り当てられています。"
     return

@@ -30,7 +30,8 @@ param(
     [string] $Name = "tt-mcp",
     [string] $Image = "ghcr.io/yamadakou/timetracker-mcp",
     [string] $ImageTag = "latest",
-    [ValidateSet("server", "user", "server,user")] [string] $IdentityModes = "server",
+    # server / user / server,user（PowerShell から server,user と書くと配列になるため、配列も受け付ける）
+    [string[]] $IdentityModes = @("server"),
     # server 方式で操作を許すリソースグループ名（このサブスクリプション。無ければ作成する）
     [string[]] $AllowedResourceGroups = @(),
     [switch] $CanCreateResourceGroup,
@@ -60,9 +61,20 @@ function Graph([string] $Method, [string] $Uri, $Body) {
 
 function Step([string] $Message) { Write-Host "==> $Message" -ForegroundColor Cyan }
 
+# 無ければ作る（既にあるリソースグループは、場所が違っても変えない。az group create は場所の変更を拒否するため）
+function New-ResourceGroupIfMissing([string] $Group) {
+    if ((Invoke-Az group exists --name $Group) -ne "true") {
+        Invoke-Az group create --name $Group --location $Location --output none | Out-Null
+    }
+}
+
 # pwsh -File で渡すと「a,b」が 1 つの文字列になるため、カンマでも分ける
 $AllowedResourceGroups = @($AllowedResourceGroups | ForEach-Object { $_ -split "," } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
-$modes = $IdentityModes.Split(",")
+$modes = @($IdentityModes | ForEach-Object { $_ -split "," } | ForEach-Object { $_.Trim().ToLowerInvariant() } | Where-Object { $_ } | Select-Object -Unique)
+if ($modes.Count -eq 0 -or ($modes | Where-Object { $_ -notin @("server", "user") })) {
+    throw "-IdentityModes には server、user、または server,user を指定してください。"
+}
+$identityModesValue = $modes -join ","
 $serverMode = $modes -contains "server"
 $userMode = $modes -contains "user"
 if ($serverMode -and $AllowedResourceGroups.Count -eq 0) {
@@ -85,7 +97,7 @@ Step "リソースプロバイダーを登録します（登録済みなら何�
 Invoke-Az provider register --namespace Microsoft.App --wait | Out-Null
 
 Step "リソースグループ $ResourceGroup とマネージド ID $Name-id"
-Invoke-Az group create --name $ResourceGroup --location $Location --output none | Out-Null
+New-ResourceGroupIfMissing $ResourceGroup
 $identity = Invoke-AzJson identity create --resource-group $ResourceGroup --name "$Name-id" --location $Location
 
 Step "Entra ID: サーバーのアプリ登録"
@@ -168,11 +180,15 @@ $clientApp = Invoke-AzJson ad app show --id $clientAppId
 Graph PATCH "/applications/$($clientApp.id)" @{
     isFallbackPublicClient = $true
     # Claude Code（--callback-port）と VS Code のループバック。VS Code の URI は docs/design/mcp-phase4c.md の確認事項を参照
-    publicClient = @{ redirectUris = @("http://localhost:$ClaudeCodeCallbackPort/callback", "http://127.0.0.1:33418") }
+    # 管理者が後から加えたリダイレクト URI は残す
+    publicClient = @{ redirectUris = @(@($clientApp.publicClient.redirectUris) + @("http://localhost:$ClaudeCodeCallbackPort/callback", "http://127.0.0.1:33418") |
+        Where-Object { $_ } | Select-Object -Unique) }
     requiredResourceAccess = @(@{ resourceAppId = $serverAppId; resourceAccess = @(@{ id = $scopeId; type = "Scope" }) })
 }
 # クライアントを事前承認し、利用者に Mcp.Access への同意を求めない（スコープを作った後に、api 全体を送り直す）
-$api.preAuthorizedApplications = @(@{ appId = $clientAppId; delegatedPermissionIds = @($scopeId) })
+# 管理者が後から事前承認したクライアント（VS Code など）は残し、このスクリプトのクライアントだけを置き換える
+$api.preAuthorizedApplications = @(@($api.preAuthorizedApplications | Where-Object { $_.appId -ne $clientAppId }) +
+    @(@{ appId = $clientAppId; delegatedPermissionIds = @($scopeId) }))
 Graph PATCH "/applications/$($serverApp.id)" @{ api = $api }
 
 Step "Container Apps の Environment $Name-env"
@@ -188,7 +204,7 @@ $envVars = @(
     "TT_MCP_HTTP__TENANT_ID=$tenantId",
     "TT_MCP_HTTP__CLIENT_ID=$serverAppId",
     "TT_MCP_HTTP__PUBLIC_URL=$publicUrl",
-    "TT_MCP_HTTP__IDENTITY_MODES=$IdentityModes",
+    "TT_MCP_HTTP__IDENTITY_MODES=$identityModesValue",
     "TT_MCP_HTTP__SERVER_IDENTITY=managed-identity",
     "TT_MCP_HTTP__USER_CLIENT_CREDENTIAL=managed-identity",
     # ユーザー割り当てのマネージド ID（server 方式の資格情報と、user 方式のフェデレーション資格情報に使う）
@@ -216,7 +232,7 @@ else {
 if ($serverMode) {
     Step "server 方式: 許可するリソースグループと、マネージド ID への Contributor の割り当て"
     foreach ($group in $AllowedResourceGroups) {
-        Invoke-Az group create --name $group --location $Location --output none | Out-Null
+        New-ResourceGroupIfMissing $group
         $scope = "/subscriptions/$SubscriptionId/resourceGroups/$group"
         $assigned = Invoke-Az role assignment list --assignee $identity.principalId --role Contributor --scope $scope --query "[0].id" --output tsv
         if (-not $assigned) {
