@@ -10,10 +10,10 @@ COPY src/Timetracker.Infrastructure.Azure/Timetracker.Infrastructure.Azure.cspro
 COPY src/Timetracker.Controller.Mcp/Timetracker.Controller.Mcp.csproj src/Timetracker.Controller.Mcp/
 RUN dotnet restore src/Timetracker.Controller.Mcp/Timetracker.Controller.Mcp.csproj
 COPY src/ src/
-# サーバーが報告する版（リリースではタグの版を渡す）
-ARG VERSION=0.0.0
+# サーバーが報告する版（リリースではタグの版を渡す。ARG は RUN の環境変数になるため、MSBuild の Version と同じ名前にしない）
+ARG MCP_VERSION=0.0.0
 RUN dotnet publish src/Timetracker.Controller.Mcp/Timetracker.Controller.Mcp.csproj --configuration Release --no-restore \
-    -p:UseAppHost=false -p:DebugType=None -p:Version=$VERSION --output /app
+    -p:UseAppHost=false -p:DebugType=None -p:Version=$MCP_VERSION --output /app
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app
