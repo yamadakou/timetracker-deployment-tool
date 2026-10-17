@@ -241,6 +241,12 @@ Store を使えない利用者（社内の PC で Store が無効など）向け
 | 5b | WinUI 3 のアプリ（画面、WAM でのサインイン、ファイルの選択、更新の確認）、`Timetracker.Desktop.slnx`、CI の `desktop` ジョブ | CI で MSIX ができる。Windows の実機で、サインイン → 計画 → デプロイ → 状態の確認 → 削除、Dry-run の保存が成功する（Azure での確認は利用者の確認を取ってから行う） |
 | 5c | `release.yml` の配布物、`docs/PRIVACY.md`、README・利用者向けの手順、Store への初回の提出（利用者が Partner Center で行う） | Release に `.msixupload` が出る。Store の認定に通る |
 
+**実施結果（5a・5b・5c の準備）**
+- 5a: Application に `DeploymentWorkflow` / `DeletionWorkflow` / `ComposeExporter` を追加し、MCP のツールをそれに置き換えた（MCP の入力・結果・メッセージは変えていない）。Infrastructure に `AzureTenantDirectory` / `TenantScopedCredential`、`Timetracker.Controller.Desktop.Core`（ViewModel）とテストを追加した。永続化オプション（7.1）も反映した
+- 5b: WinUI 3 のアプリ（`Timetracker.Controller.Desktop`、`Timetracker.Desktop.slnx`）と、CI の `desktop` ジョブを追加した。CI（作業ブランチで手動実行）で、署名なしの `.msixupload`（x64 と arm64 のバンドル、約 190MB。.NET と Windows App SDK を含む自己完結のため）ができ、マニフェストの版・対象 OS（10.0.17763.0）・機能（internetClient, runFullTrust）・アーキテクチャを `check-msix.ps1` で確かめた。CI で直したこと: ComboBox の選択は `BindBack` を使えないため選択の変更イベントで戻す、`Run` に `x:Bind` を結び付けると XBF の生成が失敗するため横に並べた `TextBlock` にする、マニフェストの `Resource` は `x-generate`、バンドルではプラットフォームごとに RID を決める
+- 5c の準備: `release.yml` に、タグの版（X.Y.Z.0）で `.msixupload` を作って Release に載せる `desktop` ジョブを追加した（実際のリリースでは未確認）。プライバシー ポリシーの案（`docs/PRIVACY.md`）を追加した
+- 未確認: Windows の実機での動作（サインイン、テナントごとのサブスクリプションの一覧、計画 → デプロイ → 状態の確認 → 削除、Dry-run の保存、閉じる前の確認、Store の更新の確認）と 11 の確認事項。Store への提出（Partner Center のアカウント、アプリ名の予約、マニフェストの Identity の置き換え、正式なアイコン、アプリ登録のクライアント ID）
+
 - 5a は Windows が無くても進められる（この開発環境でも実装とテストができる）。5b の画面とサインインは Windows の実機での確認が要る
 - 各フェーズの結果は `docs/REVIEW_ISSUES.md` に新しい番号で記録する
 
