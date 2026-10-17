@@ -59,6 +59,21 @@ function Graph([string] $Method, [string] $Uri, $Body) {
     finally { Remove-Item $file -ErrorAction SilentlyContinue }
 }
 
+# 実行したアカウントの分だけ、サーバーのアプリに Azure Service Management の user_impersonation を同意する（作れたか、既にあれば true）
+function Grant-ConsentForSelf([string] $AppId) {
+    try {
+        $clientSp = Invoke-Az ad sp show --id $AppId --query id --output tsv
+        $resourceSp = Invoke-Az ad sp show --id $armAppId --query id --output tsv
+        $me = Invoke-Az ad signed-in-user show --query id --output tsv
+        $grants = Invoke-AzJson rest --method GET --uri "https://graph.microsoft.com/v1.0/oauth2PermissionGrants?`$filter=clientId eq '$clientSp' and principalId eq '$me'"
+        if (-not @($grants.value | Where-Object { $_.resourceId -eq $resourceSp -and ($_.scope -split " ") -contains "user_impersonation" })) {
+            Graph POST "/oauth2PermissionGrants" @{ clientId = $clientSp; consentType = "Principal"; principalId = $me; resourceId = $resourceSp; scope = "user_impersonation" }
+        }
+        return $true
+    }
+    catch { return $false }
+}
+
 function Step([string] $Message) { Write-Host "==> $Message" -ForegroundColor Cyan }
 
 # 無ければ作る（既にあるリソースグループは、場所が違っても変えない。az group create は場所の変更を拒否するため）
@@ -166,7 +181,9 @@ if ($userMode) {
     Step "Entra ID: Azure Service Management の委任アクセス許可への管理者の同意"
     az ad app permission admin-consent --id $serverAppId --output none
     if ($LASTEXITCODE -ne 0) {
-        Write-Warning "管理者の同意に失敗しました。テナントの管理者に、Entra 管理センターの「$serverName」の「API のアクセス許可」で同意を付与してもらってください。"
+        # 管理者でなくても、実行した本人の分の同意は作れることがある（テナントの同意の設定による）。同意が無いと、MFA を済ませても OBO が AADSTS65001 で失敗する
+        $self = if (Grant-ConsentForSelf $serverAppId) { "実行したアカウントの分だけ同意しました。" } else { "実行したアカウントの分の同意も作れませんでした。" }
+        Write-Warning "管理者の同意に失敗しました。$self ほかの利用者が user 方式を使うには、テナントの管理者に、Entra 管理センターの「$serverName」の「API のアクセス許可」で同意を付与してもらってください。"
     }
 }
 

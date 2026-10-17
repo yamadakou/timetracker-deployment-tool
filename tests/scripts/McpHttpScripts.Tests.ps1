@@ -26,6 +26,7 @@ BeforeAll {
             SpExists = $false
             Fics = @()                       # 既にあるフェデレーション資格情報の名前
             ConsentFails = $false
+            SelfGrants = @()                 # 実行したアカウントの既にある同意（oauth2PermissionGrants）
             EnvExists = $false
             AppExists = $false
             RoleAssigned = @()               # Contributor が割り当て済みのスコープ
@@ -62,6 +63,9 @@ BeforeAll {
             "ad app show --id client-app --output json" { $s.ClientApp | ConvertTo-Json -Depth 10; break }
             "ad sp show --id server-app --output none" { if (-not $s.SpExists) { $global:LASTEXITCODE = 1 }; break }
             "ad sp show --id server-app --query id*" { "sp-id"; break }
+            "ad sp show --id 797f4846-ba00-4fd7-ba43-dac1f8f63013 --query id*" { "arm-sp"; break }
+            "ad signed-in-user show --query id*" { "me-id"; break }
+            "rest --method GET --uri *oauth2PermissionGrants*" { @{ value = @($s.SelfGrants) } | ConvertTo-Json -Depth 5; break }
             "ad app federated-credential list *" { $s.Fics -join "`n"; break }
             "ad app permission admin-consent *" { if ($s.ConsentFails) { $global:LASTEXITCODE = 1 }; break }
             "containerapp env show * --output none" { if (-not $s.EnvExists) { $global:LASTEXITCODE = 1 }; break }
@@ -150,6 +154,7 @@ Describe "deploy-mcp-http.ps1" {
             $first.requiredResourceAccess[0].resourceAccess[0].id | Should -Be "41094075-9dad-400e-a0bd-54e686782033"
 
             $fic = Body "ad app federated-credential create *"
+            Calls "*oauth2PermissionGrants*" | Should -HaveCount 0
             $fic.issuer | Should -Be "https://login.microsoftonline.com/tenant-1/v2.0"
             $fic.subject | Should -Be "mi-principal"
             $fic.audiences | Should -Be @("api://AzureADTokenExchange")
@@ -311,7 +316,38 @@ Describe "deploy-mcp-http.ps1" {
 
             & $script:Deploy -SubscriptionId sub-1 -ResourceGroup rg-mcp -IdentityModes user
 
-            Should -Invoke Write-Warning -Times 1 -ParameterFilter { $Message -like "管理者の同意に失敗しました。*" }
+            Should -Invoke Write-Warning -Times 1 -ParameterFilter { $Message -like "管理者の同意に失敗しました。実行したアカウントの分だけ同意しました。*" }
+            Calls "containerapp create *" | Should -HaveCount 1
+            Calls "rest --method GET --uri *oauth2PermissionGrants?`$filter=clientId eq 'sp-id' and principalId eq 'me-id'*" | Should -HaveCount 1
+            $grant = Body "rest --method POST --uri https://graph.microsoft.com/v1.0/oauth2PermissionGrants *"
+            $grant.clientId | Should -Be "sp-id"
+            $grant.consentType | Should -Be "Principal"
+            $grant.principalId | Should -Be "me-id"
+            $grant.resourceId | Should -Be "arm-sp"
+            $grant.scope | Should -Be "user_impersonation"
+        }
+
+        It "管理者の同意に失敗し、実行したアカウントの分の同意が既にあれば、作り直さない" {
+            $global:FakeAzState.ConsentFails = $true
+            $global:FakeAzState.SelfGrants = @(
+                @{ resourceId = "other-sp"; scope = "user_impersonation" },
+                @{ resourceId = "arm-sp"; scope = "openid user_impersonation" })
+            Mock Write-Warning { }
+
+            & $script:Deploy -SubscriptionId sub-1 -ResourceGroup rg-mcp -IdentityModes user
+
+            Should -Invoke Write-Warning -Times 1 -ParameterFilter { $Message -like "管理者の同意に失敗しました。実行したアカウントの分だけ同意しました。*" }
+            Calls "rest --method POST --uri *oauth2PermissionGrants*" | Should -HaveCount 0
+        }
+
+        It "管理者の同意に失敗し、実行したアカウントの分の同意も作れなくても、警告して続ける" {
+            $global:FakeAzState.ConsentFails = $true
+            $global:FakeAzState.FailOn = "rest --method POST --uri https://graph.microsoft.com/v1.0/oauth2PermissionGrants"
+            Mock Write-Warning { }
+
+            & $script:Deploy -SubscriptionId sub-1 -ResourceGroup rg-mcp -IdentityModes user
+
+            Should -Invoke Write-Warning -Times 1 -ParameterFilter { $Message -like "管理者の同意に失敗しました。実行したアカウントの分の同意も作れませんでした。*" }
             Calls "containerapp create *" | Should -HaveCount 1
         }
     }
