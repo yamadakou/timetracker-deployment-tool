@@ -26,4 +26,7 @@ public sealed record DeployInput
 
     public bool DryRun { get; init; }
     public bool Verbose { get; init; }
+
+    /// <summary>DB のデータを Azure Files に置くか（null は今の状態を引き継ぐ）。</summary>
+    public bool? PersistDb { get; init; }
 }

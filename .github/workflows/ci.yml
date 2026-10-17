@@ -5,9 +5,54 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  # 手動で実行したときは、変更したファイルにかかわらず、すべて実行する
+  workflow_dispatch:
 
 jobs:
+  # 変更したファイルがドキュメント（docs/ の下と *.md）だけかを判定する（.github/scripts/detect-code-changes.ps1）。
+  # ドキュメントは、下の 5 つのチェックのどれにも使われていないため、ドキュメントだけなら各チェックを省く（Skipped は成功として扱われる）
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      code: ${{ steps.detect.outputs.code }}
+
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
+
+    - name: Detect code changes
+      id: detect
+      shell: pwsh
+      env:
+        EVENT_NAME: ${{ github.event_name }}
+        BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        FORCED: ${{ github.event.forced }}
+      run: ./.github/scripts/detect-code-changes.ps1 -EventName $env:EVENT_NAME -Base $env:BASE_SHA -Head $env:HEAD_SHA -Forced $env:FORCED
+
+  # Markdown の中のリンク（ファイルと見出し #...）が切れていないかを確かめる（lychee。設定は lychee.toml）。
+  # 外部のサイト（https://...）は相手の都合で失敗することがあるため、ここでは確かめず、.github/workflows/links.yml で月 1 回確かめる。
+  # ドキュメントだけの変更でも省かない
+  links:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Check internal links
+      uses: lycheeverse/lychee-action@v2.9.0
+      with:
+        lycheeVersion: v0.24.2
+        args: --offline --include-fragments --no-progress --config lychee.toml './**/*.md'
+
   build:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: windows-latest
     permissions:
       contents: read
@@ -32,6 +77,8 @@ jobs:
   # MCP サーバー（HTTP）の配置とロールの割り当てのスクリプト（scripts/*.ps1）を、az を模擬に置き換えて確かめる（Pester）。
   # 管理者が実行する Windows の PowerShell 7 で動かす
   scripts:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: windows-latest
     permissions:
       contents: read
@@ -54,7 +101,10 @@ jobs:
   # サンプルデータベースのユーザーでログインできることをブラウザー（Playwright）で確かめる（PostgreSQL / SQL Server）。Linux コンテナを使うため ubuntu で動かす。
   # ライセンスキーとサンプルデータベースのユーザー（リポジトリのシークレット TT_E2E_*）が無い場合（フォークからの PR など）は、テストがスキップされる
   # サンプルデータベースの作成に時間がかかるため、DB 種別ごとにジョブを分けて並行に動かす
+  # ドキュメントだけの変更では、ジョブではなく各ステップを省く（マトリックスのジョブをまとめて省くと、
+  # 「e2e-local (postgresql)」などの DB 種別ごとの名前でチェックが報告されないため）
   e2e-local:
+    needs: changes
     runs-on: ubuntu-latest
     timeout-minutes: 80
     strategy:
@@ -66,19 +116,23 @@ jobs:
 
     steps:
     - uses: actions/checkout@v6
+      if: needs.changes.outputs.code == 'true'
 
     - name: Setup .NET
+      if: needs.changes.outputs.code == 'true'
       uses: actions/setup-dotnet@v5
       with:
         dotnet-version: 10.0.x
 
     - name: Install Playwright browser
+      if: needs.changes.outputs.code == 'true'
       run: |
         dotnet build tests/Timetracker.SystemTests
         pwsh tests/Timetracker.SystemTests/bin/Debug/net10.0/playwright.ps1 install --with-deps chromium
 
     # すべてスキップされた場合の終了コード 8（テストが 0 件）は失敗にしない
     - name: Setup wizard and login (docker compose)
+      if: needs.changes.outputs.code == 'true'
       env:
         TT_E2E_DB_TYPE: ${{ matrix.db-type }}
         TT_E2E_LICENSE_KEY: ${{ secrets.TT_E2E_LICENSE_KEY }}
@@ -90,7 +144,7 @@ jobs:
         --output detailed --report-xunit-trx --results-directory=TestResults --ignore-exit-code 8
 
     - name: Upload test results
-      if: always()
+      if: always() && needs.changes.outputs.code == 'true'
       uses: actions/upload-artifact@v7
       with:
         name: e2e-local-results-${{ matrix.db-type }}
@@ -98,6 +152,8 @@ jobs:
 
   # MCP サーバー（HTTP）のコンテナイメージがビルドでき、起動して /healthz に応答し、トークンなしの /mcp を 401 にすることを確かめる（push はしない）
   docker-mcp:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read

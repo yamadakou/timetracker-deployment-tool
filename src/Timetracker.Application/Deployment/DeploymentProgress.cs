@@ -5,6 +5,7 @@ public enum DeploymentStep
 {
     ResourceGroup,
     Environment,
+    DbStorage,
     ContainerApps,
 }
 

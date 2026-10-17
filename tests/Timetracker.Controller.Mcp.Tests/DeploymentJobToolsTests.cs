@@ -51,7 +51,7 @@ public sealed class DeploymentJobToolsTests
         _jobs = new JobManager(new InMemoryJobStore(), _time, NullLogger<JobManager>.Instance);
         _gateway.Setup(g => g.ListContainerAppsAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync(() => _apps.ToList());
         _gateway.Setup(g => g.GetPermissionsAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync([new PermissionSet(["*"], [])]);
-        _gateway.Setup(g => g.GetResourcePermissionsAsync("sub", "rg", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _gateway.Setup(g => g.GetResourcePermissionsAsync("sub", "rg", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
     }
 
@@ -362,6 +362,107 @@ public sealed class DeploymentJobToolsTests
         info.Db!.Managed.Should().BeFalse();
         info.Redis.Should().BeNull();
         info.Endpoint.Should().Be("https://demo-tt.example.io");
+    }
+
+    // ---- DB のデータの永続化（persist_db）
+
+    private static readonly string Account = ResourceNaming.StorageAccount("sub", "rg", "demo");
+
+    [Fact]
+    public async Task PlanDeployment_Should_Plan_The_Storage_When_Persisting()
+    {
+        _gateway.Setup(g => g.IsStorageAccountNameAvailableAsync("sub", Account, It.IsAny<CancellationToken>())).ReturnsAsync(true);
+
+        var result = await Tools().PlanDeployment(app_name: "demo", persist_db: true, cancellationToken: Ct);
+
+        result.PlanId.Should().NotBeNull();
+        result.PersistDb.Should().BeTrue();
+        result.StorageAccount.Should().Be(Account);
+        result.Resolved.PersistDb.Should().BeTrue();
+        result.Actions.Select(a => (a.Resource, a.Name, a.Action)).Should().ContainInOrder(
+            ("storage_account", Account, "create"), ("file_share", "demo-db", "create"), ("environment_storage", "dbdata", "create"));
+        result.Warnings.Should().Contain(DbPersistence.StorageNotice(Account));
+    }
+
+    [Fact]
+    public async Task PlanDeployment_Should_Not_Persist_By_Default()
+    {
+        var result = await Plan();
+
+        result.PersistDb.Should().BeFalse();
+        result.StorageAccount.Should().BeNull();
+        result.Resolved.PersistDb.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task StartDeployment_Should_Not_Require_Consent_When_The_Persisted_Db_Is_Kept()
+    {
+        // 永続化している DB アプリを、persist_db を省略して再デプロイする（今の状態を引き継ぐ）
+        ExistingResourceGroup();
+        ExistingEnvironment();
+        _apps.Add(new ContainerAppInfo("demo-db", EnvId, ManagedTags.For("demo"), [DbPersistence.StorageName]));
+        _gateway.Setup(g => g.GetStorageAccountAsync("sub", "rg", Account, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new StorageAccountInfo(Account, "japaneast", ManagedTags.For("demo")));
+        _gateway.Setup(g => g.FileShareExistsAsync("sub", "rg", Account, "demo-db", It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        _gateway.Setup(g => g.EnvironmentStorageExistsAsync("sub", "rg", "demo-env", "dbdata", It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        DeploymentSucceeds();
+        var plan = await Plan();
+
+        plan.RequiresDataLossAck.Should().BeFalse();
+        plan.PersistDb.Should().BeTrue();
+        plan.Actions.Single(a => a.Name == "demo-db" && a.Resource == "container_app").DataLoss.Should().BeFalse();
+        var started = await Tools().StartDeployment(plan.PlanId!, cancellationToken: Ct);
+        await WaitForJob(started.JobId);
+
+        var status = Tools().GetJobStatus(started.JobId);
+        status.Status.Should().Be("succeeded");
+        status.CurrentStep.Should().Be(new JobStepInfo(4, 4, "Container Apps（DB / Redis / Timetracker）"));
+        status.Result!.StorageAccount.Should().Be(Account);
+        _gateway.Verify(g => g.EnsureDbStorageAsync("sub", "rg", "demo", "japaneast", It.IsAny<ContainerAppManagedEnvironmentResource>(), It.IsAny<CancellationToken>()), Times.Once);
+        _gateway.Verify(g => g.CreateOrUpdateContainerAppAsync("sub", "rg", "demo", "japaneast",
+            It.Is<DeployOptions>(o => o.PersistDb == true), It.IsAny<ContainerAppManagedEnvironmentResource>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task PlanDeployment_Should_Require_Consent_To_Stop_Persisting()
+    {
+        ExistingResourceGroup();
+        ExistingEnvironment();
+        _apps.Add(new ContainerAppInfo("demo-db", EnvId, ManagedTags.For("demo"), [DbPersistence.StorageName]));
+
+        var plan = await Tools().PlanDeployment(app_name: "demo", persist_db: false, cancellationToken: Ct);
+
+        plan.RequiresDataLossAck.Should().BeTrue();
+        plan.PersistDb.Should().BeFalse();
+        plan.Warnings.Should().Contain(DbPersistence.DataLossWarning("demo-db", true, false));
+    }
+
+    [Fact]
+    public async Task GetDeploymentInfo_Should_Return_The_Persistence()
+    {
+        ExistingResourceGroup();
+        _gateway.Setup(g => g.ListContainerAppDetailsAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync(
+        [
+            new ContainerAppDetails("demo-db", "Succeeded", "Running", "postgres:16", 1, "2Gi", "demo-db--r1", null, ManagedTags.For("demo"),
+                [DbPersistence.StorageName]),
+        ]);
+        _gateway.Setup(g => g.GetStorageAccountAsync("sub", "rg", Account, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new StorageAccountInfo(Account, "japaneast", ManagedTags.For("demo")));
+
+        var info = await Tools().GetDeploymentInfo(app_name: "demo", cancellationToken: Ct);
+
+        info.Persistence.Should().Be(new PersistenceState(true, Account, true));
+    }
+
+    [Fact]
+    public async Task GetDeploymentInfo_Should_Report_No_Persistence_Without_A_Storage_Account()
+    {
+        ExistingResourceGroup();
+        _gateway.Setup(g => g.ListContainerAppDetailsAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync([]);
+
+        var info = await Tools().GetDeploymentInfo(app_name: "demo", cancellationToken: Ct);
+
+        info.Persistence.Should().Be(new PersistenceState(false, null, null));
     }
 
     [Fact]

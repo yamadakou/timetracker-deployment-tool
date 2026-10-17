@@ -37,6 +37,7 @@ public class DeployOptionsResolverTests
         opts.RedisMemoryGi.Should().Be(Defaults.RedisMemoryGi);
         opts.DryRun.Should().BeFalse();
         opts.Verbose.Should().BeFalse();
+        opts.PersistDb.Should().BeNull(); // 今の状態を引き継ぐ
     }
 
     [Fact]
@@ -58,6 +59,7 @@ public class DeployOptionsResolverTests
             RedisMemoryGi = 0.5,
             DryRun = true,
             Verbose = true,
+            PersistDb = true,
         });
 
         opts.Location.Should().Be("eastus");
@@ -74,6 +76,7 @@ public class DeployOptionsResolverTests
         opts.RedisMemoryGi.Should().Be(0.5);
         opts.DryRun.Should().BeTrue();
         opts.Verbose.Should().BeTrue();
+        opts.PersistDb.Should().BeTrue();
     }
 
     [Fact]

@@ -24,7 +24,7 @@ public sealed class CliArgs
 
     private static readonly IReadOnlySet<string> DeployBoolFlags = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
-        "--dry-run", "--verbose",
+        "--dry-run", "--verbose", "--persist-db",
     };
 
     private static readonly IReadOnlySet<string> DeleteValueOptions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -34,7 +34,7 @@ public sealed class CliArgs
 
     private static readonly IReadOnlySet<string> DeleteBoolFlags = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
-        "--dry-run", "--verbose", "--include-untagged", "--yes",
+        "--dry-run", "--verbose", "--include-untagged", "--yes", "--keep-db-data",
     };
 
     private static readonly IReadOnlyDictionary<string, CliCommand> Commands = new Dictionary<string, CliCommand>(StringComparer.OrdinalIgnoreCase)
@@ -72,6 +72,8 @@ public sealed class CliArgs
           --tt-cpu / --tt-memory      Timetracker の vCPU / メモリ(Gi)（既定: 1.5 / 3.0）
           --db-cpu / --db-memory      DB の vCPU / メモリ(Gi)（既定: 1.0 / 2.0）
           --redis-cpu / --redis-memory Redis の vCPU / メモリ(Gi)（既定: 0.5 / 1.0）
+          --persist-db [true|false]   DB のデータを Azure Files に置き、DB コンテナの再起動の後も残す（ストレージの料金がかかる）。
+                                      省略時は既存の DB アプリの今の状態を引き継ぐ（新規は永続化しない）。やめるには false を指定
           --dry-run [true|false]      Azure へ反映せず docker-compose.yml と .env を生成
           --verbose [true|false]      詳細ログを出力
           -h, --help                  このヘルプを表示
@@ -82,6 +84,7 @@ public sealed class CliArgs
           --app-name <名前>           既定: timetracker
           --auth-mode <モード>        deploy と同じ
           --include-untagged [true|false] 管理タグの無いリソースも削除の対象にする
+          --keep-db-data [true|false] --persist-db で DB のデータを置いたストレージアカウントを残す（既定では削除する）
           --dry-run [true|false]      削除計画を表示するだけで、削除しない
           --yes [true|false]          確認の入力（アプリ名）を省略する
           --verbose [true|false]      詳細ログを出力
@@ -197,6 +200,9 @@ public sealed class CliArgs
     public string Get(string name, string defaultValue) => Get(name) ?? defaultValue;
 
     public bool GetBool(string name) => _values.TryGetValue(name, out var v) && v == "true";
+
+    /// <summary>true/false のフラグを取得する。指定が無い場合は null。</summary>
+    public bool? GetBoolOrNull(string name) => _values.TryGetValue(name, out var v) ? v == "true" : null;
 
     /// <summary>
     /// 正の数値を取得する。OS のロケールに依存せず小数点は "." として解釈する

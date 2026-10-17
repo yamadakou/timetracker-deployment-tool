@@ -34,7 +34,8 @@ public class DeletionViewModelTests
 
         vm.Targets.Select(t => (t.Name, t.Resource, t.Decision)).Should().Equal(
             ("demo-tt", "Container App", "削除する"), ("demo-redis", "Container App", "削除する"),
-            ("demo-db", "Container App", "削除する"), ("demo-env", "Container Apps Environment", "削除する"));
+            ("demo-db", "Container App", "削除する"), ("demo-env", "Container Apps Environment", "削除する"),
+            (FakeAzure.StorageAccountName, "ストレージアカウント（DB のデータ）", "削除しない"));
         vm.Warnings.Should().Equal(DeletionViewModel.DbDataLossWarning);
         vm.KeptText.Should().StartWith("リソースグループ rg は削除しません");
         vm.AppNameToConfirm.Should().Be("demo");

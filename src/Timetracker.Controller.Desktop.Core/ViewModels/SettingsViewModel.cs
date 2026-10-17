@@ -5,6 +5,9 @@ using Timetracker.Domain.Deployment;
 
 namespace Timetracker.Controller.Desktop.Core.ViewModels;
 
+/// <summary>DB のデータの永続化の選択肢（<see cref="Value"/> は null で今の状態を引き継ぐ）。</summary>
+public sealed record PersistDbOption(bool? Value, string Label);
+
 /// <summary>設定から作ったデプロイの設定と、誤り・警告。<see cref="Options"/> は誤りがあれば null。</summary>
 public sealed record DeploymentInput(DeployOptions? Options, IReadOnlyList<string> Errors, IReadOnlyList<string> Warnings);
 
@@ -15,6 +18,14 @@ public sealed record DeploymentInput(DeployOptions? Options, IReadOnlyList<strin
 public sealed class SettingsViewModel : ObservableObject
 {
     public static readonly IReadOnlyList<string> DbTypes = ["postgresql", "sqlserver"];
+
+    /// <summary>永続化の選択肢（CLI の --persist-db を指定しない / true / false に対応する）。</summary>
+    public static readonly IReadOnlyList<PersistDbOption> PersistDbOptions =
+    [
+        new(null, "今の状態を引き継ぐ（新しく作る場合は永続化しない）"),
+        new(true, "Azure Files に永続化する（料金がかかる）"),
+        new(false, "永続化しない（DB コンテナの再起動でデータが失われる）"),
+    ];
 
     private readonly TargetViewModel _target;
     private string _dbType = DeployOptionsResolver.DefaultDbType;
@@ -28,6 +39,7 @@ public sealed class SettingsViewModel : ObservableObject
     private string _dbMemory = Format(Defaults.DbMemoryGi);
     private string _redisCpu = Format(Defaults.RedisCpu);
     private string _redisMemory = Format(Defaults.RedisMemoryGi);
+    private PersistDbOption _persistDb = PersistDbOptions[0];
 
     public SettingsViewModel(TargetViewModel target)
     {
@@ -61,6 +73,17 @@ public sealed class SettingsViewModel : ObservableObject
 
     public string RedisMemoryGi { get => _redisMemory; set => Set(ref _redisMemory, value); }
 
+    /// <summary>DB のデータを Azure Files に置くか（詳細設計 docs/design/db-persistence.md）。</summary>
+    public PersistDbOption PersistDb
+    {
+        get => _persistDb;
+        set
+        {
+            if (SetProperty(ref _persistDb, value))
+                Validate();
+        }
+    }
+
     /// <summary>Azure へのデプロイの設定の誤り（入力のたびに更新する）。</summary>
     public ObservableCollection<string> Errors { get; } = [];
 
@@ -88,6 +111,7 @@ public sealed class SettingsViewModel : ObservableObject
             DbMemoryGi          = Parse(DbMemoryGi, "db-memory", errors),
             RedisCpu            = Parse(RedisCpu, "redis-cpu", errors),
             RedisMemoryGi       = Parse(RedisMemoryGi, "redis-memory", errors),
+            PersistDb           = PersistDb.Value,
         });
         errors.AddRange(DeploymentValidator.GetErrors(options, target));
         var warnings = DeploymentAdvisor.GetWarnings(options, target);

@@ -27,7 +27,7 @@ public class DeploymentPlannerPlanTests
     {
         _gateway.Setup(g => g.ListContainerAppsAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync(() => _apps);
         _gateway.Setup(g => g.GetPermissionsAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync([new PermissionSet(["*"], [])]);
-        _gateway.Setup(g => g.GetResourcePermissionsAsync("sub", "rg", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _gateway.Setup(g => g.GetResourcePermissionsAsync("sub", "rg", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
     }
 
@@ -81,7 +81,10 @@ public class DeploymentPlannerPlanTests
         plan.CreatesEnvironment.Should().BeFalse();
         plan.Warnings.Should().ContainSingle().Which.Should().Contain("DB アプリ 'demo-db' は既に存在します。設定が変わると DB コンテナが再起動し");
         plan.PermissionCheck.Should().Be(PermissionCheckResult.Ok);
-        plan.Options.Should().BeSameAs(Opts);
+        // 指定が無く、既存の DB アプリが永続化していないため、永続化しない計画になる（元の設定は変えない）
+        plan.Options.Should().NotBeSameAs(Opts).And.BeEquivalentTo(Opts, o => o.Excluding(x => x.PersistDb));
+        plan.PersistDb.Should().BeFalse();
+        Opts.PersistDb.Should().BeNull();
     }
 
     [Fact]
@@ -184,6 +187,28 @@ public class DeploymentInspectorTests
         info.Endpoint.Should().Be("https://demo-tt.example.io");
     }
 
+    [Fact]
+    public async Task Should_Return_The_Storage_Account_And_Whether_The_Db_Is_Persisted()
+    {
+        var account = new StorageAccountInfo(ResourceNaming.StorageAccount("sub", "rg", "demo"), "japaneast", new Dictionary<string, string>());
+        _gateway.Setup(g => g.GetResourceGroupAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync(new ResourceGroupInfo("rg", "japaneast"));
+        _gateway.Setup(g => g.ListContainerAppDetailsAsync("sub", "rg", It.IsAny<CancellationToken>()))
+            .ReturnsAsync([App("demo-db") with { StorageNames = [DbPersistence.StorageName] }]);
+        _gateway.Setup(g => g.GetStorageAccountAsync("sub", "rg", account.Name, It.IsAny<CancellationToken>())).ReturnsAsync(account);
+
+        var info = await new DeploymentInspector(_gateway.Object).InspectAsync("sub", "rg", "demo", Ct);
+
+        info.StorageAccount.Should().Be(account);
+        info.DbPersisted.Should().BeTrue();
+    }
+
+    [Fact]
+    public void DbPersisted_Should_Be_False_Without_A_Db_App_Or_A_Mount()
+    {
+        new DeploymentInfo("sub", "rg", "demo", null, null, null, null, null).DbPersisted.Should().BeFalse();
+        new DeploymentInfo("sub", "rg", "demo", null, null, null, App("demo-db"), null).DbPersisted.Should().BeFalse();
+    }
+
     [Theory]
     [InlineData(true, false, false, false)]
     [InlineData(false, true, false, false)]
@@ -197,5 +222,15 @@ public class DeploymentInspectorTests
 
         info.Exists.Should().BeTrue();
         info.Endpoint.Should().BeNull();
+    }
+
+    [Fact]
+    public void Exists_Should_Be_True_When_Only_The_Storage_Account_Remains()
+    {
+        // delete --keep-db-data の後
+        var info = new DeploymentInfo("sub", "rg", "demo", new ResourceGroupInfo("rg", "japaneast"), null, null, null, null,
+            new StorageAccountInfo("ttdemo12345678", "japaneast", new Dictionary<string, string>()));
+
+        info.Exists.Should().BeTrue();
     }
 }

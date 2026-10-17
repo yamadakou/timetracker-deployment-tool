@@ -123,7 +123,7 @@ internal static class ToolSupport
         return new ResolvedSettings(
             o.Subscription, o.ResourceGroup, o.Location, o.AppName, o.DbType, o.DbName, o.TimetrackerTag,
             Mask(resolved.DbPasswordSource), Mask(resolved.TrackerPasswordSource),
-            o.TimetrackerCpu, o.TimetrackerMemoryGi, o.DbCpu, o.DbMemoryGi, o.RedisCpu, o.RedisMemoryGi);
+            o.TimetrackerCpu, o.TimetrackerMemoryGi, o.DbCpu, o.DbMemoryGi, o.RedisCpu, o.RedisMemoryGi, o.PersistDb);
     }
 
     public static ResourceNames ToResourceNames(string appName) => new(

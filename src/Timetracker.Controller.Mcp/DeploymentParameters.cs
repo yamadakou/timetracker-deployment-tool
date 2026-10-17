@@ -30,6 +30,7 @@ public sealed record DeploymentParameters
     public double? DbMemoryGi { get; init; }
     public double? RedisCpu { get; init; }
     public double? RedisMemoryGi { get; init; }
+    public bool? PersistDb { get; init; }
 
     /// <summary>
     /// 既定値を適用した設定を作る。subscription / resource_group は引数が無ければサーバーの既定値を使い、
@@ -56,6 +57,7 @@ public sealed record DeploymentParameters
             DbMemoryGi          = DbMemoryGi,
             RedisCpu            = RedisCpu,
             RedisMemoryGi       = RedisMemoryGi,
+            PersistDb           = PersistDb,
             AuthMode            = settings.AuthMode,
         });
         return new ResolvedParameters(options, dbSource, trackerSource);

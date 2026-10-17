@@ -20,11 +20,14 @@ public sealed class DeletionViewModel : ObservableObject
     public const string UnmanagedWarning =
         "管理タグが無いため削除しないリソースがあります。本ツールで作ったものであれば、「管理タグの無いものも対象にする」で対象にできます。";
 
+    public const string KeptReason = "「DB のデータを残す」の指定により残します";
+
     private readonly DeletionWorkflow _workflow;
     private readonly TargetViewModel _target;
     private readonly Func<JobViewModel, Task> _watch;
     private DeletionPlanTicket? _ticket;
     private bool _includeUntagged;
+    private bool _keepDbData;
     private string _confirmAppName = "";
     private string? _error;
     private string? _note;
@@ -61,6 +64,17 @@ public sealed class DeletionViewModel : ObservableObject
         }
     }
 
+    /// <summary>DB のデータを置いたストレージアカウントを残すか（残すと料金がかかり続けるが、同じアプリ名で永続化してデプロイするとデータを引き継げる）。</summary>
+    public bool KeepDbData
+    {
+        get => _keepDbData;
+        set
+        {
+            if (SetProperty(ref _keepDbData, value))
+                Ticket = null;
+        }
+    }
+
     /// <summary>確認のためのアプリ名の入力。</summary>
     public string ConfirmAppName
     {
@@ -80,7 +94,12 @@ public sealed class DeletionViewModel : ObservableObject
     /// <summary>入力してもらうアプリ名（計画のアプリ名）。</summary>
     public string? AppNameToConfirm => _ticket?.CanRun == true ? _ticket.Plan.AppName : null;
 
-    public string? KeptText => _ticket == null ? null : $"リソースグループ {_ticket.Plan.ResourceGroup} は削除しません（不要であれば Azure ポータルや az group delete で削除してください）。";
+    public string? KeptText => _ticket switch
+    {
+        null => null,
+        { Plan.KeepsDbData: true } t => $"{KeptResourceGroup(t.Plan)}\n{KeptDbDataNotice(t.Plan)}",
+        { } t => KeptResourceGroup(t.Plan),
+    };
 
     public bool CanStart => AppNameToConfirm != null && ConfirmAppName == AppNameToConfirm;
 
@@ -114,12 +133,22 @@ public sealed class DeletionViewModel : ObservableObject
                 var plan = value.Plan;
                 foreach (var t in plan.Targets)
                     Targets.Add(new DeletionRow(
-                        t.Name, t.Kind == DeletionResourceKind.ContainerApp ? "Container App" : "Container Apps Environment",
-                        t.WillDelete ? "削除する" : "削除しない", t.Reason, t.WillDelete));
+                        t.Name,
+                        t.Kind switch
+                        {
+                            DeletionResourceKind.ContainerApp => "Container App",
+                            DeletionResourceKind.Environment => "Container Apps Environment",
+                            _ => "ストレージアカウント（DB のデータ）",
+                        },
+                        t.WillDelete ? "削除する" : "削除しない",
+                        t.Reason == DeletionPlanner.KeptReason ? KeptReason : t.Reason,
+                        t.WillDelete));
                 foreach (var blocker in value.Blockers)
                     Blockers.Add(blocker);
-                if (plan.DeletesDb)
+                if (plan.LosesDbData)
                     Warnings.Add(DbDataLossWarning);
+                if (plan.DeletesDbData)
+                    Warnings.Add($"ストレージアカウント {plan.StorageAccountName}（Azure Files に永続化した DB のデータ）も削除します。元に戻せません（残すには「DB のデータを残す」にチェックを入れてください）。");
                 if (plan.HasUnmanaged)
                     Warnings.Add(UnmanagedWarning);
                 if (plan.PermissionCheck.Status == PermissionCheckStatus.NotChecked)
@@ -135,6 +164,13 @@ public sealed class DeletionViewModel : ObservableObject
         }
     }
 
+    private static string KeptResourceGroup(DeletionPlan plan) =>
+        $"リソースグループ {plan.ResourceGroup} は削除しません（不要であれば Azure ポータルや az group delete で削除してください）。";
+
+    private static string KeptDbDataNotice(DeletionPlan plan) =>
+        $"ストレージアカウント {plan.StorageAccountName}（DB のデータ）は残します。料金がかかり続けます。同じアプリ名で「Azure Files に永続化する」を選んで" +
+        "デプロイすると、データを引き継ぎます。不要になったら「DB のデータを残す」のチェックを外して削除してください。";
+
     // 読み取りだけで計画を作る。対象に誤りがあれば Azure は読まない
     private async Task PlanAsync()
     {
@@ -148,7 +184,7 @@ public sealed class DeletionViewModel : ObservableObject
         try
         {
             Ticket = await _workflow.PlanAsync(
-                _target.CreateSession(), _target.Subscription, _target.ResourceGroup, _target.AppName.ToLowerInvariant(), IncludeUntagged);
+                _target.CreateSession(), _target.Subscription, _target.ResourceGroup, _target.AppName.ToLowerInvariant(), IncludeUntagged, KeepDbData);
         }
         catch (Exception ex)
         {
@@ -162,7 +198,7 @@ public sealed class DeletionViewModel : ObservableObject
         JobViewModel job;
         try
         {
-            job = new JobViewModel(await _workflow.StartAsync(_ticket!.Saved!.PlanId, ConfirmAppName, _ => _target.CreateSession()));
+            job = new JobViewModel(await _workflow.StartAsync(_ticket!.Saved!.PlanId, ConfirmAppName, _ => _target.CreateSession(), KeptDbDataNotice));
         }
         catch (Exception ex)
         {

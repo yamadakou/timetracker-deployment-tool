@@ -60,6 +60,14 @@ public sealed class DeploymentViewModel : ObservableObject
 
     public string? EstimatedDuration => _ticket?.EstimatedDuration;
 
+    /// <summary>DB のデータを永続化するか（「今の状態を引き継ぐ」を選んだ場合は、既存の DB アプリから決めた結果）。</summary>
+    public string? PersistDbText => _ticket?.Plan switch
+    {
+        null => null,
+        { PersistDb: true } p => $"DB のデータ: Azure Files に永続化する（ストレージアカウント {ResourceNaming.StorageAccount(p.Options.Subscription, p.Options.ResourceGroup, p.Options.AppName)}）",
+        _ => "DB のデータ: 永続化しない（DB コンテナの再起動でデータが失われる）",
+    };
+
     public DateTimeOffset? ExpiresAt => _ticket?.Saved?.ExpiresAt;
 
     public bool RequiresDataLossAck => _ticket?.Plan.RequiresDataLossAck == true;
@@ -106,6 +114,7 @@ public sealed class DeploymentViewModel : ObservableObject
             OnPropertyChanged(nameof(HasPlan));
             OnPropertyChanged(nameof(PermissionText));
             OnPropertyChanged(nameof(EstimatedDuration));
+            OnPropertyChanged(nameof(PersistDbText));
             OnPropertyChanged(nameof(ExpiresAt));
             OnPropertyChanged(nameof(RequiresDataLossAck));
             OnPropertyChanged(nameof(CanStart));
@@ -156,11 +165,14 @@ public sealed class DeploymentViewModel : ObservableObject
         await _watch(job);
     }
 
-    private static OperationRow ToRow(PlannedOperation op) => new(
+    internal static OperationRow ToRow(PlannedOperation op) => new(
         op.Kind switch
         {
             PlannedResourceKind.ResourceGroup => "リソースグループ",
             PlannedResourceKind.Environment => "Container Apps Environment",
+            PlannedResourceKind.StorageAccount => "ストレージアカウント（DB のデータ）",
+            PlannedResourceKind.FileShare => "ファイル共有（DB のデータ）",
+            PlannedResourceKind.EnvironmentStorage => "Environment のストレージ",
             _ => "Container App",
         },
         op.Name,

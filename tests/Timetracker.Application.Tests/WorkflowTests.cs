@@ -62,7 +62,7 @@ public class DeploymentWorkflowTests
         _workflow = new DeploymentWorkflow(_plans, _jobs, new LocalCallerContext(), new SimpleLogger(false, TextWriter.Null));
         _gateway.Setup(g => g.ListContainerAppsAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync(() => _apps.ToList());
         _gateway.Setup(g => g.GetPermissionsAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync([new PermissionSet(["*"], [])]);
-        _gateway.Setup(g => g.GetResourcePermissionsAsync("sub", "rg", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _gateway.Setup(g => g.GetResourcePermissionsAsync("sub", "rg", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
     }
 
@@ -318,7 +318,7 @@ public class DeletionWorkflowTests
         _gateway.Setup(g => g.GetResourceGroupAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync(new ResourceGroupInfo("rg", "japaneast"));
         _gateway.Setup(g => g.ListContainerAppsAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync(() => _apps.ToList());
         _gateway.Setup(g => g.GetPermissionsAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync(() => _permissions);
-        _gateway.Setup(g => g.GetResourcePermissionsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _gateway.Setup(g => g.GetResourcePermissionsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
     }
 
@@ -329,8 +329,10 @@ public class DeletionWorkflowTests
         _apps.Add(new ContainerAppInfo("demo-redis", EnvId, Managed));
     }
 
-    private Task<DeletionPlanTicket> Plan(string? context = null) =>
-        _workflow.PlanAsync(_session, "sub", "rg", "demo", includeUntagged: false, context, Ct);
+    private Task<DeletionPlanTicket> Plan(string? context = null, bool keepDbData = false) =>
+        _workflow.PlanAsync(_session, "sub", "rg", "demo", includeUntagged: false, keepDbData, context, Ct);
+
+    private static string Notice(DeletionPlan plan) => $"{plan.StorageAccountName} を残しました";
 
     private Func<string?, IAzureSession> SessionFor(List<string?>? contexts = null) => context =>
     {
@@ -383,7 +385,7 @@ public class DeletionWorkflowTests
         var planId = (await Plan("user")).Saved!.PlanId;
         var contexts = new List<string?>();
 
-        var job = await _workflow.StartAsync(planId, "demo", SessionFor(contexts), Ct);
+        var job = await _workflow.StartAsync(planId, "demo", SessionFor(contexts), Notice, Ct);
         await job.Completion;
 
         contexts.Should().Equal("user");
@@ -400,13 +402,32 @@ public class DeletionWorkflowTests
     }
 
     [Fact]
+    public async Task Start_Should_Add_The_Notice_When_The_Db_Data_Is_Kept()
+    {
+        _apps.Add(new ContainerAppInfo("demo-db", EnvId, Managed));
+        _gateway.Setup(g => g.GetStorageAccountAsync("sub", "rg", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string _, string _, string name, CancellationToken _) => new StorageAccountInfo(name, "japaneast", Managed));
+        _gateway.Setup(g => g.DeleteContainerAppAsync("sub", "rg", "demo-db", It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        (await Plan()).Plan.LosesDbData.Should().BeTrue();
+        var ticket = await Plan(keepDbData: true);
+        ticket.Plan.KeepsDbData.Should().BeTrue();
+        ticket.Plan.LosesDbData.Should().BeFalse();
+
+        var job = await _workflow.StartAsync(ticket.Saved!.PlanId, "demo", SessionFor(), Notice, Ct);
+        await job.Completion;
+
+        job.Snapshot().Logs.Select(l => l.Message).Should().EndWith($"{ticket.Plan.StorageAccountName} を残しました");
+        job.Snapshot().Result.Should().BeOfType<DeletionOutcome>().Which.Deleted.Should().Equal("demo-db");
+    }
+
+    [Fact]
     public async Task Start_Should_Require_The_Same_App_Name_Without_Using_Up_The_Plan()
     {
         TwoApps();
         var planId = (await Plan()).Saved!.PlanId;
         var contexts = new List<string?>();
 
-        var ex = await Fails(() => _workflow.StartAsync(planId, "Demo", SessionFor(contexts), Ct));
+        var ex = await Fails(() => _workflow.StartAsync(planId, "Demo", SessionFor(contexts), Notice, Ct));
 
         ex.Failure.Should().Be(WorkflowFailure.AppNameMismatch);
         contexts.Should().BeEmpty();
@@ -416,7 +437,7 @@ public class DeletionWorkflowTests
     [Fact]
     public async Task Start_Should_Reject_Unknown_Plans()
     {
-        (await Fails(() => _workflow.StartAsync("pln_unknown", "demo", SessionFor(), Ct))).Failure.Should().Be(WorkflowFailure.PlanNotFound);
+        (await Fails(() => _workflow.StartAsync("pln_unknown", "demo", SessionFor(), Notice, Ct))).Failure.Should().Be(WorkflowFailure.PlanNotFound);
     }
 
     [Fact]
@@ -426,7 +447,7 @@ public class DeletionWorkflowTests
         var planId = (await Plan()).Saved!.PlanId;
         _session.Scope = "範囲外です";
 
-        var ex = await Fails(() => _workflow.StartAsync(planId, "demo", SessionFor(), Ct));
+        var ex = await Fails(() => _workflow.StartAsync(planId, "demo", SessionFor(), Notice, Ct));
 
         ex.Failure.Should().Be(WorkflowFailure.OutOfScope);
         ex.Blockers.Should().Equal("範囲外です");
@@ -439,7 +460,7 @@ public class DeletionWorkflowTests
         var planId = (await Plan()).Saved!.PlanId;
         _permissions[0] = new PermissionSet(["*/read"], []);
 
-        var ex = await Fails(() => _workflow.StartAsync(planId, "demo", SessionFor(), Ct));
+        var ex = await Fails(() => _workflow.StartAsync(planId, "demo", SessionFor(), Notice, Ct));
 
         ex.Failure.Should().Be(WorkflowFailure.Blocked);
         ex.Blockers.Should().ContainSingle().Which.Should().StartWith("権限が不足しています");
@@ -453,7 +474,7 @@ public class DeletionWorkflowTests
         _apps.RemoveAt(1);
         _apps.Add(new ContainerAppInfo("demo-redis", EnvId, new Dictionary<string, string>()));
 
-        (await Fails(() => _workflow.StartAsync(planId, "demo", SessionFor(), Ct))).Failure.Should().Be(WorkflowFailure.Changed);
+        (await Fails(() => _workflow.StartAsync(planId, "demo", SessionFor(), Notice, Ct))).Failure.Should().Be(WorkflowFailure.Changed);
     }
 
     [Fact]
@@ -464,9 +485,9 @@ public class DeletionWorkflowTests
         _gateway.Setup(g => g.DeleteContainerAppAsync("sub", "rg", It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns(release.Task);
         var first = (await Plan()).Saved!.PlanId;
         var second = (await Plan()).Saved!.PlanId;
-        var running = await _workflow.StartAsync(first, "demo", SessionFor(), Ct);
+        var running = await _workflow.StartAsync(first, "demo", SessionFor(), Notice, Ct);
 
-        var ex = await Fails(() => _workflow.StartAsync(second, "demo", SessionFor(), Ct));
+        var ex = await Fails(() => _workflow.StartAsync(second, "demo", SessionFor(), Notice, Ct));
         release.SetResult(true);
         await running.Completion;
 

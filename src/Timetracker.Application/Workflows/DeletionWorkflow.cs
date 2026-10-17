@@ -38,13 +38,14 @@ public sealed class DeletionWorkflow
     }
 
     /// <summary>削除の計画を作り、実行できれば保存する（Azure は変更しない）。</summary>
+    /// <param name="keepDbData">DB のデータを置いたストレージアカウントを残すか</param>
     /// <param name="context">計画に付ける情報（実行のときに <see cref="StartAsync"/> の sessionFor に渡る）</param>
     public async Task<DeletionPlanTicket> PlanAsync(
-        IAzureSession session, string subscription, string resourceGroup, string appName, bool includeUntagged,
+        IAzureSession session, string subscription, string resourceGroup, string appName, bool includeUntagged, bool keepDbData,
         string? context = null, CancellationToken cancellationToken = default)
     {
         var plan = await new DeletionPlanner(session.CreateGateway(_logger))
-            .PlanAsync(subscription, resourceGroup, appName, includeUntagged, cancellationToken);
+            .PlanAsync(subscription, resourceGroup, appName, includeUntagged, keepDbData, cancellationToken);
         var blockers = Blockers(plan);
         var saved = plan.HasDeletions && blockers.Count == 0
             ? _plans.Save(new StoredPlan<DeletionPlan>(plan, context), _caller.CallerId)
@@ -62,9 +63,11 @@ public sealed class DeletionWorkflow
     /// </summary>
     /// <param name="confirmAppName">利用者が入力したアプリ名（計画のアプリ名と完全に一致すること）</param>
     /// <param name="sessionFor">計画に付けた情報から、実行に使う接続を作る（呼び出し元がまだ使えるかを確かめ、使えなければ例外を投げる）</param>
+    /// <param name="keptDbDataNotice">DB のデータを残した場合に、完了のログに添える案内（フロントエンドの言葉で、次の手順を示す）</param>
     /// <exception cref="WorkflowException">実行しなかった場合</exception>
     public async Task<Job> StartAsync(
-        string planId, string confirmAppName, Func<string?, IAzureSession> sessionFor, CancellationToken cancellationToken = default)
+        string planId, string confirmAppName, Func<string?, IAzureSession> sessionFor, Func<DeletionPlan, string> keptDbDataNotice,
+        CancellationToken cancellationToken = default)
     {
         var stored = Find(planId);
         if (confirmAppName != stored.Plan.AppName)
@@ -76,7 +79,7 @@ public sealed class DeletionWorkflow
         if (session.ScopeBlocker(plan.Subscription, plan.ResourceGroup) is { } outOfScope)
             throw new WorkflowException(WorkflowFailure.OutOfScope, [outOfScope]);
         var current = await new DeletionPlanner(session.CreateGateway(_logger))
-            .PlanAsync(plan.Subscription, plan.ResourceGroup, plan.AppName, plan.IncludeUntagged, cancellationToken);
+            .PlanAsync(plan.Subscription, plan.ResourceGroup, plan.AppName, plan.IncludeUntagged, plan.KeepDbData, cancellationToken);
         var blockers = Blockers(current);
         if (blockers.Count > 0)
             throw new WorkflowException(WorkflowFailure.Blocked, blockers);
@@ -97,6 +100,8 @@ public sealed class DeletionWorkflow
             foreach (var r in results.Where(r => !r.Deleted))
                 context.Logger.Info($"{r.Name} は既に削除されていました。");
             context.Logger.Success($"削除が完了しました（リソースグループ {plan.ResourceGroup} は残しています）。");
+            if (plan.KeepsDbData)
+                context.Logger.Info(keptDbDataNotice(plan));
             return new DeletionOutcome(
                 plan.ResourceGroup,
                 results.Where(r => r.Deleted).Select(r => r.Name).ToList(),

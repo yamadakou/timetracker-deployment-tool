@@ -3,7 +3,7 @@
 単体テスト（`tests/*.Tests`）では Azure SDK をモックしているため、Azure の実際の挙動（タグの扱い、権限の判定、削除の所要時間など）は確認できません。システムテスト（`tests/Timetracker.SystemTests`）は、CLI を**本物の Azure** に対して実行し、結果を Azure から直接読んで確かめます。
 
 - 環境変数 `TT_SYSTEMTEST_SUBSCRIPTION_ID` が無い場合はスキップされます。通常の `dotnet test Timetracker.sln` や PR の CI では実行されません
-- **料金が発生します**（Azure Container Apps。1 回 20〜40 分）。リリース前などに実行してください
+- **料金が発生します**（Azure Container Apps。1 回 20〜40 分。`DbPersistenceLifecycleTests` はストレージアカウントも作る）。リリース前などに実行してください
 - Timetracker のライセンスキーとサンプルデータベースのユーザー（環境変数 `TT_E2E_LICENSE_KEY` / `TT_E2E_SAMPLE_LOGIN` / `TT_E2E_SAMPLE_PASSWORD`）がある場合は、ブラウザー（Playwright）でセットアップウィザードを操作し、サンプルデータベースの作成と、そのユーザーでのログイン（管理画面のユーザー一覧にサンプルのユーザーが表示されること）まで確認します（Azure 上と、ローカルの docker compose 上）。無い場合はその確認だけを省略します
 - テスト用のリソースは、テストの最後に削除します（下記「後片付け」）
 
@@ -11,6 +11,7 @@
 | テスト | 内容 |
 |---|---|
 | `DeploymentLifecycleTests` | 実行ごとに専用のリソースグループを作り、次を順に確認する。① デプロイすると 4 つのリソースに管理タグが付き、Timetracker が HTTP で応答する（E2E の設定があれば、続けてセットアップウィザードでサンプルデータベースを作り、ログインできる） ② 手で付けたタグが再デプロイ後も残る ③ DB アプリの管理タグを外すと、DB アプリと Environment が削除の対象外になる（`--include-untagged` で対象になる） ④ 確認の入力が一致しなければ中止する ⑤ 管理タグがあるものだけ削除される ⑥ 残りを削除してもリソースグループは残る ⑦ 再実行しても失敗しない |
+| `DbPersistenceLifecycleTests` | DB データの永続化（`--persist-db`。PostgreSQL）を、専用のリソースグループで確認する。① `--persist-db` でデプロイすると、管理タグ付きのストレージアカウントができ、DB アプリが Azure Files をマウントし、DB のデータのディレクトリが共有の上に作られる ② `--persist-db` を省略して設定を変えた再デプロイで、永続化を引き継いで停止 → 更新 → 開始し（データ消失の警告は出ない）、新しい DB コンテナが共有の上のデータを初期化せずに使う（`PG_VERSION` が変わらず、再デプロイの後に `postmaster.pid` が作られる）③ `--keep-db-data` の削除ではストレージアカウントとデータが残る ④ 既定の削除でストレージアカウントも消える。サブスクリプションにリソースプロバイダー `Microsoft.Storage` の登録が必要 |
 | `LocalComposeSetupTests` | CLI の Dry-run で作った docker-compose.yml でローカルに起動し、セットアップウィザードでサンプルデータベースを作って、サンプルデータベースのユーザーでログインできることを確かめる（PostgreSQL と SQL Server）。Azure は使わない。E2E の設定が無い場合と、Docker が使えない場合はスキップする。ポート 8080 を使う |
 | `LimitedPermissionTests` | 権限の少ないサービスプリンシパルで、権限の事前確認が Azure の実際の挙動と合っていることを確認する。① Environment の新規作成が必要なデプロイは止まり、何も作成しない ② 既存の Environment への Container App の更新は成功する（`containerApps/*/write` で `containerApps/write` が許可される） ③ Environment の削除権限が無いため、削除は止まり何も削除しない |
 
@@ -90,7 +91,7 @@ scripts/run-system-tests.sh <サブスクリプション ID> <appId>
 ### CI（自動）
 GitHub の Actions → **System Test** → Run workflow で実行します（`workflow_dispatch`）。結果はジョブの成果物（`system-test-results`）に保存されます。ローカルの docker compose での確認（`LocalComposeSetupTests`）は、ここでは行いません（次の PR の CI で行うため）。
 
-ローカルの docker compose でのセットアップウィザードとログインの確認（`LocalComposeSetupTests`）は、PR と `main` へのプッシュのたびに CI（`ci.yml` の `e2e-local`。ubuntu）で実行します。Azure は使わず、料金はかかりません。サンプルデータベースの作成に時間がかかるため、DB 種別ごとにジョブを分けて並行に実行します（環境変数 `TT_E2E_DB_TYPE` で 1 つに絞る）。結果は成果物（`e2e-local-results-<DB 種別>`）に保存されます。待つ間は、実行中の画面の進み具合をテストの出力に記録します。
+ローカルの docker compose でのセットアップウィザードとログインの確認（`LocalComposeSetupTests`）は、PR と `main` へのプッシュのたびに CI（`ci.yml` の `e2e-local`。ubuntu）で実行します（ドキュメントだけの変更では省きます）。Azure は使わず、料金はかかりません。サンプルデータベースの作成に時間がかかるため、DB 種別ごとにジョブを分けて並行に実行します（環境変数 `TT_E2E_DB_TYPE` で 1 つに絞る）。結果は成果物（`e2e-local-results-<DB 種別>`）に保存されます。待つ間は、実行中の画面の進み具合をテストの出力に記録します。
 
 - GitHub の仕様により、手動で実行できるのは既定のブランチ（`main`）にあるワークフローだけです。他のブランチのワークフローは、`main` にマージされるまで Actions の一覧に表示されません
 - `main` にマージされた後は、Run workflow の「Use workflow from」で、テストするブランチを選べます

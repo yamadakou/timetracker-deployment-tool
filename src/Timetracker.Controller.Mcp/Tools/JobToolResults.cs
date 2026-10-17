@@ -4,6 +4,7 @@ namespace Timetracker.Controller.Mcp.Tools;
 
 /// <summary>
 /// plan_deployment の結果。<see cref="PlanId"/> は、誤りやブロッカーがあれば null（実行できない計画は発行しない）。
+/// <see cref="PersistDb"/> は実際に DB のデータを Azure Files に置くか、<see cref="StorageAccount"/> はそのストレージアカウント（永続化しない場合は null）。
 /// </summary>
 public sealed record DeploymentPlanResult(
     string? PlanId,
@@ -16,7 +17,9 @@ public sealed record DeploymentPlanResult(
     bool RequiresDataLossAck,
     string? EstimatedDuration,
     ResolvedSettings Resolved,
-    ResourceNames ResourceNames);
+    ResourceNames ResourceNames,
+    bool PersistDb = false,
+    string? StorageAccount = null);
 
 /// <summary>Azure を操作する ID（stdio ではサーバーの認証モードの資格情報）。</summary>
 public sealed record IdentityInfo(string AuthMode, string Display);
@@ -25,7 +28,7 @@ public sealed record IdentityInfo(string AuthMode, string Display);
 public sealed record PermissionCheckInfo(string Status, IReadOnlyList<string> Missing, string? Note);
 
 /// <summary>
-/// 計画した操作。<see cref="Resource"/> は resource_group / environment / container_app、
+/// 計画した操作。<see cref="Resource"/> は resource_group / environment / container_app / storage_account / file_share / environment_storage、
 /// <see cref="Action"/> は create / use_existing / update。
 /// </summary>
 public sealed record PlannedActionInfo(string Resource, string Name, string Action, bool DataLoss);
@@ -38,8 +41,12 @@ public sealed record JobStepInfo(int Index, int Total, string Name);
 
 public sealed record JobLogInfo(string Level, string Message, DateTimeOffset At);
 
-/// <summary>デプロイのジョブが成功したときの結果。<see cref="Endpoint"/> は Timetracker の URL（取得できなければ null）。</summary>
-public sealed record DeploymentJobResult(string ResourceGroup, string Environment, string Tt, string Db, string Redis, string? Endpoint);
+/// <summary>
+/// デプロイのジョブが成功したときの結果。<see cref="Endpoint"/> は Timetracker の URL（取得できなければ null）。
+/// <see cref="StorageAccount"/> は DB のデータを置いたストレージアカウント（永続化しない場合は null）。
+/// </summary>
+public sealed record DeploymentJobResult(
+    string ResourceGroup, string Environment, string Tt, string Db, string Redis, string? Endpoint, string? StorageAccount = null);
 
 public sealed record JobStatusResult(
     string JobId,
@@ -71,7 +78,14 @@ public sealed record DeploymentInfoResult(
     ContainerAppState? Tt,
     ContainerAppState? Db,
     ContainerAppState? Redis,
-    string? Endpoint);
+    string? Endpoint,
+    PersistenceState? Persistence = null);
+
+/// <summary>
+/// DB のデータの永続化の状態。<see cref="DbPersisted"/> は DB アプリが Azure Files を使っているか、
+/// <see cref="StorageAccount"/> は DB のデータを置くストレージアカウント（無ければ null）。
+/// </summary>
+public sealed record PersistenceState(bool DbPersisted, string? StorageAccount, bool? StorageAccountManaged);
 
 public sealed record ResourceGroupState(string Name, string Location);
 
@@ -96,9 +110,11 @@ public sealed record DeletionPlanResult(
     IReadOnlyList<string> Warnings,
     bool DeletesDb,
     string? ConfirmationRequired,
-    string? Note);
+    string? Note,
+    bool DeletesDbData = false,
+    bool KeepsDbData = false);
 
-/// <summary>削除計画の対象。<see cref="Resource"/> は container_app / environment。<see cref="Reason"/> は削除しない理由。</summary>
+/// <summary>削除計画の対象。<see cref="Resource"/> は container_app / environment / storage_account。<see cref="Reason"/> は削除しない理由。</summary>
 public sealed record DeletionTargetInfo(string Name, string Resource, bool Exists, bool Managed, bool WillDelete, string? Reason);
 
 /// <summary>削除のジョブが成功したときの結果。<see cref="AlreadyDeleted"/> は計画の後に既に無かったもの。</summary>

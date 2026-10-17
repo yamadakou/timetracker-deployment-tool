@@ -41,6 +41,15 @@ public sealed class StatusViewModel : ObservableObject
 
     public Uri? Endpoint => _info?.Endpoint is { } url ? new Uri(url) : null;
 
+    /// <summary>DB のデータの永続化の状態。</summary>
+    public string? PersistenceText => _info switch
+    {
+        null => null,
+        { DbPersisted: true } i => $"DB のデータ: Azure Files に永続化しています（ストレージアカウント {ResourceNaming.StorageAccount(i.Subscription, i.ResourceGroup, i.AppName)}）",
+        { StorageAccount: { } account } => $"DB のデータ: 永続化していません（以前の DB のデータがストレージアカウント {account.Name} に残っています）",
+        _ => "DB のデータ: 永続化していません（DB コンテナの再起動でデータが失われます）",
+    };
+
     public string? Error
     {
         get => _error;
@@ -61,6 +70,7 @@ public sealed class StatusViewModel : ObservableObject
             }
             OnPropertyChanged(nameof(Summary));
             OnPropertyChanged(nameof(Endpoint));
+            OnPropertyChanged(nameof(PersistenceText));
         }
     }
 

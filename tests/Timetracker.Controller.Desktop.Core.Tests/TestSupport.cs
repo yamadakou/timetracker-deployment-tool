@@ -89,6 +89,10 @@ internal sealed class FakeAzure : IAzureClients
     public Task Release { get; set; } = Task.CompletedTask;
     public string? DeployedUrl { get; set; } = "https://demo-tt.example.io";
     public List<TokenCredential> Credentials { get; } = [];
+    public bool HasStorageAccount { get; set; }
+
+    /// <summary>DB のデータを置くストレージアカウントの名前（サブスクリプション・リソースグループ・アプリ名から決まる）。</summary>
+    public static string StorageAccountName => ResourceNaming.StorageAccount("sub", "rg", "demo");
 
     public FakeAzure()
     {
@@ -99,8 +103,14 @@ internal sealed class FakeAzure : IAzureClients
         GatewayMock.Setup(g => g.ListContainerAppDetailsAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync(() => AppDetails.ToList());
         GatewayMock.Setup(g => g.GetPermissionsAsync("sub", "rg", It.IsAny<CancellationToken>()))
             .Returns(() => PermissionsError != null ? Task.FromException<IReadOnlyList<PermissionSet>>(PermissionsError) : Task.FromResult<IReadOnlyList<PermissionSet>>(Permissions));
-        GatewayMock.Setup(g => g.GetResourcePermissionsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        GatewayMock.Setup(g => g.GetResourcePermissionsAsync(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
+        GatewayMock.Setup(g => g.GetStorageAccountAsync("sub", "rg", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string _, string _, string name, CancellationToken _) => HasStorageAccount ? new StorageAccountInfo(name, "japaneast", Managed) : null);
+        GatewayMock.Setup(g => g.IsStorageAccountNameAvailableAsync("sub", It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        GatewayMock.Setup(g => g.EnsureDbStorageAsync("sub", "rg", "demo", "japaneast", env, It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        GatewayMock.Setup(g => g.DeleteStorageAccountAsync("sub", "rg", It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
         GatewayMock.Setup(g => g.EnsureResourceGroupAsync("sub", "rg", "japaneast", It.IsAny<CancellationToken>())).Returns(() => Release);
         GatewayMock.Setup(g => g.EnsureContainerAppEnvAsync("sub", "rg", "demo", "japaneast", It.IsAny<CancellationToken>())).ReturnsAsync(env);
         GatewayMock.Setup(g => g.CreateOrUpdateContainerAppAsync("sub", "rg", "demo", "japaneast", It.IsAny<DeployOptions>(), env, It.IsAny<CancellationToken>()))
@@ -117,10 +127,12 @@ internal sealed class FakeAzure : IAzureClients
     public static IReadOnlyDictionary<string, string> Managed => ManagedTags.For("demo");
 
     /// <summary>本ツールで作った 3 つの Container App と Environment がある。</summary>
-    public void Deployed()
+    public void Deployed(bool persisted = false)
     {
-        foreach (var name in new[] { "demo-tt", "demo-redis", "demo-db" })
+        foreach (var name in new[] { "demo-tt", "demo-redis" })
             Apps.Add(new ContainerAppInfo(name, EnvId, Managed));
+        Apps.Add(new ContainerAppInfo("demo-db", EnvId, Managed, persisted ? [DbPersistence.StorageName] : null));
+        HasStorageAccount = persisted;
         Environment = new ManagedEnvironmentInfo(EnvId, "demo-env", "japaneast", Managed, "Succeeded");
     }
 

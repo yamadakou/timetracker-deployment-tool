@@ -45,7 +45,7 @@ public sealed class DeletionJobTools
 
     [McpServerTool(Name = "plan_deletion", Title = "Azure からの削除の計画",
         ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = true, UseStructuredContent = true)]
-    [Description("本ツールが作ったリソース（{app}-tt / -redis / -db / -env）を削除する計画を作る（Azure を読むだけで、変更しない）。" +
+    [Description("本ツールが作ったリソース（{app}-tt / -redis / -db / -env と、persist_db で作ったストレージアカウント）を削除する計画を作る（Azure を読むだけで、変更しない）。" +
                  "対象ごとに削除するか・しない理由、残すもの（リソースグループは削除しない）、警告、権限の確認結果を返す。" +
                  "結果を利用者に示し、削除してよいかとアプリ名を確認してから start_deletion に渡す。" +
                  "ブロッカーがある場合や削除するものが無い場合は plan_id が null になる。計画の有効期限は 15 分。")]
@@ -55,18 +55,22 @@ public sealed class DeletionJobTools
         [Description("アプリ名（既定 timetracker）")] string? app_name = null,
         [Description("管理タグの無いリソース（本ツールの以前の版で作ったものなど）も対象にするか（既定 false）。" +
                      "別のアプリ・ツールの管理タグがあるものは対象にしない")] bool include_untagged = false,
+        [Description("persist_db で DB のデータを置いたストレージアカウントを残すか（既定 false: DB のデータごと削除する）。" +
+                     "残すと料金がかかり続けるが、同じアプリ名で persist_db=true のデプロイをするとデータを引き継げる")] bool keep_db_data = false,
         [Description(DeploymentTools.AzureIdentityDescription)] string? azure_identity = null,
         CancellationToken cancellationToken = default)
     {
         var access = _policy.Resolve(azure_identity);
         var o = ToolSupport.ResolveTarget(_settings, access, subscription, resource_group, app_name);
         var ticket = await ToolSupport.CallAzureAsync(access, _logger, () =>
-            Workflow().PlanAsync(new AccessSession(access, _gatewayFactory), o.Subscription, o.ResourceGroup, o.AppName, include_untagged, access.Mode, cancellationToken));
+            Workflow().PlanAsync(new AccessSession(access, _gatewayFactory), o.Subscription, o.ResourceGroup, o.AppName, include_untagged, keep_db_data, access.Mode, cancellationToken));
         var plan = ticket.Plan;
         var blockers = ticket.Blockers;
         var warnings = new List<string>();
-        if (plan.DeletesDb)
+        if (plan.LosesDbData)
             warnings.Add(DbDataLossWarning);
+        if (plan.DeletesDbData)
+            warnings.Add($"ストレージアカウント {plan.StorageAccountName}（Azure Files に永続化した DB のデータ）も削除します。元に戻せません（残すには keep_db_data=true）。");
         if (plan.HasUnmanaged)
             warnings.Add("管理タグが無いため削除しないリソースがあります。本ツールで作ったものであれば、include_untagged=true で対象にできます。");
         if (plan.PermissionCheck.Status == PermissionCheckStatus.NotChecked)
@@ -80,11 +84,13 @@ public sealed class DeletionJobTools
             Identity: access.Identity,
             PermissionCheck: DeploymentJobTools.ToPermissionCheckInfo(plan.PermissionCheck),
             Targets: plan.Targets.Select(ToTargetInfo).ToList(),
-            Kept: [$"resource_group: {o.ResourceGroup}（削除しません。不要であれば Azure ポータルや az group delete で削除してください）"],
+            Kept: Kept(plan),
             Warnings: warnings,
             DeletesDb: plan.DeletesDb,
             ConfirmationRequired: canRun ? $"start_deletion の confirm_app_name に '{o.AppName}' を指定してください（利用者に入力してもらってください）" : null,
-            Note: plan.HasDeletions ? null : "削除するリソースはありません。");
+            Note: plan.HasDeletions ? null : "削除するリソースはありません。",
+            DeletesDbData: plan.DeletesDbData,
+            KeepsDbData: plan.KeepsDbData);
     }
 
     [McpServerTool(Name = "start_deletion", Title = "Azure からの削除の開始",
@@ -106,7 +112,7 @@ public sealed class DeletionJobTools
             // 計画を作った方式で実行する（呼び出し元がまだその方式を使えるかも確かめる）
             job = await ToolSupport.CallAzureAsync(() => access, _logger, () =>
                 workflow.StartAsync(plan_id, confirm_app_name,
-                    mode => new AccessSession(access = _policy.ForMode(mode!), _gatewayFactory), cancellationToken));
+                    mode => new AccessSession(access = _policy.ForMode(mode!), _gatewayFactory), KeptDbDataNotice, cancellationToken));
         }
         catch (WorkflowException ex) when (ex.Failure == WorkflowFailure.AppNameMismatch)
         {
@@ -128,6 +134,26 @@ public sealed class DeletionJobTools
     // 計画 → 確認 → 実行の安全策（計画で Azure を読むときは、ツールのログに書く）
     private DeletionWorkflow Workflow() => new(_plans, _jobs, _caller, new McpDeploymentLogger(_logger));
 
+    // 削除しないもの（リソースグループと、keep_db_data で残すストレージアカウント）
+    private static List<string> Kept(DeletionPlan plan)
+    {
+        var kept = new List<string> { $"resource_group: {plan.ResourceGroup}（削除しません。不要であれば Azure ポータルや az group delete で削除してください）" };
+        if (plan.KeepsDbData)
+            kept.Add($"storage_account: {KeptDbDataNotice(plan)}");
+        return kept;
+    }
+
+    private static string KeptDbDataNotice(DeletionPlan plan) =>
+        $"ストレージアカウント {plan.StorageAccountName}（DB のデータ）は残します。料金がかかり続けます。同じアプリ名で persist_db=true のデプロイをすると" +
+        "データを引き継ぎます。不要になったら keep_db_data を指定せずに削除してください。";
+
     private static DeletionTargetInfo ToTargetInfo(DeletionTarget t) => new(
-        t.Name, t.Kind == DeletionResourceKind.ContainerApp ? "container_app" : "environment", t.Exists, t.Managed, t.WillDelete, t.Reason);
+        t.Name,
+        t.Kind switch
+        {
+            DeletionResourceKind.ContainerApp => "container_app",
+            DeletionResourceKind.Environment => "environment",
+            _ => "storage_account",
+        },
+        t.Exists, t.Managed, t.WillDelete, t.Reason);
 }

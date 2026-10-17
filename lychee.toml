@@ -1,0 +1,25 @@
+# リンク切れのチェック（lychee。.github/workflows/ci.yml の links と .github/workflows/links.yml）の設定
+# https://lychee.cli.rs/guides/config/
+
+# 一時的な失敗（タイムアウト・接続の切断）に備えて再試行する
+max_retries = 3
+retry_wait_time = 5
+timeout = 30
+
+# 429（アクセスの制限）は、リンク先があるものとして扱う
+accept = ["200..=299", "429"]
+
+# 説明の中の例・プレースホルダー・API のエンドポイントは、確かめる対象から外す
+exclude = [
+  '^https?://localhost',
+  '^https?://127\.0\.0\.1',
+  'example\.com',
+  '<[^>]*>',
+  '%3C.*%3E',
+  '^https://graph\.microsoft\.com/',
+  '^https://management\.azure\.com/',
+  '^https://login\.microsoftonline\.com/',
+]
+
+# ビルドの成果物とテストの結果は対象にしない
+exclude_path = ['(^|/)(bin|obj|TestResults|node_modules)/']

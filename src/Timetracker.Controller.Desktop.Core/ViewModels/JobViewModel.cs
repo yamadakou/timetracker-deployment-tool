@@ -50,6 +50,11 @@ public sealed class JobViewModel : ObservableObject
     /// <summary>デプロイが成功した場合の Timetracker の URL。</summary>
     public Uri? Endpoint => _snapshot.Result is DeploymentResult { TimetrackerUrl: { } url } ? new Uri(url) : null;
 
+    /// <summary>デプロイが成功し、DB のデータを永続化した場合の保存先。</summary>
+    public string? PersistenceSummary => _snapshot.Result is DeploymentResult { StorageAccountName: { } account }
+        ? $"DB のデータはストレージアカウント {account}（Azure Files）に保存しています。"
+        : null;
+
     /// <summary>削除が成功した場合の結果。</summary>
     public string? DeletionSummary => _snapshot.Result is DeletionOutcome d
         ? $"削除したもの: {Join(d.Deleted)}。既に無かったもの: {Join(d.AlreadyDeleted)}。リソースグループ {d.ResourceGroup} は残しています。"
@@ -78,6 +83,7 @@ public sealed class JobViewModel : ObservableObject
         OnPropertyChanged(nameof(StepText));
         OnPropertyChanged(nameof(Error));
         OnPropertyChanged(nameof(Endpoint));
+        OnPropertyChanged(nameof(PersistenceSummary));
         OnPropertyChanged(nameof(DeletionSummary));
     }
 
