@@ -14,6 +14,7 @@ PR #38（REVIEW_ISSUES No.46）で追加した `persist_db` / `keep_db_data` を
   ```
 - [ ] `server` 方式で使う、許可したリソースグループ（`TT_MCP_HTTP__SERVER_ALLOWED_RESOURCE_GROUPS`）がある。MCP サーバーのマネージド ID には、配置スクリプトがそこに Contributor を割り当てている（Storage の権限も含まれる）
 - [ ] （`user` 方式も確かめる場合）自分に Contributor があるリソースグループがある
+- [ ] 「データの確認」（S4・S6）を行う自分に、`server` 方式で使うリソースグループの Contributor など、ストレージアカウントのキーの取得（`Microsoft.Storage/storageAccounts/listKeys/action`）と `az containerapp exec` ができるロールがある（MCP サーバーのマネージド ID の権限とは別に必要）
 - [ ] Claude Code（または VS Code）から HTTP 版の MCP サーバーにサインインできる（Phase 4c の 4.3）
 
 ## 2. MCP サーバーのイメージを更新する
@@ -78,4 +79,5 @@ az containerapp exec -n ttmcp-db -g $RG --command "psql -U postgres"
 | S2 が「ストレージアカウント名は…使われているため作成できません」 | アプリ名を変える（名前はサブスクリプション・リソースグループ・アプリ名から作るため、別の組み合わせなら変わる） |
 | S2 で DB アプリの起動に失敗する、マウントのエラーが出る | Azure Policy で、ストレージアカウントのアカウントキーによるアクセス（`allowSharedKeyAccess`）やパブリック ネットワーク アクセスを禁止している |
 | S3 の `persistence` が無い | イメージが古い（2 の確認をやり直す） |
+| S4 の `az storage file list` が権限の不足（`AuthorizationFailed`）で失敗する | 自分に `listKeys/action` を含むロールが無い（1 の前提を確かめる） |
 | `get_job_status` でジョブが見つからない | MCP サーバーが再起動した（Azure 側の処理は続いている。`get_deployment_info` で状態を確かめる） |
