@@ -82,6 +82,9 @@ BeforeAll {
     # 指定した呼び出しで送った Graph の本文（最後のもの）
     function script:Body([string] $Pattern) { ($global:FakeAzState.Bodies | Where-Object { $_.Call -like $Pattern } | Select-Object -Last 1).Body }
 
+    # サーバーのアプリに最後に送った api（スコープと事前承認）
+    function script:ServerApiBody { ($global:FakeAzState.Bodies | Where-Object { $_.Call -like "*applications/server-obj*" -and $_.Body.api } | Select-Object -Last 1).Body }
+
     # Container App に設定した環境変数（名前 → 値）
     function script:EnvVars {
         $call = (Calls "containerapp create *") + (Calls "containerapp update *") | Select-Object -Last 1
@@ -96,6 +99,7 @@ BeforeAll {
         $s.Groups = @("rg-mcp", "rg-a")
         $s.ServerApp = @{
             id = "server-obj"
+            identifierUris = @("api://server-app", "https://admin-added.example.com/mcp")
             api = @{
                 oauth2PermissionScopes = @(@{ id = "scope-1"; value = "Mcp.Access" })
                 preAuthorizedApplications = @(
@@ -132,12 +136,15 @@ Describe "deploy-mcp-http.ps1" {
             Calls "ad sp create --id server-app --output none" | Should -HaveCount 1
             Calls "containerapp env create *" | Should -HaveCount 1
 
-            $server = Body "rest --method PATCH --uri https://graph.microsoft.com/v1.0/applications/server-obj *"
+            $server = ServerApiBody
             $server.api.requestedAccessTokenVersion | Should -Be 2
             $server.api.oauth2PermissionScopes[0].value | Should -Be "Mcp.Access"
             $server.api.preAuthorizedApplications.appId | Should -Be @("client-app")
             $first = ($global:FakeAzState.Bodies | Where-Object { $_.Call -like "*applications/server-obj*" } | Select-Object -First 1).Body
             $first.identifierUris | Should -Be @("api://server-app")
+            # 公開 URL もアプリケーション ID の URI にする（MCP のクライアントが付ける resource と、スコープの対象を合わせるため）
+            $identifierUris = ($global:FakeAzState.Bodies | Where-Object { $_.Call -like "*applications/server-obj*" -and $_.Body.identifierUris } | Select-Object -Last 1).Body.identifierUris
+            $identifierUris | Should -Be @("api://server-app", "https://tt-mcp.happy-sea.japaneast.azurecontainerapps.io/mcp")
             $first.appRoles.value | Should -Be @("Timetracker.Deploy.Server", "Timetracker.Deploy.User")
             $first.requiredResourceAccess[0].resourceAppId | Should -Be "797f4846-ba00-4fd7-ba43-dac1f8f63013"
             $first.requiredResourceAccess[0].resourceAccess[0].id | Should -Be "41094075-9dad-400e-a0bd-54e686782033"
@@ -249,13 +256,16 @@ Describe "deploy-mcp-http.ps1" {
             $update[0] | Should -BeLike "*--image ghcr.io/yamadakou/timetracker-mcp:2.0.0 --min-replicas 1 --max-replicas 1 --set-env-vars *"
 
             # スコープとロールの ID は変えない
-            $server = Body "*applications/server-obj*"
+            $server = ServerApiBody
             $server.api.oauth2PermissionScopes[0].id | Should -Be "scope-1"
             $first = ($global:FakeAzState.Bodies | Where-Object { $_.Call -like "*applications/server-obj*" } | Select-Object -First 1).Body
             ($first.appRoles | ForEach-Object { $_.id }) | Should -Be @("role-server", "role-user")
             # 別のクライアント（VS Code など）の事前承認は残し、このスクリプトのクライアントだけを置き換える
             $preAuthorized = @($server.api.preAuthorizedApplications | ForEach-Object { "$($_.appId):$($_.delegatedPermissionIds -join '+')" })
             $preAuthorized | Should -Be @("vscode-app:scope-1", "client-app:scope-1")
+            # 管理者が加えたアプリケーション ID の URI は残し、公開 URL を重複なしで加える
+            ($global:FakeAzState.Bodies | Where-Object { $_.Call -like "*applications/server-obj*" -and $_.Body.identifierUris } | Select-Object -Last 1).Body.identifierUris |
+                Should -Be @("api://server-app", "https://admin-added.example.com/mcp", "https://tt-mcp.happy-sea.japaneast.azurecontainerapps.io/mcp")
             # 管理者が加えたリダイレクト URI は残し、必要なものを重複なしで加える
             (Body "*applications/client-obj*").publicClient.redirectUris | Should -Be @(
                 "https://admin-added/callback", "http://127.0.0.1:33418", "http://localhost:8765/callback")

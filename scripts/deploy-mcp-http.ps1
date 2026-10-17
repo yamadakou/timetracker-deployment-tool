@@ -200,6 +200,13 @@ if ($LASTEXITCODE -ne 0) {
 $domain = Invoke-Az containerapp env show --resource-group $ResourceGroup --name "$Name-env" --query properties.defaultDomain --output tsv
 $publicUrl = "https://$Name.$domain/mcp"
 
+# MCP のクライアントは認可の要求に resource（公開 URL）を付け、Entra ID はスコープの対象と違う resource を拒否する（AADSTS9010010）。
+# そのため公開 URL もアプリケーション ID の URI にし、サーバーは公開 URL のスコープ（<公開 URL>/Mcp.Access）を示す。管理者が加えた URI は残す
+Step "Entra ID: 公開 URL $publicUrl をサーバーのアプリのアプリケーション ID の URI に加える"
+Graph PATCH "/applications/$($serverApp.id)" @{
+    identifierUris = @(@($serverApp.identifierUris) + @("api://$serverAppId", $publicUrl) | Where-Object { $_ } | Select-Object -Unique)
+}
+
 $envVars = @(
     "TT_MCP_HTTP__TENANT_ID=$tenantId",
     "TT_MCP_HTTP__CLIENT_ID=$serverAppId",

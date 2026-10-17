@@ -43,7 +43,9 @@ public class HttpSettingsAndPolicyTests
         http.AllowedResourceGroups.Should().Equal(new AllowedResourceGroup("sub", "rg"));
         http.CanCreateResourceGroup.Should().BeFalse();
         http.Issuer.Should().Be($"https://login.microsoftonline.com/{HttpTestSupport.TenantId}/v2.0");
-        http.Scope.Should().Be($"api://{HttpTestSupport.ClientId}/Mcp.Access");
+        // MCP のクライアントが付ける resource（公開 URL）とスコープの対象を合わせる（Entra ID は違うと AADSTS9010010 で拒否する）
+        http.Scope.Should().Be($"{HttpTestSupport.PublicUrl}/Mcp.Access");
+        (http with { PublicUrl = new Uri("https://mcp.example.com/") }).Scope.Should().Be("https://mcp.example.com/Mcp.Access");
     }
 
     [Fact]

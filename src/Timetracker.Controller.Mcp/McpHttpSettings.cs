@@ -58,8 +58,12 @@ public sealed partial record McpHttpSettings
     /// <summary>トークンの発行者（v2）。認可サーバーとして保護リソースのメタデータにも載せる。</summary>
     public string Issuer => $"https://login.microsoftonline.com/{TenantId}/v2.0";
 
-    /// <summary>クライアントが要求するスコープ。</summary>
-    public string Scope => $"api://{ClientId}/{ScopeName}";
+    /// <summary>
+    /// クライアントが要求するスコープ（保護リソースのメタデータの scopes_supported）。公開 URL をアプリ登録のアプリケーション ID の URI にして使う。
+    /// MCP のクライアントは認可の要求に resource（公開 URL）を付けるが、Entra ID はスコープの対象と resource が違う要求を
+    /// AADSTS9010010 で拒否するため、api://{クライアント ID} ではなく公開 URL のスコープにする（詳細設計 Phase 4c の確認結果）。
+    /// </summary>
+    public string Scope => $"{PublicUrl.AbsoluteUri.TrimEnd('/')}/{ScopeName}";
 
     public const string ScopeName = "Mcp.Access";
 
