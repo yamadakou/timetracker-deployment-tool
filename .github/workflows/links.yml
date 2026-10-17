@@ -6,6 +6,9 @@ name: Links
 on:
   schedule:
     # 毎月 1 日の 9:17（日本時間。UTC では 0:17）
+    # 9 時台: 日本時間の朝に実行し、リンク切れの Issue に、その日の作業の始めに気づけるようにする
+    # 17 分: GitHub Actions の定期実行は毎時 0 分に集中し、遅れたり実行されなかったりすることがあるため、0 分や 30 分を避ける
+    #   （https://docs.github.com/ja/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule）
     - cron: '17 0 1 * *'
   workflow_dispatch:
 
