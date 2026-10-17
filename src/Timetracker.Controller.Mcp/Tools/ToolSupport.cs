@@ -39,28 +39,43 @@ internal static class ToolSupport
     /// <summary>
     /// Azure を呼ぶ処理を実行し、よくある失敗（認証・Azure のエラー・資格情報を作れない）を、対処を添えたツールのエラーにする。
     /// </summary>
-    public static async Task<T> CallAzureAsync<T>(AzureAccess access, ILogger logger, Func<Task<T>> call)
+    public static Task<T> CallAzureAsync<T>(AzureAccess access, ILogger logger, Func<Task<T>> call) =>
+        CallAzureAsync(() => access, logger, call);
+
+    /// <summary>
+    /// <see cref="CallAzureAsync{T}(AzureAccess, ILogger, Func{Task{T}})"/> と同じ。方式が処理の途中で決まる場合（計画を作った方式で実行する場合）に使う。
+    /// 方式が決まる前の失敗は、そのまま投げる。
+    /// </summary>
+    public static async Task<T> CallAzureAsync<T>(Func<AzureAccess?> access, ILogger logger, Func<Task<T>> call)
     {
         try
         {
             return await call();
         }
-        catch (AuthenticationFailedException ex)
+        catch (Exception ex) when (access() is { } decided && ToToolError(decided, logger, ex) is { } error)
         {
-            logger.LogWarning(ex, "Azure の認証に失敗しました");
-            var hint = ex.Message.Contains(MfaRegistrationRequiredError) ? MfaRegistrationHint
-                : ex.Message.Contains(MfaRequiredError) ? MfaHint
-                : access.AuthFailureHint;
-            throw new McpException($"Azure の認証に失敗しました（{access.CredentialName}）。{hint}");
+            throw error;
         }
-        catch (RequestFailedException ex)
+    }
+
+    // よくある失敗（認証・Azure のエラー・資格情報を作れない）を、対処を添えたツールのエラーにする。それ以外は null
+    private static McpException? ToToolError(AzureAccess access, ILogger logger, Exception ex)
+    {
+        switch (ex)
         {
-            throw new McpException($"Azure がエラーを返しました（{ex.Status} {ex.ErrorCode}）: {ex.Message}");
-        }
-        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
-        {
-            // 資格情報を作れない場合（sp-env で環境変数が足りないなど）。メッセージに秘密情報は含まれない
-            throw new McpException(ex.Message);
+            case AuthenticationFailedException auth:
+                logger.LogWarning(auth, "Azure の認証に失敗しました");
+                var hint = auth.Message.Contains(MfaRegistrationRequiredError) ? MfaRegistrationHint
+                    : auth.Message.Contains(MfaRequiredError) ? MfaHint
+                    : access.AuthFailureHint;
+                return new McpException($"Azure の認証に失敗しました（{access.CredentialName}）。{hint}");
+            case RequestFailedException request:
+                return new McpException($"Azure がエラーを返しました（{request.Status} {request.ErrorCode}）: {request.Message}");
+            case InvalidOperationException or ArgumentException:
+                // 資格情報を作れない場合（sp-env で環境変数が足りないなど）。メッセージに秘密情報は含まれない
+                return new McpException(ex.Message);
+            default:
+                return null;
         }
     }
 

@@ -2,6 +2,7 @@ using System.ComponentModel;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol;
 using ModelContextProtocol.Server;
+using Timetracker.Application.Compose;
 using Timetracker.Domain.Deployment;
 
 namespace Timetracker.Controller.Mcp.Tools;
@@ -55,29 +56,27 @@ public sealed class ComposeFileTools
         if (errors.Count > 0)
             throw new McpException("設定に誤りがあるため、ファイルを生成しませんでした:\n- " + string.Join("\n- ", errors));
 
-        var composePath = Path.Combine(directory, DeploymentTools.ComposeFileName);
-        var envPath = Path.Combine(directory, DeploymentTools.EnvFileName);
-        if (!overwrite && (File.Exists(composePath) || File.Exists(envPath)))
+        ComposeFiles files;
+        string compose;
+        try
+        {
+            (files, compose) = ComposeExporter.Write(directory, resolved.Options, overwrite);
+        }
+        catch (ComposeExportException ex) when (ex.Failure == ComposeExportFailure.AlreadyExists)
+        {
             throw new McpException(
                 $"{directory} に {DeploymentTools.ComposeFileName} または {DeploymentTools.EnvFileName} が既にあるため、上書きしませんでした。" +
                 "上書きしてよい場合は overwrite=true を指定してください（.env の以前のパスワードは失われます）。");
-
-        var compose = ComposeGenerator.GenerateCompose(resolved.Options);
-        try
-        {
-            Directory.CreateDirectory(directory);
-            File.WriteAllText(composePath, compose);
-            File.WriteAllText(envPath, ComposeGenerator.GenerateEnv(resolved.Options));
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (ComposeExportException ex)
         {
-            throw new McpException($"{directory} に書き込めませんでした: {ex.Message}");
+            throw new McpException($"{directory} に書き込めませんでした: {ex.Detail}");
         }
         _logger.LogInformation("docker-compose.yml と .env を生成しました: {Directory}", directory);
 
         return new ComposeResult(
-            ComposePath: composePath,
-            EnvPath: envPath,
+            ComposePath: files.ComposePath,
+            EnvPath: files.EnvPath,
             ComposeContent: compose,
             Warnings: DeploymentAdvisor.GetWarnings(resolved.Options, ValidationTarget.Compose),
             NextSteps:

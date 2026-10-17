@@ -6,6 +6,7 @@ using ModelContextProtocol.Server;
 using Timetracker.Application.Deployment;
 using Timetracker.Application.Jobs;
 using Timetracker.Application.Permissions;
+using Timetracker.Application.Workflows;
 using Timetracker.Common;
 using Timetracker.Domain.Deployment;
 using Timetracker.Infrastructure.Azure;
@@ -91,18 +92,19 @@ public sealed class DeploymentJobTools
                 [], advice, false, null, ToolSupport.ToResolvedSettings(resolved), ToolSupport.ToResourceNames(o.AppName));
         }
 
-        var plan = await PlanAsync(access, o, cancellationToken);
-        var saved = plan.CanRun ? _plans.Save(new IdentityPlan<DeploymentPlan>(plan, access.Mode), _caller.CallerId) : null;
+        var ticket = await ToolSupport.CallAzureAsync(access, _logger, () =>
+            Workflow().PlanAsync(new AccessSession(access, _gatewayFactory), o, access.Mode, cancellationToken));
+        var plan = ticket.Plan;
         return new DeploymentPlanResult(
-            PlanId: saved?.PlanId,
-            ExpiresAt: saved?.ExpiresAt,
+            PlanId: ticket.Saved?.PlanId,
+            ExpiresAt: ticket.Saved?.ExpiresAt,
             Blockers: plan.Blockers,
             Identity: identity,
             PermissionCheck: ToPermissionCheckInfo(plan.PermissionCheck),
             Actions: plan.Operations.Select(ToActionInfo).ToList(),
             Warnings: advice.Concat(plan.Warnings).ToList(),
             RequiresDataLossAck: plan.RequiresDataLossAck,
-            EstimatedDuration: plan.CreatesEnvironment ? "5〜15 分（Environment を新規作成するため）" : "2〜5 分",
+            EstimatedDuration: ticket.EstimatedDuration,
             Resolved: ToolSupport.ToResolvedSettings(resolved),
             ResourceNames: ToolSupport.ToResourceNames(o.AppName));
     }
@@ -118,36 +120,23 @@ public sealed class DeploymentJobTools
         CancellationToken cancellationToken = default)
     {
         _policy.RequireAzureAccess();
-        var (plan, mode) = RequirePlan(_plans.Find<IdentityPlan<DeploymentPlan>>(plan_id, _caller.CallerId), plan_id, "plan_deployment");
-        // 同意が無い場合は計画を使用済みにしない（同意を得て、同じ計画で実行し直せるように）
-        if (plan.RequiresDataLossAck && !acknowledge_data_loss)
-            throw new McpException(
-                "この計画は既存の DB アプリを更新します。設定が変わると DB コンテナが再起動し、DB のデータは失われます。利用者が同意した場合だけ、" +
-                "acknowledge_data_loss=true を指定して実行してください。");
-        // 計画を作った方式で実行する（呼び出し元がまだその方式を使えるかも確かめる）
-        var access = _policy.ForMode(mode);
-        plan = RequirePlan(_plans.Take<IdentityPlan<DeploymentPlan>>(plan_id, _caller.CallerId), plan_id, "plan_deployment").Plan;
-
-        // 計画の後に Azure の状態が変わっていないかを、実行の直前にもう一度確かめる
-        var current = await PlanAsync(access, plan.Options, cancellationToken);
-        if (!current.CanRun)
-            throw new McpException("実行の直前の確認で、実行できない状態になっていました:\n- " + string.Join("\n- ", current.Blockers));
-        if (!plan.HasSameOperations(current))
-            throw new McpException("計画の後に Azure の状態が変わりました（リソースが作成・削除されたなど）。plan_deployment で計画を作り直してください。");
-
-        var o = plan.Options;
-        var started = _jobs.TryStart(JobKind.Deploy, new JobTarget(o.Subscription, o.ResourceGroup, o.AppName), _caller.CallerId, async context =>
+        Job job;
+        AzureAccess? access = null;
+        try
         {
-            var gateway = _gatewayFactory(context.Logger, access.CreateCredential(context.Logger));
-            var progress = new ActionProgress<DeploymentProgress>(p => context.ReportStep(p.Index, p.Total, p.Description));
-            return await new DeploymentRunner(gateway).RunAsync(o, progress);
-        });
-        if (started.Job == null)
-            throw new McpException(
-                $"同じ対象（{o.ResourceGroup} / {o.AppName}）のジョブ {started.ConflictingJobId} が実行中です。" +
-                "get_job_status で完了を確認してから、plan_deployment で計画を作り直してください。");
-        _logger.LogInformation("デプロイのジョブ {JobId} を開始しました（{ResourceGroup} / {AppName}）", started.Job.Id, o.ResourceGroup, o.AppName);
-        return new StartJobResult(started.Job.Id, "deploy", "running", PollHint);
+            // 計画を作った方式で実行する（呼び出し元がまだその方式を使えるかも確かめる）
+            job = await ToolSupport.CallAzureAsync(() => access, _logger, () =>
+                Workflow().StartAsync(plan_id, acknowledge_data_loss,
+                    mode => new AccessSession(access = _policy.ForMode(mode!), _gatewayFactory), cancellationToken));
+        }
+        catch (WorkflowException ex)
+        {
+            throw WorkflowMessages.ToMcpException(ex, plan_id, "plan_deployment",
+                "計画の後に Azure の状態が変わりました（リソースが作成・削除されたなど）。plan_deployment で計画を作り直してください。");
+        }
+        var o = job.Target;
+        _logger.LogInformation("デプロイのジョブ {JobId} を開始しました（{ResourceGroup} / {AppName}）", job.Id, o.ResourceGroup, o.AppName);
+        return new StartJobResult(job.Id, "deploy", "running", PollHint);
     }
 
     [McpServerTool(Name = "get_job_status", Title = "ジョブの状態",
@@ -170,7 +159,7 @@ public sealed class DeploymentJobTools
             s.Result is DeploymentResult r
                 ? new DeploymentJobResult(r.ResourceGroup, r.EnvironmentName, r.TimetrackerAppName, r.DbAppName, r.RedisAppName, r.TimetrackerUrl)
                 : null,
-            s.Result as DeletionJobResult,
+            s.Result is DeletionOutcome d ? new DeletionJobResult(d.ResourceGroup, d.Deleted, d.AlreadyDeleted, d.ResourceGroup) : null,
             s.Error,
             s.DeviceCodeMessage);
     }
@@ -221,20 +210,8 @@ public sealed class DeploymentJobTools
             info.Endpoint);
     }
 
-    // 操作してよい範囲に無いリソースグループは、Azure を読まずにブロッカーにする。リソースグループを作成できない設定では、
-    // リソースグループが無いこともブロッカーにする（計画時と実行の直前の両方で確かめる）
-    private async Task<DeploymentPlan> PlanAsync(AzureAccess access, DeployOptions options, CancellationToken cancellationToken)
-    {
-        if (access.ResourceGroupBlocker(options.Subscription, options.ResourceGroup) is { } blocker)
-            return new DeploymentPlan(options, [], [blocker], [], PermissionCheckResult.NotChecked("操作できる範囲に無いため確認していません。"));
-
-        var plan = await ToolSupport.CallAzureAsync(access, _logger, () =>
-            new DeploymentPlanner(CreateGateway(access)).PlanAsync(options, cancellationToken));
-        return !access.CanCreateResourceGroup
-               && plan.Operations.Any(op => op.Kind == PlannedResourceKind.ResourceGroup && op.Action == PlannedAction.Create)
-            ? plan with { Blockers = [.. plan.Blockers, string.Format(CannotCreateResourceGroup, options.ResourceGroup)] }
-            : plan;
-    }
+    // 計画 → 確認 → 実行の安全策（計画で Azure を読むときは、ツールのログに書く）
+    private DeploymentWorkflow Workflow() => new(_plans, _jobs, _caller, new McpDeploymentLogger(_logger));
 
     // ツールのログに書き、方式の資格情報で操作する Azure の操作
     private IAzureDeploymentGateway CreateGateway(AzureAccess access)
@@ -242,14 +219,6 @@ public sealed class DeploymentJobTools
         var logger = new McpDeploymentLogger(_logger);
         return _gatewayFactory(logger, access.CreateCredential(logger));
     }
-
-    // 存在しない・期限切れ・使用済み・ほかの呼び出し元・種類の違う計画は、実行できない理由と次の手順を返す
-    internal static TPlan RequirePlan<TPlan>(PlanLookup<TPlan> lookup, string planId, string planTool) where TPlan : class => lookup.Status switch
-    {
-        PlanLookupStatus.Found => lookup.Plan!,
-        PlanLookupStatus.Expired => throw new McpException($"計画 '{planId}' の有効期限（15 分）が切れました。{planTool} で計画を作り直してください。"),
-        _ => throw new McpException($"計画 '{planId}' が見つかりません（使用済みか、サーバーが再起動されました）。{planTool} で計画を作り直してください。"),
-    };
 
     internal static PermissionCheckInfo ToPermissionCheckInfo(PermissionCheckResult result) => new(
         result.Status switch
@@ -287,10 +256,4 @@ public sealed class DeploymentJobTools
         JobStatus.Succeeded => "succeeded",
         _ => "failed",
     };
-
-    // Progress<T> は SynchronizationContext 経由で非同期に通知するため、手順の順に記録できるよう同期的に呼ぶ
-    internal sealed class ActionProgress<T>(Action<T> report) : IProgress<T>
-    {
-        public void Report(T value) => report(value);
-    }
 }

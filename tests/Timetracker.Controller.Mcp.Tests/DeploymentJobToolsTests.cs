@@ -525,7 +525,7 @@ public sealed class DeploymentJobToolsTests
 
         await act.Should().ThrowAsync<McpException>().WithMessage("server 方式を使うには、MCP サーバーのアプリロール Timetracker.Deploy.Server が必要です（使える方式: user）。");
         // 計画は使用済みにしない
-        _plans.Find<IdentityPlan<Timetracker.Application.Deployment.DeploymentPlan>>(planId, LocalCallerContext.Id).Status.Should().Be(PlanLookupStatus.Found);
+        _plans.Find<Timetracker.Application.Workflows.StoredPlan<Timetracker.Application.Deployment.DeploymentPlan>>(planId, LocalCallerContext.Id).Status.Should().Be(PlanLookupStatus.Found);
         _jobs.List(LocalCallerContext.Id, null).Should().BeEmpty();
     }
 

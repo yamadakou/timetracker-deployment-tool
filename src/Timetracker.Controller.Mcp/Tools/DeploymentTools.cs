@@ -3,6 +3,7 @@ using Azure.Core;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol;
 using ModelContextProtocol.Server;
+using Timetracker.Application.Compose;
 using Timetracker.Domain.Deployment;
 using Timetracker.Infrastructure.Azure;
 
@@ -16,8 +17,8 @@ namespace Timetracker.Controller.Mcp.Tools;
 [McpServerToolType]
 public sealed class DeploymentTools
 {
-    public const string ComposeFileName = "docker-compose.yml";
-    public const string EnvFileName = ".env";
+    public const string ComposeFileName = ComposeExporter.ComposeFileName;
+    public const string EnvFileName = ComposeExporter.EnvFileName;
     public const string MaskedPassword = ToolSupport.MaskedPassword;
 
     /// <summary>azure_identity 引数の説明（HTTP のサーバーだけで使う）。</summary>
