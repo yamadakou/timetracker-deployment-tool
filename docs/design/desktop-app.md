@@ -3,7 +3,10 @@
 - 対象ブランチ: `feature/desktop-app`
 - 全体設計: `docs/ROADMAP.md` の「2. ストア配布できるデスクトップアプリ」、`docs/MCP_TOOL_DESIGN.md`（3.2 依存関係、3.4 Application を共有する方針、4.7・4.12 計画 → 確認 → 実行、4.10 パスワードの扱い）
 - 前の段階: `docs/design/mcp-phase3b.md`（計画ストア・ジョブ）、`docs/design/mcp-phase3c.md`（削除の計画と実行）
-- 状況: 10 の論点はオーナーの回答で決定した（WinUI 3・限定公開で始める・マルチテナントのアプリ登録・パスワードは保存しない）。5a から実装する。一次情報の確認日は 2026-10-17
+- 状況: 10 の論点はオーナーの回答で決定した（WinUI 3・限定公開で始める・マルチテナントのアプリ登録・パスワードは保存しない）。一次情報の確認日は 2026-10-17
+- **中断中**: 5a の途中で中断した（オーナーの指示）。ROADMAP の「1. DB データの永続化オプション」でアプリ側の設計が変わる見込みのため、その修正が終わってから再開する。再開するときは、永続化オプションの引数（デプロイの設定・削除での扱い・再デプロイの警告）を 4・6・7 と `Desktop.Core` に反映する
+  - 済み: Application の `DeploymentWorkflow` / `DeletionWorkflow` / `ComposeExporter`（MCP をこれに置き換え。MCP の結果・メッセージは変えていない）、Infrastructure の `AzureTenantDirectory` / `TenantScopedCredential`、`Timetracker.Controller.Desktop.Core`（ViewModel。MVVM の基盤は CommunityToolkit.Mvvm ではなく、生成コードの無い小さな自前のクラスにした）とテスト。分岐網羅率は Application・Desktop.Core とも 100%、MCP は Program.cs と正規表現の生成コードを除き 100%
+  - 未着手: 5a の残り（README の設計概要の更新）、5b（WinUI 3 のアプリ、WAM でのサインイン、CI の `desktop` ジョブ）、5c
 
 ## 1. 目的
 CLI や AI アシスタントを使わない利用者が、画面の操作で次を行えるようにする。Microsoft Store から導入・更新できるようにする。
