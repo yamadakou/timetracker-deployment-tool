@@ -69,7 +69,7 @@ public class DbPersistenceTests
 
     [Theory]
     [InlineData(false, false, "永続ボリュームを設定していないため")]
-    [InlineData(false, true, "今の DB のデータは引き継がれません")]
+    [InlineData(false, true, "共有にあるデータから始まります")]
     [InlineData(true, false, "DB は空から始まります")]
     public void DataLossWarning_Should_Explain_Why_The_Data_Is_Lost(bool currentlyPersisted, bool persist, string expected)
     {

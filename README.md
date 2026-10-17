@@ -505,7 +505,7 @@ timetracker-cli.exe deploy --subscription "<SUBSCRIPTION_ID>" --resource-group "
 
 - 作成するもの: ストレージアカウント・ファイル共有 `{アプリ名}-db`・Environment のストレージ `dbdata`（[作成される Azure リソース](#作成される-azure-リソース)）。DB コンテナの `/var/lib/postgresql/data`（PostgreSQL。データは `pgdata` の下）または `/var/opt/mssql`（SQL Server）にマウントします
 - 再デプロイ: `--persist-db` を省略すると、既存の DB アプリの今の状態を引き継ぎます（永続化していれば続ける）。永続化を続ける更新では、新旧の DB コンテナが同じデータを同時に開かないよう、**DB アプリを停止してから更新し、開始します**（その間は Timetracker から DB に接続できません）。この場合、DB のデータは失われないため、データ消失の警告は出ません（MCP の `acknowledge_data_loss` も不要です）
-- 切り替え: 永続化していない環境に `--persist-db` を付けると、今の DB のデータは引き継がれず、空の共有から始まります。永続化をやめる（`--persist-db false`）と、DB は空から始まります（ストレージアカウントのデータは残ります）。どちらも警告を表示します
+- 切り替え: 永続化していない環境に `--persist-db` を付けると、今の DB のデータは引き継がれず、共有にあるデータから始まります（共有を新しく作る場合は空）。永続化をやめる（`--persist-db false`）と、DB は空から始まります（ストレージアカウントのデータは残り、もう一度 `--persist-db` を付けると戻ります）。どちらも警告を表示します
 - 削除: `delete` は、既定でストレージアカウントも DB のデータごと削除します。`--keep-db-data` で残せます（料金はかかり続けます。同じアプリ名で `--persist-db` を付けてデプロイすると、データを引き継げます）
 - 料金: Azure Files（Standard、LRS）の保存容量とトランザクションの料金がかかります。DB は読み書きが多いため、トランザクションの料金が主になります。金額は [Azure Files の料金](https://azure.microsoft.com/ja-jp/pricing/details/storage/files/) を確認してください
 - 前提: リソースプロバイダー `Microsoft.Storage` の登録（[Azure リソースプロバイダーの登録](#azure-リソースプロバイダーの登録)）と、ストレージの権限（[必要な RBAC ロールと権限](#必要な-rbac-ロールと権限)。Contributor には含まれます）。Azure Policy でアカウントキーによるアクセスやパブリック ネットワーク アクセスを禁止している環境では使えません
