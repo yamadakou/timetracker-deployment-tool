@@ -205,7 +205,7 @@ public sealed class HttpServerTests : IAsyncLifetime
         json.RootElement.GetProperty("authorization_servers").EnumerateArray().Select(e => e.GetString())
             .Should().Equal($"https://login.microsoftonline.com/{HttpTestSupport.TenantId}/v2.0");
         json.RootElement.GetProperty("scopes_supported").EnumerateArray().Select(e => e.GetString())
-            .Should().Equal($"api://{HttpTestSupport.ClientId}/Mcp.Access");
+            .Should().Equal($"{HttpTestSupport.PublicUrl}/Mcp.Access");
     }
 
     [Fact]

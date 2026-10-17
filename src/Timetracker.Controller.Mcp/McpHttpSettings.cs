@@ -58,8 +58,12 @@ public sealed partial record McpHttpSettings
     /// <summary>トークンの発行者（v2）。認可サーバーとして保護リソースのメタデータにも載せる。</summary>
     public string Issuer => $"https://login.microsoftonline.com/{TenantId}/v2.0";
 
-    /// <summary>クライアントが要求するスコープ。</summary>
-    public string Scope => $"api://{ClientId}/{ScopeName}";
+    /// <summary>
+    /// クライアントが要求するスコープ（保護リソースのメタデータの scopes_supported）。公開 URL をアプリ登録のアプリケーション ID の URI にして使う。
+    /// MCP のクライアントは認可の要求に resource（公開 URL）を付けるが、Entra ID はスコープの対象と resource が違う要求を
+    /// AADSTS9010010 で拒否するため、api://{クライアント ID} ではなく公開 URL のスコープにする（詳細設計 Phase 4c の確認結果）。
+    /// </summary>
+    public string Scope => $"{PublicUrl.AbsoluteUri}/{ScopeName}";
 
     public const string ScopeName = "Mcp.Access";
 
@@ -77,6 +81,9 @@ public sealed partial record McpHttpSettings
         var publicUrl = Require("TT_MCP_HTTP__PUBLIC_URL");
         if (!Uri.TryCreate(publicUrl, UriKind.Absolute, out var url) || url.Scheme is not ("https" or "http"))
             throw new ArgumentException($"TT_MCP_HTTP__PUBLIC_URL には MCP のエンドポイントの絶対 URL を指定してください: {publicUrl}");
+        // 末尾の / があると、保護リソースのメタデータの resource（この URL）とスコープの対象（アプリケーション ID の URI）が食い違い、サインインが AADSTS9010010 で失敗する
+        if (url.AbsolutePath.EndsWith('/'))
+            throw new ArgumentException($"TT_MCP_HTTP__PUBLIC_URL には、末尾に / を付けずに MCP のエンドポイントの URL（https://<FQDN>/mcp）を指定してください: {publicUrl}");
 
         var modes = (get("TT_MCP_HTTP__IDENTITY_MODES") ?? ServerMode)
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)

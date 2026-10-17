@@ -26,7 +26,7 @@
   - 対象（audience）: アプリ登録のクライアント ID、または `api://{クライアント ID}`
   - 署名鍵は発行者のメタデータ（OpenID Connect の discovery）から取得する
   - 委任のスコープ `scp`（スペース区切り）に `Mcp.Access` があることを求める（無ければ 403）。発行者・対象・署名だけでは、このアプリ登録向けの ID トークン（対象がクライアント ID）と区別できないため。アプリのみのトークン（`scp` が無い）も受け付けない
-- トークンが無い・無効な場合は 401 と `WWW-Authenticate: Bearer resource_metadata="…"` を返す。保護リソースのメタデータ（RFC 9728、`/.well-known/oauth-protected-resource`）には、`resource`（`TT_MCP_HTTP__PUBLIC_URL`）、認可サーバー（上の発行者）、スコープ（`api://{クライアント ID}/Mcp.Access`）を載せる。これは SDK の `AddMcp` 認証ハンドラーで返す
+- トークンが無い・無効な場合は 401 と `WWW-Authenticate: Bearer resource_metadata="…"` を返す。保護リソースのメタデータ（RFC 9728、`/.well-known/oauth-protected-resource`）には、`resource`（`TT_MCP_HTTP__PUBLIC_URL`）、認可サーバー（上の発行者）、スコープ（`{公開 URL}/Mcp.Access`。当初は `api://{クライアント ID}/Mcp.Access` としたが、Entra ID がクライアントの付ける `resource` と違うスコープを拒否したため、4c で変更した）を載せる。これは SDK の `AddMcp` 認証ハンドラーで返す
 - Entra ID は動的クライアント登録（DCR）に対応していないため、クライアントは事前に登録したクライアント ID を使う（手順は 4c）
 
 ### 3.1 呼び出し元（`HttpCallerContext`）

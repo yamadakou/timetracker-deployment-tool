@@ -26,6 +26,7 @@ BeforeAll {
             SpExists = $false
             Fics = @()                       # 既にあるフェデレーション資格情報の名前
             ConsentFails = $false
+            SelfGrants = @()                 # 実行したアカウントの既にある同意（oauth2PermissionGrants）
             EnvExists = $false
             AppExists = $false
             RoleAssigned = @()               # Contributor が割り当て済みのスコープ
@@ -62,6 +63,9 @@ BeforeAll {
             "ad app show --id client-app --output json" { $s.ClientApp | ConvertTo-Json -Depth 10; break }
             "ad sp show --id server-app --output none" { if (-not $s.SpExists) { $global:LASTEXITCODE = 1 }; break }
             "ad sp show --id server-app --query id*" { "sp-id"; break }
+            "ad sp show --id 797f4846-ba00-4fd7-ba43-dac1f8f63013 --query id*" { "arm-sp"; break }
+            "ad signed-in-user show --query id*" { "me-id"; break }
+            "rest --method GET --uri *oauth2PermissionGrants*" { @{ value = @($s.SelfGrants) } | ConvertTo-Json -Depth 5; break }
             "ad app federated-credential list *" { $s.Fics -join "`n"; break }
             "ad app permission admin-consent *" { if ($s.ConsentFails) { $global:LASTEXITCODE = 1 }; break }
             "containerapp env show * --output none" { if (-not $s.EnvExists) { $global:LASTEXITCODE = 1 }; break }
@@ -82,6 +86,9 @@ BeforeAll {
     # 指定した呼び出しで送った Graph の本文（最後のもの）
     function script:Body([string] $Pattern) { ($global:FakeAzState.Bodies | Where-Object { $_.Call -like $Pattern } | Select-Object -Last 1).Body }
 
+    # サーバーのアプリに最後に送った api（スコープと事前承認）
+    function script:ServerApiBody { ($global:FakeAzState.Bodies | Where-Object { $_.Call -like "*applications/server-obj*" -and $_.Body.api } | Select-Object -Last 1).Body }
+
     # Container App に設定した環境変数（名前 → 値）
     function script:EnvVars {
         $call = (Calls "containerapp create *") + (Calls "containerapp update *") | Select-Object -Last 1
@@ -96,6 +103,7 @@ BeforeAll {
         $s.Groups = @("rg-mcp", "rg-a")
         $s.ServerApp = @{
             id = "server-obj"
+            identifierUris = @("api://server-app", "https://admin-added.example.com/mcp")
             api = @{
                 oauth2PermissionScopes = @(@{ id = "scope-1"; value = "Mcp.Access" })
                 preAuthorizedApplications = @(
@@ -132,17 +140,21 @@ Describe "deploy-mcp-http.ps1" {
             Calls "ad sp create --id server-app --output none" | Should -HaveCount 1
             Calls "containerapp env create *" | Should -HaveCount 1
 
-            $server = Body "rest --method PATCH --uri https://graph.microsoft.com/v1.0/applications/server-obj *"
+            $server = ServerApiBody
             $server.api.requestedAccessTokenVersion | Should -Be 2
             $server.api.oauth2PermissionScopes[0].value | Should -Be "Mcp.Access"
             $server.api.preAuthorizedApplications.appId | Should -Be @("client-app")
             $first = ($global:FakeAzState.Bodies | Where-Object { $_.Call -like "*applications/server-obj*" } | Select-Object -First 1).Body
             $first.identifierUris | Should -Be @("api://server-app")
+            # 公開 URL もアプリケーション ID の URI にする（MCP のクライアントが付ける resource と、スコープの対象を合わせるため）
+            $identifierUris = ($global:FakeAzState.Bodies | Where-Object { $_.Call -like "*applications/server-obj*" -and $_.Body.identifierUris } | Select-Object -Last 1).Body.identifierUris
+            $identifierUris | Should -Be @("api://server-app", "https://tt-mcp.happy-sea.japaneast.azurecontainerapps.io/mcp")
             $first.appRoles.value | Should -Be @("Timetracker.Deploy.Server", "Timetracker.Deploy.User")
             $first.requiredResourceAccess[0].resourceAppId | Should -Be "797f4846-ba00-4fd7-ba43-dac1f8f63013"
             $first.requiredResourceAccess[0].resourceAccess[0].id | Should -Be "41094075-9dad-400e-a0bd-54e686782033"
 
             $fic = Body "ad app federated-credential create *"
+            Calls "*oauth2PermissionGrants*" | Should -HaveCount 0
             $fic.issuer | Should -Be "https://login.microsoftonline.com/tenant-1/v2.0"
             $fic.subject | Should -Be "mi-principal"
             $fic.audiences | Should -Be @("api://AzureADTokenExchange")
@@ -249,13 +261,16 @@ Describe "deploy-mcp-http.ps1" {
             $update[0] | Should -BeLike "*--image ghcr.io/yamadakou/timetracker-mcp:2.0.0 --min-replicas 1 --max-replicas 1 --set-env-vars *"
 
             # スコープとロールの ID は変えない
-            $server = Body "*applications/server-obj*"
+            $server = ServerApiBody
             $server.api.oauth2PermissionScopes[0].id | Should -Be "scope-1"
             $first = ($global:FakeAzState.Bodies | Where-Object { $_.Call -like "*applications/server-obj*" } | Select-Object -First 1).Body
             ($first.appRoles | ForEach-Object { $_.id }) | Should -Be @("role-server", "role-user")
             # 別のクライアント（VS Code など）の事前承認は残し、このスクリプトのクライアントだけを置き換える
             $preAuthorized = @($server.api.preAuthorizedApplications | ForEach-Object { "$($_.appId):$($_.delegatedPermissionIds -join '+')" })
             $preAuthorized | Should -Be @("vscode-app:scope-1", "client-app:scope-1")
+            # 管理者が加えたアプリケーション ID の URI は残し、公開 URL を重複なしで加える
+            ($global:FakeAzState.Bodies | Where-Object { $_.Call -like "*applications/server-obj*" -and $_.Body.identifierUris } | Select-Object -Last 1).Body.identifierUris |
+                Should -Be @("api://server-app", "https://admin-added.example.com/mcp", "https://tt-mcp.happy-sea.japaneast.azurecontainerapps.io/mcp")
             # 管理者が加えたリダイレクト URI は残し、必要なものを重複なしで加える
             (Body "*applications/client-obj*").publicClient.redirectUris | Should -Be @(
                 "https://admin-added/callback", "http://127.0.0.1:33418", "http://localhost:8765/callback")
@@ -301,7 +316,38 @@ Describe "deploy-mcp-http.ps1" {
 
             & $script:Deploy -SubscriptionId sub-1 -ResourceGroup rg-mcp -IdentityModes user
 
-            Should -Invoke Write-Warning -Times 1 -ParameterFilter { $Message -like "管理者の同意に失敗しました。*" }
+            Should -Invoke Write-Warning -Times 1 -ParameterFilter { $Message -like "管理者の同意に失敗しました。実行したアカウントの分だけ同意しました。*" }
+            Calls "containerapp create *" | Should -HaveCount 1
+            Calls "rest --method GET --uri *oauth2PermissionGrants?`$filter=clientId eq 'sp-id' and principalId eq 'me-id'*" | Should -HaveCount 1
+            $grant = Body "rest --method POST --uri https://graph.microsoft.com/v1.0/oauth2PermissionGrants *"
+            $grant.clientId | Should -Be "sp-id"
+            $grant.consentType | Should -Be "Principal"
+            $grant.principalId | Should -Be "me-id"
+            $grant.resourceId | Should -Be "arm-sp"
+            $grant.scope | Should -Be "user_impersonation"
+        }
+
+        It "管理者の同意に失敗し、実行したアカウントの分の同意が既にあれば、作り直さない" {
+            $global:FakeAzState.ConsentFails = $true
+            $global:FakeAzState.SelfGrants = @(
+                @{ resourceId = "other-sp"; scope = "user_impersonation" },
+                @{ resourceId = "arm-sp"; scope = "openid user_impersonation" })
+            Mock Write-Warning { }
+
+            & $script:Deploy -SubscriptionId sub-1 -ResourceGroup rg-mcp -IdentityModes user
+
+            Should -Invoke Write-Warning -Times 1 -ParameterFilter { $Message -like "管理者の同意に失敗しました。実行したアカウントの分だけ同意しました。*" }
+            Calls "rest --method POST --uri *oauth2PermissionGrants*" | Should -HaveCount 0
+        }
+
+        It "管理者の同意に失敗し、実行したアカウントの分の同意も作れなくても、警告して続ける" {
+            $global:FakeAzState.ConsentFails = $true
+            $global:FakeAzState.FailOn = "rest --method POST --uri https://graph.microsoft.com/v1.0/oauth2PermissionGrants"
+            Mock Write-Warning { }
+
+            & $script:Deploy -SubscriptionId sub-1 -ResourceGroup rg-mcp -IdentityModes user
+
+            Should -Invoke Write-Warning -Times 1 -ParameterFilter { $Message -like "管理者の同意に失敗しました。実行したアカウントの分の同意も作れませんでした。*" }
             Calls "containerapp create *" | Should -HaveCount 1
         }
     }

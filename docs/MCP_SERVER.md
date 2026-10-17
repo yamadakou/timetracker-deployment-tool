@@ -136,15 +136,15 @@ claude mcp add timetracker `
 ## HTTP 版（開発中）
 
 > [!NOTE]
-> HTTP 版は開発中で、まだ提供していません。サーバーの本体（HTTP トランスポート、Entra ID による呼び出し元の認証、`server` 方式と `user` 方式）とコンテナイメージはできていますが、Azure Container Apps への配置と Entra ID のアプリ登録のスクリプト・手順は用意しましたが、Azure と Entra ID での確認はまだです（下の「導入（確認前の手順）」）。内容は提供までに変わることがあります。
+> HTTP 版は開発中で、まだ提供していません。サーバーの本体（HTTP トランスポート、Entra ID による呼び出し元の認証、`server` 方式と `user` 方式）、コンテナイメージ、Azure Container Apps への配置と Entra ID のアプリ登録のスクリプトはできており、Azure と Entra ID で配置とツールを確認しました。Claude Code と VS Code からのサインインは未確認です（下の「導入」）。内容は提供までに変わることがあります。
 
 ### 開発の段階
 
 | 段階 | 内容 | 状況 |
 |---|---|---|
 | 4a | HTTP トランスポート、Entra ID のアクセストークンの検証、アプリロール、呼び出し元ごとの計画・ジョブ、`server` 方式（許可したリソースグループだけ）、HTTP 用の `generate_compose`、コンテナイメージ | 実装済み（自動テストとローカルの Docker で確認） |
-| 4b | `user` 方式（利用者本人の権限）と、方式を選ぶ引数 `azure_identity` | 実装済み（自動テストで確認。Entra ID での実際のトークン交換は 4c で確認） |
-| 4c | Azure Container Apps への配置、Entra ID のアプリ登録、アシスタントからの接続の手順 | 手順書とスクリプトを用意（Azure と Entra ID での確認はこれから） |
+| 4b | `user` 方式（利用者本人の権限）と、方式を選ぶ引数 `azure_identity` | 実装済み（Entra ID でのトークン交換も 4c で確認） |
+| 4c | Azure Container Apps への配置、Entra ID のアプリ登録、アシスタントからの接続の手順 | Azure と Entra ID で配置とツールを確認済み（Claude Code・VS Code からの接続は未確認） |
 
 ### stdio 版との違い
 
@@ -167,7 +167,7 @@ claude mcp add timetracker `
 |---|---|---|
 | `TT_MCP_HTTP__TENANT_ID` | ✔ | Entra ID のテナント ID |
 | `TT_MCP_HTTP__CLIENT_ID` | ✔ | MCP サーバーのアプリ登録のクライアント ID |
-| `TT_MCP_HTTP__PUBLIC_URL` | ✔ | 公開する MCP のエンドポイントの URL（`https://…/mcp`） |
+| `TT_MCP_HTTP__PUBLIC_URL` | ✔ | 公開する MCP のエンドポイントの URL（`https://…/mcp`。末尾に `/` を付けない） |
 | `TT_MCP_HTTP__IDENTITY_MODES` | – | 使える方式。`server`（既定）/ `user` / `server,user` |
 | `TT_MCP_HTTP__DEFAULT_IDENTITY_MODE` | – | `azure_identity` を省略したときの方式（既定は `IDENTITY_MODES` の最初）。利用者がその方式を使えなければ、使えるほうになる |
 | `TT_MCP_HTTP__SERVER_ALLOWED_RESOURCE_GROUPS` | `server` 方式が有効なら ✔ | `server` 方式で操作してよいリソースグループ（`/subscriptions/<ID>/resourceGroups/<名前>` のカンマ区切り） |
@@ -188,14 +188,14 @@ claude mcp add timetracker `
 ### `user` 方式の前提
 
 - 利用者本人に、CLI を自分で実行する場合と同じロールが必要です（[必要な RBAC ロールと権限](../README.md#必要な-rbac-ロールと権限)）。権限が足りない場合は、計画の段階で示されます
-- サーバーは、利用者のアクセストークンを OBO（On-Behalf-Of）で Azure 用のトークンに交換します。MCP サーバーのアプリ登録に、Azure Service Management の委任アクセス許可（`user_impersonation`）を追加し、テナント管理者の同意を得ておきます
+- サーバーは、利用者のアクセストークンを OBO（On-Behalf-Of）で Azure 用のトークンに交換します。MCP サーバーのアプリ登録に、Azure Service Management の委任アクセス許可（`user_impersonation`）を追加し、テナント管理者の同意を得ておきます（同意が無いと AADSTS65001 で失敗します。スクリプトを実行した本人の分だけは、管理者でなくても同意できることがあります）
+- Azure の管理 API には MFA が必須です。MCP サーバーへのサインインで MFA を行っていないと、交換が AADSTS50076 で失敗し、サインインし直しても解消しません。テナントの管理者が、条件付きアクセスで MCP サーバーのアプリ（エンタープライズ アプリケーション「Timetracker MCP (…)」）へのサインインに MFA を要求するポリシーを設定してください
 - 計画の結果には「サインインした利用者本人の権限（user 方式）」と表示され、Azure のアクティビティログにも本人の操作として残ります
-- 条件付きアクセス（MFA の要求など）によっては、サインインし直すよう求められることがあります
 
-### 導入（確認前の手順）
+### 導入
 
-> [!WARNING]
-> まだ Azure と Entra ID で確認していない手順です。確認の結果に合わせて変わります。確認すべき点は [Phase 4c の詳細設計](design/mcp-phase4c.md)の「確認事項」にまとめています。
+> [!NOTE]
+> Azure と Entra ID で、配置・アプリ登録・ツール（`server` 方式と `user` 方式のデプロイと削除）を確認しました。Claude Code と VS Code からのサインインは未確認です。確認の結果は [Phase 4c の詳細設計](design/mcp-phase4c.md)の「確認結果」にまとめています。
 
 1. 管理者が、PowerShell 7 と Azure CLI で次を実行します。MCP サーバーを置くリソースグループ、マネージド ID、Entra ID のアプリ登録（サーバー用とクライアント用）、Container Apps の Environment と Container App を作り、`server` 方式なら許可するリソースグループにマネージド ID の Contributor を割り当てます
    ```powershell

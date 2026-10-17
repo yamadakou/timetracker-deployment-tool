@@ -10,8 +10,10 @@ COPY src/Timetracker.Infrastructure.Azure/Timetracker.Infrastructure.Azure.cspro
 COPY src/Timetracker.Controller.Mcp/Timetracker.Controller.Mcp.csproj src/Timetracker.Controller.Mcp/
 RUN dotnet restore src/Timetracker.Controller.Mcp/Timetracker.Controller.Mcp.csproj
 COPY src/ src/
+# サーバーが報告する版（リリースではタグの版を渡す）
+ARG VERSION=0.0.0
 RUN dotnet publish src/Timetracker.Controller.Mcp/Timetracker.Controller.Mcp.csproj --configuration Release --no-restore \
-    -p:UseAppHost=false -p:DebugType=None --output /app
+    -p:UseAppHost=false -p:DebugType=None -p:Version=$VERSION --output /app
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app

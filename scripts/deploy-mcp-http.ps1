@@ -59,6 +59,21 @@ function Graph([string] $Method, [string] $Uri, $Body) {
     finally { Remove-Item $file -ErrorAction SilentlyContinue }
 }
 
+# 実行したアカウントの分だけ、サーバーのアプリに Azure Service Management の user_impersonation を同意する（作れたか、既にあれば true）
+function Grant-ConsentForSelf([string] $AppId) {
+    try {
+        $clientSp = Invoke-Az ad sp show --id $AppId --query id --output tsv
+        $resourceSp = Invoke-Az ad sp show --id $armAppId --query id --output tsv
+        $me = Invoke-Az ad signed-in-user show --query id --output tsv
+        $grants = Invoke-AzJson rest --method GET --uri "https://graph.microsoft.com/v1.0/oauth2PermissionGrants?`$filter=clientId eq '$clientSp' and principalId eq '$me'"
+        if (-not @($grants.value | Where-Object { $_.resourceId -eq $resourceSp -and ($_.scope -split " ") -contains "user_impersonation" })) {
+            Graph POST "/oauth2PermissionGrants" @{ clientId = $clientSp; consentType = "Principal"; principalId = $me; resourceId = $resourceSp; scope = "user_impersonation" }
+        }
+        return $true
+    }
+    catch { return $false }
+}
+
 function Step([string] $Message) { Write-Host "==> $Message" -ForegroundColor Cyan }
 
 # 無ければ作る（既にあるリソースグループは、場所が違っても変えない。az group create は場所の変更を拒否するため）
@@ -166,7 +181,9 @@ if ($userMode) {
     Step "Entra ID: Azure Service Management の委任アクセス許可への管理者の同意"
     az ad app permission admin-consent --id $serverAppId --output none
     if ($LASTEXITCODE -ne 0) {
-        Write-Warning "管理者の同意に失敗しました。テナントの管理者に、Entra 管理センターの「$serverName」の「API のアクセス許可」で同意を付与してもらってください。"
+        # 管理者でなくても、実行した本人の分の同意は作れることがある（テナントの同意の設定による）。同意が無いと、MFA を済ませても OBO が AADSTS65001 で失敗する
+        $self = if (Grant-ConsentForSelf $serverAppId) { "実行したアカウントの分だけ同意しました。" } else { "実行したアカウントの分の同意も作れませんでした。" }
+        Write-Warning "管理者の同意に失敗しました。$self ほかの利用者が user 方式を使うには、テナントの管理者に、Entra 管理センターの「$serverName」の「API のアクセス許可」で同意を付与してもらってください。"
     }
 }
 
@@ -199,6 +216,13 @@ if ($LASTEXITCODE -ne 0) {
 }
 $domain = Invoke-Az containerapp env show --resource-group $ResourceGroup --name "$Name-env" --query properties.defaultDomain --output tsv
 $publicUrl = "https://$Name.$domain/mcp"
+
+# MCP のクライアントは認可の要求に resource（公開 URL）を付け、Entra ID はスコープの対象と違う resource を拒否する（AADSTS9010010）。
+# そのため公開 URL もアプリケーション ID の URI にし、サーバーは公開 URL のスコープ（<公開 URL>/Mcp.Access）を示す。管理者が加えた URI は残す
+Step "Entra ID: 公開 URL $publicUrl をサーバーのアプリのアプリケーション ID の URI に加える"
+Graph PATCH "/applications/$($serverApp.id)" @{
+    identifierUris = @(@($serverApp.identifierUris) + @("api://$serverAppId", $publicUrl) | Where-Object { $_ } | Select-Object -Unique)
+}
 
 $envVars = @(
     "TT_MCP_HTTP__TENANT_ID=$tenantId",
@@ -250,7 +274,7 @@ Write-Host "完了しました。" -ForegroundColor Green
 Write-Host "  MCP のエンドポイント : $publicUrl"
 Write-Host "  サーバーのアプリ     : $serverAppId（$serverName）"
 Write-Host "  クライアントのアプリ : $clientAppId（$clientName）"
-Write-Host "  スコープ             : api://$serverAppId/Mcp.Access"
+Write-Host "  スコープ             : $publicUrl/Mcp.Access"
 Write-Host ""
 Write-Host "次の手順:"
 Write-Host "  1. 利用者にアプリロールを割り当てる: ./scripts/assign-mcp-role.ps1 -Name $Name -Role Server -UserPrincipalName <UPN>"

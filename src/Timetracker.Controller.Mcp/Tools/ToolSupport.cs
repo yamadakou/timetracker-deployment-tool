@@ -21,6 +21,21 @@ internal static class ToolSupport
         ["managed-identity"] = "マネージド ID が使える Azure 上の環境で実行しているか（ユーザー割り当ての場合は環境変数 AZURE_CLIENT_ID）を確認してください。",
     };
 
+    // 多要素認証が必要なためにトークンを交換できなかったときのエラー（user 方式。Azure の管理 API は MFA が必須）。
+    // AADSTS50076 は MFA を行っていない、AADSTS50079 は MFA の方法を登録していない
+    private const string MfaRequiredError = "AADSTS50076";
+    private const string MfaRegistrationRequiredError = "AADSTS50079";
+
+    internal const string MfaHint =
+        "Azure の管理 API には多要素認証（MFA）が必要ですが、MCP サーバーへのサインインで MFA を行っていないため、利用者本人の権限に交換できませんでした。" +
+        "管理者に、条件付きアクセスで MCP サーバーのアプリへのサインインに MFA を要求するよう依頼してください（その後、サインインし直してください）。" +
+        "それまでは、server 方式（azure_identity=server）を使ってください。";
+
+    internal const string MfaRegistrationHint =
+        "Azure の管理 API には多要素認証（MFA）が必要ですが、MFA の方法（認証アプリなど）が登録されていないため、利用者本人の権限に交換できませんでした。" +
+        "https://aka.ms/mysecurityinfo で MFA の方法を登録してから、サインインし直してください。" +
+        "それまでは、server 方式（azure_identity=server）を使ってください。";
+
     /// <summary>
     /// Azure を呼ぶ処理を実行し、よくある失敗（認証・Azure のエラー・資格情報を作れない）を、対処を添えたツールのエラーにする。
     /// </summary>
@@ -33,7 +48,10 @@ internal static class ToolSupport
         catch (AuthenticationFailedException ex)
         {
             logger.LogWarning(ex, "Azure の認証に失敗しました");
-            throw new McpException($"Azure の認証に失敗しました（{access.CredentialName}）。{access.AuthFailureHint}");
+            var hint = ex.Message.Contains(MfaRegistrationRequiredError) ? MfaRegistrationHint
+                : ex.Message.Contains(MfaRequiredError) ? MfaHint
+                : access.AuthFailureHint;
+            throw new McpException($"Azure の認証に失敗しました（{access.CredentialName}）。{hint}");
         }
         catch (RequestFailedException ex)
         {
