@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  CI（.github/workflows/ci.yml）で、5 つのチェックを実行する必要があるか（ドキュメント以外の変更があるか）を判定する。
+  CI（.github/workflows/ci.yml）で、6 つのチェックを実行する必要があるか（ドキュメント以外の変更があるか）を判定する。
 
 .DESCRIPTION
   変更したファイルがドキュメント（docs/ の下と *.md）だけなら code=false、それ以外を 1 つでも含むなら code=true を
@@ -61,7 +61,7 @@ if ($changes.Reason) {
     $code = -not (Test-DocsOnly $files)
     Write-Host "変更したファイル（$($files.Count) 件）:"
     $files | ForEach-Object { Write-Host "  $_" }
-    Write-Host ($code ? "ドキュメント以外の変更があるため、すべて実行します。" : "ドキュメントだけの変更のため、5 つのチェックを省きます。")
+    Write-Host ($code ? "ドキュメント以外の変更があるため、すべて実行します。" : "ドキュメントだけの変更のため、6 つのチェックを省きます。")
 }
 
 if ($OutputPath) {

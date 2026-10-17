@@ -10,7 +10,7 @@ on:
 
 jobs:
   # 変更したファイルがドキュメント（docs/ の下と *.md）だけかを判定する（.github/scripts/detect-code-changes.ps1）。
-  # ドキュメントは、下の 5 つのチェックのどれにも使われていないため、ドキュメントだけなら各チェックを省く（Skipped は成功として扱われる）
+  # ドキュメントは、下の 6 つのチェックのどれにも使われていないため、ドキュメントだけなら各チェックを省く（Skipped は成功として扱われる）
   changes:
     runs-on: ubuntu-latest
     permissions:
@@ -177,3 +177,41 @@ jobs:
         test "$(curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:8080/mcp -H 'Content-Type: application/json' -d '{}')" = 401
         test "$(docker exec ttmcp id -u)" != 0
         docker logs ttmcp
+
+  # デスクトップアプリ（WinUI 3）の Store 用のパッケージ（.msixupload。x64 と arm64 のバンドル。署名なし: Store が認定の後に署名する）を作り、
+  # パッケージのマニフェストの版・対象 OS・機能を確かめる（docs/design/desktop-app.md の 9.1）。
+  # Microsoft Learn の WinUI 3 の CI の例に合わせて msbuild を使う。画面の状態と操作のテストは build ジョブ（Timetracker.sln）で行う
+  desktop:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: windows-latest
+    permissions:
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: 10.0.x
+
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Build MSIX for the Store
+      run: >
+        msbuild src/Timetracker.Controller.Desktop/Timetracker.Controller.Desktop.csproj /restore
+        /p:Configuration=Release /p:Platform=x64 /p:AppxBundlePlatforms="x64|arm64" /p:AppxBundle=Always
+        /p:UapAppxPackageBuildMode=StoreUpload /p:AppxPackageSigningEnabled=false /p:GenerateAppxPackageOnBuild=true
+        /p:AppxPackageDir=${{ github.workspace }}\AppPackages\
+
+    - name: Check package manifest
+      shell: pwsh
+      run: ./.github/scripts/check-msix.ps1 -PackageDir AppPackages -ExpectedVersion 0.1.0.0
+
+    - name: Upload package
+      uses: actions/upload-artifact@v7
+      with:
+        name: timetracker-desktop-msixupload
+        path: AppPackages/**/*.msixupload

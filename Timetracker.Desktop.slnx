@@ -1,0 +1,20 @@
+<!-- デスクトップアプリ（WinUI 3。Windows でしかビルドできない）と、それが使うプロジェクト。Timetracker.sln とは分ける（詳細設計 3.2） -->
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="ARM64" />
+  </Configurations>
+  <Folder Name="/src/">
+    <Project Path="src/Timetracker.Common/Timetracker.Common.csproj" />
+    <Project Path="src/Timetracker.Domain/Timetracker.Domain.csproj" />
+    <Project Path="src/Timetracker.Infrastructure.Azure/Timetracker.Infrastructure.Azure.csproj" />
+    <Project Path="src/Timetracker.Application/Timetracker.Application.csproj" />
+    <Project Path="src/Timetracker.Controller.Desktop.Core/Timetracker.Controller.Desktop.Core.csproj" />
+    <Project Path="src/Timetracker.Controller.Desktop/Timetracker.Controller.Desktop.csproj">
+      <Deploy />
+    </Project>
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Timetracker.Controller.Desktop.Core.Tests/Timetracker.Controller.Desktop.Core.Tests.csproj" />
+  </Folder>
+</Solution>

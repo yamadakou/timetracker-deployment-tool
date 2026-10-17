@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    デスクトップアプリ（WinUI 3、単一プロジェクト MSIX。詳細設計 docs/design/desktop-app.md）。
+    Windows でしかビルドできないため Timetracker.sln には入れず、Timetracker.Desktop.slnx と CI の desktop ジョブでビルドする。
+    画面の状態と操作は Timetracker.Controller.Desktop.Core（Linux でもテストできる）に置き、ここは画面と OS の機能だけにする。
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <RootNamespace>Timetracker.Controller.Desktop</RootNamespace>
+    <AssemblyName>timetracker-desktop</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Platforms>x64;ARM64</Platforms>
+    <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
+    <UseWinUI>true</UseWinUI>
+    <EnableMsixTooling>true</EnableMsixTooling>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- 利用者の PC に .NET と Windows App SDK のランタイムを求めない（詳細設計 8.1） -->
+    <SelfContained>true</SelfContained>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <!--
+      サインインに使うアプリ登録のクライアント ID（詳細設計 5.1・Q3）。空なら Azure.Identity の既定（開発用）を使う。
+      オーナーがアプリ登録を用意したら、ビルドで /p:DesktopClientId=<ID> を渡す
+    -->
+  </PropertyGroup>
+  <ItemGroup>
+    <AssemblyMetadata Include="DesktopClientId" Value="$(DesktopClientId)" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Assets\*.png" />
+    <Manifest Include="$(ApplicationManifest)" />
+  </ItemGroup>
+  <!-- Visual Studio で MSIX の作成と発行のメニューを出す（テンプレートと同じ） -->
+  <ItemGroup Condition="'$(DisableMsixProjectCapabilityAddedByProject)' != 'true' and '$(EnableMsixTooling)' == 'true'">
+    <ProjectCapability Include="Msix" />
+  </ItemGroup>
+  <PropertyGroup Condition="'$(DisableHasPackageAndPublishMenuAddedByProject)' != 'true' and '$(EnableMsixTooling)' == 'true'">
+    <HasPackageAndPublishMenu>true</HasPackageAndPublishMenu>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Azure.Identity.Broker" Version="1.7.0" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2705" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.5.1" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Timetracker.Controller.Desktop.Core\Timetracker.Controller.Desktop.Core.csproj" />
+  </ItemGroup>
+</Project>
