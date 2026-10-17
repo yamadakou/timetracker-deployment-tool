@@ -687,16 +687,20 @@ dotnet publish .\src\Timetracker.Controller.Cli\Timetracker.Controller.Cli.cspro
 - アプリケーション層（Timetracker.Application）
   - デプロイの手順の実行（DeploymentRunner: リソースグループ → 環境 →（--persist-db の場合）DB のストレージ → DB / Redis / Timetracker）と結果（DeploymentResult）
   - 削除の計画の作成と削除の実行（DeletionPlanner / DeletionRunner）、権限の事前確認（PermissionChecker / DeploymentPlanner）
+  - 計画 → 確認 → 実行の安全策（DeploymentWorkflow / DeletionWorkflow: 計画の保存、実行の直前の再確認、データ消失への同意、アプリ名の確認、同じ対象の二重実行の拒否）。MCP サーバーとデスクトップアプリで共有する
+  - Dry-run のファイルの保存（ComposeExporter）
 - インフラストラクチャ層（Timetracker.Infrastructure.Azure）
-  - Azure SDK による実行（AzureSdkExecutor / IAzureDeploymentGateway）、Container Apps のコンテナの仕様の生成（ContainerAppSpecBuilder）、認証（CredentialFactory）
+  - Azure SDK による実行（AzureSdkExecutor / IAzureDeploymentGateway）、Container Apps のコンテナの仕様の生成（ContainerAppSpecBuilder）、認証（CredentialFactory）、テナントの一覧（AzureTenantDirectory / TenantScopedCredential）
 - コントローラー層（Timetracker.Controller.Cli）
   - CLI の入出力、オプションの解析（CliArgs）
 - コントローラー層（Timetracker.Controller.Mcp）
   - MCP サーバー（`timetracker-mcp`。stdio と HTTP）。ツール・Resources・Prompts と、計画 → 確認 → 実行の流れは [MCP サーバーの利用者向けマニュアル](docs/MCP_SERVER.md) を参照してください（設計は [docs/MCP_TOOL_DESIGN.md](docs/MCP_TOOL_DESIGN.md) と [docs/design/](docs/design/) の mcp-phase*.md）
+- コントローラー層（Timetracker.Controller.Desktop.Core）
+  - デスクトップアプリ（開発中）の画面の状態と操作（ViewModel）。UI のフレームワークに依存しないため、Linux でもテストできる（設計は [docs/design/desktop-app.md](docs/design/desktop-app.md)）
 - 共通（Timetracker.Common）
   - ロガー（IDeploymentLogger / SimpleLogger）などのユーティリティ
 
-依存の向きは「コントローラー層 → アプリケーション層 → インフラストラクチャ層 → ドメイン層」です。CLI 以外のフロントエンド（MCP サーバーなど）を加える場合も、アプリケーション層から下を共有します。
+依存の向きは「コントローラー層 → アプリケーション層 → インフラストラクチャ層 → ドメイン層」です。CLI 以外のフロントエンド（MCP サーバー、デスクトップアプリなど）を加える場合も、アプリケーション層から下を共有します。
 
 作る Container Apps の構成:
 - 3 つのコンテナ

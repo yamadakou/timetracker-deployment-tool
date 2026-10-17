@@ -4,9 +4,7 @@
 - 全体設計: `docs/ROADMAP.md` の「2. ストア配布できるデスクトップアプリ」、`docs/MCP_TOOL_DESIGN.md`（3.2 依存関係、3.4 Application を共有する方針、4.7・4.12 計画 → 確認 → 実行、4.10 パスワードの扱い）
 - 前の段階: `docs/design/mcp-phase3b.md`（計画ストア・ジョブ）、`docs/design/mcp-phase3c.md`（削除の計画と実行）
 - 状況: 10 の論点はオーナーの回答で決定した（WinUI 3・限定公開で始める・マルチテナントのアプリ登録・パスワードは保存しない）。一次情報の確認日は 2026-10-17
-- **中断中**: 5a の途中で中断した（オーナーの指示）。ROADMAP の「1. DB データの永続化オプション」でアプリ側の設計が変わる見込みのため、その修正が終わってから再開する。再開するときは、永続化オプションの引数（デプロイの設定・削除での扱い・再デプロイの警告）を 4・6・7 と `Desktop.Core` に反映する
-  - 済み: Application の `DeploymentWorkflow` / `DeletionWorkflow` / `ComposeExporter`（MCP をこれに置き換え。MCP の結果・メッセージは変えていない）、Infrastructure の `AzureTenantDirectory` / `TenantScopedCredential`、`Timetracker.Controller.Desktop.Core`（ViewModel。MVVM の基盤は CommunityToolkit.Mvvm ではなく、生成コードの無い小さな自前のクラスにした）とテスト。分岐網羅率は Application・Desktop.Core とも 100%、MCP は Program.cs と正規表現の生成コードを除き 100%
-  - 未着手: 5a の残り（README の設計概要の更新）、5b（WinUI 3 のアプリ、WAM でのサインイン、CI の `desktop` ジョブ）、5c
+- 中断と再開: 5a の途中で中断し（オーナーの指示）、DB データの永続化オプション（`docs/design/db-persistence.md`）のマージの後に再開した。永続化の扱いは 7.1 に反映した
 
 ## 1. 目的
 CLI や AI アシスタントを使わない利用者が、画面の操作で次を行えるようにする。Microsoft Store から導入・更新できるようにする。
@@ -60,7 +58,7 @@ flowchart TB
     MCP["Controller.Mcp"]
     DESK["Controller.Desktop<br/>WinUI 3 の画面・WAM・MSIX"]
   end
-  CORE["Controller.Desktop.Core<br/>ViewModel（CommunityToolkit.Mvvm）<br/>ISignInService / IFileDialogs / ISecretStore"]
+  CORE["Controller.Desktop.Core<br/>ViewModel（自前の小さな MVVM の基盤）<br/>ISignInService / IDialogService / ISystemLauncher / IAzureClients"]
   APP["Application<br/>DeploymentWorkflow / DeletionWorkflow（新規）<br/>DeploymentPlanner / DeploymentRunner / DeletionPlanner / DeletionRunner<br/>DeploymentInspector / JobManager / IPlanStore"]
   INFRA["Infrastructure.Azure"]
   DOMAIN["Domain"]
@@ -73,6 +71,7 @@ flowchart TB
 ```
 
 - 画面（XAML）には処理を書かず、ViewModel のプロパティとコマンドに結び付けるだけにする。分岐のある処理はすべて `Desktop.Core` か Application に置き、テストする
+- MVVM の基盤（`ObservableObject` / `AsyncCommand`）は、CommunityToolkit.Mvvm を使わず小さな自前のクラスにする。ソース生成のコードが分岐網羅率の測定に入らないようにするため（5a で決めた）。WinUI 3 の `x:Bind` は `INotifyPropertyChanged` と `ICommand` だけを使うので、機能の差は無い
 - `Timetracker.Controller.Desktop`（WinUI 3）は `Timetracker.sln` に入れない。Windows でしかビルドできず、Linux の開発環境で `dotnet build Timetracker.sln` が失敗するため。`Timetracker.Desktop.slnx`（ソリューションファイル）に分け、CI の Windows のジョブでビルドする。`Desktop.Core` とそのテストは `Timetracker.sln` に入れる
 - 依存の向きは既存と同じ（コントローラー層 → アプリケーション層 → インフラストラクチャ層 → ドメイン層）
 
@@ -160,10 +159,22 @@ flowchart LR
 | 計画（DB の更新） | 「DB のデータが失われることを理解しました」のチェックを入れるまで「実行」ボタンを押せない（`acknowledge_data_loss` と同じ） |
 | 実行 | 実行の直前の再確認で状態が変わっていたら、実行せずに計画の画面に戻す。実行中はキャンセルできない（Azure の操作を途中で止めると中途半端な状態が残るため）。実行中にウィンドウを閉じようとしたら確認する（閉じるとジョブは止まる。Azure の状態は「状態の確認」で見られる） |
 | 削除 | 削除するもの・削除しないもの（理由）・残すもの（リソースグループ）を表示する。アプリ名を入力し、計画のアプリ名と一致するまで「削除」ボタンを押せない（`confirm_app_name` と同じ。Application でも確かめる） |
+| 計画（永続化した DB の更新） | 永続化を続ける場合はデータが残るため、同意のチェックは要らない。停止 → 更新 → 開始の間（数分）Timetracker を使えないことを警告で示す（7.1） |
 | Dry-run | フォルダーを選ぶ（`FolderPicker`）。既存のファイルがあれば上書きを確認する。保存の後に `docker compose up -d` の手順とフォルダーを開くボタンを表示する |
 
 - 画面の文言は既存の CLI・MCP のメッセージ（日本語）をそのまま使う
 - 同時に実行できるジョブは、同じ対象（サブスクリプション・リソースグループ・アプリ名）につき 1 つ（`JobManager`）。アプリを 2 つ起動した場合は排他できないが、実行の直前の再確認である程度防げる（MCP の stdio と同じ）
+
+### 7.1 DB データの永続化オプション（`docs/design/db-persistence.md`）
+CLI の `--persist-db` / `--keep-db-data`、MCP の `persist_db` / `keep_db_data` と同じ規則を、画面では次のように扱う。規則（データが失われるか、作るもの、警告の文）は Application と Domain のものをそのまま使う。
+
+| 画面 | 扱い |
+|---|---|
+| 設定 | 「DB のデータ」を 3 つから選ぶ: 今の状態を引き継ぐ（既定。新しく作る場合は永続化しない）/ Azure Files に永続化する（料金がかかる）/ 永続化しない。Dry-run では使わない（Domain の警告を表示する） |
+| 計画 | 永続化するかの結果（「引き継ぐ」を選んだ場合は既存の DB アプリから決めた結果）と、ストレージアカウントの名前を表示する。ストレージアカウント・ファイル共有・Environment のストレージの作成を操作の一覧に出す。料金と削除での扱いの案内（`DbPersistence.StorageNotice`）を警告に出す。データ消失の同意は、計画が求める場合（永続化しない DB の更新、永続化の切り替え）だけ求める |
+| 実行の結果 | 永続化した場合は、DB のデータを置いたストレージアカウントを表示する |
+| 状態の確認 | 永続化しているか、永続化していないが以前のデータのストレージアカウントが残っているか、を表示する |
+| 削除 | 「DB のデータを残す」のチェック（既定は外す。データごと削除する）。チェックが無ければ、ストレージアカウントも削除することと元に戻せないことを警告に出す。チェックがあれば、残すもの（料金がかかり続けること、同じアプリ名で永続化してデプロイすると引き継げること）を表示し、完了のログにも添える |
 
 ## 8. Microsoft Store での配布
 ### 8.1 パッケージ
