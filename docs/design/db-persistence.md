@@ -187,5 +187,5 @@ timetracker-cli delete ... [--keep-db-data [true|false]]
 
 - 3・6 から、永続化した DB アプリの再起動は、Azure ポータルの「再起動」や `az containerapp revision restart` ではなく、本ツールの再デプロイで行うよう README と MCP の注意事項に書いた。Azure 基盤のメンテナンスでの再起動は制御できないため、3 と同様の復旧（PostgreSQL）または 6 と同様の停滞（SQL Server）が起こりうる。6 が起きた場合も、再デプロイで回復できる
 - `mountOptions` は 4 のままで追加は不要だった（`nobrl` なしで PostgreSQL・SQL Server とも動いた）
-- システムテスト: `DbPersistenceLifecycleTests`（PostgreSQL。1〜4 の流れに相当: デプロイ → 再デプロイ → `--keep-db-data` の削除 → 既定の削除）を追加し、Azure で成功した（15 分 41 秒）。DB のデータが残っていることは、共有の上の `PG_VERSION`（初期化のときだけ書かれる）が変わらず、再デプロイの後に `postmaster.pid`（起動のたびに作られる）が作られることで確かめる
+- システムテスト: `DbPersistenceLifecycleTests`（PostgreSQL。1〜4 の流れに相当: デプロイ → 再デプロイ → `--keep-db-data` の削除 → 既定の削除）を追加し、Azure で成功した（15 分 41 秒）。マージ後の `main`（f5b7391）でも、GitHub Actions の System Test（run 39047827720）で、このテストを含む 16 件がすべて成功した（16 分 11 秒）。DB のデータが残っていることは、共有の上の `PG_VERSION`（初期化のときだけ書かれる）が変わらず、再デプロイの後に `postmaster.pid`（起動のたびに作られる）が作られることで確かめる
 - 未実施: 権限の不足のシナリオ（権限の少ないサービスプリンシパルが無いため）、1 日の料金、HTTP 版の MCP サーバー（Container Apps に配置したもの）での確認。HTTP 版の確認の手順は `docs/design/db-persistence-mcp-http-check.md`（次のリリースの後、MCP サーバーのイメージを更新するときに行う）
