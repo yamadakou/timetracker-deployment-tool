@@ -70,3 +70,56 @@ jobs:
           --label org.opencontainers.image.version=$version .
         docker push $image:$version
         docker push $image:latest
+
+  # デスクトップアプリの Store 用のパッケージ（.msixupload。署名なし）を作り、Release に載せる（docs/design/desktop-app.md の 9.2）。
+  # Store への提出は、このファイルを Partner Center にアップロードして行う（初回の提出は手作業が必要）
+  desktop:
+    # テスト（release ジョブ）が成功し、Release ができてから載せる
+    needs: release
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    env:
+      RELEASE_TAG: ${{ github.ref_name }}
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: 10.0.x
+
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2
+
+    # パッケージの版はタグから X.Y.Z.0 にする（Store では 4 つ目を 0 にする必要がある）
+    - name: Set package version
+      shell: pwsh
+      run: |
+        $path = "src/Timetracker.Controller.Desktop/Package.appxmanifest"
+        [xml] $manifest = Get-Content $path
+        $manifest.Package.Identity.Version = "$($env:RELEASE_TAG.TrimStart('v')).0"
+        $manifest.Save((Resolve-Path $path).Path)
+
+    - name: Build MSIX for the Store
+      run: >
+        msbuild src/Timetracker.Controller.Desktop/Timetracker.Controller.Desktop.csproj /restore
+        /p:Configuration=Release /p:Platform=x64 /p:AppxBundlePlatforms="x64|arm64" /p:AppxBundle=Always
+        /p:UapAppxPackageBuildMode=StoreUpload /p:AppxPackageSigningEnabled=false /p:GenerateAppxPackageOnBuild=true
+        /p:AppxPackageDir=${{ github.workspace }}\AppPackages\
+
+    - name: Check package manifest
+      shell: pwsh
+      run: ./.github/scripts/check-msix.ps1 -PackageDir AppPackages -ExpectedVersion "$($env:RELEASE_TAG.TrimStart('v')).0"
+
+    - name: Upload to GitHub Release
+      shell: pwsh
+      run: |
+        $upload = Get-ChildItem AppPackages -Recurse -Filter *.msixupload | Select-Object -First 1
+        $name = "timetracker-desktop-$($env:RELEASE_TAG).msixupload"
+        Copy-Item $upload.FullName $name
+        gh release upload $env:RELEASE_TAG $name
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
