@@ -169,3 +169,7 @@ timetracker-cli delete ... [--keep-db-data [true|false]]
 | Q2 | 削除のときのデータ | 既定で消す（`--keep-db-data` / `keep_db_data` で残す） | 推奨（残す）とは逆。`delete` で料金のかかるものを残さない（8） |
 | Q3 | 永続化した環境に `--persist-db` なしで再デプロイしたとき | 今の状態を引き継ぐ（やめるには `--persist-db false`、データ消失の同意が要る） | 推奨どおり（5.1・6） |
 | Q4 | Azure 上の SQL Server のサンプル DB（No.19） | 別の項目にする | 推奨どおり（1） |
+
+## 14. 実施状況
+- 実装: 11 の分担のとおり（REVIEW_ISSUES No.46）。自動テストは全件成功、分岐網羅率は正規表現の生成コードを除き 100%
+- 未実施: 10 の Azure での確認と、システムテスト（`DeploymentLifecycleTests` / `LimitedPermissionTests`）への永続化のシナリオの追加。Azure へのデプロイは料金がかかるため、オーナーの了承を得てから行う。確認の結果で、`mountOptions`（`nobrl` などの要否、SQL Server の gid）、停止 → 更新 → 開始の手順、PostgreSQL での可否（動かない場合は PostgreSQL では `--persist-db` をエラーにする）を見直す

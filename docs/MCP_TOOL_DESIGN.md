@@ -15,6 +15,7 @@
 | 4.2 | Phase 1（PR #22）・Phase 2（PR #23）のマージを反映。Phase 3a の実施結果を 8.2 に追記（詳細設計は `docs/design/mcp-phase3a.md`） |
 | 4.3 | Phase 3b の実施結果を 8.2 に追記（詳細設計は `docs/design/mcp-phase3b.md`）。進捗の通知（`notifications/progress`）は送らず、`get_job_status` のポーリングで完結させることにした |
 | 4.4 | Phase 3c の実施結果を 8.2 に追記（詳細設計は `docs/design/mcp-phase3c.md`）。Prompts に `delete-timetracker` を追加（5.3）。削除の結果は `get_job_status` の `deletion_result` で返す |
+| 4.5 | DB データの永続化（`persist_db` / `keep_db_data`）を 4.2・4.7・4.12・4.13 に追記（詳細設計は `docs/design/db-persistence.md`） |
 
 ---
 
@@ -39,7 +40,7 @@ README の「将来の GUI 化に備えドメイン層とコントローラー�
 | WebAPI フロントエンド | 本設計の対象外。ただしアプリケーション層を共有できる構成にする（3.4） |
 | 削除機能 | 対象。**CLI に先に実装**し、MCP は同じアプリケーション層を使う |
 | 本番環境構築 | 対象外（ツールの目的「検証環境の構築支援」は変えない） |
-| スケール設定・永続ボリューム等の新機能 | 対象外 |
+| スケール設定・永続ボリューム等の新機能 | 対象外（DB データの永続化は、後から `docs/design/db-persistence.md` で追加した） |
 
 ### 1.3 ブランチと実施順【決定: フェーズごとにブランチを分ける】
 オーナー方針に従い、フェーズごとにブランチを分ける。まず共有層を切り出し（挙動は変えない）、その後に挙動を変える変更（Dry-run の緩和、削除機能、MCP、HTTP 公開）をそれぞれ別ブランチで行う。各ブランチは PR で main にマージしてから、次のブランチを main から作る。
@@ -237,6 +238,7 @@ flowchart TB
 | `tt_cpu` / `tt_memory_gi` | number | – | 1.5 / 3.0 | `--tt-cpu` / `--tt-memory` |
 | `db_cpu` / `db_memory_gi` | number | – | 1.0 / 2.0 | `--db-cpu` / `--db-memory` |
 | `redis_cpu` / `redis_memory_gi` | number | – | 0.5 / 1.0 | `--redis-cpu` / `--redis-memory` |
+| `persist_db` | bool | – | なし（既存の DB アプリの今の状態を引き継ぐ。新規は永続化しない） | `--persist-db`（`validate_deployment` と `plan_deployment` だけ。`generate_compose` には無い） |
 
 既定値の解決は新設する `DeployOptionsResolver`（Domain）で行い、CLI と MCP が同じ結果になるようにする。`validate_deployment` には `target`（`azure` | `compose`、既定 `azure`）を追加し、どちらの必須項目で検証するかを選べるようにする。
 
@@ -320,7 +322,7 @@ DB を再デプロイするとデータが消えるため、**計画（読み取
   2. リソースグループ: 存在の有無とリージョン（不一致なら警告。現行の `EnsureResourceGroupAsync` と同じ判定）
   3. Environment: 存在の有無とリージョン（不一致なら **ブロッカー**。現行の `EnsureContainerAppEnvAsync` と同じ判定）
   4. `-db` / `-redis` / `-tt` の各 Container App: 作成か更新か
-  5. `-db` が既にある場合はデータ消失の警告（`WarnIfDbAppExistsAsync` と同じ内容）
+  5. `-db` が既にある場合はデータ消失の警告（`WarnIfDbAppExistsAsync` と同じ内容）。`persist_db` で永続化を続ける場合は、データが失われないため `data_loss` を false にし、停止 → 更新 → 開始の案内を警告に出す（`docs/design/db-persistence.md` の 6）。永続化する場合は、ストレージアカウント・ファイル共有・Environment のストレージの操作も `actions` に加え、結果に `persist_db`（実際に永続化するか）と `storage_account` を返す
   6. **権限の事前確認**（4.13）: 上の 2〜5 で決まった操作（RG の作成、Environment の作成、Container App の作成・更新）に必要な権限が、実行する ID にあるかを確認する。足りなければ、足りない権限と対処（「リソースグループを事前に作成してください」「Contributor をこのスコープに割り当ててください」など）を**ブロッカー**として返す
 - 出力:
   ```json
@@ -565,7 +567,8 @@ Azure のコスト分析でもタグごとに費用を集計できるため、�
 | 実装 | デプロイ時のタグ付与と、更新時のタグの引き継ぎが必要 | 不要 |
 
 #### `plan_deletion`
-- 入力: `subscription`、`resource_group`、`app_name`、`include_untagged`（bool, 既定 false）
+- 入力: `subscription`、`resource_group`、`app_name`、`include_untagged`（bool, 既定 false）、`keep_db_data`（bool, 既定 false。`persist_db` で作ったストレージアカウントを残す）
+- `persist_db` で作ったストレージアカウントも、管理タグの規則で削除の対象にする（`keep_db_data=true` なら残す）。結果に `deletes_db_data` / `keeps_db_data` を返す
 - 出力:
   ```json
   {
@@ -590,7 +593,7 @@ Azure のコスト分析でもタグごとに費用を集計できるため、�
 #### `start_deletion`
 - 入力: `plan_id`（必須）、`confirm_app_name`（必須。計画の `app_name` と完全に一致すること）
 - 処理は `start_deployment` と同じ: 作成者・有効期限の確認 → 直前の再確認（計画時から対象が変わっていれば中止）→ 二重実行の防止 → ジョブとして開始
-- 削除のステップ: ① 再確認 ② `-tt` ③ `-redis` ④ `-db` ⑤ `-env`（対象のものだけ）
+- 削除のステップ: ① 再確認 ② `-tt` ③ `-redis` ④ `-db` ⑤ `-env` ⑥ ストレージアカウント（対象のものだけ）
 - 既に存在しないリソースは成功扱いにする（何度実行しても同じ結果になる）
 
 #### CLI 側（先行実装）のコマンド案
@@ -619,6 +622,8 @@ README の「必要な RBAC ロールと権限」（`docs/fix-rbac-requirements`
 | Container App の作成・更新（タグの付与を含む） | `start_deployment` | `Microsoft.App/containerApps/write`、`Microsoft.App/managedEnvironments/join/action` | RG |
 | Container App の削除 | `start_deletion` | `Microsoft.App/containerApps/delete` | RG |
 | Environment の削除 | `start_deletion` | `Microsoft.App/managedEnvironments/delete` | RG |
+| DB データの永続化（`persist_db=true`） | `start_deployment` | `Microsoft.Storage/storageAccounts/read` / `write`（作成する場合）/ `listkeys/action`、`Microsoft.Storage/storageAccounts/fileServices/shares/read` / `write`（作成する場合）、`Microsoft.App/managedEnvironments/storages/read` / `write`。永続化を続ける DB アプリの更新では `Microsoft.App/containerApps/stop/action` / `start/action` | RG |
+| ストレージアカウントの削除（`keep_db_data=false`） | `start_deletion` | `Microsoft.Storage/storageAccounts/delete` | RG |
 | 既存リソースへのタグの後付け（運用イメージ C） | Azure CLI（手作業） | `Microsoft.Resources/tags/write` | リソース |
 | リソースプロバイダーの登録 | Azure CLI（手作業、初回のみ） | `*/register/action` | サブスクリプション |
 
