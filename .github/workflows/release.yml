@@ -12,8 +12,9 @@ jobs:
       contents: write
 
     # EXE とイメージの版（MCP サーバーが serverInfo で報告する）。タグ v1.2.3 → 1.2.3
+    # （VERSION という名前にしないこと。MSBuild が環境変数をプロパティとして読み、Version=v1.2.3 になって復元が失敗する）
     env:
-      VERSION: ${{ github.ref_name }}
+      RELEASE_TAG: ${{ github.ref_name }}
 
     steps:
     - uses: actions/checkout@v6
@@ -28,11 +29,11 @@ jobs:
 
     # README 記載と同じ単一ファイル・self-contained の EXE を生成（.NET ランタイム不要）
     - name: Publish
-      run: dotnet publish src/Timetracker.Controller.Cli/Timetracker.Controller.Cli.csproj --configuration Release -r win-x64 -p:PublishSingleFile=true -p:SelfContained=true -p:UseAppHost=true -p:DebugType=None -p:Version=$($env:VERSION.TrimStart("v")) --output publish
+      run: dotnet publish src/Timetracker.Controller.Cli/Timetracker.Controller.Cli.csproj --configuration Release -r win-x64 -p:PublishSingleFile=true -p:SelfContained=true -p:UseAppHost=true -p:DebugType=None -p:Version=$($env:RELEASE_TAG.TrimStart("v")) --output publish
 
     # MCP サーバー（stdio）も CLI と同じ形式の単一ファイル EXE にする（MCP クライアントの設定で command に指定する）
     - name: Publish MCP server
-      run: dotnet publish src/Timetracker.Controller.Mcp/Timetracker.Controller.Mcp.csproj --configuration Release -r win-x64 -p:PublishSingleFile=true -p:SelfContained=true -p:UseAppHost=true -p:DebugType=None -p:Version=$($env:VERSION.TrimStart("v")) --output publish-mcp
+      run: dotnet publish src/Timetracker.Controller.Mcp/Timetracker.Controller.Mcp.csproj --configuration Release -r win-x64 -p:PublishSingleFile=true -p:SelfContained=true -p:UseAppHost=true -p:DebugType=None -p:Version=$($env:RELEASE_TAG.TrimStart("v")) --output publish-mcp
 
     - name: Zip artifacts
       run: |
@@ -64,7 +65,7 @@ jobs:
       run: |
         image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/timetracker-mcp
         version=${GITHUB_REF_NAME#v}
-        docker build -t $image:$version -t $image:latest --build-arg VERSION=$version \
+        docker build -t $image:$version -t $image:latest --build-arg MCP_VERSION=$version \
           --label org.opencontainers.image.source=https://github.com/${{ github.repository }} \
           --label org.opencontainers.image.version=$version .
         docker push $image:$version
