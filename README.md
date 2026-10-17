@@ -5,10 +5,12 @@
 ## ツールの概要
 [TimeTracker](https://www.timetracker.jp/)（Docker Hub の [`densocreate/timetracker`](https://hub.docker.com/r/densocreate/timetracker) イメージ）を、[Azure Container Apps](https://learn.microsoft.com/ja-jp/azure/container-apps/overview) の上に、DB（PostgreSQL または SQL Server）と Redis と一緒に、コマンド 1 つで用意するツールです。Timetracker の検証環境（評価・動作確認・デモ）を手早く作ることを目的としています。
 
+TimeTracker のコンテナイメージの詳細（使い方、環境変数、タグの一覧）は、[Docker Hub の TimeTracker のページ](https://hub.docker.com/r/densocreate/timetracker)を参照してください。
+
 できること:
 - Azure へのデプロイ（`deploy`）: Timetracker・DB・Redis の 3 つのコンテナを、Azure Container Apps のアプリとして作成・更新します。リソースグループが無ければ作成します
 - 作ったリソースの削除（`delete`）: 本ツールで作ったものだけを削除します（リソースグループは削除しません）
-- ローカルでの検証（Dry-run）: Azure を使わずに、Docker Compose で起動するための `docker-compose.yml` と `.env` を作ります（Docker Hub の「クイックスタート」に沿った構成）
+- ローカルでの検証（Dry-run）: Azure を使わずに、Docker Compose で起動するための `docker-compose.yml` と `.env` を作ります（[Docker Hub の TimeTracker のページ](https://hub.docker.com/r/densocreate/timetracker)の「クイックスタート」に沿った構成）
 - 設定の指定: Timetracker のイメージのバージョン（タグ）と、コンテナごとの CPU・メモリを指定できます。台数は 1 台に固定です
 - DB のデータの永続化（`--persist-db`）: 既定では、DB のデータは DB コンテナの再起動で消えます。指定すると、Azure Files に置いて残します（[DB のデータの扱い](#db-のデータの扱いと永続化--persist-db)）
 - AI アシスタントからの操作: MCP サーバー（`timetracker-mcp`）で、同じ操作を AI アシスタントとの対話で行えます（[MCP サーバーの利用者向けマニュアル](docs/MCP_SERVER.md)）
@@ -546,7 +548,7 @@ CLI と同じ機能を、[MCP（Model Context Protocol）](https://modelcontextp
   - サンプル DB を使う場合は `postgresql` を使ってください。`sqlserver` は Developer エディションで起動し、Azure 上では空のデータベースで評価します（[本ツールの目的と注意事項](#本ツールの目的と注意事項)）
 - `--db-password`（必須）: DB のパスワード（DB の種類に関係なく共通。8 文字以上。`sqlserver` の場合は、英大文字・英小文字・数字・記号のうち 3 種類以上を含める必要があります）
 - `--db-name`（任意）: DB 名（省略時は `timetracker`）
-- `--tracker-password`（必須）: Timetracker のパスワード（Docker Hub の説明の `<your password>` に当たるもの）
+- `--tracker-password`（必須）: Timetracker のパスワード（[Docker Hub の TimeTracker のページ](https://hub.docker.com/r/densocreate/timetracker)の説明にある `<your password>` に当たるもの）
 - `--tt-tag`（任意）: Timetracker のイメージのタグ（版）。省略時は、DB の種類に合わせて `11.0.1-linux-postgres`（postgresql）または `11.0.1-linux-mssql`（sqlserver）。使えるタグは [Docker Hub](https://hub.docker.com/r/densocreate/timetracker/tags) を参照してください。**DB の種類に合ったタグ**（PostgreSQL 用は `-linux-postgres`、SQL Server 用は `-linux-mssql`）を指定してください
 - `--persist-db`（任意）: DB のデータを Azure Files に置き、DB コンテナの再起動の後も残す（[DB のデータの扱いと永続化](#db-のデータの扱いと永続化--persist-db)）。省略時は、既存の DB アプリの今の状態を引き継ぎます（新しく作る場合は永続化しない）。永続化をやめるには `--persist-db false`。Dry-run では使いません（警告を表示します）
 
@@ -570,7 +572,7 @@ CLI と同じ機能を、[MCP（Model Context Protocol）](https://modelcontextp
 - `--` で始まる値（例: パスワード）は、`--db-password=--xxxx` のように `=` で指定してください
 
 **補足**:
-- DB のユーザーは、Docker Hub の「クイックスタート」に書かれた固定の値を使います（CLI からは変えられません）
+- DB のユーザーは、[Docker Hub の TimeTracker のページ](https://hub.docker.com/r/densocreate/timetracker)の「クイックスタート」に書かれた固定の値を使います（CLI からは変えられません）
 - `.env` には機密情報が書かれます。扱いにご注意ください（[本ツールの目的と注意事項](#本ツールの目的と注意事項)）
 
 #### アプリ名の規則
@@ -711,7 +713,7 @@ dotnet publish .\src\Timetracker.Controller.Cli\Timetracker.Controller.Cli.cspro
 - 検証環境の構築が目的のため、Azure Container Apps の DB と Redis には、既定では永続ボリュームを付けていません（Dry-run の docker-compose は名前付きボリュームを使います）。DB だけは、`--persist-db` で Azure Files をマウントできます（設計は [docs/design/db-persistence.md](docs/design/db-persistence.md)）
 - DB のパスワードと Timetracker のパスワードは、Container Apps のシークレット（`db-password` / `app-password`）として登録し、環境変数からは `secretRef` で参照します（ポータルの環境変数の一覧に平文で表示されません）
 - 認証には、マネージド ID かサービスプリンシパルをおすすめします（DefaultAzureCredential で使えます）
-- Docker Hub の「クイックスタート」に書かれた固定の DB ユーザー名は、ドメイン層の Defaults にまとめています
+- [Docker Hub の TimeTracker のページ](https://hub.docker.com/r/densocreate/timetracker)の「クイックスタート」に書かれた固定の DB ユーザー名は、ドメイン層の Defaults にまとめています
 
 ### FAQ
 - **Q: 単一ファイルの EXE の起動が遅い**  
