@@ -3,7 +3,7 @@
 - 対象ブランチ: `feature/desktop-app`
 - 全体設計: `docs/ROADMAP.md` の「2. ストア配布できるデスクトップアプリ」、`docs/MCP_TOOL_DESIGN.md`（3.2 依存関係、3.4 Application を共有する方針、4.7・4.12 計画 → 確認 → 実行、4.10 パスワードの扱い）
 - 前の段階: `docs/design/mcp-phase3b.md`（計画ストア・ジョブ）、`docs/design/mcp-phase3c.md`（削除の計画と実行）
-- 状況: **設計の案**。10 の「決めていただきたい事項」の回答を待っている。一次情報の確認日は 2026-10-17
+- 状況: 10 の論点はオーナーの回答で決定した（WinUI 3・限定公開で始める・マルチテナントのアプリ登録・パスワードは保存しない）。5a から実装する。一次情報の確認日は 2026-10-17
 
 ## 1. 目的
 CLI や AI アシスタントを使わない利用者が、画面の操作で次を行えるようにする。Microsoft Store から導入・更新できるようにする。
@@ -23,7 +23,7 @@ CLI・MCP サーバーと同じアプリケーション層（`Timetracker.Applic
 | Windows のデスクトップアプリ（画面、サインイン、MSIX） | ✔（5b） |
 | CI でのビルドとテスト、リリースでの配布物 | ✔（5b・5c） |
 | Microsoft Store への提出 | ✔（5c。初回の提出は利用者が Partner Center で行う） |
-| macOS / Linux 版 | ✘（10 の Q1 の回答による。WinUI 3 を選んだ場合は対象外） |
+| macOS / Linux 版 | ✘（Q1 で WinUI 3 に決定したため対象外） |
 | 認証モードの選択（`azure-cli` / `sp-env` など） | ✘（画面では対話サインインだけにする。4.1） |
 | HTTP 版の MCP サーバーへの接続（サーバー経由の操作） | ✘（ROADMAP の 5. WebAPI のフロントエンドの後に検討する） |
 
@@ -38,7 +38,7 @@ CLI・MCP サーバーと同じアプリケーション層（`Timetracker.Applic
 | サインイン（WAM） | ウィンドウハンドルを `WinRT.Interop.WindowNative.GetWindowHandle` で取れる | Windows ではできる。macOS は別の作り込みが要る | Windows ではウィンドウハンドルを取れる。macOS・Linux はブラウザーでのサインイン |
 | 提供元 | Microsoft | Microsoft | OSS（MIT） |
 
-**推奨: WinUI 3**。対象を Windows と Microsoft Store に絞るなら、MSIX と Store への提出・WAM でのサインインが公式の手順どおりに作れて、手順が一番少ない。MAUI はサポート期間が短く（.NET の版ごとに作り直しが要る）、Windows だけなら WinUI 3 に対する利点が無い。macOS・Linux も対象にするなら Avalonia を選ぶ（10 の Q1）。
+**推奨: WinUI 3**。対象を Windows と Microsoft Store に絞るなら、MSIX と Store への提出・WAM でのサインインが公式の手順どおりに作れて、手順が一番少ない。MAUI はサポート期間が短く（.NET の版ごとに作り直しが要る）、Windows だけなら WinUI 3 に対する利点が無い。macOS・Linux も対象にするなら Avalonia を選ぶ。→ **WinUI 3 に決定**（10 の Q1）。
 
 ### 3.2 プロジェクト構成（WinUI 3 の場合）
 ```
@@ -133,7 +133,7 @@ MCP の `generate_compose` の書き込み（上書きの確認、書き込め�
 |---|---|
 | 入力 | `PasswordBox` で入力する。表示の切り替え（目のアイコン）を付ける。入力の誤り（8 文字以上、SQL Server の複雑さ）は `DeploymentValidator` の結果をその場で表示する |
 | 保持（既定） | **保存しない**。アプリを終了すると消える。計画には解決済みの `DeployOptions`（パスワードを含む）を持つが、メモリ内だけ（MCP と同じ）。WinUI 3 の `PasswordBox.Password` は `string` で、.NET は `SecureString` を新しい開発に推奨していないため、メモリ内の扱いは CLI・MCP と同じにする |
-| 保持（利用者が選んだ場合。10 の Q4） | 「この PC に保存する」を選んだ場合だけ、Windows の資格情報の保管庫（`Windows.Security.Credentials.PasswordVault`）に、サブスクリプション・リソースグループ・アプリ名ごとに保存する。保管庫は 1 アプリにつき 20 件までで、Microsoft アカウントではほかの PC にローミングされる（ドメインのアカウントではされない） |
+| 保持（Q4 で見送り。参考） | 要望があれば後から追加できる案: 「この PC に保存する」を選んだ場合だけ、Windows の資格情報の保管庫（`Windows.Security.Credentials.PasswordVault`）に、サブスクリプション・リソースグループ・アプリ名ごとに保存する。保管庫は 1 アプリにつき 20 件までで、Microsoft アカウントではほかの PC にローミングされる（ドメインのアカウントではされない） |
 | 表示・ログ | 画面のログ、ジョブのログ、エラー、計画の表示にパスワードを含めない（既存のマスクの規則を使う） |
 | Dry-run の `.env` | パスワードが平文で入るため、保存の前に注意を表示する（README の「機密情報の取り扱い」と同じ文） |
 
@@ -181,15 +181,15 @@ flowchart LR
 | プライバシー ポリシーの URL | Win32・デスクトップのアプリは常に必要（ポリシー 10.5.1）。リポジトリに `docs/PRIVACY.md` を置き、その URL を使う（本アプリは利用者の情報を外部に送らない。Azure への操作は利用者のアカウントで直接行う） |
 | 年齢区分 | IARC のアンケートに答える（ポリシー 11.11） |
 | 審査用の情報 | サインインが必要なアプリは、審査用のアカウントか確かめ方を Notes for certification に書く（10.3.1）。Azure のアカウントは渡さず、「Dry-run（サインイン不要）で docker-compose を作る機能を確かめられる。Azure の機能には Azure のサブスクリプションが必要」と書く（11 の 6） |
-| 公開の範囲 | 公開（Public）か、限定公開（Private audience。指定した個人の Microsoft アカウントだけ。**Entra ID の職場のアカウントは対象外**。一度公開にすると限定公開に戻せない）（10 の Q2） |
+| 公開の範囲 | **限定公開（Private audience）で始める**（Q2）。指定した個人の Microsoft アカウント（メールアドレスの一覧）の人だけが Store で見つけて導入できる。**Entra ID の職場のアカウントは対象外**のため、利用者には Microsoft アカウントで Store にサインインしてもらう。一度公開（Public）にすると限定公開に戻せないため、公開への切り替えは確認を終えてから行う |
 | 自動更新 | Store が配信し、Windows が自動で更新する。アプリ内でも `StoreContext.GetAppAndOptionalStorePackageUpdatesAsync` で更新を確かめ、「更新があります」と表示する |
 | 提出の自動化 | 初回の提出は Partner Center で手作業で行う必要がある。2 回目以降は `msstore` CLI（GitHub Actions では `microsoft/microsoft-store-apppublisher`）で自動化できる（無料のアプリのみ。Entra ID のアプリ登録と Partner Center の Manager のロールが必要）。本設計では 5c で手作業から始め、自動化はオーナーの判断で追加する |
 
 ### 8.3 Store 以外の配布（任意）
-Store を使えない利用者（社内の PC で Store が無効など）向けに、GitHub Release にサイドロード用の `.msix` を載せることもできる。ただしサイドロードでは自分で署名する必要がある（10 の Q2）。
+Store を使えない利用者（社内の PC で Store が無効など）向けに、GitHub Release にサイドロード用の `.msix` を載せることもできる。ただしサイドロードでは自分で署名する必要がある（10 の Q2）。→ **当面は配布しない**（Q2）。
 - 自己署名の証明書: 費用はかからないが、利用者が証明書を「信頼されたユーザー」に入れる必要があり、一般の利用者には勧められない
 - Azure Artifact Signing（旧 Trusted Signing）: 月 9.99 USD（Basic）から。日本の組織は公的に信頼される証明書を使える（個人は米国・カナダのみ）。本人確認に 1〜20 営業日
-- 推奨: まず Store だけで配布し、サイドロードは必要になってから追加する
+- 決定: Store だけで配布し、サイドロードは必要になってから追加する
 
 ## 9. CI とリリース
 ### 9.1 CI（`ci.yml`）
@@ -203,13 +203,13 @@ Store を使えない利用者（社内の PC で Store が無効など）向け
 - タグ `vX.Y.Z` で、`desktop` と同じビルドに版 `X.Y.Z.0` を渡し、`timetracker-desktop-vX.Y.Z.msixupload` を GitHub Release に CLI・MCP の zip と並べて載せる
 - Store への提出は、利用者がこのファイルを Partner Center にアップロードして行う（5c）。自動化する場合は、Partner Center の資格情報をリポジトリのシークレットに入れ、`release.yml` に提出のジョブを追加する（オーナーの判断）
 
-## 10. 決めていただきたい事項
-| # | 論点 | 選択肢 | 推奨 |
+## 10. 決定事項
+| # | 論点 | 決定 | 補足 |
 |---|---|---|---|
-| Q1 | UI のフレームワークと対象 OS | (a) WinUI 3（Windows のみ） / (b) Avalonia（Windows・macOS・Linux） / (c) .NET MAUI（Windows・macOS） | (a)。Store・MSIX・WAM が公式の手順で作れる。macOS も必要なら (b)（Mac App Store には Apple Developer Program（年 99 USD）とサンドボックス対応が別に要る） |
-| Q2 | Store の開発者アカウントと公開の範囲、Store 以外の配布 | アカウント: 会社 / 個人。範囲: 公開 / 限定公開。Store 以外: なし / 自己署名 / Artifact Signing | 会社のアカウントで公開。Store 以外はまず配布しない |
-| Q3 | サインインに使うアプリ登録 | (a) オーナーがマルチテナントの公開クライアントを登録する / (b) 自社のテナントだけ（シングルテナント） / (c) 当面は Azure CLI のクライアント ID（既定）を使う | (a)。社外の利用者にも Store で配る前提なら必要。開発中は (c) で進め、登録ができたら差し替える（クライアント ID は設定値にする） |
-| Q4 | パスワードを保存する選択肢を付けるか | (a) 保存しない（毎回入力） / (b) 利用者が選んだ場合だけ Windows の資格情報の保管庫に保存する | (a)。検証環境のパスワードを PC に残さない。要望があれば (b) を後から追加できる |
+| Q1 | UI のフレームワークと対象 OS | **WinUI 3（Windows のみ）** | Windows 10 1809 以降と Windows 11。比較は 3.1 |
+| Q2 | Store の公開の範囲、Store 以外の配布 | **限定公開（Private audience）で始める**。Store 以外の配布（サイドロード用の .msix）はしない | 開発者アカウント（会社か個人か）は、5c の提出の前にオーナーが用意する。限定公開では職場のアカウントが使えないこと、一度公開にすると戻せないことは 8.2 |
+| Q3 | サインインに使うアプリ登録 | **オーナーがマルチテナントの公開クライアントを登録する** | 開発中は既定のクライアント ID で進め、登録ができたら差し替える（クライアント ID は設定値にする）。設定は 5.1 |
+| Q4 | パスワードを保存する選択肢 | **保存しない**（毎回入力） | 要望があれば資格情報の保管庫での保存を後から追加できる（6） |
 
 ## 11. 確認事項（実装・確認の中で確かめる）
 1. Windows App SDK 2.x のテンプレートと `net10.0-windows10.0.19041.0`・自己完結での MSIX のビルドが、CI（windows-latest）で通るか
