@@ -1,12 +1,12 @@
 name: Links
 
-# Markdown の中の外部のサイトへのリンク（https://...）が切れていないかを、週 1 回確かめる（lychee。設定は lychee.toml）。
+# Markdown の中の外部のサイトへのリンク（https://...）が切れていないかを、月 1 回確かめる（lychee。設定は lychee.toml）。
 # 外部のサイトは相手の都合で一時的に失敗することがあるため、PR の CI では確かめず、ここで確かめて Issue で知らせる。
 # ファイルと見出しへのリンクは、ci.yml の links で PR ごとに確かめている
 on:
   schedule:
-    # 毎週月曜 9:17（日本時間。UTC では 0:17）
-    - cron: '17 0 * * 1'
+    # 毎月 1 日の 9:17（日本時間。UTC では 0:17）
+    - cron: '17 0 1 * *'
   workflow_dispatch:
 
 jobs:
