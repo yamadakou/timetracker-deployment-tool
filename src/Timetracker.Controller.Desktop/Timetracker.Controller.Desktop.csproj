@@ -15,6 +15,8 @@
     <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
     <UseWinUI>true</UseWinUI>
     <EnableMsixTooling>true</EnableMsixTooling>
+    <!-- パッケージの言語（マニフェストの Resource は x-generate にして、ビルドがこの言語で生成する） -->
+    <DefaultLanguage>ja-JP</DefaultLanguage>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <!-- 利用者の PC に .NET と Windows App SDK のランタイムを求めない（詳細設計 8.1） -->
