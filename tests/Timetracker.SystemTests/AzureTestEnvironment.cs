@@ -6,6 +6,9 @@ using Azure.Identity;
 using Azure.ResourceManager;
 using Azure.ResourceManager.AppContainers;
 using Azure.ResourceManager.Resources;
+using Azure.ResourceManager.Storage;
+using Azure.Storage;
+using Azure.Storage.Files.Shares;
 using Timetracker.Domain.Deployment;
 
 namespace Timetracker.SystemTests;
@@ -190,6 +193,52 @@ public sealed class AzureTestEnvironment
     {
         var app = await ResourceGroup(rgName).GetContainerAppAsync(name, cancellationToken);
         await app.Value.RemoveTagAsync(key, cancellationToken);
+    }
+
+    /// <summary>Container App のボリュームで使っている、Environment のストレージ（Azure Files）の名前。</summary>
+    public async Task<IReadOnlyList<string>> GetContainerAppStorageNamesAsync(string rgName, string name, CancellationToken cancellationToken)
+    {
+        var app = await ResourceGroup(rgName).GetContainerAppAsync(name, cancellationToken);
+        return app.Value.Data.Template?.Volumes.Where(v => v.StorageName != null).Select(v => v.StorageName).ToList() ?? [];
+    }
+
+    /// <summary>ストレージアカウントのタグ（存在しなければ null）。</summary>
+    public async Task<IReadOnlyDictionary<string, string>?> GetStorageAccountTagsAsync(string rgName, string name, CancellationToken cancellationToken)
+    {
+        var account = await ResourceGroup(rgName).GetStorageAccounts().GetIfExistsAsync(name, cancellationToken: cancellationToken);
+        return account.HasValue ? new Dictionary<string, string>(account.Value!.Data.Tags) : null;
+    }
+
+    /// <summary>
+    /// ファイル共有の中のファイルの最終更新日時（ファイルが無ければ null）。アカウントキーで共有を読む
+    /// （DB のデータを置く共有は、本ツールがアカウントキーで Environment に登録しているため、キーによるアクセスが許可されている）。
+    /// </summary>
+    public async Task<DateTimeOffset?> GetShareFileLastModifiedAsync(
+        string rgName, string accountName, string shareName, string path, CancellationToken cancellationToken)
+    {
+        var account = (await ResourceGroup(rgName).GetStorageAccountAsync(accountName, cancellationToken: cancellationToken)).Value;
+        var keys = await account.GetKeysAsync(cancellationToken: cancellationToken);
+        var credential = new StorageSharedKeyCredential(accountName, keys.Value.Keys[0].Value);
+        var file = new ShareClient(new Uri($"https://{accountName}.file.core.windows.net/{shareName}"), credential)
+            .GetRootDirectoryClient().GetFileClient(path);
+        if (!(await file.ExistsAsync(cancellationToken)).Value)
+            return null;
+        return (await file.GetPropertiesAsync(cancellationToken: cancellationToken)).Value.LastModified;
+    }
+
+    /// <summary>ファイル共有の中のファイルの最終更新日時が条件を満たすまで待ち、その日時を返す（時間内に満たさなければ最後に読んだ値）。</summary>
+    public async Task<DateTimeOffset?> WaitForShareFileAsync(
+        string rgName, string accountName, string shareName, string path, Func<DateTimeOffset?, bool> condition, TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (true)
+        {
+            var lastModified = await GetShareFileLastModifiedAsync(rgName, accountName, shareName, path, cancellationToken);
+            if (condition(lastModified) || DateTime.UtcNow > deadline)
+                return lastModified;
+            await Task.Delay(TimeSpan.FromSeconds(15), cancellationToken);
+        }
     }
 
     /// <summary>Timetracker が HTTP で応答するまで待つ（初回起動は時間がかかる）。応答した状態コードを返す。</summary>
