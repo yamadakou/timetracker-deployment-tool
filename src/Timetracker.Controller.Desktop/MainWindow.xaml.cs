@@ -31,12 +31,21 @@ public sealed partial class MainWindow : Window
         _ = CheckForUpdatesAsync(hwnd);
     }
 
-    // x:Bind の TwoWay で、ComboBox の選択（object）を ViewModel の型に戻す
-    private void SetSubscription(object value) => ViewModel.Target.SelectedSubscription = value as SubscriptionChoice;
+    // ComboBox の選択（object）を ViewModel の型に戻す（x:Bind の TwoWay は SelectedItem の object を変換できないため）
+    private void OnSubscriptionChanged(object sender, SelectionChangedEventArgs e) =>
+        ViewModel.Target.SelectedSubscription = ((ComboBox)sender).SelectedItem as SubscriptionChoice;
 
-    private void SetDbType(object value) => ViewModel.Settings.DbType = (string)value;
+    private void OnDbTypeChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (((ComboBox)sender).SelectedItem is string dbType)
+            ViewModel.Settings.DbType = dbType;
+    }
 
-    private void SetPersistDb(object value) => ViewModel.Settings.PersistDb = (PersistDbOption)value;
+    private void OnPersistDbChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (((ComboBox)sender).SelectedItem is PersistDbOption option)
+            ViewModel.Settings.PersistDb = option;
+    }
 
     private void OnNavigationChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
     {

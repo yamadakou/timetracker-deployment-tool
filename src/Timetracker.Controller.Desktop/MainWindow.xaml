@@ -61,7 +61,7 @@
                         <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="対象" Margin="0,16,0,0" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <ComboBox Header="サブスクリプション" MinWidth="480" ItemsSource="{x:Bind ViewModel.Target.Subscriptions}"
-                                      SelectedItem="{x:Bind ViewModel.Target.SelectedSubscription, Mode=TwoWay, BindBack=SetSubscription}"
+                                      SelectedItem="{x:Bind ViewModel.Target.SelectedSubscription, Mode=OneWay}" SelectionChanged="OnSubscriptionChanged"
                                       DisplayMemberPath="Display" />
                             <Button Content="読み直す" VerticalAlignment="Bottom" Command="{x:Bind ViewModel.Target.LoadCommand}" />
                         </StackPanel>
@@ -78,7 +78,7 @@
                     <StackPanel x:Name="SettingsPanel" Spacing="12" MaxWidth="900" HorizontalAlignment="Left" Visibility="Collapsed">
                         <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="デプロイの設定" />
                         <ComboBox Header="DB 種別" ItemsSource="{x:Bind vm:SettingsViewModel.DbTypes}"
-                                  SelectedItem="{x:Bind ViewModel.Settings.DbType, Mode=TwoWay, BindBack=SetDbType}" Width="240" />
+                                  SelectedItem="{x:Bind ViewModel.Settings.DbType, Mode=OneWay}" SelectionChanged="OnDbTypeChanged" Width="240" />
                         <TextBox Header="DB 名" Text="{x:Bind ViewModel.Settings.DbName, Mode=TwoWay}" Width="480" HorizontalAlignment="Left" />
                         <TextBox Header="timetracker イメージのタグ（空なら既定のタグ）" PlaceholderText="{x:Bind ViewModel.Settings.DefaultTag, Mode=OneWay}"
                                  Text="{x:Bind ViewModel.Settings.TtTag, Mode=TwoWay}" Width="480" HorizontalAlignment="Left" />
@@ -86,7 +86,7 @@
                         <PasswordBox Header="DB のパスワード（8 文字以上）" Password="{x:Bind ViewModel.Settings.DbPassword, Mode=TwoWay}" Width="480" HorizontalAlignment="Left" />
                         <PasswordBox Header="Timetracker のパスワード（8 文字以上）" Password="{x:Bind ViewModel.Settings.TrackerPassword, Mode=TwoWay}" Width="480" HorizontalAlignment="Left" />
                         <ComboBox Header="DB のデータ" ItemsSource="{x:Bind vm:SettingsViewModel.PersistDbOptions}" DisplayMemberPath="Label"
-                                  SelectedItem="{x:Bind ViewModel.Settings.PersistDb, Mode=TwoWay, BindBack=SetPersistDb}" MinWidth="480" />
+                                  SelectedItem="{x:Bind ViewModel.Settings.PersistDb, Mode=OneWay}" SelectionChanged="OnPersistDbChanged" MinWidth="480" />
                         <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="CPU（vCPU）とメモリ（Gi）" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <TextBox Header="Timetracker の CPU" Text="{x:Bind ViewModel.Settings.TtCpu, Mode=TwoWay}" Width="150" />
