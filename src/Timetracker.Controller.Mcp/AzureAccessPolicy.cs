@@ -141,10 +141,21 @@ public sealed class HttpAccessPolicy : IAzureAccessPolicy
     private readonly McpHttpSettings _settings;
     private readonly IHttpContextAccessor _http;
 
+    // user 方式の資格情報（要求のアクセストークンを OBO で交換する）。テストでは、渡したトークンを確かめるために差し替える
+    private readonly Func<string, IDeploymentLogger, TokenCredential> _userCredential;
+
     public HttpAccessPolicy(McpServerSettings settings, IHttpContextAccessor http)
+        : this(settings, http, null)
+    {
+    }
+
+    internal HttpAccessPolicy(McpServerSettings settings, IHttpContextAccessor http, Func<string, IDeploymentLogger, TokenCredential>? userCredential)
     {
         _settings = settings.Http!;
         _http = http;
+        var secret = _settings.UserClientCredential == "client-secret" ? _settings.ClientSecret : null;
+        _userCredential = userCredential
+            ?? ((token, logger) => CredentialFactory.CreateOnBehalfOf(_settings.TenantId, _settings.ClientId, secret, token, logger));
     }
 
     /// <summary>azure_identity を省略したときの ID（既定の方式を呼び出し元が使えなければ、使えるほう）。</summary>
@@ -217,10 +228,9 @@ public sealed class HttpAccessPolicy : IAzureAccessPolicy
         // 要求のアクセストークン（このサーバー向け）。/mcp は認証が必須のため、通常は必ずある
         var token = BearerToken(_http.HttpContext)
                     ?? throw new McpException("要求にアクセストークンがないため、user 方式で操作できません。サインインし直してください。");
-        var secret = _settings.UserClientCredential == "client-secret" ? _settings.ClientSecret : null;
         return new AzureAccess(
             mode, Identity(mode), canCreateResourceGroup: true, (_, _) => null,
-            logger => CredentialFactory.CreateOnBehalfOf(_settings.TenantId, _settings.ClientId, secret, token, logger),
+            logger => _userCredential(token, logger),
             "user 方式（利用者本人の権限）", UserAuthHint);
     }
 
@@ -244,10 +254,15 @@ public sealed class HttpAccessPolicy : IAzureAccessPolicy
     // 使える方式に必要なロール（server 方式は Server、user 方式は User または Server）
     private string RequiredRoles() => _settings.UserModeEnabled ? $"{UserRole} または {ServerRole}" : ServerRole;
 
-    /// <summary>Authorization ヘッダーの Bearer トークン（無ければ null）。</summary>
+    /// <summary>
+    /// Authorization ヘッダーの Bearer トークン（無ければ null）。ヘッダーが複数ある場合は、どれを使うかが曖昧なため null にする
+    /// （JWT の検証も、その要求を受け付けない）。
+    /// </summary>
     internal static string? BearerToken(HttpContext? context) =>
-        context?.Request.Headers.Authorization.ToString() is { } header && header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
-            ? header["Bearer ".Length..].Trim() is { Length: > 0 } token ? token : null
+        context?.Request.Headers.Authorization is { Count: 1 } values
+        && values[0] is { } header && header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+        && header["Bearer ".Length..].Trim() is { Length: > 0 } token
+            ? token
             : null;
 }
 

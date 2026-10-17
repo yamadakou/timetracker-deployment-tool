@@ -32,11 +32,17 @@ internal static class HttpTestSupport
     };
 
     /// <summary>アクセストークン（Authorization ヘッダー）とロールを持つ呼び出し元のポリシー（user 方式の資格情報を作れる）。</summary>
-    public static HttpAccessPolicy PolicyWithToken(McpServerSettings settings, string token = "user-token", params string[] roles)
+    public static HttpAccessPolicy PolicyWithToken(McpServerSettings settings, string token = "user-token", params string[] roles) =>
+        PolicyWithToken(settings, token, null, roles);
+
+    /// <summary><paramref name="userCredential"/> で、user 方式の資格情報に渡したトークンを確かめられるポリシー。</summary>
+    public static HttpAccessPolicy PolicyWithToken(
+        McpServerSettings settings, string token, Func<string, Timetracker.Common.IDeploymentLogger, Azure.Core.TokenCredential>? userCredential,
+        params string[] roles)
     {
         var context = new DefaultHttpContext { User = User(roles: roles) };
         context.Request.Headers.Authorization = $"Bearer {token}";
-        return new HttpAccessPolicy(settings, new FixedAccessor { HttpContext = context });
+        return new HttpAccessPolicy(settings, new FixedAccessor { HttpContext = context }, userCredential);
     }
 
     public static ClaimsPrincipal User(string oid = "user-a", params string[] roles)

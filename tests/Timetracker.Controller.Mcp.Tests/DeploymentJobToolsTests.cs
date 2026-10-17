@@ -553,4 +553,27 @@ public sealed class DeploymentJobToolsTests
         _credentials.Should().ContainSingle().Which.Should().BeOfType<OnBehalfOfCredential>();
         await stdio.Should().ThrowAsync<McpException>().WithMessage("azure_identity は HTTP のサーバーでだけ指定できます*");
     }
+
+    [Fact]
+    public async Task StartDeployment_Should_Exchange_The_Token_Of_The_Start_Request()
+    {
+        ExistingResourceGroup();
+        var tokens = new List<string>();
+        Azure.Core.TokenCredential Record(string token, IDeploymentLogger _)
+        {
+            tokens.Add(token);
+            return Mock.Of<Azure.Core.TokenCredential>();
+        }
+        var planPolicy = HttpTestSupport.PolicyWithToken(BothModes, "plan-token", Record, HttpAccessPolicy.UserRole);
+        var startPolicy = HttpTestSupport.PolicyWithToken(BothModes, "start-token", Record, HttpAccessPolicy.UserRole);
+        var planId = (await PlanAsUser(planPolicy)).PlanId!;
+        tokens.Should().NotBeEmpty().And.OnlyContain(t => t == "plan-token");
+        tokens.Clear();
+
+        var started = await Tools(BothModes, startPolicy).StartDeployment(planId, cancellationToken: Ct);
+        await WaitForJob(started.JobId);
+
+        // 実行の直前の確認とジョブは、計画のときではなく実行の要求のトークンで交換する（計画の後にトークンが更新されても使える）
+        tokens.Should().HaveCountGreaterThanOrEqualTo(2).And.OnlyContain(t => t == "start-token");
+    }
 }

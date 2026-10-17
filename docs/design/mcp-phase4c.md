@@ -3,7 +3,7 @@
 - 対象ブランチ: `feature/mcp-http`
 - 全体設計: `docs/MCP_TOOL_DESIGN.md`（3.3 実行形態、4.11 HTTP 公開時の Azure 資格情報、6.1 動作確認のクライアント）
 - 前の段階: `docs/design/mcp-phase4a.md`（HTTP と `server` 方式）、`docs/design/mcp-phase4b.md`（`user` 方式）
-- 状況: **手順書とスクリプトの準備まで**。Azure と Entra ID での確認は未実施（8 の確認事項を、確認しながら直す）
+- 状況: **手順書とスクリプトの準備まで**。Azure と Entra ID での確認は未実施（9 の確認事項を、確認しながら直す）
 
 ## 1. 目的
 4a・4b で作った HTTP のサーバーを Azure Container Apps に配置し、Entra ID のアプリ登録を用意して、Claude Code（と VS Code の確認できる範囲）から接続できるようにする。管理者が同じ手順を繰り返せるよう、スクリプトにする。
@@ -76,7 +76,7 @@ flowchart LR
   claude mcp add --transport http --client-id <クライアントのアプリの appId> --callback-port 8765 timetracker https://<FQDN>/mcp
   ```
   追加した後、Claude Code で `/mcp` を開き、`timetracker` を選んでサインインする
-- VS Code（`mcp.json`。`oauth.clientId` にクライアントのアプリの appId。8 の確認事項 2 を参照）
+- VS Code（`mcp.json`。`oauth.clientId` にクライアントのアプリの appId。9 の確認事項 2 を参照）
   ```json
   {
     "servers": {
@@ -112,15 +112,21 @@ flowchart LR
 | 11 | `generate_compose` | ファイルを書かず、`.env` のパスワードがプレースホルダー |
 | 12 | Container App を再起動した後に `get_job_status` | ジョブが見つからない（`get_deployment_info` で状態は分かる） |
 
-結果は `docs/REVIEW_ISSUES.md` の No.45 と、この文書の 9 に記入する。
+結果は `docs/REVIEW_ISSUES.md` の No.45 と、この文書の 10 に記入する。
 
-## 7. 運用の注意
+## 7. スクリプトのテスト
+- `tests/scripts/McpHttpScripts.Tests.ps1`（Pester 5 以上）。`az` を模擬に置き換え、Azure と Entra ID の状態（作成済みのもの、アプリ登録の内容、割り当て）を変えながら、呼び出しの引数と Graph に送る本文を確かめる。CI の `scripts` ジョブ（windows-latest の PowerShell 7）で毎回動かす
+- `deploy-mcp-http.ps1`: 新規の配置（server と user の両方・server だけ・user だけ、配列とカンマ区切りの指定、名前・場所・タグ・ポートの指定、`-CanCreateResourceGroup`、未サインイン）、同じ引数での再実行（作成済みのものを作らない、スコープとロールの ID を変えない、管理者が加えた事前承認とリダイレクト URI を残す、場所の違う既存のリソースグループ）、誤りと失敗（無効な方式、許可するリソースグループが無い、サインインの失敗、az の失敗で止まる、管理者の同意の失敗は警告して続ける）
+- `assign-mcp-role.ps1`: 利用者・グループへの割り当て（`-Role` の大文字小文字）、割り当て済みの判定（後のページ、別のロールだけの場合）、引数の誤り、アプリ登録が無い場合、az の失敗
+- 網羅率（Pester のコマンド単位）: 295 中 294（未計上の 1 つは、Pester が数えない引数の既定値の式。既定値を使う場合もテストしている）。if のすべての分岐を、上のテストのどれかで通している
+
+## 8. 運用の注意
 - 計画とジョブはプロセスのメモリにある。レプリカを増やさないこと。デプロイ中に再起動するとジョブの情報が消える（Azure 側の処理は続く）
 - ログの送信先を設定していないため、ログはコンテナの再起動で消える。だれの操作かを長く残す場合は、Environment に Log Analytics を設定する
 - イメージの更新は、リリースの後に `-ImageTag` を変えてスクリプトを再実行する（`latest` のままでは、新しいリビジョンが作られないことがある）
 - クライアントのアプリにシークレットは無い。サーバーのアプリにもシークレットは無い（`user` 方式のトークン交換はフェデレーション資格情報）
 
-## 8. 確認事項（Azure と Entra ID で確かめながら直す）
+## 9. 確認事項（Azure と Entra ID で確かめながら直す）
 1. **`resource` パラメーター**: MCP のクライアントは、認可の要求に保護リソースのメタデータの `resource`（`https://<FQDN>/mcp`）を付ける（RFC 8707）。Entra ID の v2 のエンドポイントが、スコープの対象（`api://<appId>`）と違う `resource` を拒否する（AADSTS9010010 など）場合は、次のどれかで合わせる: クライアントの設定でスコープ `api://<appId>/Mcp.Access` を明示する、アプリケーション ID の URI に公開 URL を加える（検証済みのドメインが必要）、メタデータの `resource` を `api://<appId>` にする（サーバーの変更）
 2. **VS Code**: Entra ID の発行者に対して、VS Code が組み込みの Microsoft 認証（VS Code のアプリの ID）を使うか、`oauth.clientId` のアプリを使うかを確かめる。組み込みを使う場合は、VS Code のアプリ（`aebc6443-996d-45c2-90f0-388ff96faa56`）をサーバーのアプリで事前承認する。`oauth.clientId` を使う場合は、VS Code のリダイレクト URI（`http://127.0.0.1:33418` と `https://vscode.dev/redirect` を想定）をクライアントのアプリに登録する
 3. **トークンのバージョン**: クライアントが取得したトークンが v2（発行者 `https://login.microsoftonline.com/<テナント>/v2.0`、`aud` がサーバーのアプリの appId）になっていること
@@ -128,5 +134,5 @@ flowchart LR
 5. **Claude Code のコールバック**: `http://localhost:<ポート>/callback` の完全一致（Claude Code の版によっては `127.0.0.1` を送るため、その場合は両方を登録する）
 6. **アプリロールの反映**: 割り当て後、クライアントのトークンの更新までの時間（サインインし直しが必要か）
 
-## 9. 確認結果
+## 10. 確認結果
 （Azure と Entra ID で確認した後に記入）

@@ -319,4 +319,26 @@ public sealed class DeletionJobToolsTests
         _deleted.Should().Equal("demo-tt", "demo-redis", "demo-db", "demo-env");
         _credentials.Should().NotBeEmpty().And.AllBeOfType<Azure.Identity.OnBehalfOfCredential>();
     }
+
+    [Fact]
+    public async Task StartDeletion_Should_Exchange_The_Token_Of_The_Start_Request()
+    {
+        var settings = HttpTestSupport.Settings(modes: "user");
+        var tokens = new List<string>();
+        Azure.Core.TokenCredential Record(string token, IDeploymentLogger _)
+        {
+            tokens.Add(token);
+            return Mock.Of<Azure.Core.TokenCredential>();
+        }
+        var plan = await Tools(settings, HttpTestSupport.PolicyWithToken(settings, "plan-token", Record, HttpAccessPolicy.UserRole))
+            .PlanDeletion(app_name: "demo", cancellationToken: Ct);
+        tokens.Clear();
+
+        var started = await Tools(settings, HttpTestSupport.PolicyWithToken(settings, "start-token", Record, HttpAccessPolicy.UserRole))
+            .StartDeletion(plan.PlanId!, "demo", Ct);
+        var status = await WaitForJob(started.JobId);
+
+        status.Status.Should().Be("succeeded");
+        tokens.Should().HaveCountGreaterThanOrEqualTo(2).And.OnlyContain(t => t == "start-token");
+    }
 }

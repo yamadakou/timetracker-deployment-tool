@@ -254,6 +254,9 @@ public class UserModeSettingsAndPolicyTests
     [InlineData("", null)]
     [InlineData("Basic abc", null)]
     [InlineData("Bearer ", null)]
+    [InlineData("Bearer", null)]
+    [InlineData("Bearerabc", null)]
+    [InlineData("Bearer  abc", "abc")]
     [InlineData("bearer abc ", "abc")]
     public void BearerToken_Should_Read_The_Authorization_Header(string? header, string? expected)
     {
@@ -263,6 +266,16 @@ public class UserModeSettingsAndPolicyTests
 
         HttpAccessPolicy.BearerToken(context).Should().Be(expected);
         HttpAccessPolicy.BearerToken(null).Should().BeNull();
+    }
+
+    [Fact]
+    public void BearerToken_Should_Ignore_Multiple_Authorization_Headers()
+    {
+        // どのトークンを使うかが曖昧なため使わない（JWT の検証もこの要求を受け付けない）
+        var context = new DefaultHttpContext();
+        context.Request.Headers.Authorization = new Microsoft.Extensions.Primitives.StringValues(["Bearer a", "Bearer b"]);
+
+        HttpAccessPolicy.BearerToken(context).Should().BeNull();
     }
 
     // ---- instructions と Prompts

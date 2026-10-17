@@ -29,6 +29,27 @@ jobs:
     - name: Test
       run: dotnet test Timetracker.sln --configuration Release --no-build --verbosity normal
 
+  # MCP サーバー（HTTP）の配置とロールの割り当てのスクリプト（scripts/*.ps1）を、az を模擬に置き換えて確かめる（Pester）。
+  # 管理者が実行する Windows の PowerShell 7 で動かす
+  scripts:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Test PowerShell scripts
+      shell: pwsh
+      run: |
+        Install-Module Pester -MinimumVersion 5.5 -Force -Scope CurrentUser -SkipPublisherCheck
+        Import-Module Pester -MinimumVersion 5.5
+        $config = New-PesterConfiguration
+        $config.Run.Path = "tests/scripts"
+        $config.Run.Exit = $true
+        $config.Output.Verbosity = "Detailed"
+        Invoke-Pester -Configuration $config
+
   # CLI の Dry-run で作った docker-compose.yml でローカルに起動し、セットアップウィザードでサンプルデータベースを作って
   # サンプルデータベースのユーザーでログインできることをブラウザー（Playwright）で確かめる（PostgreSQL / SQL Server）。Linux コンテナを使うため ubuntu で動かす。
   # ライセンスキーとサンプルデータベースのユーザー（リポジトリのシークレット TT_E2E_*）が無い場合（フォークからの PR など）は、テストがスキップされる
