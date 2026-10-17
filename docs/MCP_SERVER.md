@@ -136,7 +136,7 @@ claude mcp add timetracker `
 ## HTTP 版（開発中）
 
 > [!NOTE]
-> HTTP 版は開発中で、まだ提供していません。サーバーの本体（HTTP トランスポート、Entra ID による呼び出し元の認証、`server` 方式と `user` 方式）とコンテナイメージはできていますが、Azure Container Apps への配置と Entra ID のアプリ登録のスクリプト・手順は用意しましたが、Azure と Entra ID での確認はまだです（下の「導入（確認前の手順）」）。内容は提供までに変わることがあります。
+> HTTP 版は開発中で、まだ提供していません。サーバーの本体（HTTP トランスポート、Entra ID による呼び出し元の認証、`server` 方式と `user` 方式）、コンテナイメージ、Azure Container Apps への配置と Entra ID のアプリ登録のスクリプトはできており、Azure と Entra ID で配置とツールを確認しました。Claude Code と VS Code からのサインインは未確認です（下の「導入」）。内容は提供までに変わることがあります。
 
 ### 開発の段階
 
@@ -167,7 +167,7 @@ claude mcp add timetracker `
 |---|---|---|
 | `TT_MCP_HTTP__TENANT_ID` | ✔ | Entra ID のテナント ID |
 | `TT_MCP_HTTP__CLIENT_ID` | ✔ | MCP サーバーのアプリ登録のクライアント ID |
-| `TT_MCP_HTTP__PUBLIC_URL` | ✔ | 公開する MCP のエンドポイントの URL（`https://…/mcp`） |
+| `TT_MCP_HTTP__PUBLIC_URL` | ✔ | 公開する MCP のエンドポイントの URL（`https://…/mcp`。末尾に `/` を付けない） |
 | `TT_MCP_HTTP__IDENTITY_MODES` | – | 使える方式。`server`（既定）/ `user` / `server,user` |
 | `TT_MCP_HTTP__DEFAULT_IDENTITY_MODE` | – | `azure_identity` を省略したときの方式（既定は `IDENTITY_MODES` の最初）。利用者がその方式を使えなければ、使えるほうになる |
 | `TT_MCP_HTTP__SERVER_ALLOWED_RESOURCE_GROUPS` | `server` 方式が有効なら ✔ | `server` 方式で操作してよいリソースグループ（`/subscriptions/<ID>/resourceGroups/<名前>` のカンマ区切り） |

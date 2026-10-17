@@ -274,7 +274,7 @@ Write-Host "完了しました。" -ForegroundColor Green
 Write-Host "  MCP のエンドポイント : $publicUrl"
 Write-Host "  サーバーのアプリ     : $serverAppId（$serverName）"
 Write-Host "  クライアントのアプリ : $clientAppId（$clientName）"
-Write-Host "  スコープ             : api://$serverAppId/Mcp.Access"
+Write-Host "  スコープ             : $publicUrl/Mcp.Access"
 Write-Host ""
 Write-Host "次の手順:"
 Write-Host "  1. 利用者にアプリロールを割り当てる: ./scripts/assign-mcp-role.ps1 -Name $Name -Role Server -UserPrincipalName <UPN>"

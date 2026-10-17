@@ -45,7 +45,6 @@ public class HttpSettingsAndPolicyTests
         http.Issuer.Should().Be($"https://login.microsoftonline.com/{HttpTestSupport.TenantId}/v2.0");
         // MCP のクライアントが付ける resource（公開 URL）とスコープの対象を合わせる（Entra ID は違うと AADSTS9010010 で拒否する）
         http.Scope.Should().Be($"{HttpTestSupport.PublicUrl}/Mcp.Access");
-        (http with { PublicUrl = new Uri("https://mcp.example.com/") }).Scope.Should().Be("https://mcp.example.com/Mcp.Access");
     }
 
     [Fact]
@@ -74,6 +73,8 @@ public class HttpSettingsAndPolicyTests
     [InlineData("TT_MCP_HTTP__PUBLIC_URL", null, "HTTP で起動するには TT_MCP_HTTP__PUBLIC_URL が必要です。")]
     [InlineData("TT_MCP_HTTP__PUBLIC_URL", "/mcp", "TT_MCP_HTTP__PUBLIC_URL には")]
     [InlineData("TT_MCP_HTTP__PUBLIC_URL", "ftp://mcp.example.com/mcp", "TT_MCP_HTTP__PUBLIC_URL には")]
+    [InlineData("TT_MCP_HTTP__PUBLIC_URL", "https://mcp.example.com/mcp/", "TT_MCP_HTTP__PUBLIC_URL には、末尾に / を付けずに")]
+    [InlineData("TT_MCP_HTTP__PUBLIC_URL", "https://mcp.example.com", "TT_MCP_HTTP__PUBLIC_URL には、末尾に / を付けずに")]
     [InlineData("TT_MCP_HTTP__SERVER_IDENTITY", "azure-cli", "TT_MCP_HTTP__SERVER_IDENTITY 'azure-cli' は無効です。")]
     [InlineData("TT_MCP_HTTP__SERVER_ALLOWED_RESOURCE_GROUPS", null, "HTTP で起動するには TT_MCP_HTTP__SERVER_ALLOWED_RESOURCE_GROUPS が必要です。")]
     [InlineData("TT_MCP_HTTP__SERVER_ALLOWED_RESOURCE_GROUPS", " , ", "TT_MCP_HTTP__SERVER_ALLOWED_RESOURCE_GROUPS に、操作してよいリソースグループを 1 つ以上")]

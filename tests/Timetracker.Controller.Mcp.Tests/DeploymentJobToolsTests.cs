@@ -541,16 +541,16 @@ public sealed class DeploymentJobToolsTests
     }
 
     [Theory]
-    [InlineData("AADSTS50076: Due to a configuration change made by your administrator, ... you must use multi-factor authentication")]
-    [InlineData("AADSTS50079: Due to a configuration change made by your administrator, ... you must enroll in multi-factor authentication")]
-    public async Task User_Mode_Should_Explain_That_Mfa_Is_Required_For_Azure(string error)
+    [InlineData("AADSTS50076: Due to a configuration change made by your administrator, ... you must use multi-factor authentication", ToolSupport.MfaHint)]
+    [InlineData("AADSTS50079: Due to a configuration change made by your administrator, ... you must enroll in multi-factor authentication", ToolSupport.MfaRegistrationHint)]
+    public async Task User_Mode_Should_Explain_That_Mfa_Is_Required_For_Azure(string error, string hint)
     {
         // Azure の管理 API は MFA が必須。MCP サーバーへのサインインで MFA を行っていないと、OBO で交換できない（Phase 4c の確認結果）
         _gateway.Setup(g => g.GetResourceGroupAsync("sub", "rg", It.IsAny<CancellationToken>())).ThrowsAsync(new AuthenticationFailedException(error));
 
         var act = () => PlanAsUser(HttpTestSupport.PolicyWithToken(BothModes, roles: HttpAccessPolicy.UserRole));
 
-        await act.Should().ThrowAsync<McpException>().WithMessage($"Azure の認証に失敗しました（user 方式（利用者本人の権限））。{ToolSupport.MfaHint}");
+        await act.Should().ThrowAsync<McpException>().WithMessage($"Azure の認証に失敗しました（user 方式（利用者本人の権限））。{hint}");
     }
 
     [Fact]
