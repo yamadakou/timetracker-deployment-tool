@@ -13,6 +13,9 @@ public class DeployOptions
     public bool DryRun { get; set; }
     public bool Verbose { get; set; }
 
+    // DB のデータを Azure Files に置くか。null は既存の DB アプリの今の状態を引き継ぐ（新規は永続化しない）
+    public bool? PersistDb { get; set; }
+
     // 認証モード（default | azure-cli | sp-env | device-code | managed-identity）
     public string AuthMode { get; set; } = "default";
 
@@ -29,4 +32,12 @@ public class DeployOptions
 
     // Dry-run 用ファイル出力
     public string OutputCompose { get; set; } = "./docker-compose.yml";
+
+    /// <summary>実際に永続化するかを決めた設定の複製を返す（元の設定は変えない）。</summary>
+    public DeployOptions WithPersistDb(bool persistDb)
+    {
+        var copy = (DeployOptions)MemberwiseClone();
+        copy.PersistDb = persistDb;
+        return copy;
+    }
 }

@@ -145,8 +145,8 @@ public class AzureSdkExecutorInventoryTests
 
         apps[0].Should().BeEquivalentTo(new ContainerAppDetails(
             "app-tt", "Succeeded", "Running", "densocreate/timetracker:11.0.1-linux-postgres", 1.5, "3Gi", "app-tt--rev1", "app-tt.example.io",
-            new Dictionary<string, string> { ["owner"] = "alice" }));
-        apps[1].Should().BeEquivalentTo(new ContainerAppDetails("app-new", null, null, null, null, null, null, null, new Dictionary<string, string>()));
+            new Dictionary<string, string> { ["owner"] = "alice" }, []));
+        apps[1].Should().BeEquivalentTo(new ContainerAppDetails("app-new", null, null, null, null, null, null, null, new Dictionary<string, string>(), []));
         (apps[2].Image, apps[2].Cpu, apps[2].Memory, apps[2].Fqdn).Should().Be(("postgres:16", null, null, null));
         apps[3].Image.Should().BeNull();
     }
@@ -162,9 +162,30 @@ public class AzureSdkExecutorInventoryTests
         var apps = await Sut().ListContainerAppsAsync(SubscriptionId, RgName, Ct);
 
         apps.Should().HaveCount(3);
-        apps[0].Should().BeEquivalentTo(new ContainerAppInfo("by-environment-id", EnvId, new Dictionary<string, string> { ["managed-by"] = "x" }));
+        apps[0].Should().BeEquivalentTo(new ContainerAppInfo("by-environment-id", EnvId, new Dictionary<string, string> { ["managed-by"] = "x" }, []));
         apps[1].EnvironmentId.Should().Be(EnvId); // 古い API の応答では managedEnvironmentId だけが返る
         apps[2].EnvironmentId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ListContainerApps_Should_Return_The_Azure_Files_Storages_Of_The_Volumes()
+    {
+        const string volumes = """
+            { "template": { "volumes": [
+                { "name": "dbdata", "storageType": "AzureFile", "storageName": "dbdata" },
+                { "name": "tmp", "storageType": "EmptyDir" },
+                { "name": "noname", "storageType": "AzureFile" } ] } }
+            """;
+        _apps.Setup(c => c.GetAllAsync(It.IsAny<CancellationToken>())).Returns(Pageable(App("app-db", volumes).Object, App("app-tt").Object));
+
+        var apps = await Sut().ListContainerAppsAsync(SubscriptionId, RgName, Ct);
+        var details = await Sut().ListContainerAppDetailsAsync(SubscriptionId, RgName, Ct);
+
+        apps[0].StorageNames.Should().Equal("dbdata");
+        apps[0].UsesDbStorage.Should().BeTrue();
+        apps[1].UsesDbStorage.Should().BeFalse();
+        details[0].UsesDbStorage.Should().BeTrue();
+        details[1].StorageNames.Should().BeEmpty();
     }
 
     [Fact]
@@ -214,7 +235,7 @@ public class AzureSdkExecutorInventoryTests
         _authorization.Setup(a => a.GetAzurePermissionsForResourcesAsync("Microsoft.App", "", "containerApps", "app-db", It.IsAny<CancellationToken>()))
             .Returns(Pageable(permission));
 
-        var permissions = await Sut().GetResourcePermissionsAsync(SubscriptionId, RgName, "containerApps", "app-db", Ct);
+        var permissions = await Sut().GetResourcePermissionsAsync(SubscriptionId, RgName, "Microsoft.App", "containerApps", "app-db", Ct);
 
         permissions.Should().ContainSingle().Which.Should().BeEquivalentTo(new PermissionSet(["Microsoft.App/containerApps/*"], []));
     }

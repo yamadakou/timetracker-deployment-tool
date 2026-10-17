@@ -8,12 +8,14 @@ namespace Timetracker.Application.Deletion;
 /// <summary>
 /// 削除計画を作る（読み取りのみ）。本ツールの命名規則に一致し、かつ管理タグがあるリソースだけを削除の対象にする
 /// （includeUntagged の場合は管理タグが無くても対象にする。別のアプリ・ツールの管理タグがあるものは対象にしない）。リソースグループは削除しない。
+/// DB のデータを置いたストレージアカウントも同じ規則で削除の対象にする（keepDbData の場合は残す）。
 /// </summary>
 public sealed class DeletionPlanner
 {
     public const string NotFoundReason = "存在しません";
     public const string UnmanagedReason = "管理タグがありません";
     public const string OtherOwnerReason = "別のアプリまたは別のツールの管理タグがあります（--include-untagged でも対象にしません）";
+    public const string KeptReason = "--keep-db-data の指定により残します（DB のデータ）";
 
     private readonly IAzureDeploymentGateway _gateway;
 
@@ -23,33 +25,40 @@ public sealed class DeletionPlanner
     }
 
     public async Task<DeletionPlan> PlanAsync(
-        string subscriptionId, string rgName, string appName, bool includeUntagged, CancellationToken cancellationToken = default)
+        string subscriptionId, string rgName, string appName, bool includeUntagged, bool keepDbData = false,
+        CancellationToken cancellationToken = default)
     {
-        var targets = await PlanTargetsAsync(subscriptionId, rgName, appName, includeUntagged, cancellationToken);
+        var targets = await PlanTargetsAsync(subscriptionId, rgName, appName, includeUntagged, keepDbData, cancellationToken);
 
         var requirements = targets.Where(t => t.WillDelete)
-            .Select(t => t.Kind == DeletionResourceKind.ContainerApp
-                ? new PermissionRequirement(AzurePermissions.ContainerAppDelete, TargetResource.ContainerApp(t.Name))
-                : new PermissionRequirement(AzurePermissions.EnvironmentDelete, TargetResource.Environment(t.Name)))
+            .Select(t => t.Kind switch
+            {
+                DeletionResourceKind.ContainerApp => new PermissionRequirement(AzurePermissions.ContainerAppDelete, TargetResource.ContainerApp(t.Name)),
+                DeletionResourceKind.Environment => new PermissionRequirement(AzurePermissions.EnvironmentDelete, TargetResource.Environment(t.Name)),
+                _ => new PermissionRequirement(AzurePermissions.StorageAccountDelete, TargetResource.StorageAccount(t.Name)),
+            })
             .ToList();
         var permissionCheck = requirements.Count == 0
             ? PermissionCheckResult.Ok
             : await new PermissionChecker(_gateway).CheckAsync(subscriptionId, rgName, requirements, cancellationToken);
 
-        return new DeletionPlan(subscriptionId, rgName, appName, targets, permissionCheck, includeUntagged);
+        return new DeletionPlan(subscriptionId, rgName, appName, targets, permissionCheck, includeUntagged, keepDbData);
     }
 
     /// <summary>現在の Azure の状態から、各対象を削除するかを決める（権限は確認しない）。</summary>
     public async Task<IReadOnlyList<DeletionTarget>> PlanTargetsAsync(
-        string subscriptionId, string rgName, string appName, bool includeUntagged, CancellationToken cancellationToken = default)
+        string subscriptionId, string rgName, string appName, bool includeUntagged, bool keepDbData = false,
+        CancellationToken cancellationToken = default)
     {
         var appNames = new[] { ResourceNaming.TimetrackerApp(appName), ResourceNaming.RedisApp(appName), ResourceNaming.DbApp(appName) };
         var envName = ResourceNaming.Environment(appName);
+        var accountName = ResourceNaming.StorageAccount(subscriptionId, rgName, appName);
 
         if (await _gateway.GetResourceGroupAsync(subscriptionId, rgName, cancellationToken) == null)
         {
             return appNames.Select(n => NotFound(n, DeletionResourceKind.ContainerApp))
-                .Append(NotFound(envName, DeletionResourceKind.Environment)).ToList();
+                .Append(NotFound(envName, DeletionResourceKind.Environment))
+                .Append(NotFound(accountName, DeletionResourceKind.StorageAccount)).ToList();
         }
 
         var existingApps = await _gateway.ListContainerAppsAsync(subscriptionId, rgName, cancellationToken);
@@ -64,6 +73,11 @@ public sealed class DeletionPlanner
 
         var env = await _gateway.GetEnvironmentAsync(subscriptionId, rgName, envName, cancellationToken);
         targets.Add(env == null ? NotFound(envName, DeletionResourceKind.Environment) : PlanEnvironment(env, appName, includeUntagged, existingApps, targets));
+
+        var account = await _gateway.GetStorageAccountAsync(subscriptionId, rgName, accountName, cancellationToken);
+        targets.Add(account == null ? NotFound(accountName, DeletionResourceKind.StorageAccount)
+            : keepDbData ? new DeletionTarget(accountName, DeletionResourceKind.StorageAccount, true, ManagedTags.IsManaged(account.Tags, appName), false, KeptReason)
+            : Candidate(accountName, DeletionResourceKind.StorageAccount, account.Tags, appName, includeUntagged));
         return targets;
     }
 

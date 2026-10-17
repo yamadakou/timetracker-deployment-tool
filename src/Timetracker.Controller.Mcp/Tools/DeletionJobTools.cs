@@ -150,7 +150,7 @@ public sealed class DeletionJobTools
         {
             var logger = new McpDeploymentLogger(_logger);
             return new DeletionPlanner(_gatewayFactory(logger, access.CreateCredential(logger)))
-                .PlanAsync(subscription, resourceGroup, appName, includeUntagged, cancellationToken);
+                .PlanAsync(subscription, resourceGroup, appName, includeUntagged, cancellationToken: cancellationToken);
         });
 
     private static List<string> Blockers(DeletionPlan plan) =>

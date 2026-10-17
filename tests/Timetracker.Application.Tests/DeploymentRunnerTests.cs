@@ -59,6 +59,62 @@ public class DeploymentRunnerTests
         reported.Should().OnlyContain(p => p.Total == 3);
     }
 
+    [Fact]
+    public async Task Should_Create_The_Db_Storage_Before_The_Apps_When_Persisting()
+    {
+        var calls = new List<string>();
+        var (gateway, env) = SetupGateway(calls);
+        gateway.Setup(g => g.EnsureDbStorageAsync("sub", "rg", "demo", "japaneast", env, It.IsAny<CancellationToken>()))
+            .Callback(() => calls.Add("storage")).Returns(Task.CompletedTask);
+        var reported = new List<DeploymentProgress>();
+        var opts = Options();
+        opts.PersistDb = true;
+
+        var result = await new DeploymentRunner(gateway.Object).RunAsync(opts, new SyncProgress(reported.Add), TestContext.Current.CancellationToken);
+
+        calls.Should().Equal("rg", "env", "storage", "apps");
+        reported.Select(p => p.Step).Should().Equal(
+            DeploymentStep.ResourceGroup, DeploymentStep.Environment, DeploymentStep.DbStorage, DeploymentStep.ContainerApps);
+        reported.Should().OnlyContain(p => p.Total == 4);
+        result.StorageAccountName.Should().Be(ResourceNaming.StorageAccount("sub", "rg", "demo"));
+        gateway.Verify(g => g.CreateOrUpdateContainerAppAsync(
+            "sub", "rg", "demo", "japaneast", It.Is<DeployOptions>(o => o.PersistDb == true), env, It.IsAny<CancellationToken>()), Times.Once);
+        // 指定があれば、既存の DB アプリの状態は読まない
+        gateway.Verify(g => g.ListContainerAppsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    public async Task Should_Keep_The_Current_Persistence_When_Not_Specified(bool currentlyPersisted, bool expected)
+    {
+        var (gateway, _) = SetupGateway(new List<string>());
+        gateway.Setup(g => g.GetResourceGroupAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync(new ResourceGroupInfo("rg", "japaneast"));
+        gateway.Setup(g => g.ListContainerAppsAsync("sub", "rg", It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new ContainerAppInfo("demo-db", "env", new Dictionary<string, string>(), currentlyPersisted ? [DbPersistence.StorageName] : [])]);
+
+        var result = await new DeploymentRunner(gateway.Object).RunAsync(Options(), cancellationToken: TestContext.Current.CancellationToken);
+
+        (result.StorageAccountName != null).Should().Be(expected);
+        gateway.Verify(g => g.CreateOrUpdateContainerAppAsync(
+            "sub", "rg", "demo", "japaneast", It.Is<DeployOptions>(o => o.PersistDb == expected), It.IsAny<ContainerAppManagedEnvironmentResource>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Should_Not_Persist_A_New_Deployment_When_Not_Specified()
+    {
+        // リソースグループが無ければ（新規）、DB アプリも無いので永続化しない
+        var (gateway, _) = SetupGateway(new List<string>());
+
+        var result = await new DeploymentRunner(gateway.Object).RunAsync(Options(), cancellationToken: TestContext.Current.CancellationToken);
+
+        result.StorageAccountName.Should().BeNull();
+        gateway.Verify(g => g.ListContainerAppsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        gateway.Verify(g => g.EnsureDbStorageAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<ContainerAppManagedEnvironmentResource>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     public static IEnumerable<object[]> InvalidOptions()
     {
         yield return new object[] { (Action<DeployOptions>)(o => o.DbPassword = "short") };

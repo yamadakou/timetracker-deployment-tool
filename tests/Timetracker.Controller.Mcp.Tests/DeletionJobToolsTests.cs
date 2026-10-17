@@ -39,7 +39,7 @@ public sealed class DeletionJobToolsTests
         _gateway.Setup(g => g.GetEnvironmentAsync("sub", "rg", "demo-env", It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ManagedEnvironmentInfo(EnvId, "demo-env", "japaneast", ManagedTags.For("demo")));
         _gateway.Setup(g => g.GetPermissionsAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync(() => _permissions);
-        _gateway.Setup(g => g.GetResourcePermissionsAsync("sub", "rg", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _gateway.Setup(g => g.GetResourcePermissionsAsync("sub", "rg", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
         _gateway.Setup(g => g.DeleteContainerAppAsync("sub", "rg", It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((string _, string _, string name, CancellationToken _) => Delete(name));

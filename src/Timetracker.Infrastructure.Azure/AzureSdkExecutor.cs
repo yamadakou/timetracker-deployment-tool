@@ -3,7 +3,10 @@ using Azure.Core;
 using Azure.ResourceManager;
 using Azure.ResourceManager.Resources;
 using Azure.ResourceManager.AppContainers;
+using Azure.ResourceManager.AppContainers.Models;
 using Azure.ResourceManager.Authorization;
+using Azure.ResourceManager.Storage;
+using Azure.ResourceManager.Storage.Models;
 using Timetracker.Common;
 using Timetracker.Domain.Azure;
 using Timetracker.Domain.Deployment;
@@ -95,9 +98,7 @@ public class AzureSdkExecutor : IAzureDeploymentGateway
         return true;
     }
 
-    private void WarnDbDataLoss(string dbAppName) =>
-        _logger.Warn($"DB アプリ '{dbAppName}' は既に存在します。設定が変わると DB コンテナが再起動し、" +
-                     "永続ボリュームを設定していないため DB のデータは失われます。必要に応じて事前にバックアップしてください。");
+    private void WarnDbDataLoss(string dbAppName) => _logger.Warn(DbPersistence.DataLossWarning(dbAppName, false, false)!);
 
     // 既存の Container App のタグ（存在しなければ null）。更新時に引き継ぐために読む
     private static async Task<IReadOnlyDictionary<string, string>?> GetExistingTagsAsync(
@@ -105,6 +106,59 @@ public class AzureSdkExecutor : IAzureDeploymentGateway
     {
         var existing = await apps.GetIfExistsAsync(name, cancellationToken);
         return existing.HasValue ? new Dictionary<string, string>(existing.Value!.Data.Tags) : null;
+    }
+
+    // ボリュームで使っている Environment のストレージ（Azure Files）の名前
+    private static IReadOnlyList<string> StorageNames(ContainerAppData data) =>
+        data.Template?.Volumes
+            .Where(v => v.StorageType == ContainerAppStorageType.AzureFile && v.StorageName != null)
+            .Select(v => v.StorageName)
+            .ToList() ?? [];
+
+    public async Task EnsureDbStorageAsync(
+        string subscriptionId, string rgName, string appName, string location, ContainerAppManagedEnvironmentResource env,
+        CancellationToken cancellationToken = default)
+    {
+        var accountName = ResourceNaming.StorageAccount(subscriptionId, rgName, appName);
+        var shareName = ResourceNaming.DbFileShare(appName);
+        var accounts = ResourceGroup(subscriptionId, rgName).GetStorageAccounts();
+
+        // 既存のストレージアカウントは変更しない（PUT すると利用者が変えた設定やタグが上書きされるため）
+        var existing = await accounts.GetIfExistsAsync(accountName, cancellationToken: cancellationToken);
+        StorageAccountResource account;
+        if (existing.HasValue)
+        {
+            account = existing.Value!;
+            _logger.Info($"既存のストレージアカウントを使用: {accountName}");
+        }
+        else
+        {
+            var created = await accounts.CreateOrUpdateAsync(
+                WaitUntil.Completed, accountName, ContainerAppSpecBuilder.BuildStorageAccount(location, appName), cancellationToken);
+            account = created.Value;
+            _logger.Info($"ストレージアカウントを作成: {accountName}");
+        }
+
+        var shares = account.GetFileService().GetFileShares();
+        if ((await shares.GetIfExistsAsync(shareName, cancellationToken: cancellationToken)).HasValue)
+        {
+            _logger.Info($"既存のファイル共有を使用: {shareName}");
+        }
+        else
+        {
+            await shares.CreateOrUpdateAsync(WaitUntil.Completed, shareName, ContainerAppSpecBuilder.BuildDbFileShare(), cancellationToken: cancellationToken);
+            _logger.Info($"ファイル共有を作成: {shareName}");
+        }
+
+        // キーが再生成されていてもマウントできるよう、毎回取得して登録し直す（キーはログに出さない）
+        var keys = await account.GetKeysAsync(cancellationToken: cancellationToken);
+        var key = keys.Value.Keys.FirstOrDefault()?.Value;
+        if (key == null)
+            throw new InvalidOperationException($"ストレージアカウント '{accountName}' のアカウントキーを取得できませんでした。");
+        await env.GetContainerAppManagedEnvironmentStorages().CreateOrUpdateAsync(
+            WaitUntil.Completed, DbPersistence.StorageName,
+            ContainerAppSpecBuilder.BuildEnvironmentStorage(accountName, key, shareName), cancellationToken);
+        _logger.Info($"Container Apps Environment にストレージを登録: {DbPersistence.StorageName}（{accountName}/{shareName}）");
     }
 
     public async Task<ContainerAppsDeployment> CreateOrUpdateContainerAppAsync(
@@ -123,13 +177,35 @@ public class AzureSdkExecutor : IAzureDeploymentGateway
 
         // 1) DB
         var dbAppName = ResourceNaming.DbApp(appName);
-        var dbTags = await GetExistingTagsAsync(apps, dbAppName, cancellationToken);
-        if (dbTags != null)
-            WarnDbDataLoss(dbAppName);
+        var existingDb = await apps.GetIfExistsAsync(dbAppName, cancellationToken);
+        IReadOnlyDictionary<string, string>? dbTags = null;
+        // 永続化を続ける場合は、新旧の DB コンテナが同じデータを同時に開かないよう、停止してから更新し、開始する
+        var restartDb = false;
+        if (existingDb.HasValue)
+        {
+            var current = existingDb.Value!;
+            dbTags = new Dictionary<string, string>(current.Data.Tags);
+            var currentlyPersisted = StorageNames(current.Data).Contains(DbPersistence.StorageName, StringComparer.OrdinalIgnoreCase);
+            if (DbPersistence.DataLossWarning(dbAppName, currentlyPersisted, opts.PersistDb == true) is { } warning)
+            {
+                _logger.Warn(warning);
+            }
+            else
+            {
+                _logger.Info(DbPersistence.RestartNotice(dbAppName));
+                await current.StopAsync(WaitUntil.Completed, cancellationToken);
+                restartDb = true;
+            }
+        }
         var dbAppOp = await apps.CreateOrUpdateAsync(WaitUntil.Completed, dbAppName,
             ContainerAppSpecBuilder.WithManagedTags(ContainerAppSpecBuilder.BuildDbApp(opts, location, env.Id), appName, dbTags),
             cancellationToken);
         var dbApp = dbAppOp.Value;
+        if (restartDb)
+        {
+            await dbApp.StartAsync(WaitUntil.Completed, cancellationToken);
+            _logger.Info($"DB アプリを開始: {dbAppName}");
+        }
         // 内部接続は Container App 名を使用
         var dbEndpointHost = dbAppName;
         _logger.Info($"DB app ready: {dbApp.Data.Name} (endpoint: {dbEndpointHost}:{dbPort})");
@@ -198,7 +274,8 @@ public class AzureSdkExecutor : IAzureDeploymentGateway
         await foreach (var app in ResourceGroup(subscriptionId, rgName).GetContainerApps().GetAllAsync(cancellationToken))
         {
             var environmentId = app.Data.EnvironmentId ?? app.Data.ManagedEnvironmentId;
-            result.Add(new ContainerAppInfo(app.Data.Name, environmentId?.ToString(), new Dictionary<string, string>(app.Data.Tags)));
+            result.Add(new ContainerAppInfo(
+                app.Data.Name, environmentId?.ToString(), new Dictionary<string, string>(app.Data.Tags), StorageNames(app.Data)));
         }
         return result;
     }
@@ -219,7 +296,8 @@ public class AzureSdkExecutor : IAzureDeploymentGateway
                 container?.Resources?.Memory,
                 app.Data.LatestRevisionName,
                 app.Data.Configuration?.Ingress?.Fqdn,
-                new Dictionary<string, string>(app.Data.Tags)));
+                new Dictionary<string, string>(app.Data.Tags),
+                StorageNames(app.Data)));
         }
         return result;
     }
@@ -227,6 +305,48 @@ public class AzureSdkExecutor : IAzureDeploymentGateway
     public async Task<bool> DeleteContainerAppAsync(string subscriptionId, string rgName, string name, CancellationToken cancellationToken = default)
     {
         var existing = await ResourceGroup(subscriptionId, rgName).GetContainerApps().GetIfExistsAsync(name, cancellationToken);
+        if (!existing.HasValue)
+            return false;
+        await existing.Value!.DeleteAsync(WaitUntil.Completed, cancellationToken);
+        return true;
+    }
+
+    public async Task<StorageAccountInfo?> GetStorageAccountAsync(
+        string subscriptionId, string rgName, string name, CancellationToken cancellationToken = default)
+    {
+        var existing = await ResourceGroup(subscriptionId, rgName).GetStorageAccounts().GetIfExistsAsync(name, cancellationToken: cancellationToken);
+        if (!existing.HasValue)
+            return null;
+        var data = existing.Value!.Data;
+        return new StorageAccountInfo(data.Name, data.Location.Name, new Dictionary<string, string>(data.Tags));
+    }
+
+    public async Task<bool> IsStorageAccountNameAvailableAsync(string subscriptionId, string name, CancellationToken cancellationToken = default)
+    {
+        var sub = _arm.GetSubscriptionResource(new ResourceIdentifier($"/subscriptions/{subscriptionId}"));
+        var result = await sub.CheckStorageAccountNameAvailabilityAsync(new StorageAccountNameAvailabilityContent(name), cancellationToken);
+        return result.Value.IsNameAvailable == true;
+    }
+
+    public async Task<bool> FileShareExistsAsync(
+        string subscriptionId, string rgName, string accountName, string shareName, CancellationToken cancellationToken = default)
+    {
+        var account = await ResourceGroup(subscriptionId, rgName).GetStorageAccounts().GetIfExistsAsync(accountName, cancellationToken: cancellationToken);
+        return account.HasValue &&
+               (await account.Value!.GetFileService().GetFileShares().GetIfExistsAsync(shareName, cancellationToken: cancellationToken)).HasValue;
+    }
+
+    public async Task<bool> EnvironmentStorageExistsAsync(
+        string subscriptionId, string rgName, string envName, string storageName, CancellationToken cancellationToken = default)
+    {
+        var env = await ResourceGroup(subscriptionId, rgName).GetContainerAppManagedEnvironments().GetIfExistsAsync(envName, cancellationToken);
+        return env.HasValue &&
+               (await env.Value!.GetContainerAppManagedEnvironmentStorages().GetIfExistsAsync(storageName, cancellationToken)).HasValue;
+    }
+
+    public async Task<bool> DeleteStorageAccountAsync(string subscriptionId, string rgName, string name, CancellationToken cancellationToken = default)
+    {
+        var existing = await ResourceGroup(subscriptionId, rgName).GetStorageAccounts().GetIfExistsAsync(name, cancellationToken: cancellationToken);
         if (!existing.HasValue)
             return false;
         await existing.Value!.DeleteAsync(WaitUntil.Completed, cancellationToken);
@@ -253,11 +373,12 @@ public class AzureSdkExecutor : IAzureDeploymentGateway
     }
 
     public async Task<IReadOnlyList<PermissionSet>> GetResourcePermissionsAsync(
-        string subscriptionId, string rgName, string resourceType, string name, CancellationToken cancellationToken = default)
+        string subscriptionId, string rgName, string resourceProviderNamespace, string resourceType, string name,
+        CancellationToken cancellationToken = default)
     {
         var result = new List<PermissionSet>();
         await foreach (var p in ResourceGroup(subscriptionId, rgName)
-                           .GetAzurePermissionsForResourcesAsync("Microsoft.App", "", resourceType, name, cancellationToken))
+                           .GetAzurePermissionsForResourcesAsync(resourceProviderNamespace, "", resourceType, name, cancellationToken))
         {
             result.Add(new PermissionSet(p.Actions.ToList(), p.NotActions.ToList()));
         }

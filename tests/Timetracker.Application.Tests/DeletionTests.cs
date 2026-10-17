@@ -27,7 +27,7 @@ public class DeletionPlannerTests
         _gateway.Setup(g => g.GetResourceGroupAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync(new ResourceGroupInfo("rg", "japaneast"));
         _gateway.Setup(g => g.ListContainerAppsAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync(() => _apps);
         _gateway.Setup(g => g.GetPermissionsAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync([new PermissionSet(["*"], [])]);
-        _gateway.Setup(g => g.GetResourcePermissionsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _gateway.Setup(g => g.GetResourcePermissionsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
     }
 
@@ -37,6 +37,12 @@ public class DeletionPlannerTests
         _gateway.Setup(g => g.GetEnvironmentAsync("sub", "rg", "demo-env", It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ManagedEnvironmentInfo(EnvId, "demo-env", "japaneast", tags));
 
+    private static readonly string Account = ResourceNaming.StorageAccount("sub", "rg", "demo");
+
+    private void StorageAccount(IReadOnlyDictionary<string, string> tags) =>
+        _gateway.Setup(g => g.GetStorageAccountAsync("sub", "rg", Account, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new StorageAccountInfo(Account, "japaneast", tags));
+
     private void AllManaged()
     {
         App("demo-tt", Managed);
@@ -45,8 +51,8 @@ public class DeletionPlannerTests
         Environment(Managed);
     }
 
-    private Task<DeletionPlan> Plan(bool includeUntagged = false) =>
-        new DeletionPlanner(_gateway.Object).PlanAsync("sub", "rg", "demo", includeUntagged, Ct);
+    private Task<DeletionPlan> Plan(bool includeUntagged = false, bool keepDbData = false) =>
+        new DeletionPlanner(_gateway.Object).PlanAsync("sub", "rg", "demo", includeUntagged, keepDbData, Ct);
 
     private static DeletionTarget Target(DeletionPlan plan, string name) => plan.Targets.Single(t => t.Name == name);
 
@@ -57,15 +63,76 @@ public class DeletionPlannerTests
 
         var plan = await Plan();
 
+        // 永続化していない環境では、ストレージアカウントは「存在しません」として載る
         plan.Targets.Select(t => (t.Name, t.Kind, t.WillDelete)).Should().Equal(
             ("demo-tt", DeletionResourceKind.ContainerApp, true),
             ("demo-redis", DeletionResourceKind.ContainerApp, true),
             ("demo-db", DeletionResourceKind.ContainerApp, true),
-            ("demo-env", DeletionResourceKind.Environment, true));
+            ("demo-env", DeletionResourceKind.Environment, true),
+            (Account, DeletionResourceKind.StorageAccount, false));
+        Target(plan, Account).Reason.Should().Be(DeletionPlanner.NotFoundReason);
         plan.HasDeletions.Should().BeTrue();
         plan.DeletesDb.Should().BeTrue();
+        plan.DeletesDbData.Should().BeFalse();
+        plan.KeepsDbData.Should().BeFalse();
+        plan.LosesDbData.Should().BeTrue();
         plan.HasUnmanaged.Should().BeFalse();
         plan.PermissionCheck.Should().Be(PermissionCheckResult.Ok);
+    }
+
+    [Fact]
+    public async Task Should_Delete_The_Managed_Storage_Account_Last_By_Default()
+    {
+        AllManaged();
+        StorageAccount(Managed);
+
+        var plan = await Plan();
+
+        plan.Targets.Last().Should().Be(new DeletionTarget(Account, DeletionResourceKind.StorageAccount, true, true, true, null));
+        plan.DeletesDbData.Should().BeTrue();
+        plan.LosesDbData.Should().BeTrue();
+        plan.StorageAccountName.Should().Be(Account);
+        plan.KeepDbData.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Should_Keep_The_Storage_Account_When_Requested()
+    {
+        AllManaged();
+        StorageAccount(Managed);
+
+        var plan = await Plan(keepDbData: true);
+
+        Target(plan, Account).Should().Be(new DeletionTarget(Account, DeletionResourceKind.StorageAccount, true, true, false, DeletionPlanner.KeptReason));
+        plan.KeepDbData.Should().BeTrue();
+        plan.KeepsDbData.Should().BeTrue();
+        plan.DeletesDbData.Should().BeFalse();
+        // DB アプリは削除するが、データはストレージアカウントに残る
+        plan.DeletesDb.Should().BeTrue();
+        plan.LosesDbData.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Should_Keep_An_Untagged_Storage_Account_Unless_Untagged_Are_Included()
+    {
+        StorageAccount(NoTags);
+
+        Target(await Plan(), Account).Reason.Should().Be(DeletionPlanner.UnmanagedReason);
+        Target(await Plan(includeUntagged: true), Account).WillDelete.Should().BeTrue();
+        Target(await Plan(keepDbData: true), Account).Should().Be(
+            new DeletionTarget(Account, DeletionResourceKind.StorageAccount, true, false, false, DeletionPlanner.KeptReason));
+    }
+
+    [Fact]
+    public async Task Should_Check_Storage_Account_Delete_Permission_On_The_Account()
+    {
+        StorageAccount(Managed);
+        _gateway.Setup(g => g.GetPermissionsAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync([new PermissionSet(["*/read"], [])]);
+
+        var plan = await Plan();
+
+        plan.PermissionCheck.MissingActions.Should().Equal(AzurePermissions.StorageAccountDelete);
+        _gateway.Verify(g => g.GetResourcePermissionsAsync("sub", "rg", "Microsoft.Storage", "storageAccounts", Account, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -75,7 +142,8 @@ public class DeletionPlannerTests
 
         var plan = await Plan();
 
-        plan.Targets.Should().HaveCount(4).And.OnlyContain(t => !t.Exists && !t.WillDelete && t.Reason == DeletionPlanner.NotFoundReason);
+        plan.Targets.Should().HaveCount(5).And.OnlyContain(t => !t.Exists && !t.WillDelete && t.Reason == DeletionPlanner.NotFoundReason);
+        plan.Targets.Last().Kind.Should().Be(DeletionResourceKind.StorageAccount);
         plan.HasDeletions.Should().BeFalse();
         _gateway.Verify(g => g.ListContainerAppsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
@@ -214,14 +282,14 @@ public class DeletionPlannerTests
         // リソースグループでは Reader、削除する各リソースには Contributor が割り当てられている
         AllManaged();
         _gateway.Setup(g => g.GetPermissionsAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync([new PermissionSet(["*/read"], [])]);
-        _gateway.Setup(g => g.GetResourcePermissionsAsync("sub", "rg", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _gateway.Setup(g => g.GetResourcePermissionsAsync("sub", "rg", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([new PermissionSet(["*"], [])]);
 
         var plan = await Plan();
 
         plan.PermissionCheck.Should().Be(PermissionCheckResult.Ok);
-        _gateway.Verify(g => g.GetResourcePermissionsAsync("sub", "rg", "containerApps", "demo-db", It.IsAny<CancellationToken>()), Times.Once);
-        _gateway.Verify(g => g.GetResourcePermissionsAsync("sub", "rg", "managedEnvironments", "demo-env", It.IsAny<CancellationToken>()), Times.Once);
+        _gateway.Verify(g => g.GetResourcePermissionsAsync("sub", "rg", "Microsoft.App", "containerApps", "demo-db", It.IsAny<CancellationToken>()), Times.Once);
+        _gateway.Verify(g => g.GetResourcePermissionsAsync("sub", "rg", "Microsoft.App", "managedEnvironments", "demo-env", It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -240,7 +308,9 @@ public class DeletionRunnerTests
     // Azure の現在の状態。削除するとここから消える
     private readonly List<ContainerAppInfo> _apps = [];
     private ManagedEnvironmentInfo? _env;
+    private StorageAccountInfo? _storage;
     private readonly List<string> _deleted = [];
+    private static readonly string Account = ResourceNaming.StorageAccount("sub", "rg", "demo");
 
     private static IReadOnlyDictionary<string, string> Managed => ManagedTags.For("demo");
     private static IReadOnlyDictionary<string, string> NoTags => new Dictionary<string, string>();
@@ -265,6 +335,14 @@ public class DeletionRunnerTests
                 _env = null;
                 return true;
             });
+        _gateway.Setup(g => g.GetStorageAccountAsync("sub", "rg", Account, It.IsAny<CancellationToken>())).ReturnsAsync(() => _storage);
+        _gateway.Setup(g => g.DeleteStorageAccountAsync("sub", "rg", Account, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() =>
+            {
+                _deleted.Add(Account);
+                _storage = null;
+                return true;
+            });
     }
 
     private void App(string name, IReadOnlyDictionary<string, string> tags, string? envId = EnvId) => _apps.Add(new ContainerAppInfo(name, envId, tags));
@@ -281,6 +359,19 @@ public class DeletionRunnerTests
 
     private static DeletionPlan Plan(bool includeUntagged, params DeletionTarget[] targets) =>
         new("sub", "rg", "demo", targets, PermissionCheckResult.Ok, includeUntagged);
+
+    [Fact]
+    public async Task Should_Delete_The_Storage_Account_After_The_Environment()
+    {
+        AllManaged();
+        _storage = new StorageAccountInfo(Account, "japaneast", Managed);
+        var plan = AllPlan() with { Targets = [.. AllPlan().Targets, Delete(Account, DeletionResourceKind.StorageAccount)] };
+
+        var results = await new DeletionRunner(_gateway.Object).RunAsync(plan, cancellationToken: Ct);
+
+        _deleted.Should().Equal("demo-tt", "demo-redis", "demo-db", "demo-env", Account);
+        results.Last().Should().Be(new DeletionResult(Account, DeletionResourceKind.StorageAccount, true));
+    }
 
     private static DeletionPlan AllPlan(bool includeUntagged = false) => Plan(includeUntagged,
         Delete("demo-tt", DeletionResourceKind.ContainerApp),

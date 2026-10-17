@@ -35,6 +35,7 @@ public static class DeployOptionsResolver
             RedisCpu            = input.RedisCpu ?? Defaults.RedisCpu,
             RedisMemoryGi       = input.RedisMemoryGi ?? Defaults.RedisMemoryGi,
             Verbose             = input.Verbose,
+            PersistDb           = input.PersistDb,
             AuthMode            = OrDefault(input.AuthMode, DefaultAuthMode),
         };
     }

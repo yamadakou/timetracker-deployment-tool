@@ -24,6 +24,8 @@ public static class DeploymentAdvisor
             warnings.Add(
                 $"tt-tag '{o.TimetrackerTag}' は既定のタグ（{Defaults.GetDefaultTimetrackerTag(o.DbType)}）ではありません。" +
                 "本ツールで動作を確認しているのは既定のタグです。");
+        if (o.PersistDb == true && target == ValidationTarget.Compose)
+            warnings.Add("persist-db は Azure 向けの設定のため、ローカル（Dry-run）では使いません（docker-compose は名前付きボリュームで DB のデータを保持します）。");
         return warnings;
     }
 }
