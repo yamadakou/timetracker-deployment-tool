@@ -24,13 +24,14 @@ Timetracker（DockerHub の `densocreate/timetracker` イメージ）を、選�
 ## 本ツールの目的と注意事項
 
 > [!IMPORTANT]
-> 本ツールは、Timetracker の **検証環境（評価・動作確認・デモ用途）を手早く構築するための支援ツール** です。本番環境の構築は対象外です。本番運用に必要な構成（データの永続化、バックアップ、冗長化、ネットワーク設計、ライセンスに合った DB エディションの選択など）は、本ツールでは行いません。
+> 本ツールは、Timetracker の **検証環境（評価・動作確認・デモ用途）を手早く構築するための支援ツール** です。本番環境の構築は対象外です。本番運用に必要な構成（バックアップ、冗長化、ネットワーク設計、ライセンスに合った DB エディションの選択など）は、本ツールでは行いません（DB のデータの永続化は、検証を続けるための補助として `--persist-db` で選べます）。
 
 検証用途に割り切った設計のため、以下の点にご注意ください。
 
 | 項目 | 内容 |
 |---|---|
-| Azure 上の DB データは永続化されない | Azure Container Apps では、DB はボリュームを持たないコンテナとして動作します。DB コンテナが再起動すると（ツールの再実行による設定変更、リビジョン更新、Azure 基盤のメンテナンス等）、**DB のデータは失われます**。既存の DB アプリがある状態で再実行すると、ツールは警告を表示します。残したいデータは事前にエクスポートしてください。なお、Dry-run で生成する docker-compose（ローカル検証）は名前付きボリュームを使用するため、コンテナを再起動してもデータは保持されます（`docker compose down -v` でボリュームごと削除されます）。 |
+| Azure 上の DB データは既定では永続化されない | 既定では、Azure Container Apps の DB はボリュームを持たないコンテナとして動作します。DB コンテナが再起動すると（ツールの再実行による設定変更、リビジョン更新、Azure 基盤のメンテナンス等）、**DB のデータは失われます**。既存の DB アプリがある状態で再実行すると、ツールは警告を表示します。残したいデータは事前にエクスポートしてください。なお、Dry-run で生成する docker-compose（ローカル検証）は名前付きボリュームを使用するため、コンテナを再起動してもデータは保持されます（`docker compose down -v` でボリュームごと削除されます）。 |
+| `--persist-db` で DB データを Azure Files に置ける | `--persist-db` を指定すると、DB のデータを Azure Files（ストレージアカウントのファイル共有。SMB）に置き、DB コンテナの再起動の後も残します（[DB データの永続化（--persist-db）](#db-データの永続化--persist-db)）。ストレージの料金がかかります。`delete` では、`--keep-db-data` を指定しない限りストレージアカウントも DB のデータごと削除します。検証環境向けの補助で、バックアップはありません。まれにデータが壊れるおそれがあるため、重要なデータは Timetracker の機能でエクスポートしておいてください。 |
 | SQL Server は Developer エディション | `--db-type sqlserver` の場合、SQL Server は `MSSQL_PID=Developer` で起動します。Developer エディションは開発・テスト用途に限られ、本番環境では使用できません。 |
 | SQL Server ＋ Azure ではサンプル DB を作成できない | サンプル DB を利用する場合は、PostgreSQL（`--db-type` の既定値）を使用してください。SQL Server を使用する場合は、セットアップウィザードで「空のデータベースを作成する」を選択して評価してください（SQL Server の復元処理は DB コンテナ側のファイルを読むため、Azure Container Apps ではアプリコンテナ内のサンプル DB を参照できません。なお、Dry-run で生成する docker-compose によるローカル検証では、SQL Server でもサンプル DB を作成できます）。 |
 | スケールは 1 台固定 | 各コンテナとも 1 台で動作し、冗長化・スケールアウトは行いません。 |
@@ -59,6 +60,11 @@ Timetracker（DockerHub の `densocreate/timetracker` イメージ）を、選�
    - **`{アプリ名}-db`**: データベース（PostgreSQL または SQL Server、内部専用、TCP接続）
    - **`{アプリ名}-redis`**: Redis キャッシュ（内部専用、TCP接続）
 
+4. **ストレージアカウント**（`--persist-db` を指定した場合だけ）
+   - DB のデータを置くファイル共有 `{アプリ名}-db`（SMB）を持つストレージアカウント（StorageV2 / Standard_LRS）
+   - 名前: `tt` ＋ アプリ名の英数字（先頭 14 文字まで）＋ サブスクリプション・リソースグループ・アプリ名から作る 8 文字（ストレージアカウント名は Azure 全体で一意のため）。例: `tttimetracker1a2b3c4d`
+   - Container Apps Environment に、ストレージ `dbdata`（アカウントキーを登録）を追加します。既存の Environment にも追加します（Environment 自体の設定は変更しません）
+
 **管理タグ**:
 
 本ツールは、作成したリソースに次のタグを付けます。[削除](#リソースの削除delete)の際は、名前が一致し、かつこのタグが付いているリソースだけを削除します（同じリソースグループに同じ名前の別のリソースがあっても、誤って削除しないため）。
@@ -69,6 +75,7 @@ Timetracker（DockerHub の `densocreate/timetracker` イメージ）を、選�
 | `tt-app-name` | アプリ名（`--app-name`） |
 
 - 3 つの Container Apps には、作成時・更新時とも付けます。更新時は、利用者が付けた他のタグを残したまま管理タグを追加します
+- ストレージアカウント（`--persist-db`）には、新規作成時だけ付けます
 - Container Apps Environment には、新規作成時だけ付けます（既存の Environment は変更しないため）
 - タグは誤って削除しないための目印で、セキュリティ上の制限ではありません（削除できるかどうかは Azure の RBAC で決まります）
 - 本ツールで作成したリソースは、タグで一覧できます（`az resource list` では `--tag` と `--resource-group` を同時に指定できないため、リソースグループは `--query` で絞り込みます）: `az resource list --tag managed-by=timetracker-deployment-tool --query "[?resourceGroup=='<RG名>'].{name:name, type:type}" -o table`
@@ -77,7 +84,7 @@ Timetracker（DockerHub の `densocreate/timetracker` イメージ）を、選�
 - DB および Redis は **コンテナ** として Container Apps 内で実行されます
 - Azure Database for PostgreSQL、Azure SQL Database などの PaaS データベースリソースは作成されません
 - Log Analytics ワークスペースは自動作成されません（Container Apps Environment が必要に応じて作成する場合があります）
-- Azure 上の DB のデータは永続化されません（[本ツールの目的と注意事項](#本ツールの目的と注意事項) を参照）
+- Azure 上の DB のデータは、既定では永続化されません（`--persist-db` で Azure Files に置けます。[本ツールの目的と注意事項](#本ツールの目的と注意事項) を参照）
 
 ### 必要な RBAC ロールと権限
 
@@ -104,13 +111,18 @@ Timetracker（DockerHub の `densocreate/timetracker` イメージ）を、選�
 | Container App（DB / Redis / Timetracker）の確認・作成・更新 | `Microsoft.App/containerApps/read` / `write`、`Microsoft.App/managedEnvironments/join/action` | リソースグループ |
 | Container App の削除（`delete`） | `Microsoft.App/containerApps/delete` | リソースグループ |
 | Container Apps Environment の削除（`delete`） | `Microsoft.App/managedEnvironments/delete` | リソースグループ |
+| DB データの永続化（`--persist-db`）: ストレージアカウントの確認・作成・キーの取得 | `Microsoft.Storage/storageAccounts/read` / `write`（作成する場合）/ `listkeys/action` | リソースグループ |
+| DB データの永続化: ファイル共有の確認・作成 | `Microsoft.Storage/storageAccounts/fileServices/shares/read` / `write`（作成する場合） | リソースグループ |
+| DB データの永続化: Environment へのストレージの登録 | `Microsoft.App/managedEnvironments/storages/read` / `write` | リソースグループ |
+| 永続化した DB アプリの更新（停止 → 更新 → 開始） | `Microsoft.App/containerApps/stop/action` / `start/action` | リソースグループ |
+| ストレージアカウントの削除（`delete`。`--keep-db-data` なし） | `Microsoft.Storage/storageAccounts/delete` | リソースグループ |
 | 権限の事前確認（下記） | `Microsoft.Authorization/permissions/read`（自分の権限の一覧。通常どのロールでも可） | リソースグループ |
 
 **権限の事前確認**: `deploy` と `delete` は、Azure のリソースを変更する前に、上の表の権限が実行する ID にあるかを確認します。不足していれば、不足している権限を表示して何も変更せずに終了します（途中で権限エラーになり、一部のリソースだけが作成・削除された状態になるのを防ぐため）。既存のリソースの更新・削除は、リソースグループでの権限に加えて、そのリソースに割り当てられたロールでも判定します（例: リソースグループでは閲覧者で、各 Container App と Environment に共同作成者が割り当てられている場合）。新しく作成するリソースには、リソースグループでの権限が必要です。次の場合は確認をせずに続行します（`--verbose` で理由を表示します）。
 - リソースグループがまだ存在しない場合（権限の一覧はリソースグループ単位でしか取得できないため。作成する権限が無ければ最初の手順で失敗し、リソースは作成されません）
 - 権限の一覧を取得できなかった場合
 
-なお、この確認には拒否割り当てや Azure Policy による拒否は反映されません。これらで拒否された場合は、実行時のエラーとして表示されます。
+なお、この確認には拒否割り当てや Azure Policy による拒否は反映されません。これらで拒否された場合は、実行時のエラーとして表示されます。`--persist-db` では、Azure Policy でストレージアカウントのアカウントキーによるアクセス（`allowSharedKeyAccess`）やパブリック ネットワーク アクセスを禁止していると、DB コンテナへのマウントが失敗します（SMB のマウントにアカウントキーを使い、Environment は VNet を使わないため）。
 
 本ツールはリソースプロバイダーの登録を**行いません**。[次節](#azure-リソースプロバイダーの登録)の Azure CLI コマンドで、利用者または管理者が事前に登録してください。登録には `*/register/action`（例: `Microsoft.App/register/action`）の権限がサブスクリプションのスコープで必要です。
 
@@ -138,12 +150,14 @@ Container Apps を初めて使用する場合、以下のリソースプロバ�
 - **Microsoft.App** (必須): Azure Container Apps
 - **Microsoft.OperationalInsights** (必須): Container Apps Environment が使用
 - **Microsoft.Web** (オプション): 一部のシナリオで必要
+- **Microsoft.Storage** (`--persist-db` を使う場合): DB のデータを置くストレージアカウント
 
 **登録方法（Azure CLI）**:
 ```bash
 az provider register --namespace Microsoft.App
 az provider register --namespace Microsoft.OperationalInsights
 az provider register --namespace Microsoft.Web
+az provider register --namespace Microsoft.Storage   # --persist-db を使う場合
 
 # 登録状態の確認
 az provider show --namespace Microsoft.App --query "registrationState"
@@ -450,11 +464,11 @@ az provider show --namespace Microsoft.OperationalInsights --query "registration
    ```powershell
    timetracker-cli.exe delete --subscription "<SUBSCRIPTION_ID>" --resource-group "rg-tt-demo" --app-name "timetracker"
    ```
-   `{アプリ名}-tt` → `-redis` → `-db` → `-env` の順に削除します。途中で失敗した場合は、もう一度実行すると残りを削除します（既に削除済みのものは飛ばします）。
+   `{アプリ名}-tt` → `-redis` → `-db` → `-env` → ストレージアカウント（`--persist-db` で作ったもの）の順に削除します。途中で失敗した場合は、もう一度実行すると残りを削除します（既に削除済みのものは飛ばします）。
    Container Apps Environment の削除は、完了まで十数分かかることがあります。
 
 削除の対象になる条件:
-- 名前が `{アプリ名}-tt` / `-redis` / `-db` / `-env` で、かつ[管理タグ](#作成される-azure-リソース)が付いているもの
+- 名前が `{アプリ名}-tt` / `-redis` / `-db` / `-env`、または `--persist-db` で作ったストレージアカウントの名前で、かつ[管理タグ](#作成される-azure-リソース)が付いているもの（ストレージアカウントは `--keep-db-data` で残せます）
 - Environment は、その中に削除しない Container App（管理タグの無いもの、本ツール以外で作成したものなど）が残る場合は削除しません
 
 管理タグの無いリソース（管理タグを付けるようになる前のバージョンで作成したものなど）は、既定では削除しません。次のどちらかで対応してください。
@@ -473,11 +487,33 @@ az provider show --namespace Microsoft.OperationalInsights --query "registration
 - `--app-name` (任意): アプリ名（省略時は `timetracker`）
 - `--auth-mode` (任意): 認証モード（`deploy` と同じ）
 - `--include-untagged` (任意): 管理タグの無いリソースも削除の対象にする（別のアプリ名や別のツールの管理タグ（例: `managed-by=terraform`）が付いているものは、指定しても削除しません）
+- `--keep-db-data` (任意): `--persist-db` で DB のデータを置いたストレージアカウントを残す（既定では DB のデータごと削除します）。残すと料金がかかり続けますが、同じアプリ名で `--persist-db` を付けてデプロイするとデータを引き継げます
 - `--dry-run` (任意): 削除計画を表示するだけで、削除しない
 - `--yes` (任意): 確認の入力（アプリ名）を省略する
 - `--verbose` (任意): 詳細ログを出力
 
 `deploy` 専用のオプション（`--db-password` など）を `delete` に指定した場合、また `delete` 専用のオプションを `deploy` に指定した場合はエラーになります。
+
+### DB データの永続化（--persist-db）
+
+`deploy` に `--persist-db` を付けると、DB のデータを Azure Files（SMB のファイル共有）に置き、DB コンテナの再起動（設定を変えた再デプロイ、リビジョンの更新、Azure 基盤のメンテナンス）の後も残します。既定は今までどおり永続化しません。
+
+```powershell
+timetracker-cli.exe deploy --subscription "<SUBSCRIPTION_ID>" --resource-group "rg-tt-demo" `
+  --db-password "<DB パスワード>" --tracker-password "<Timetracker パスワード>" --persist-db
+```
+
+- 作成するもの: ストレージアカウント・ファイル共有 `{アプリ名}-db`・Environment のストレージ `dbdata`（[作成される Azure リソース](#作成される-azure-リソース)）。DB コンテナの `/var/lib/postgresql/data`（PostgreSQL。データは `pgdata` の下）または `/var/opt/mssql`（SQL Server）にマウントします
+- 再デプロイ: `--persist-db` を省略すると、既存の DB アプリの今の状態を引き継ぎます（永続化していれば続ける）。永続化を続ける更新では、新旧の DB コンテナが同じデータを同時に開かないよう、**DB アプリを停止してから更新し、開始します**（その間は Timetracker から DB に接続できません）。この場合、DB のデータは失われないため、データ消失の警告は出ません（MCP の `acknowledge_data_loss` も不要です）
+- 切り替え（どちらも警告を表示します）:
+  - 永続化していない環境に `--persist-db` を付けると、今の DB に保存されているデータは消えます。切り替えた後の DB は、以前に永続化していたときのデータ（初めて永続化する場合は空の DB）になります。今のデータを残したい場合は、事前に Timetracker でエクスポートしてください
+  - 永続化をやめる（`--persist-db false`）と、Timetracker からは空の DB に見えます。これまでのデータは消えずにストレージアカウントに残り、もう一度 `--persist-db` を付けてデプロイすると元に戻ります
+- **再起動は本ツールの再デプロイで**: 永続化した DB アプリを再起動したいときは、同じ設定で `deploy` を実行してください（停止 → 更新 → 開始で再起動します）。Azure ポータルの「再起動」や `az containerapp revision restart` は使わないでください。Container Apps は新しいレプリカが準備できるまで古いレプリカを止めないため、同じデータを新旧の DB が同時に開こうとします。Azure での確認では、SQL Server は新しいレプリカが起動に失敗し続けて再起動が終わらなくなり（データは無事。本ツールの再デプロイで回復）、PostgreSQL は新旧が一時的に同時に動いた後、正しく停止されなかったときの自動の復旧で起動しました（データは無事）
+- 削除: `delete` は、既定でストレージアカウントも DB のデータごと削除します。`--keep-db-data` で残せます（料金はかかり続けます。同じアプリ名で `--persist-db` を付けてデプロイすると、データを引き継げます）
+- 料金: Azure Files（Standard、LRS）の保存容量とトランザクションの料金がかかります。DB は読み書きが多いため、トランザクションの料金が主になります。金額は [Azure Files の料金](https://azure.microsoft.com/ja-jp/pricing/details/storage/files/) を確認してください
+- 前提: リソースプロバイダー `Microsoft.Storage` の登録（[Azure リソースプロバイダーの登録](#azure-リソースプロバイダーの登録)）と、ストレージの権限（[必要な RBAC ロールと権限](#必要な-rbac-ロールと権限)。Contributor には含まれます）。Azure Policy でアカウントキーによるアクセスやパブリック ネットワーク アクセスを禁止している環境では使えません
+- 制約: 検証環境向けの補助です。バックアップ・冗長化（LRS 固定）はありません。Azure 基盤のメンテナンスによる再起動は本ツールでは制御できず、まれにデータが壊れるおそれがあります。重要なデータは Timetracker の機能でエクスポートしておいてください。Azure 上の SQL Server でサンプル DB を作れない制約は、`--persist-db` でも変わりません
+- 設計の詳細: [docs/design/db-persistence.md](docs/design/db-persistence.md)
 
 ### MCP サーバー（AI アシスタントから使う）
 
@@ -496,6 +532,7 @@ CLI と同じ機能を、MCP（Model Context Protocol）に対応した AI ア�
 - `--db-name` (任意): DB 名。デフォルト `timetracker`
 - `--tracker-password` (必須): Timetracker アプリパスワード（DockerHub の `<your password>` に対応）
 - `--tt-tag` (任意): timetracker コンテナイメージのタグ（バージョン）。省略時は DB 種別に応じて `11.0.1-linux-postgres`（postgresql）または `11.0.1-linux-mssql`（sqlserver）。利用可能なタグ一覧は [DockerHub](https://hub.docker.com/r/densocreate/timetracker/tags) を参照してください。
+- `--persist-db` (任意): DB のデータを Azure Files に置き、DB コンテナの再起動の後も残す（[DB データの永続化（--persist-db）](#db-データの永続化--persist-db)）。省略時は既存の DB アプリの今の状態を引き継ぎます（新規は永続化しない）。永続化をやめるには `--persist-db false`。Dry-run では使いません（警告を表示します）
 - `--dry-run` (任意): 指定した場合（または `--dry-run true`）、Azure 反映せず `docker-compose.yml` と `.env` の生成のみ。`--subscription` / `--resource-group` は不要。`--dry-run false` で無効
 - `--verbose` (任意): 詳細ログを出力
 - `--help` / `-h`: 使い方を表示
@@ -561,7 +598,7 @@ timetracker-cli.exe deploy `
   A: いいえ。本ツールは DB を **コンテナ** として Container Apps にデプロイします。PaaS データベースリソースは作成されません。
 
 - **Q: データの永続化はどうなりますか？**  
-  A: Azure 上では永続化されません。本ツールは検証環境の構築が目的のため、Azure Container Apps の DB はコンテナのエフェメラルストレージで動作し、コンテナの再起動でデータが失われます。Dry-run で生成する docker-compose（ローカル検証）は名前付きボリュームを使用するため、コンテナを再起動してもデータは保持されます。
+  A: 既定では、Azure 上では永続化されません。本ツールは検証環境の構築が目的のため、Azure Container Apps の DB はコンテナのエフェメラルストレージで動作し、コンテナの再起動でデータが失われます。データを残したい場合は `--persist-db` を指定すると、DB のデータを Azure Files に置きます（[DB データの永続化（--persist-db）](#db-データの永続化--persist-db)）。Dry-run で生成する docker-compose（ローカル検証）は名前付きボリュームを使用するため、コンテナを再起動してもデータは保持されます。
 
 #### リソースとスケーリング
 
@@ -571,7 +608,7 @@ timetracker-cli.exe deploy `
 - **Q: コンテナのCPU/メモリは後から変更できますか？**  
   A: 再実行時にオプションを変更すれば Container Apps 上の設定が更新されます。  
   > [!WARNING]
-  > DB アプリ（`{アプリ名}-db`）の設定が変わると DB コンテナが再起動し、**DB のデータは失われます**。既存の DB アプリがある状態で再実行すると、ツールは警告を表示します。
+  > DB アプリ（`{アプリ名}-db`）の設定が変わると DB コンテナが再起動し、**DB のデータは失われます**（`--persist-db` で永続化している場合を除く）。既存の DB アプリがある状態で再実行すると、ツールは警告を表示します。
 
 - **Q: Log Analytics ワークスペースは作成されますか？**  
   A: 本ツールは明示的に作成しません。ただし、Container Apps Environment が必要に応じて自動作成する場合があります。
@@ -628,7 +665,7 @@ dotnet publish .\src\Timetracker.Controller.Cli\Timetracker.Controller.Cli.cspro
 - ドメイン層（Timetracker.Domain）
   - パラメータモデル（DeployOptions）、既定値（Defaults）と既定値の適用（DeployOptionsResolver）、検証（DeploymentValidator。すべてのエラーを列挙する）と警告（DeploymentAdvisor）、リソース名の規則（ResourceNaming）、管理タグ（ManagedTags）、権限の判定（PermissionEvaluator）、Compose/.env生成（Dry-run用）
 - アプリケーション層（Timetracker.Application）
-  - デプロイ手順の実行（DeploymentRunner: リソースグループ → Environment → DB / Redis / Timetracker）と結果（DeploymentResult）
+  - デプロイ手順の実行（DeploymentRunner: リソースグループ → Environment →（--persist-db の場合）DB のストレージ → DB / Redis / Timetracker）と結果（DeploymentResult）
   - 削除計画の作成と削除の実行（DeletionPlanner / DeletionRunner）、権限の事前確認（PermissionChecker / DeploymentPlanner）
 - インフラストラクチャ層（Timetracker.Infrastructure.Azure）
   - Azure SDK 実行（AzureSdkExecutor / IAzureDeploymentGateway）、Container Apps のコンテナ仕様生成（ContainerAppSpecBuilder）、認証（CredentialFactory）
@@ -651,10 +688,10 @@ dotnet publish .\src\Timetracker.Controller.Cli\Timetracker.Controller.Cli.cspro
 - timetracker のイメージタグは `--tt-tag` で指定した値を使用（省略時は DB 種別に応じて `11.0.1-linux-postgres` / `11.0.1-linux-mssql`）
 
 ### 将来の検討
-今後の機能の候補（DB データの永続化オプション、ストア配布できるデスクトップアプリなど）と優先度は [docs/ROADMAP.md](docs/ROADMAP.md) にまとめています。
+今後の機能の候補（ストア配布できるデスクトップアプリなど）と優先度は [docs/ROADMAP.md](docs/ROADMAP.md) にまとめています。
 
 ### 注意点
-- 本ツールは検証環境の構築支援が目的のため、Azure Container Apps の DB/Redis には永続ボリュームを設定していません（Dry-run の docker-compose は名前付きボリュームを使用）（[本ツールの目的と注意事項](#本ツールの目的と注意事項) を参照）。
+- 本ツールは検証環境の構築支援が目的のため、Azure Container Apps の DB/Redis には既定では永続ボリュームを設定していません（Dry-run の docker-compose は名前付きボリュームを使用）。DB だけは `--persist-db` で Azure Files をマウントできます（設計は [docs/design/db-persistence.md](docs/design/db-persistence.md)。[本ツールの目的と注意事項](#本ツールの目的と注意事項) を参照）。
 - DB パスワード・Timetracker アプリパスワードは Container Apps の secret（`db-password` / `app-password`）として登録し、環境変数からは `secretRef` で参照します（ポータル上の環境変数一覧に平文で表示されません）。
 - 認証は Managed Identity もしくは Service Principal を推奨（DefaultAzureCredential 利用）。
 - DockerHub「クイックスタート」記載の固定 DB ユーザ名は Domain 層の Defaults に集約しています（必要に応じて正確値に更新）。

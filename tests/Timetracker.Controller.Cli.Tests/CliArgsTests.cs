@@ -214,4 +214,22 @@ public class CliArgsTests
         var act = () => CliArgs.Parse(new[] { "delete", "--unknown", "x" });
         act.Should().Throw<ArgumentException>().WithMessage("*不明なオプション*--unknown*");
     }
+
+    [Theory]
+    [InlineData(new string[0], null)]
+    [InlineData(new[] { "--persist-db" }, true)]
+    [InlineData(new[] { "--persist-db", "true" }, true)]
+    [InlineData(new[] { "--persist-db=false" }, false)]
+    public void GetBoolOrNull_Should_Return_Null_Only_When_Not_Specified(string[] args, bool? expected)
+    {
+        CliArgs.Parse(args).GetBoolOrNull("--persist-db").Should().Be(expected);
+    }
+
+    [Fact]
+    public void Keep_Db_Data_Should_Be_A_Delete_Flag_Only()
+    {
+        CliArgs.Parse(["delete", "--keep-db-data"]).GetBool("--keep-db-data").Should().BeTrue();
+        var act = () => CliArgs.Parse(["deploy", "--keep-db-data"]);
+        act.Should().Throw<ArgumentException>().WithMessage("*'--keep-db-data' は deploy では使えません*");
+    }
 }

@@ -132,6 +132,18 @@ public sealed class DeploymentToolsTests : IDisposable
     }
 
     [Fact]
+    public void ValidateDeployment_Should_Return_The_Requested_Persistence_And_Warn_For_Compose()
+    {
+        var settings = new McpServerSettings { DbPassword = DbPassword, TrackerPassword = TrackerPassword };
+
+        var result = Tools(settings).ValidateDeployment(target: "compose", persist_db: true);
+
+        result.Valid.Should().BeTrue();
+        result.Resolved.PersistDb.Should().BeTrue();
+        result.Warnings.Should().ContainSingle().Which.Should().StartWith("persist-db は Azure 向けの設定のため");
+    }
+
+    [Fact]
     public void ValidateDeployment_Should_Reject_An_Unknown_Target()
     {
         var settings = new McpServerSettings

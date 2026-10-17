@@ -8,6 +8,9 @@ public enum PlannedResourceKind
     ResourceGroup,
     Environment,
     ContainerApp,
+    StorageAccount,
+    FileShare,
+    EnvironmentStorage,
 }
 
 public enum PlannedAction
@@ -22,7 +25,8 @@ public sealed record PlannedOperation(PlannedResourceKind Kind, string Name, Pla
 
 /// <summary>
 /// デプロイの計画（読み取りだけで作る）。<see cref="Blockers"/> があれば実行できない。
-/// <see cref="Options"/> はパスワードを含むため、結果やログに出さない。
+/// <see cref="Options"/> はパスワードを含むため、結果やログに出さない。<see cref="Options"/> の PersistDb は、
+/// 既存の DB アプリの状態から決めた実際の値（true / false）にしてある。
 /// </summary>
 public sealed record DeploymentPlan(
     DeployOptions Options,
@@ -32,6 +36,9 @@ public sealed record DeploymentPlan(
     PermissionCheckResult PermissionCheck)
 {
     public bool CanRun => Blockers.Count == 0;
+
+    /// <summary>DB のデータを Azure Files に置くか。</summary>
+    public bool PersistDb => Options.PersistDb == true;
 
     /// <summary>DB アプリを更新するため、実行には利用者のデータ消失への同意が必要か。</summary>
     public bool RequiresDataLossAck => Operations.Any(o => o.DataLoss);

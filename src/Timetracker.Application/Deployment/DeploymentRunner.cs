@@ -4,13 +4,11 @@ using Timetracker.Infrastructure.Azure;
 namespace Timetracker.Application.Deployment;
 
 /// <summary>
-/// Azure Container Apps へのデプロイ手順（リソースグループ → Environment → DB / Redis / Timetracker）を実行する。
+/// Azure Container Apps へのデプロイ手順（リソースグループ → Environment →（永続化する場合）DB のストレージ → DB / Redis / Timetracker）を実行する。
 /// CLI など各フロントエンドから共通で使う。
 /// </summary>
 public sealed class DeploymentRunner
 {
-    private const int TotalSteps = 3;
-
     private readonly IAzureDeploymentGateway _gateway;
 
     public DeploymentRunner(IAzureDeploymentGateway gateway)
@@ -25,18 +23,32 @@ public sealed class DeploymentRunner
         // 呼び出し元で検証済みでも、不正な設定で Azure にリソースを作らないよう実行前に必ず検証する
         ComposeGenerator.Validate(opts);
 
-        progress?.Report(new DeploymentProgress(DeploymentStep.ResourceGroup, 1, TotalSteps, $"リソースグループ {opts.ResourceGroup}"));
+        // 永続化の指定が無ければ、既存の DB アプリの今の状態を引き継ぐ（リソースグループが無ければ新規なので永続化しない）
+        var persist = opts.PersistDb ?? await DeploymentPlanner.UsesDbStorageAsync(_gateway, opts, cancellationToken);
+        opts = opts.WithPersistDb(persist);
+        var total = persist ? 4 : 3;
+        var index = 0;
+
+        progress?.Report(new DeploymentProgress(DeploymentStep.ResourceGroup, ++index, total, $"リソースグループ {opts.ResourceGroup}"));
         await _gateway.EnsureResourceGroupAsync(opts.Subscription, opts.ResourceGroup, opts.Location, cancellationToken);
 
         var envName = ResourceNaming.Environment(opts.AppName);
-        progress?.Report(new DeploymentProgress(DeploymentStep.Environment, 2, TotalSteps, $"Container Apps Environment {envName}"));
+        progress?.Report(new DeploymentProgress(DeploymentStep.Environment, ++index, total, $"Container Apps Environment {envName}"));
         var env = await _gateway.EnsureContainerAppEnvAsync(opts.Subscription, opts.ResourceGroup, opts.AppName, opts.Location, cancellationToken);
 
-        progress?.Report(new DeploymentProgress(DeploymentStep.ContainerApps, 3, TotalSteps, "Container Apps（DB / Redis / Timetracker）"));
+        string? storageAccount = null;
+        if (persist)
+        {
+            storageAccount = ResourceNaming.StorageAccount(opts.Subscription, opts.ResourceGroup, opts.AppName);
+            progress?.Report(new DeploymentProgress(DeploymentStep.DbStorage, ++index, total, $"DB のストレージ {storageAccount}（Azure Files）"));
+            await _gateway.EnsureDbStorageAsync(opts.Subscription, opts.ResourceGroup, opts.AppName, opts.Location, env, cancellationToken);
+        }
+
+        progress?.Report(new DeploymentProgress(DeploymentStep.ContainerApps, ++index, total, "Container Apps（DB / Redis / Timetracker）"));
         var apps = await _gateway.CreateOrUpdateContainerAppAsync(
             opts.Subscription, opts.ResourceGroup, opts.AppName, opts.Location, opts, env, cancellationToken);
 
         return new DeploymentResult(
-            opts.ResourceGroup, envName, apps.TimetrackerAppName, apps.DbAppName, apps.RedisAppName, apps.TimetrackerUrl);
+            opts.ResourceGroup, envName, apps.TimetrackerAppName, apps.DbAppName, apps.RedisAppName, apps.TimetrackerUrl, storageAccount);
     }
 }

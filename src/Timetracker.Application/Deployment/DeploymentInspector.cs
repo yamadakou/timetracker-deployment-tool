@@ -3,7 +3,10 @@ using Timetracker.Infrastructure.Azure;
 
 namespace Timetracker.Application.Deployment;
 
-/// <summary>デプロイ済みの環境の状態（MCP の get_deployment_info）。存在しないリソースは null。</summary>
+/// <summary>
+/// デプロイ済みの環境の状態（MCP の get_deployment_info）。存在しないリソースは null。
+/// <see cref="StorageAccount"/> は DB のデータを置くストレージアカウント（永続化していない、または削除済みなら null）。
+/// </summary>
 public sealed record DeploymentInfo(
     string Subscription,
     string ResourceGroup,
@@ -12,10 +15,14 @@ public sealed record DeploymentInfo(
     ManagedEnvironmentInfo? Environment,
     ContainerAppDetails? Timetracker,
     ContainerAppDetails? Db,
-    ContainerAppDetails? Redis)
+    ContainerAppDetails? Redis,
+    StorageAccountInfo? StorageAccount = null)
 {
     /// <summary>本ツールが作るリソースのいずれかがあるか。</summary>
-    public bool Exists => Environment != null || Timetracker != null || Db != null || Redis != null;
+    public bool Exists => Environment != null || Timetracker != null || Db != null || Redis != null || StorageAccount != null;
+
+    /// <summary>DB アプリが DB のデータを Azure Files に置いているか。</summary>
+    public bool DbPersisted => Db?.UsesDbStorage == true;
 
     /// <summary>Timetracker の URL（Ingress の FQDN が無ければ null）。</summary>
     public string? Endpoint => Timetracker?.Fqdn is { } fqdn ? $"https://{fqdn}" : null;
@@ -40,7 +47,9 @@ public sealed class DeploymentInspector
         var env = await _gateway.GetEnvironmentAsync(subscriptionId, rgName, ResourceNaming.Environment(appName), cancellationToken);
         var apps = await _gateway.ListContainerAppDetailsAsync(subscriptionId, rgName, cancellationToken);
         ContainerAppDetails? App(string name) => apps.FirstOrDefault(a => string.Equals(a.Name, name, StringComparison.OrdinalIgnoreCase));
+        var storage = await _gateway.GetStorageAccountAsync(
+            subscriptionId, rgName, ResourceNaming.StorageAccount(subscriptionId, rgName, appName), cancellationToken);
         return new DeploymentInfo(subscriptionId, rgName, appName, rg, env,
-            App(ResourceNaming.TimetrackerApp(appName)), App(ResourceNaming.DbApp(appName)), App(ResourceNaming.RedisApp(appName)));
+            App(ResourceNaming.TimetrackerApp(appName)), App(ResourceNaming.DbApp(appName)), App(ResourceNaming.RedisApp(appName)), storage);
     }
 }

@@ -21,12 +21,14 @@ public sealed record PermissionCheckResult(PermissionCheckStatus Status, IReadOn
     public static PermissionCheckResult NotChecked(string note) => new(PermissionCheckStatus.NotChecked, [], note);
 }
 
-/// <summary>既存のリソース（Microsoft.App の種類と名前）。</summary>
-public sealed record TargetResource(string Type, string Name)
+/// <summary>既存のリソース（リソースプロバイダーの名前空間・種類・名前）。</summary>
+public sealed record TargetResource(string Namespace, string Type, string Name)
 {
-    public static TargetResource ContainerApp(string name) => new("containerApps", name);
+    public static TargetResource ContainerApp(string name) => new("Microsoft.App", "containerApps", name);
 
-    public static TargetResource Environment(string name) => new("managedEnvironments", name);
+    public static TargetResource Environment(string name) => new("Microsoft.App", "managedEnvironments", name);
+
+    public static TargetResource StorageAccount(string name) => new("Microsoft.Storage", "storageAccounts", name);
 }
 
 /// <summary>必要な権限 1 件。<see cref="Resource"/> は操作する既存のリソース（作成する場合は null）。</summary>
@@ -77,7 +79,7 @@ public sealed class PermissionChecker
                     try
                     {
                         permissions = await _gateway.GetResourcePermissionsAsync(
-                            subscriptionId, rgName, resource.Type, resource.Name, cancellationToken);
+                            subscriptionId, rgName, resource.Namespace, resource.Type, resource.Name, cancellationToken);
                     }
                     catch (Exception ex) when (ex is not OperationCanceledException)
                     {

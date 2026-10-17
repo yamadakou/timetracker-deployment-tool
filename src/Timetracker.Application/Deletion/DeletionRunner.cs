@@ -30,7 +30,8 @@ public sealed class DeletionRunner
         var results = new List<DeletionResult>();
         foreach (var target in plan.Targets.Where(t => t.WillDelete))
         {
-            var current = (await planner.PlanTargetsAsync(plan.Subscription, plan.ResourceGroup, plan.AppName, plan.IncludeUntagged, cancellationToken))
+            var current = (await planner.PlanTargetsAsync(
+                    plan.Subscription, plan.ResourceGroup, plan.AppName, plan.IncludeUntagged, plan.KeepDbData, cancellationToken))
                 .Single(t => t.Name == target.Name);
             if (!current.Exists)
             {
@@ -45,9 +46,12 @@ public sealed class DeletionRunner
             }
 
             progress?.Report(target);
-            var deleted = target.Kind == DeletionResourceKind.ContainerApp
-                ? await _gateway.DeleteContainerAppAsync(plan.Subscription, plan.ResourceGroup, target.Name, cancellationToken)
-                : await _gateway.DeleteEnvironmentAsync(plan.Subscription, plan.ResourceGroup, target.Name, cancellationToken);
+            var deleted = target.Kind switch
+            {
+                DeletionResourceKind.ContainerApp => await _gateway.DeleteContainerAppAsync(plan.Subscription, plan.ResourceGroup, target.Name, cancellationToken),
+                DeletionResourceKind.Environment => await _gateway.DeleteEnvironmentAsync(plan.Subscription, plan.ResourceGroup, target.Name, cancellationToken),
+                _ => await _gateway.DeleteStorageAccountAsync(plan.Subscription, plan.ResourceGroup, target.Name, cancellationToken),
+            };
             results.Add(new DeletionResult(target.Name, target.Kind, deleted));
         }
         return results;

@@ -2,6 +2,8 @@ using System.Globalization;
 using Azure.Core;
 using Azure.ResourceManager.AppContainers;
 using Azure.ResourceManager.AppContainers.Models;
+using Azure.ResourceManager.Storage;
+using Azure.ResourceManager.Storage.Models;
 using Timetracker.Domain.Deployment;
 
 namespace Timetracker.Infrastructure.Azure;
@@ -71,7 +73,66 @@ public static class ContainerAppSpecBuilder
         return data;
     }
 
-    // 1) DB 用 Container App（Internal Ingress: TCP + ExposedPort）
+    /// <summary>
+    /// DB のデータを置くストレージアカウント（StorageV2 / Standard_LRS / ホット）。SMB のマウントはアカウントキーで行うため、
+    /// 共有キーによるアクセスを明示的に許可する。Blob の匿名アクセスは使わないため禁止する。
+    /// </summary>
+    public static StorageAccountCreateOrUpdateContent BuildStorageAccount(string location, string appName)
+    {
+        var content = new StorageAccountCreateOrUpdateContent(new StorageSku(StorageSkuName.StandardLrs), StorageKind.StorageV2, new AzureLocation(location))
+        {
+            AccessTier = StorageAccountAccessTier.Hot,
+            MinimumTlsVersion = StorageMinimumTlsVersion.Tls1_2,
+            EnableHttpsTrafficOnly = true,
+            AllowBlobPublicAccess = false,
+            AllowSharedKeyAccess = true,
+        };
+        foreach (var (key, value) in ManagedTags.For(appName))
+        {
+            content.Tags[key] = value;
+        }
+        return content;
+    }
+
+    /// <summary>DB のデータを置くファイル共有（SMB）。</summary>
+    public static FileShareData BuildDbFileShare() => new()
+    {
+        ShareQuota = DbPersistence.ShareQuotaGiB,
+        EnabledProtocol = FileShareEnabledProtocol.Smb,
+    };
+
+    /// <summary>Environment に登録するストレージ（Azure Files の SMB 共有。読み書き）。アカウントキーを含むため、ログに出さない。</summary>
+    public static ContainerAppManagedEnvironmentStorageData BuildEnvironmentStorage(string accountName, string accountKey, string shareName) => new()
+    {
+        ManagedEnvironmentStorageAzureFile = new ContainerAppAzureFileProperties
+        {
+            AccountName = accountName,
+            AccountKey = accountKey,
+            ShareName = shareName,
+            AccessMode = ContainerAppAccessMode.ReadWrite,
+        },
+    };
+
+    // DB のデータのディレクトリに Azure Files をマウントする（詳細設計 docs/design/db-persistence.md の 4）
+    private static void AddDbStorage(ContainerAppTemplate template, ContainerAppContainer container, string dbType)
+    {
+        template.Volumes.Add(new ContainerAppVolume
+        {
+            Name = DbPersistence.StorageName,
+            StorageType = ContainerAppStorageType.AzureFile,
+            StorageName = DbPersistence.StorageName,
+            MountOptions = DbPersistence.MountOptions(dbType),
+        });
+        container.VolumeMounts.Add(new ContainerAppVolumeMount
+        {
+            VolumeName = DbPersistence.StorageName,
+            MountPath = DbPersistence.MountPath(dbType),
+        });
+        if (dbType == "postgresql")
+            container.Env.Add(Env("PGDATA", DbPersistence.PostgresPgData));
+    }
+
+    // 1) DB 用 Container App（Internal Ingress: TCP + ExposedPort）。PersistDb が true なら Azure Files をマウントする
     public static ContainerAppData BuildDbApp(DeployOptions opts, string location, ResourceIdentifier envId)
     {
         var dbPort = GetDbPort(opts);
@@ -109,10 +170,14 @@ public static class ContainerAppSpecBuilder
                 }
             };
 
+        var template = SingleReplicaTemplate(dbContainer);
+        if (opts.PersistDb == true)
+            AddDbStorage(template, dbContainer, opts.DbType);
+
         return new ContainerAppData(location)
         {
             EnvironmentId = envId,
-            Template = SingleReplicaTemplate(dbContainer),
+            Template = template,
             Configuration = new ContainerAppConfiguration()
             {
                 Secrets =

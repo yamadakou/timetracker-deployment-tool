@@ -39,7 +39,7 @@ public sealed class DeletionJobToolsTests
         _gateway.Setup(g => g.GetEnvironmentAsync("sub", "rg", "demo-env", It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ManagedEnvironmentInfo(EnvId, "demo-env", "japaneast", ManagedTags.For("demo")));
         _gateway.Setup(g => g.GetPermissionsAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync(() => _permissions);
-        _gateway.Setup(g => g.GetResourcePermissionsAsync("sub", "rg", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _gateway.Setup(g => g.GetResourcePermissionsAsync("sub", "rg", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
         _gateway.Setup(g => g.DeleteContainerAppAsync("sub", "rg", It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((string _, string _, string name, CancellationToken _) => Delete(name));
@@ -65,7 +65,15 @@ public sealed class DeletionJobToolsTests
         },
         NullLogger<DeletionJobTools>.Instance);
 
-    private Task<DeletionPlanResult> Plan(bool includeUntagged = false) => Tools().PlanDeletion(app_name: "demo", include_untagged: includeUntagged, cancellationToken: Ct);
+    private Task<DeletionPlanResult> Plan(bool includeUntagged = false, bool keepDbData = false) =>
+        Tools().PlanDeletion(app_name: "demo", include_untagged: includeUntagged, keep_db_data: keepDbData, cancellationToken: Ct);
+
+    private static readonly string Account = ResourceNaming.StorageAccount("sub", "rg", "demo");
+
+    // persist_db で作ったストレージアカウント
+    private void StorageAccount() =>
+        _gateway.Setup(g => g.GetStorageAccountAsync("sub", "rg", Account, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => _deleted.Contains(Account) ? null : new StorageAccountInfo(Account, "japaneast", ManagedTags.For("demo")));
 
     private async Task<JobStatusResult> WaitForJob(string jobId)
     {
@@ -101,7 +109,10 @@ public sealed class DeletionJobToolsTests
             new DeletionTargetInfo("demo-tt", "container_app", true, true, true, null),
             new DeletionTargetInfo("demo-redis", "container_app", true, true, true, null),
             new DeletionTargetInfo("demo-db", "container_app", true, true, true, null),
-            new DeletionTargetInfo("demo-env", "environment", true, true, true, null));
+            new DeletionTargetInfo("demo-env", "environment", true, true, true, null),
+            new DeletionTargetInfo(Account, "storage_account", false, false, false, "存在しません"));
+        result.DeletesDbData.Should().BeFalse();
+        result.KeepsDbData.Should().BeFalse();
         result.Kept.Should().ContainSingle().Which.Should().StartWith("resource_group: rg（削除しません");
         result.Warnings.Should().Equal(DeletionJobTools.DbDataLossWarning);
         result.DeletesDb.Should().BeTrue();
@@ -162,6 +173,64 @@ public sealed class DeletionJobToolsTests
         result.PlanId.Should().NotBeNull();
         result.PermissionCheck.Status.Should().Be("not_checked");
         result.Warnings.Should().Contain(w => w.StartsWith("権限を事前に確認できませんでした: "));
+    }
+
+    [Fact]
+    public async Task PlanDeletion_Should_Delete_The_Storage_Account_By_Default()
+    {
+        StorageAccount();
+
+        var result = await Plan();
+
+        result.Targets.Last().Should().Be(new DeletionTargetInfo(Account, "storage_account", true, true, true, null));
+        result.DeletesDbData.Should().BeTrue();
+        result.Warnings.Should().Equal(
+            DeletionJobTools.DbDataLossWarning,
+            $"ストレージアカウント {Account}（Azure Files に永続化した DB のデータ）も削除します。元に戻せません（残すには keep_db_data=true）。");
+    }
+
+    [Fact]
+    public async Task PlanDeletion_Should_Keep_The_Storage_Account_When_Requested()
+    {
+        StorageAccount();
+
+        var result = await Plan(keepDbData: true);
+
+        result.Targets.Last().WillDelete.Should().BeFalse();
+        result.KeepsDbData.Should().BeTrue();
+        result.DeletesDbData.Should().BeFalse();
+        // DB のデータはストレージアカウントに残るため、すべて失われる警告は出さない
+        result.Warnings.Should().BeEmpty();
+        result.Kept.Should().HaveCount(2).And.Contain(k => k.StartsWith($"storage_account: ストレージアカウント {Account}（DB のデータ）は残します"));
+    }
+
+    [Fact]
+    public async Task StartDeletion_Should_Delete_The_Storage_Account_Last()
+    {
+        StorageAccount();
+        _gateway.Setup(g => g.DeleteStorageAccountAsync("sub", "rg", Account, It.IsAny<CancellationToken>())).ReturnsAsync(() => { Delete(Account); return true; });
+        var plan = await Plan();
+
+        var started = await Tools().StartDeletion(plan.PlanId!, "demo", Ct);
+        var status = await WaitForJob(started.JobId);
+
+        status.Status.Should().Be("succeeded");
+        _deleted.Should().Equal("demo-tt", "demo-redis", "demo-db", "demo-env", Account);
+        status.DeletionResult!.Deleted.Should().Contain(Account);
+    }
+
+    [Fact]
+    public async Task StartDeletion_Should_Recheck_And_Keep_The_Storage_Account_Of_The_Plan()
+    {
+        StorageAccount();
+        var plan = await Plan(keepDbData: true);
+
+        var started = await Tools().StartDeletion(plan.PlanId!, "demo", Ct);
+        var status = await WaitForJob(started.JobId);
+
+        status.Status.Should().Be("succeeded");
+        _deleted.Should().Equal("demo-tt", "demo-redis", "demo-db", "demo-env");
+        status.Logs.Select(l => l.Message).Should().Contain(m => m.StartsWith($"ストレージアカウント {Account}（DB のデータ）は残します"));
     }
 
     // ---- start_deletion

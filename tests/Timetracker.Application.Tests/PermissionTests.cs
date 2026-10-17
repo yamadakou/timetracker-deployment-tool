@@ -21,7 +21,7 @@ public class PermissionCheckerTests
         _gateway.Setup(g => g.GetPermissionsAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync(permissions);
 
     private void ResourcePermissions(TargetResource resource, params PermissionSet[] permissions) =>
-        _gateway.Setup(g => g.GetResourcePermissionsAsync("sub", "rg", resource.Type, resource.Name, It.IsAny<CancellationToken>()))
+        _gateway.Setup(g => g.GetResourcePermissionsAsync("sub", "rg", resource.Namespace, resource.Type, resource.Name, It.IsAny<CancellationToken>()))
             .ReturnsAsync(permissions);
 
     private Task<PermissionCheckResult> Check(params PermissionRequirement[] requirements) =>
@@ -37,7 +37,7 @@ public class PermissionCheckerTests
         result.Should().Be(PermissionCheckResult.Ok);
         // リソースグループで許可されていれば、リソースでの権限は取得しない
         _gateway.Verify(g => g.GetResourcePermissionsAsync(
-            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -72,7 +72,7 @@ public class PermissionCheckerTests
 
         result.MissingActions.Should().Equal(AzurePermissions.ContainerAppDelete);
         // 同じリソースの権限は 1 回だけ取得する
-        _gateway.Verify(g => g.GetResourcePermissionsAsync("sub", "rg", "containerApps", "demo-db", It.IsAny<CancellationToken>()), Times.Once);
+        _gateway.Verify(g => g.GetResourcePermissionsAsync("sub", "rg", "Microsoft.App", "containerApps", "demo-db", It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -91,7 +91,7 @@ public class PermissionCheckerTests
     public async Task Should_Be_NotChecked_When_Resource_Permissions_Cannot_Be_Read()
     {
         RgPermissions(new PermissionSet(["*/read"], []));
-        _gateway.Setup(g => g.GetResourcePermissionsAsync("sub", "rg", "containerApps", "demo-db", It.IsAny<CancellationToken>()))
+        _gateway.Setup(g => g.GetResourcePermissionsAsync("sub", "rg", "Microsoft.App", "containerApps", "demo-db", It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("not found"));
 
         var result = await Check(new PermissionRequirement(AzurePermissions.ContainerAppDelete, DbApp));
@@ -115,7 +115,7 @@ public class PermissionCheckerTests
     public async Task Should_Not_Swallow_Cancellation_While_Reading_Resource_Permissions()
     {
         RgPermissions(new PermissionSet(["*/read"], []));
-        _gateway.Setup(g => g.GetResourcePermissionsAsync("sub", "rg", "containerApps", "demo-db", It.IsAny<CancellationToken>()))
+        _gateway.Setup(g => g.GetResourcePermissionsAsync("sub", "rg", "Microsoft.App", "containerApps", "demo-db", It.IsAny<CancellationToken>()))
             .ThrowsAsync(new OperationCanceledException());
 
         var act = () => Check(new PermissionRequirement(AzurePermissions.ContainerAppDelete, DbApp));
@@ -140,7 +140,7 @@ public class DeploymentPlannerTests
         _gateway.Setup(g => g.GetPermissionsAsync("sub", "rg", It.IsAny<CancellationToken>()))
             .ReturnsAsync([new PermissionSet(["*/read"], [])]);
         _gateway.Setup(g => g.ListContainerAppsAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync([]);
-        _gateway.Setup(g => g.GetResourcePermissionsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _gateway.Setup(g => g.GetResourcePermissionsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
     }
 
@@ -178,7 +178,7 @@ public class DeploymentPlannerTests
         var result = await new DeploymentPlanner(_gateway.Object).CheckPermissionsAsync(Opts, Ct);
 
         result.MissingActions.Should().Equal(AzurePermissions.ContainerAppWrite, AzurePermissions.EnvironmentJoin);
-        _gateway.Verify(g => g.GetResourcePermissionsAsync("sub", "rg", "managedEnvironments", "demo-env", It.IsAny<CancellationToken>()), Times.Once);
+        _gateway.Verify(g => g.GetResourcePermissionsAsync("sub", "rg", "Microsoft.App", "managedEnvironments", "demo-env", It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -194,7 +194,7 @@ public class DeploymentPlannerTests
             new ContainerAppInfo("DEMO-REDIS", "id", new Dictionary<string, string>()),
             new ContainerAppInfo("demo-tt", "id", new Dictionary<string, string>()),
         ]);
-        _gateway.Setup(g => g.GetResourcePermissionsAsync("sub", "rg", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _gateway.Setup(g => g.GetResourcePermissionsAsync("sub", "rg", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([new PermissionSet(["*"], [])]);
 
         var result = await new DeploymentPlanner(_gateway.Object).CheckPermissionsAsync(Opts, Ct);
@@ -211,13 +211,13 @@ public class DeploymentPlannerTests
             .ReturnsAsync(new ManagedEnvironmentInfo("id", "demo-env", "japaneast", new Dictionary<string, string>()));
         _gateway.Setup(g => g.ListContainerAppsAsync("sub", "rg", It.IsAny<CancellationToken>()))
             .ReturnsAsync([new ContainerAppInfo("demo-db", "id", new Dictionary<string, string>())]);
-        _gateway.Setup(g => g.GetResourcePermissionsAsync("sub", "rg", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _gateway.Setup(g => g.GetResourcePermissionsAsync("sub", "rg", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([new PermissionSet(["*"], [])]);
 
         var result = await new DeploymentPlanner(_gateway.Object).CheckPermissionsAsync(Opts, Ct);
 
         result.MissingActions.Should().Equal(AzurePermissions.ContainerAppWrite);
-        _gateway.Verify(g => g.GetResourcePermissionsAsync("sub", "rg", "containerApps", "demo-db", It.IsAny<CancellationToken>()), Times.Once);
-        _gateway.Verify(g => g.GetResourcePermissionsAsync("sub", "rg", "containerApps", It.IsIn("demo-redis", "demo-tt"), It.IsAny<CancellationToken>()), Times.Never);
+        _gateway.Verify(g => g.GetResourcePermissionsAsync("sub", "rg", "Microsoft.App", "containerApps", "demo-db", It.IsAny<CancellationToken>()), Times.Once);
+        _gateway.Verify(g => g.GetResourcePermissionsAsync("sub", "rg", "Microsoft.App", "containerApps", It.IsIn("demo-redis", "demo-tt"), It.IsAny<CancellationToken>()), Times.Never);
     }
 }

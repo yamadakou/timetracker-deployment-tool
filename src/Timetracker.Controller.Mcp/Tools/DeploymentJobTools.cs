@@ -51,7 +51,7 @@ public sealed class DeploymentJobTools
     [McpServerTool(Name = "plan_deployment", Title = "Azure へのデプロイの計画",
         ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = true, UseStructuredContent = true)]
     [Description("Azure Container Apps へのデプロイの計画を作る（Azure を読むだけで、変更しない）。作成・更新するリソース、" +
-                 "DB のデータが消えるおそれがあるか（requires_data_loss_ack）、警告、権限の確認結果を返す。結果を利用者に示して確認してから、" +
+                 "DB のデータが消えるおそれがあるか（requires_data_loss_ack）、DB のデータを Azure Files に置くか（persist_db）、警告、権限の確認結果を返す。結果を利用者に示して確認してから、" +
                  "plan_id を start_deployment に渡す。blockers があると plan_id は null になり、実行できない。計画の有効期限は 15 分。")]
     public async Task<DeploymentPlanResult> PlanDeployment(
         [Description("サブスクリプション ID（省略時はサーバーの既定値 TT_MCP_DEFAULT_SUBSCRIPTION）")] string? subscription = null,
@@ -69,6 +69,7 @@ public sealed class DeploymentJobTools
         [Description("DB のメモリ（Gi、既定 2.0）")] double? db_memory_gi = null,
         [Description("Redis の CPU（vCPU、既定 0.5）")] double? redis_cpu = null,
         [Description("Redis のメモリ（Gi、既定 1.0）")] double? redis_memory_gi = null,
+        [Description(DeploymentTools.PersistDbDescription)] bool? persist_db = null,
         [Description(DeploymentTools.AzureIdentityDescription)] string? azure_identity = null,
         CancellationToken cancellationToken = default)
     {
@@ -78,6 +79,7 @@ public sealed class DeploymentJobTools
             Subscription = subscription, ResourceGroup = resource_group, Location = location, AppName = app_name, DbType = db_type,
             DbName = db_name, TtTag = tt_tag, DbPassword = db_password, TrackerPassword = tracker_password,
             TtCpu = tt_cpu, TtMemoryGi = tt_memory_gi, DbCpu = db_cpu, DbMemoryGi = db_memory_gi, RedisCpu = redis_cpu, RedisMemoryGi = redis_memory_gi,
+            PersistDb = persist_db,
         }.Resolve(_settings);
         var o = resolved.Options;
         var advice = DeploymentAdvisor.GetWarnings(o, ValidationTarget.Azure);
@@ -104,7 +106,9 @@ public sealed class DeploymentJobTools
             RequiresDataLossAck: plan.RequiresDataLossAck,
             EstimatedDuration: plan.CreatesEnvironment ? "5〜15 分（Environment を新規作成するため）" : "2〜5 分",
             Resolved: ToolSupport.ToResolvedSettings(resolved),
-            ResourceNames: ToolSupport.ToResourceNames(o.AppName));
+            ResourceNames: ToolSupport.ToResourceNames(o.AppName),
+            PersistDb: plan.PersistDb,
+            StorageAccount: plan.PersistDb ? ResourceNaming.StorageAccount(o.Subscription, o.ResourceGroup, o.AppName) : null);
     }
 
     [McpServerTool(Name = "start_deployment", Title = "Azure へのデプロイの開始",
@@ -168,7 +172,8 @@ public sealed class DeploymentJobTools
             s.Logs.Select(l => new JobLogInfo(l.Level, l.Message, l.At)).ToList(),
             s.NextLogOffset,
             s.Result is DeploymentResult r
-                ? new DeploymentJobResult(r.ResourceGroup, r.EnvironmentName, r.TimetrackerAppName, r.DbAppName, r.RedisAppName, r.TimetrackerUrl)
+                ? new DeploymentJobResult(
+                    r.ResourceGroup, r.EnvironmentName, r.TimetrackerAppName, r.DbAppName, r.RedisAppName, r.TimetrackerUrl, r.StorageAccountName)
                 : null,
             s.Result as DeletionJobResult,
             s.Error,
@@ -197,7 +202,7 @@ public sealed class DeploymentJobTools
     [McpServerTool(Name = "get_deployment_info", Title = "デプロイ済みの環境の状態",
         ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = true, UseStructuredContent = true)]
     [Description("Azure 上のデプロイ済みの環境（Environment と DB / Redis / Timetracker の Container App）の状態、イメージ、" +
-                 "CPU とメモリ、最新のリビジョン、管理タグの有無、Timetracker の URL を返す（Azure は変更しない）。")]
+                 "CPU とメモリ、最新のリビジョン、管理タグの有無、Timetracker の URL、DB のデータの永続化の状態（persistence）を返す（Azure は変更しない）。")]
     public async Task<DeploymentInfoResult> GetDeploymentInfo(
         [Description("サブスクリプション ID（省略時はサーバーの既定値 TT_MCP_DEFAULT_SUBSCRIPTION）")] string? subscription = null,
         [Description("リソースグループ名（省略時はサーバーの既定値 TT_MCP_DEFAULT_RESOURCE_GROUP）")] string? resource_group = null,
@@ -218,7 +223,8 @@ public sealed class DeploymentJobTools
             info.Environment == null ? null : new EnvironmentState(
                 info.Environment.Name, info.Environment.Location, info.Environment.ProvisioningState, ManagedTags.IsManaged(info.Environment.Tags, o.AppName)),
             App(info.Timetracker), App(info.Db), App(info.Redis),
-            info.Endpoint);
+            info.Endpoint,
+            new PersistenceState(info.DbPersisted, info.StorageAccount?.Name, info.StorageAccount == null ? null : ManagedTags.IsManaged(info.StorageAccount.Tags, o.AppName)));
     }
 
     // 操作してよい範囲に無いリソースグループは、Azure を読まずにブロッカーにする。リソースグループを作成できない設定では、
@@ -266,6 +272,9 @@ public sealed class DeploymentJobTools
         {
             PlannedResourceKind.ResourceGroup => "resource_group",
             PlannedResourceKind.Environment => "environment",
+            PlannedResourceKind.StorageAccount => "storage_account",
+            PlannedResourceKind.FileShare => "file_share",
+            PlannedResourceKind.EnvironmentStorage => "environment_storage",
             _ => "container_app",
         },
         op.Name,

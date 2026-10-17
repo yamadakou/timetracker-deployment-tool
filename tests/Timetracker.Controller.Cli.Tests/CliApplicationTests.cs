@@ -182,6 +182,45 @@ public sealed class CliApplicationTests : IDisposable
         _out.ToString().Should().Contain("[SUCCESS] Container Apps デプロイ完了");
     }
 
+    [Theory]
+    [InlineData(new string[0], null)]
+    [InlineData(new[] { "--persist-db" }, true)]
+    [InlineData(new[] { "--persist-db", "false" }, false)]
+    public async Task Deploy_Should_Pass_Persist_Db_As_Specified(string[] extra, bool? expected)
+    {
+        var gateway = new Mock<IAzureDeploymentGateway>();
+        DeployOptions? received = null;
+
+        await Run(With(extra), (opts, _) => { received = opts; return gateway.Object; });
+
+        received!.PersistDb.Should().Be(expected);
+    }
+
+    [Fact]
+    public async Task Deploy_Should_Show_The_Storage_Notice_When_Persisting()
+    {
+        var gateway = new Mock<IAzureDeploymentGateway>();
+        var env = new Mock<ContainerAppManagedEnvironmentResource>().Object;
+        gateway.Setup(g => g.EnsureContainerAppEnvAsync("sub", "rg", "timetracker", "japaneast", It.IsAny<CancellationToken>())).ReturnsAsync(env);
+        gateway.Setup(g => g.CreateOrUpdateContainerAppAsync("sub", "rg", "timetracker", "japaneast", It.IsAny<DeployOptions>(), env, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ContainerAppsDeployment("timetracker-tt", "timetracker-db", "timetracker-redis", null));
+
+        var code = await Run(With("--persist-db"), (_, _) => gateway.Object);
+
+        code.Should().Be(0);
+        gateway.Verify(g => g.EnsureDbStorageAsync("sub", "rg", "timetracker", "japaneast", env, It.IsAny<CancellationToken>()), Times.Once);
+        _out.ToString().Should().Contain(DbPersistence.StorageNotice(ResourceNaming.StorageAccount("sub", "rg", "timetracker")));
+    }
+
+    [Fact]
+    public async Task DryRun_Should_Warn_That_Persist_Db_Is_Ignored()
+    {
+        var code = await Run(With("--dry-run", "--persist-db"));
+
+        code.Should().Be(0);
+        _out.ToString().Should().Contain("[WARN] persist-db は Azure 向けの設定のため");
+    }
+
     [Fact]
     public async Task Deploy_Should_Fail_When_Azure_Operation_Fails()
     {
