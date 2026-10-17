@@ -3,7 +3,7 @@
 # Timetracker デプロイ CLI
 
 ## ツールの概要
-Timetracker（Docker Hub の [`densocreate/timetracker`](https://hub.docker.com/r/densocreate/timetracker) イメージ）を、[Azure Container Apps](https://learn.microsoft.com/ja-jp/azure/container-apps/overview) の上に、DB（PostgreSQL または SQL Server）と Redis と一緒に、コマンド 1 つで用意するツールです。Timetracker の検証環境（評価・動作確認・デモ）を手早く作ることを目的としています。
+[TimeTracker](https://www.timetracker.jp/)（Docker Hub の [`densocreate/timetracker`](https://hub.docker.com/r/densocreate/timetracker) イメージ）を、[Azure Container Apps](https://learn.microsoft.com/ja-jp/azure/container-apps/overview) の上に、DB（PostgreSQL または SQL Server）と Redis と一緒に、コマンド 1 つで用意するツールです。Timetracker の検証環境（評価・動作確認・デモ）を手早く作ることを目的としています。
 
 できること:
 - Azure へのデプロイ（`deploy`）: Timetracker・DB・Redis の 3 つのコンテナを、Azure Container Apps のアプリとして作成・更新します。リソースグループが無ければ作成します
