@@ -4,7 +4,7 @@
 
 | 優先度 | 項目 | 状況 |
 |---|---|---|
-| 最優先 | [1. DB データの永続化オプション](#1-db-データの永続化オプション) | 実装済み（Azure での確認待ち） |
+| 最優先 | [1. DB データの永続化オプション](#1-db-データの永続化オプション) | 実装済み（主な Azure での確認は済み。料金と権限不足のシナリオは未確認） |
 | 最優先 | [2. ストア配布できるデスクトップアプリ](#2-ストア配布できるデスクトップアプリ) | 未着手 |
 | 通常 | [3. HTTP 版での Key Vault のシークレット参照](#3-http-版での-key-vault-のシークレット参照) | 未着手 |
 | 通常 | [4. MCP の Tasks への移行](#4-mcp-の-tasks-への移行) | 仕様の安定待ち |
@@ -22,7 +22,7 @@
   - 再デプロイの警告: 永続化した場合は、データが失われる警告と MCP の `acknowledge_data_loss` を不要にできるか
   - 料金の案内
   - 関連: Azure 上の SQL Server でサンプル DB を作れない制約（REVIEW_ISSUES No.19）も、同じ共有ストレージで解消できる可能性がある
-- **結果**: 詳細設計 `docs/design/db-persistence.md` で、SMB の Azure Files を `--persist-db` / `persist_db` で使う形に決め、実装した（REVIEW_ISSUES No.46）。削除では既定でストレージアカウントも消し、`--keep-db-data` / `keep_db_data` で残す。No.19 は 6 に分けた。Azure での確認（PostgreSQL が SMB で動くか、停止 → 更新 → 開始の動き、料金）が残っている
+- **結果**: 詳細設計 `docs/design/db-persistence.md` で、SMB の Azure Files を `--persist-db` / `persist_db` で使う形に決め、実装した（REVIEW_ISSUES No.46）。削除では既定でストレージアカウントも消し、`--keep-db-data` / `keep_db_data` で残す。No.19 は 6 に分けた。Azure での確認（PostgreSQL・SQL Server が SMB で動くこと、停止 → 更新 → 開始、削除）とシステムテストは済み。1 日の料金と権限不足のシナリオが残っている
 
 ## 2. ストア配布できるデスクトップアプリ
 - **目的**: CLI や AI アシスタントを使わない利用者も、画面の操作でデプロイ・状態の確認・削除ができるようにする。ストア（Microsoft Store を想定）から導入・更新できるようにする

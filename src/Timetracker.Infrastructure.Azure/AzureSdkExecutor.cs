@@ -180,7 +180,7 @@ public class AzureSdkExecutor : IAzureDeploymentGateway
         var existingDb = await apps.GetIfExistsAsync(dbAppName, cancellationToken);
         IReadOnlyDictionary<string, string>? dbTags = null;
         // 永続化を続ける場合は、新旧の DB コンテナが同じデータを同時に開かないよう、停止してから更新し、開始する
-        var restartDb = false;
+        ContainerAppResource? stoppedDb = null;
         if (existingDb.HasValue)
         {
             var current = existingDb.Value!;
@@ -194,14 +194,24 @@ public class AzureSdkExecutor : IAzureDeploymentGateway
             {
                 _logger.Info(DbPersistence.RestartNotice(dbAppName));
                 await current.StopAsync(WaitUntil.Completed, cancellationToken);
-                restartDb = true;
+                stoppedDb = current;
             }
         }
-        var dbAppOp = await apps.CreateOrUpdateAsync(WaitUntil.Completed, dbAppName,
-            ContainerAppSpecBuilder.WithManagedTags(ContainerAppSpecBuilder.BuildDbApp(opts, location, env.Id), appName, dbTags),
-            cancellationToken);
+        ArmOperation<ContainerAppResource> dbAppOp;
+        try
+        {
+            dbAppOp = await apps.CreateOrUpdateAsync(WaitUntil.Completed, dbAppName,
+                ContainerAppSpecBuilder.WithManagedTags(ContainerAppSpecBuilder.BuildDbApp(opts, location, env.Id), appName, dbTags),
+                cancellationToken);
+        }
+        catch (Exception) when (stoppedDb != null)
+        {
+            // 更新に失敗しても DB アプリが止まったままにならないよう、停止する前の設定のまま開始し直す
+            await StartAfterFailedUpdateAsync(stoppedDb, dbAppName);
+            throw;
+        }
         var dbApp = dbAppOp.Value;
-        if (restartDb)
+        if (stoppedDb != null)
         {
             await dbApp.StartAsync(WaitUntil.Completed, cancellationToken);
             _logger.Info($"DB アプリを開始: {dbAppName}");
@@ -244,6 +254,19 @@ public class AzureSdkExecutor : IAzureDeploymentGateway
 
         return new ContainerAppsDeployment(ttApp.Data.Name, dbApp.Data.Name, redisApp.Data.Name,
             string.IsNullOrEmpty(ttUrl) ? null : ttUrl);
+    }
+
+    private async Task StartAfterFailedUpdateAsync(ContainerAppResource stoppedDb, string dbAppName)
+    {
+        _logger.Warn($"DB アプリ '{dbAppName}' の更新に失敗したため、停止する前の設定のまま開始し直します。");
+        try
+        {
+            await stoppedDb.StartAsync(WaitUntil.Completed, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _logger.Warn($"DB アプリ '{dbAppName}' を開始できませんでした（{ex.Message}）。DB アプリは停止しています。原因を取り除いてから、もう一度デプロイしてください。");
+        }
     }
 
     private ResourceGroupResource ResourceGroup(string subscriptionId, string rgName) =>
@@ -311,10 +334,22 @@ public class AzureSdkExecutor : IAzureDeploymentGateway
         return true;
     }
 
+    /// <summary>リソースプロバイダーがサブスクリプションに登録されていないことを表す ARM のエラーコード。</summary>
+    internal const string MissingSubscriptionRegistration = "MissingSubscriptionRegistration";
+
     public async Task<StorageAccountInfo?> GetStorageAccountAsync(
         string subscriptionId, string rgName, string name, CancellationToken cancellationToken = default)
     {
-        var existing = await ResourceGroup(subscriptionId, rgName).GetStorageAccounts().GetIfExistsAsync(name, cancellationToken: cancellationToken);
+        NullableResponse<StorageAccountResource> existing;
+        try
+        {
+            existing = await ResourceGroup(subscriptionId, rgName).GetStorageAccounts().GetIfExistsAsync(name, cancellationToken: cancellationToken);
+        }
+        catch (RequestFailedException ex) when (ex.ErrorCode == MissingSubscriptionRegistration)
+        {
+            // Microsoft.Storage が登録されていなければ、ストレージアカウントは存在しえない（永続化を使わない環境の削除・状態の確認を止めない）
+            return null;
+        }
         if (!existing.HasValue)
             return null;
         var data = existing.Value!.Data;

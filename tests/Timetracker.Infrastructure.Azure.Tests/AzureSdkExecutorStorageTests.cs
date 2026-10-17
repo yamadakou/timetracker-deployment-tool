@@ -177,6 +177,29 @@ public class AzureSdkExecutorStorageTests
         (await Sut().GetStorageAccountAsync(SubscriptionId, RgName, "missing", Ct)).Should().BeNull();
     }
 
+    [Fact]
+    public async Task GetStorageAccount_Should_Return_Null_When_The_Storage_Provider_Is_Not_Registered()
+    {
+        // Microsoft.Storage が登録されていなければ、ストレージアカウントは存在しえない（永続化を使わない環境の削除・状態の確認を止めない）
+        _accounts.Setup(c => c.GetIfExistsAsync(Account, It.IsAny<StorageAccountExpand?>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new RequestFailedException(409, "The subscription is not registered to use namespace 'Microsoft.Storage'.",
+                "MissingSubscriptionRegistration", null));
+
+        (await Sut().GetStorageAccountAsync(SubscriptionId, RgName, Account, Ct)).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetStorageAccount_Should_Not_Treat_Other_Errors_As_Not_Found()
+    {
+        // 権限の不足などを「無い」と扱うと、あるストレージアカウントを削除の対象から外してしまう
+        _accounts.Setup(c => c.GetIfExistsAsync(Account, It.IsAny<StorageAccountExpand?>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new RequestFailedException(403, "forbidden", "AuthorizationFailed", null));
+
+        var act = () => Sut().GetStorageAccountAsync(SubscriptionId, RgName, Account, Ct);
+
+        (await act.Should().ThrowAsync<RequestFailedException>()).Which.ErrorCode.Should().Be("AuthorizationFailed");
+    }
+
     [Theory]
     [InlineData("""{ "nameAvailable": true }""", true)]
     [InlineData("""{ "nameAvailable": false, "reason": "AlreadyExists" }""", false)]
@@ -336,6 +359,53 @@ public class AzureSdkExecutorStorageTests
         _log.ToString().Should().Contain("[WARN] " + DbPersistence.DataLossWarning("app-db", false, true));
         sentRedis!.Tags.Should().ContainKey("owner");
         db.Verify(a => a.StopAsync(It.IsAny<WaitUntil>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    private void DbUpdateFails() =>
+        _apps.Setup(c => c.CreateOrUpdateAsync(WaitUntil.Completed, "app-db", It.IsAny<ContainerAppData>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new RequestFailedException(400, "update failed"));
+
+    [Fact]
+    public async Task CreateOrUpdate_Should_Start_The_Stopped_Db_App_Again_When_The_Update_Fails()
+    {
+        // 停止した後に更新が失敗しても、DB アプリが止まったままにならない
+        var (existing, _, calls) = SetupDbApp(existingPersisted: true);
+        existing!.Setup(a => a.StartAsync(WaitUntil.Completed, It.IsAny<CancellationToken>()))
+            .Callback(() => calls.Add("start existing")).ReturnsAsync(Mock.Of<ArmOperation<ContainerAppResource>>());
+        DbUpdateFails();
+
+        var act = () => Deploy(true);
+
+        await act.Should().ThrowAsync<RequestFailedException>().WithMessage("update failed");
+        calls.Should().Equal("stop", "start existing");
+        _log.ToString().Should().Contain("[WARN] DB アプリ 'app-db' の更新に失敗したため、停止する前の設定のまま開始し直します。");
+    }
+
+    [Fact]
+    public async Task CreateOrUpdate_Should_Report_The_Update_Error_Even_When_The_Db_App_Cannot_Be_Started_Again()
+    {
+        var (existing, _, _) = SetupDbApp(existingPersisted: true);
+        existing!.Setup(a => a.StartAsync(WaitUntil.Completed, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new RequestFailedException(500, "start failed"));
+        DbUpdateFails();
+
+        var act = () => Deploy(true);
+
+        await act.Should().ThrowAsync<RequestFailedException>().WithMessage("update failed");
+        _log.ToString().Should().Contain("[WARN] DB アプリ 'app-db' を開始できませんでした（start failed）。DB アプリは停止しています。");
+    }
+
+    [Fact]
+    public async Task CreateOrUpdate_Should_Not_Start_A_Db_App_That_Was_Not_Stopped_When_The_Update_Fails()
+    {
+        var (existing, _, calls) = SetupDbApp(existingPersisted: false);
+        DbUpdateFails();
+
+        var act = () => Deploy(false);
+
+        await act.Should().ThrowAsync<RequestFailedException>().WithMessage("update failed");
+        calls.Should().BeEmpty();
+        existing!.Verify(a => a.StartAsync(It.IsAny<WaitUntil>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
