@@ -91,7 +91,7 @@ scripts/run-system-tests.sh <サブスクリプション ID> <appId>
 ### CI（自動）
 GitHub の Actions → **System Test** → Run workflow で実行します（`workflow_dispatch`）。結果はジョブの成果物（`system-test-results`）に保存されます。ローカルの docker compose での確認（`LocalComposeSetupTests`）は、ここでは行いません（次の PR の CI で行うため）。
 
-ローカルの docker compose でのセットアップウィザードとログインの確認（`LocalComposeSetupTests`）は、PR と `main` へのプッシュのたびに CI（`ci.yml` の `e2e-local`。ubuntu）で実行します。Azure は使わず、料金はかかりません。サンプルデータベースの作成に時間がかかるため、DB 種別ごとにジョブを分けて並行に実行します（環境変数 `TT_E2E_DB_TYPE` で 1 つに絞る）。結果は成果物（`e2e-local-results-<DB 種別>`）に保存されます。待つ間は、実行中の画面の進み具合をテストの出力に記録します。
+ローカルの docker compose でのセットアップウィザードとログインの確認（`LocalComposeSetupTests`）は、PR と `main` へのプッシュのたびに CI（`ci.yml` の `e2e-local`。ubuntu）で実行します（ドキュメントだけの変更では省きます）。Azure は使わず、料金はかかりません。サンプルデータベースの作成に時間がかかるため、DB 種別ごとにジョブを分けて並行に実行します（環境変数 `TT_E2E_DB_TYPE` で 1 つに絞る）。結果は成果物（`e2e-local-results-<DB 種別>`）に保存されます。待つ間は、実行中の画面の進み具合をテストの出力に記録します。
 
 - GitHub の仕様により、手動で実行できるのは既定のブランチ（`main`）にあるワークフローだけです。他のブランチのワークフローは、`main` にマージされるまで Actions の一覧に表示されません
 - `main` にマージされた後は、Run workflow の「Use workflow from」で、テストするブランチを選べます
