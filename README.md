@@ -529,7 +529,7 @@ Azure を使わずに、自分の PC の Docker で Timetracker・DB・Redis を
 
 ### MCP サーバー（AI アシスタントから使う）
 
-CLI と同じ機能を、[MCP（Model Context Protocol）](https://modelcontextprotocol.io/)に対応した AI アシスタント（Claude Code、VS Code の GitHub Copilot、Claude Desktop など）から、対話しながら使えます。利用者の PC で動く stdio 版と、チームで共有する HTTP 版（Azure Container Apps に置く）があります。導入、アシスタントの設定、使い方は [MCP サーバーの利用者向けマニュアル（docs/MCP_SERVER.md）](docs/MCP_SERVER.md) を参照してください。
+CLI と同じ機能を、[MCP（Model Context Protocol）](https://modelcontextprotocol.io/)に対応した AI アシスタント（Claude Code、VS Code の GitHub Copilot、Claude Desktop など）から、対話しながら使えます。提供しているのは、利用者の PC で動く stdio 版です（チームで共有する HTTP 版は開発中です）。導入、アシスタントの設定、使い方は [MCP サーバーの利用者向けマニュアル（docs/MCP_SERVER.md）](docs/MCP_SERVER.md) を参照してください。
 
 ### コマンドパラメータの説明一覧
 `deploy`（サブコマンドを省略した場合も `deploy`）のオプションです。`delete` のオプションは[リソースの削除（delete）](#リソースの削除delete)を参照してください。
