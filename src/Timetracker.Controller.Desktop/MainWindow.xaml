@@ -13,7 +13,7 @@
             <!-- デプロイ・削除のジョブの進み具合、ログ、結果 -->
             <DataTemplate x:Key="JobTemplate" x:DataType="vm:JobViewModel">
                 <StackPanel Spacing="4" Margin="0,8">
-                    <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}"><Run Text="{x:Bind Title}" /><Run Text=": " /><Run Text="{x:Bind StatusText, Mode=OneWay}" /></TextBlock>
+                    <StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind Title}" /><TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text=": " /><TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind StatusText, Mode=OneWay}" /></StackPanel>
                     <ProgressBar IsIndeterminate="True" Visibility="{x:Bind local:Ui.IfTrue(IsRunning), Mode=OneWay}" />
                     <TextBlock Text="{x:Bind StepText, Mode=OneWay}" />
                     <TextBlock Text="{x:Bind Error, Mode=OneWay}" TextWrapping="Wrap" Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
@@ -113,7 +113,7 @@
                             <ItemsControl ItemsSource="{x:Bind ViewModel.Deployment.Operations}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:OperationRow">
-                                        <TextBlock><Run Text="{x:Bind Action}" /><Run Text="  " /><Run Text="{x:Bind Name}" /><Run Text="（" /><Run Text="{x:Bind Resource}" /><Run Text="）" /></TextBlock>
+                                        <StackPanel Orientation="Horizontal"><TextBlock Text="{x:Bind Action}" /><TextBlock Text="  " /><TextBlock Text="{x:Bind Name}" /><TextBlock Text="（" /><TextBlock Text="{x:Bind Resource}" /><TextBlock Text="）" /></StackPanel>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
@@ -145,8 +145,8 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:AppStateRow">
                                     <StackPanel Margin="0,4">
-                                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}"><Run Text="{x:Bind Role}" /><Run Text=": " /><Run Text="{x:Bind Name}" /></TextBlock>
-                                        <TextBlock><Run Text="{x:Bind State}" /><Run Text="、" /><Run Text="{x:Bind Resources}" /><Run Text="、" /><Run Text="{x:Bind Image}" /></TextBlock>
+                                        <StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind Role}" /><TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text=": " /><TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind Name}" /></StackPanel>
+                                        <StackPanel Orientation="Horizontal"><TextBlock Text="{x:Bind State}" /><TextBlock Text="、" /><TextBlock Text="{x:Bind Resources}" /><TextBlock Text="、" /><TextBlock Text="{x:Bind Image}" /></StackPanel>
                                     </StackPanel>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
@@ -166,7 +166,7 @@
                             <ItemsControl ItemsSource="{x:Bind ViewModel.Deletion.Targets}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:DeletionRow">
-                                        <TextBlock TextWrapping="Wrap"><Run Text="{x:Bind Decision}" /><Run Text="  " /><Run Text="{x:Bind Name}" /><Run Text="（" /><Run Text="{x:Bind Resource}" /><Run Text="） " /><Run Text="{x:Bind Reason}" /></TextBlock>
+                                        <StackPanel Orientation="Horizontal"><TextBlock Text="{x:Bind Decision}" /><TextBlock Text="  " /><TextBlock Text="{x:Bind Name}" /><TextBlock Text="（" /><TextBlock Text="{x:Bind Resource}" /><TextBlock Text="） " /><TextBlock Text="{x:Bind Reason}" /></StackPanel>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
@@ -175,7 +175,7 @@
                             <ItemsControl ItemsSource="{x:Bind ViewModel.Deletion.Blockers}" Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
                             <ItemsControl ItemsSource="{x:Bind ViewModel.Deletion.Warnings}" Foreground="{ThemeResource SystemFillColorCautionBrush}" />
                             <StackPanel Spacing="8" Visibility="{x:Bind local:Ui.IfText(ViewModel.Deletion.AppNameToConfirm), Mode=OneWay}">
-                                <TextBlock><Run Text="確認のため、アプリ名「" /><Run Text="{x:Bind ViewModel.Deletion.AppNameToConfirm, Mode=OneWay}" /><Run Text="」を入力してください。" /></TextBlock>
+                                <StackPanel Orientation="Horizontal"><TextBlock Text="確認のため、アプリ名「" /><TextBlock Text="{x:Bind ViewModel.Deletion.AppNameToConfirm, Mode=OneWay}" /><TextBlock Text="」を入力してください。" /></StackPanel>
                                 <TextBox Text="{x:Bind ViewModel.Deletion.ConfirmAppName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="320" HorizontalAlignment="Left" />
                                 <Button Content="削除" Command="{x:Bind ViewModel.Deletion.StartCommand}" Style="{StaticResource AccentButtonStyle}" />
                             </StackPanel>
