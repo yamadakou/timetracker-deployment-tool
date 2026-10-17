@@ -172,4 +172,19 @@ timetracker-cli delete ... [--keep-db-data [true|false]]
 
 ## 14. 実施状況
 - 実装: 11 の分担のとおり（REVIEW_ISSUES No.46）。自動テストは全件成功、分岐網羅率は正規表現の生成コードを除き 100%
-- 未実施: 10 の Azure での確認と、システムテスト（`DeploymentLifecycleTests` / `LimitedPermissionTests`）への永続化のシナリオの追加。Azure へのデプロイは料金がかかるため、オーナーの了承を得てから行う。確認の結果で、`mountOptions`（`nobrl` などの要否、SQL Server の gid）、停止 → 更新 → 開始の手順、PostgreSQL での可否（動かない場合は PostgreSQL では `--persist-db` をエラーにする）を見直す
+- Azure での確認（2026-10-17、japaneast、Visual Studio Enterprise サブスクリプション、確認専用のリソースグループ。CLI の `--auth-mode azure-cli`）
+
+| No. | 確認 | 結果 |
+|---|---|---|
+| 1 | PostgreSQL ＋ `--persist-db` の新規デプロイ | 成功（約 2.5 分）。ストレージアカウント・共有・Environment のストレージを作成。SMB の共有の上で `initdb` から起動まで成功（4 の `mountOptions` と `PGDATA` のサブディレクトリで動く） |
+| 2 | PostgreSQL: 設定を変えて再デプロイ（`--persist-db` なし＝引き継ぎ） | 停止 → 更新 → 開始の案内を表示し、データ消失の警告は出ない。旧リビジョンは正常に停止（`database system was shut down`）してから新リビジョンが起動し、データが残った |
+| 3 | PostgreSQL: リビジョンの再起動（`az containerapp revision restart`） | 新旧のレプリカが一時的に同時に動いた。新しい側は `database system was not properly shut down; automatic recovery in progress` で復旧して起動し、データは残った（2 回試して同じ） |
+| 4 | PostgreSQL: 永続化をやめる → 戻す | やめると警告を表示し、DB は空に見えた。戻すと共有に残っていたデータが戻った（警告の文言をこの結果に合わせて直した） |
+| 5 | SQL Server ＋ `--persist-db` の新規デプロイと再デプロイ | 成功。`mssql` ユーザー（uid 10001・gid 0）で起動し、再デプロイ（停止 → 更新 → 開始）の後もデータが残った |
+| 6 | SQL Server: リビジョンの再起動 | **終わらなかった**。新しいレプリカが `PAL initialization failed. Error: 101` で起動に失敗し続け、古いレプリカが動いたまま（約 20 分）。データは無事。本ツールの再デプロイ（停止 → 更新 → 開始）で回復した |
+| 7 | `delete --keep-db-data` → 同じアプリ名で `--persist-db` のデプロイ | Container App と Environment を削除し、ストレージアカウントは残った。デプロイし直すとデータが戻った |
+| 8 | `delete`（既定） | 下記の追記を参照 |
+
+- 3・6 から、永続化した DB アプリの再起動は、Azure ポータルの「再起動」や `az containerapp revision restart` ではなく、本ツールの再デプロイで行うよう README と MCP の注意事項に書いた。Azure 基盤のメンテナンスでの再起動は制御できないため、3 と同様の復旧（PostgreSQL）または 6 と同様の停滞（SQL Server）が起こりうる。6 が起きた場合も、再デプロイで回復できる
+- `mountOptions` は 4 のままで追加は不要だった（`nobrl` なしで PostgreSQL・SQL Server とも動いた）
+- 未実施: 権限の不足のシナリオ（権限の少ないサービスプリンシパルが無いため）、システムテストへの永続化のシナリオの追加、1 日の料金
