@@ -33,6 +33,23 @@ jobs:
         FORCED: ${{ github.event.forced }}
       run: ./.github/scripts/detect-code-changes.ps1 -EventName $env:EVENT_NAME -Base $env:BASE_SHA -Head $env:HEAD_SHA -Forced $env:FORCED
 
+  # Markdown の中のリンク（ファイルと見出し #...）が切れていないかを確かめる（lychee。設定は lychee.toml）。
+  # 外部のサイト（https://...）は相手の都合で失敗することがあるため、ここでは確かめず、.github/workflows/links.yml で週 1 回確かめる。
+  # ドキュメントだけの変更でも省かない
+  links:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Check internal links
+      uses: lycheeverse/lychee-action@v2.9.0
+      with:
+        lycheeVersion: v0.24.2
+        args: --offline --include-fragments --no-progress --config lychee.toml './**/*.md'
+
   build:
     needs: changes
     if: needs.changes.outputs.code == 'true'
