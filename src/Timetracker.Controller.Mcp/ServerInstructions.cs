@@ -8,7 +8,9 @@ internal static class ServerInstructions
 {
     public const string Text = """
         Timetracker（DENSO CREATE の工数管理ツール）の検証環境を構築するためのサーバーです。
-        - 検証環境向けです。Azure 上の DB のデータは永続化されず、DB コンテナの再起動・再デプロイ・削除で消えます。本番環境には使わないでください。
+        - 検証環境向けです。Azure 上の DB のデータは、既定では永続化されず、DB コンテナの再起動・再デプロイ・削除で消えます。本番環境には使わないでください。
+          利用者がデータを残したい場合だけ、plan_deployment / validate_deployment に persist_db=true を指定すると、DB のデータを Azure Files に置きます（ストレージの料金がかかります）。
+          persist_db を省略すると、既存の DB アプリの今の状態（永続化しているか）を引き継ぎます。
         - 最初に get_deployment_options を呼び、既定値・選べる値・注意事項・サーバーの設定を確認してください。
         - パスワード（db_password / tracker_password）は、サーバーの環境変数での設定を推奨します（引数で渡すと会話に残ります）。
           get_deployment_options の server.password_env が true の項目は、利用者にパスワードを尋ねないでください。
@@ -19,11 +21,13 @@ internal static class ServerInstructions
           1. plan_deployment で計画を作る（Azure は変更しない）。
           2. 結果の actions・warnings・blockers を利用者に示し、実行してよいか確認する。requires_data_loss_ack が true の場合は、
              既存の DB アプリを更新するため、設定が変わると DB コンテナが再起動して DB のデータが消えることを伝え、利用者が明示的に同意した場合だけ start_deployment に acknowledge_data_loss=true を指定する。
+             永続化を続ける更新（persist_db が true のまま）では requires_data_loss_ack は false になり、DB アプリを停止してから更新します（その間は接続できません）。
           3. start_deployment に plan_id を渡して始める。その後は get_job_status を 15〜30 秒の間隔で呼び、結果（Timetracker の URL）を伝える。
         - デプロイ済みの環境の状態や URL は get_deployment_info で確認できます。
         - Azure から削除する場合も、必ず次の順に行ってください。
           1. plan_deletion で計画を作る（Azure は変更しない）。
           2. 結果の targets・kept・warnings・blockers を利用者に示す。リソースグループは削除しないこと、DB アプリを削除すると DB のデータがすべて失われることを伝える。
+             persist_db で永続化したストレージアカウントも既定で削除されるため、データを残したい場合は keep_db_data=true で計画を作り直す（料金はかかり続ける）。
           3. 削除してよいか確認し、利用者にアプリ名を入力してもらい、その値を start_deletion の confirm_app_name に渡す（利用者の入力なしに計画のアプリ名をそのまま渡さない）。
           4. get_job_status を 15〜30 秒の間隔で呼び、結果を伝える。
         - 注意事項は timetracker://docs/constraints、必要な権限は timetracker://docs/rbac（Resources）でも読めます。
@@ -41,7 +45,9 @@ internal static class ServerInstructions
 
     private const string HttpText = """
         Timetracker（DENSO CREATE の工数管理ツール）の検証環境を構築するためのサーバーです（HTTP で共有しているサーバー）。
-        - 検証環境向けです。Azure 上の DB のデータは永続化されず、DB コンテナの再起動・再デプロイ・削除で消えます。本番環境には使わないでください。
+        - 検証環境向けです。Azure 上の DB のデータは、既定では永続化されず、DB コンテナの再起動・再デプロイ・削除で消えます。本番環境には使わないでください。
+          利用者がデータを残したい場合だけ、plan_deployment / validate_deployment に persist_db=true を指定すると、DB のデータを Azure Files に置きます（ストレージの料金がかかります）。
+          persist_db を省略すると、既存の DB アプリの今の状態（永続化しているか）を引き継ぎます。
         - 最初に get_deployment_options を呼び、既定値・選べる値・注意事項・サーバーの設定を確認してください。
         {identity}
         - パスワード（db_password / tracker_password）は、Azure へのデプロイでは引数で渡す必要があります（このサーバーではパスワードの環境変数は使えません）。
@@ -55,11 +61,13 @@ internal static class ServerInstructions
           1. plan_deployment で計画を作る（Azure は変更しない）。
           2. 結果の actions・warnings・blockers を利用者に示し、実行してよいか確認する。requires_data_loss_ack が true の場合は、
              既存の DB アプリを更新するため、設定が変わると DB コンテナが再起動して DB のデータが消えることを伝え、利用者が明示的に同意した場合だけ start_deployment に acknowledge_data_loss=true を指定する。
+             永続化を続ける更新（persist_db が true のまま）では requires_data_loss_ack は false になり、DB アプリを停止してから更新します（その間は接続できません）。
           3. start_deployment に plan_id を渡して始める。その後は get_job_status を 15〜30 秒の間隔で呼び、結果（Timetracker の URL）を伝える。
         - デプロイ済みの環境の状態や URL は get_deployment_info で確認できます。
         - Azure から削除する場合も、必ず次の順に行ってください。
           1. plan_deletion で計画を作る（Azure は変更しない）。
           2. 結果の targets・kept・warnings・blockers を利用者に示す。リソースグループは削除しないこと、DB アプリを削除すると DB のデータがすべて失われることを伝える。
+             persist_db で永続化したストレージアカウントも既定で削除されるため、データを残したい場合は keep_db_data=true で計画を作り直す（料金はかかり続ける）。
           3. 削除してよいか確認し、利用者にアプリ名を入力してもらい、その値を start_deletion の confirm_app_name に渡す（利用者の入力なしに計画のアプリ名をそのまま渡さない）。
           4. get_job_status を 15〜30 秒の間隔で呼び、結果を伝える。
         - 注意事項は timetracker://docs/constraints、必要な権限は timetracker://docs/rbac（Resources）でも読めます。

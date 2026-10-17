@@ -94,6 +94,56 @@ public sealed class CliApplicationDeleteTests
             .And.Contain("[SUCCESS] 削除が完了しました（リソースグループ rg は残しています）。");
     }
 
+    private static readonly string Account = ResourceNaming.StorageAccount("sub", "rg", "demo");
+
+    private void StorageAccount()
+    {
+        _gateway.Setup(g => g.GetStorageAccountAsync("sub", "rg", Account, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new StorageAccountInfo(Account, "japaneast", ManagedTags.For("demo")));
+        _gateway.Setup(g => g.DeleteStorageAccountAsync("sub", "rg", Account, It.IsAny<CancellationToken>()))
+            .Callback<string, string, string, CancellationToken>((_, _, name, _) => _deleted.Add(name)).ReturnsAsync(true);
+    }
+
+    [Fact]
+    public async Task Should_Delete_The_Storage_Account_By_Default()
+    {
+        AllManaged();
+        StorageAccount();
+
+        var code = await Run(["--yes"]);
+
+        code.Should().Be(0);
+        _deleted.Should().Equal("demo-tt", "demo-redis", "demo-db", "demo-env", Account);
+        _out.ToString().Should().Contain($"削除する     {Account} (ストレージアカウント)");
+        _out.ToString().Should().Contain("[WARN] DB アプリを削除すると DB のデータはすべて失われます。")
+            .And.Contain($"[WARN] ストレージアカウント {Account}（Azure Files に永続化した DB のデータ）も削除します。");
+    }
+
+    [Fact]
+    public async Task Keep_Db_Data_Should_Keep_The_Storage_Account()
+    {
+        AllManaged();
+        StorageAccount();
+
+        var code = await Run(["--yes", "--keep-db-data"]);
+
+        code.Should().Be(0);
+        _deleted.Should().Equal("demo-tt", "demo-redis", "demo-db", "demo-env");
+        var output = _out.ToString();
+        output.Should().Contain($"削除しない   {Account} (ストレージアカウント): {Timetracker.Application.Deletion.DeletionPlanner.KeptReason}")
+            .And.Contain($"ストレージアカウント {Account}（DB のデータ）は残します。料金がかかり続けます。");
+        output.Should().NotContain("DB のデータはすべて失われます");
+    }
+
+    [Fact]
+    public async Task Persist_Db_Should_Not_Be_Accepted_By_Delete()
+    {
+        var code = await Run(["--persist-db"]);
+
+        code.Should().Be(1);
+        _err.ToString().Should().Contain("オプション '--persist-db' は delete では使えません");
+    }
+
     [Theory]
     [InlineData("other\n")]
     [InlineData("")] // 入力なし（EOF）

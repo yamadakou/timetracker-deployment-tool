@@ -24,7 +24,8 @@ public sealed class TimetrackerPrompts
         [Description("DB 種別の希望（postgresql または sqlserver。省略時は利用者に確認する）")] string? db_type = null) => $"""
         Timetracker の検証環境を Azure Container Apps にデプロイします。次の順に進めてください。
         1. get_deployment_options を呼び、既定値・注意事項・サーバーの設定（server.password_env など）を確認する。
-           検証環境向けであり、DB のデータは永続化されないことを利用者に伝える。
+           検証環境向けであり、DB のデータは既定では永続化されないことを利用者に伝える。データを残したい場合は persist_db=true で
+           Azure Files に置けること（ストレージの料金がかかり、削除では keep_db_data=true を指定しない限り消えること）を伝え、利用者に選んでもらう。
         2. list_subscriptions でサブスクリプションを示し、利用者にデプロイ先のサブスクリプションとリソースグループを選んでもらう。
         3. DB 種別は {(string.IsNullOrWhiteSpace(db_type) ? "利用者に確認する（既定は postgresql。サンプル DB を使うなら postgresql）" : $"利用者の希望「{db_type}」を使う")}。
            SQL Server を Azure で使う場合はサンプル DB を作れないことを伝える。
@@ -86,7 +87,8 @@ public sealed class TimetrackerPrompts
         Azure 上の Timetracker の検証環境を削除します。次の順に進めてください。
         1. 対象のサブスクリプション・リソースグループ・アプリ名（{(string.IsNullOrWhiteSpace(app_name) ? "利用者に確認する" : $"「{app_name}」")}）を利用者に確認する。
         2. plan_deletion で計画を作り、targets（削除するもの・しないものと理由）、kept（リソースグループは削除しない）、warnings、blockers を利用者に示す。
-           DB アプリを削除する場合は、DB のデータがすべて失われることを伝える。
+           DB アプリを削除する場合は、DB のデータがすべて失われることを伝える。persist_db で永続化したストレージアカウントがある場合は、
+           既定ではそれも削除されること、残すなら keep_db_data=true で計画を作り直すこと（料金はかかり続ける）を伝えて、利用者に選んでもらう。
         3. 削除してよいか確認し、利用者にアプリ名を入力してもらう。入力されたアプリ名を start_deletion の confirm_app_name に渡す
            （利用者の入力なしに、計画のアプリ名をそのまま渡さないこと）。
         4. get_job_status を 15〜30 秒の間隔で呼び、deletion_result を伝える。

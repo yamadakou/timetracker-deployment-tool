@@ -315,6 +315,30 @@ public class AzureSdkExecutorStorageTests
     }
 
     [Fact]
+    public async Task CreateOrUpdate_Should_Treat_An_App_Without_A_Template_As_Not_Persisted_And_Keep_Tags_Of_Other_Apps()
+    {
+        // 応答に template が無い既存の DB アプリ（永続化していない扱い）と、既存の Redis アプリ（タグを引き継ぐ）
+        var (_, _, calls) = SetupDbApp(existingPersisted: null);
+        var db = new Mock<ContainerAppResource>();
+        db.SetupGet(a => a.Data).Returns(new ContainerAppData(AzureLocation.JapanEast));
+        _apps.Setup(c => c.GetIfExistsAsync("app-db", It.IsAny<CancellationToken>())).ReturnsAsync(Found(db.Object));
+        var redis = new Mock<ContainerAppResource>();
+        redis.SetupGet(a => a.Data).Returns(Json<ContainerAppData>("""{ "location": "japaneast", "tags": { "owner": "alice" }, "properties": {} }"""));
+        _apps.Setup(c => c.GetIfExistsAsync("app-redis", It.IsAny<CancellationToken>())).ReturnsAsync(Found(redis.Object));
+        ContainerAppData? sentRedis = null;
+        _apps.Setup(c => c.CreateOrUpdateAsync(WaitUntil.Completed, "app-redis", It.IsAny<ContainerAppData>(), It.IsAny<CancellationToken>()))
+            .Callback<WaitUntil, string, ContainerAppData, CancellationToken>((_, _, d, _) => sentRedis = d)
+            .ReturnsAsync(Mock.Of<ArmOperation<ContainerAppResource>>(o => o.Value == redis.Object));
+
+        await Deploy(true);
+
+        calls.Should().Equal("put app-db", "put app-tt");
+        _log.ToString().Should().Contain("[WARN] " + DbPersistence.DataLossWarning("app-db", false, true));
+        sentRedis!.Tags.Should().ContainKey("owner");
+        db.Verify(a => a.StopAsync(It.IsAny<WaitUntil>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task CreateOrUpdate_Should_Not_Stop_Or_Warn_For_A_New_Db_App()
     {
         var (_, _, calls) = SetupDbApp(existingPersisted: null);

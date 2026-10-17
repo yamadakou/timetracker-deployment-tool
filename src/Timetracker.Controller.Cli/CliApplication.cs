@@ -99,6 +99,7 @@ public static class CliApplication
                 RedisMemoryGi       = cli.GetDouble("--redis-memory"),
                 DryRun              = cli.GetBool("--dry-run"),
                 Verbose             = cli.GetBool("--verbose"),
+                PersistDb           = cli.GetBoolOrNull("--persist-db"),
             };
         }
         catch (ArgumentException ex)
@@ -118,6 +119,8 @@ public static class CliApplication
             {
                 ComposeGenerator.ValidateForCompose(opts);
                 log.Info("検証 OK");
+                if (opts.PersistDb == true)
+                    log.Warn(DeploymentAdvisor.GetWarnings(opts, ValidationTarget.Compose).Single(w => w.StartsWith("persist-db")));
                 var compose = ComposeGenerator.GenerateCompose(opts);
                 await File.WriteAllTextAsync(Path.Combine(ctx.WorkingDirectory, opts.OutputCompose), compose);
                 log.Info($"Compose 生成: {opts.OutputCompose}");
@@ -136,7 +139,9 @@ public static class CliApplication
             if (!ReportPermissions(permissions, log))
                 return 1;
 
-            await new DeploymentRunner(gateway).RunAsync(opts);
+            var result = await new DeploymentRunner(gateway).RunAsync(opts);
+            if (result.StorageAccountName != null)
+                log.Info(DbPersistence.StorageNotice(result.StorageAccountName));
             log.Success("Container Apps デプロイ完了");
             return 0;
         }
@@ -169,7 +174,7 @@ public static class CliApplication
         {
             var gateway = ctx.GatewayFactory(opts, log);
             var plan = await new DeletionPlanner(gateway).PlanAsync(
-                opts.Subscription, opts.ResourceGroup, opts.AppName, cli.GetBool("--include-untagged"));
+                opts.Subscription, opts.ResourceGroup, opts.AppName, cli.GetBool("--include-untagged"), cli.GetBool("--keep-db-data"));
             WritePlan(plan, log);
 
             if (cli.GetBool("--dry-run"))
@@ -202,6 +207,8 @@ public static class CliApplication
                 log.Info($"{result.Name} は既に削除されていました。");
             }
             log.Success($"削除が完了しました（リソースグループ {opts.ResourceGroup} は残しています）。");
+            if (plan.KeepsDbData)
+                log.Info(KeptDbDataNotice(plan));
             return 0;
         }
         catch (Exception ex)
@@ -259,20 +266,33 @@ public static class CliApplication
         log.Info($"削除計画（リソースグループ {plan.ResourceGroup} は削除しません）");
         foreach (var t in plan.Targets)
         {
-            var kind = t.Kind == DeletionResourceKind.ContainerApp ? "Container App" : "Environment";
+            var kind = t.Kind switch
+            {
+                DeletionResourceKind.ContainerApp => "Container App",
+                DeletionResourceKind.Environment => "Environment",
+                _ => "ストレージアカウント",
+            };
             log.Info(t.WillDelete
                 ? $"  削除する     {t.Name} ({kind}){(t.Managed ? "" : " ※管理タグなし")}"
                 : $"  削除しない   {t.Name} ({kind}): {t.Reason}");
         }
         if (plan.HasUnmanaged)
             log.Info("  管理タグの無いリソースも削除するには --include-untagged を指定してください。");
-        if (plan.DeletesDb)
+        if (plan.LosesDbData)
             log.Warn("DB アプリを削除すると DB のデータはすべて失われます。");
+        if (plan.DeletesDbData)
+            log.Warn($"ストレージアカウント {plan.StorageAccountName}（Azure Files に永続化した DB のデータ）も削除します。元に戻せません（残すには --keep-db-data）。");
+        if (plan.KeepsDbData)
+            log.Info(KeptDbDataNotice(plan));
         if (plan.PermissionCheck.Status == PermissionCheckStatus.Missing)
             log.Warn($"権限が不足しています: {string.Join(", ", plan.PermissionCheck.MissingActions)}");
         if (plan.PermissionCheck.Status == PermissionCheckStatus.NotChecked)
             log.Warn($"権限を事前に確認できませんでした: {plan.PermissionCheck.Note}");
     }
+
+    private static string KeptDbDataNotice(DeletionPlan plan) =>
+        $"ストレージアカウント {plan.StorageAccountName}（DB のデータ）は残します。料金がかかり続けます。同じアプリ名で --persist-db を付けて" +
+        "デプロイするとデータを引き継ぎます。不要になったら --keep-db-data を付けずに delete を実行してください。";
 
     // Progress<T> は SynchronizationContext 経由で非同期に通知するため、処理の順にログを出せるよう同期的に呼ぶ
     private sealed class LogProgress<T>(Action<T> report) : IProgress<T>

@@ -25,9 +25,13 @@ public sealed class DeploymentTools
         "HTTP のサーバーで Azure を操作する方式: server（サーバーの ID）または user（利用者本人の権限）。" +
         "省略時はサーバーの既定（get_deployment_options の server.auth_mode）。stdio のサーバーでは指定しない";
 
+    public const string PersistDbDescription =
+        "Azure 上の DB のデータを Azure Files に置き、DB コンテナの再起動の後も残すか。省略時は既存の DB アプリの今の状態を引き継ぐ（新規は永続化しない）。永続化をやめるには false。ストレージの料金がかかる";
+
     internal static readonly IReadOnlyList<string> Constraints =
     [
-        "検証環境向けのツールです。Azure 上の DB のデータは永続化されません（DB コンテナの再起動・再デプロイ・削除で消えます）。",
+        "検証環境向けのツールです。Azure 上の DB のデータは、既定では永続化されません（DB コンテナの再起動・再デプロイ・削除で消えます）。" +
+        "persist_db=true で Azure Files に置くと再起動の後も残ります（ストレージの料金がかかり、plan_deletion では keep_db_data=true を指定しない限り削除されます）。",
         "SQL Server は Developer エディションです（本番環境では使えません）。",
         "Azure 上の SQL Server 構成ではサンプル DB を作成できません（Timetracker のセットアップで空の DB を選択してください）。",
         "Timetracker のメモリが 2Gi 以下だと、サンプル DB の作成が OutOfMemory で失敗することがあります。",
@@ -100,13 +104,15 @@ public sealed class DeploymentTools
         [Description("DB の CPU（vCPU、既定 1.0）")] double? db_cpu = null,
         [Description("DB のメモリ（Gi、既定 2.0）")] double? db_memory_gi = null,
         [Description("Redis の CPU（vCPU、既定 0.5）")] double? redis_cpu = null,
-        [Description("Redis のメモリ（Gi、既定 1.0）")] double? redis_memory_gi = null)
+        [Description("Redis のメモリ（Gi、既定 1.0）")] double? redis_memory_gi = null,
+        [Description(PersistDbDescription)] bool? persist_db = null)
     {
         var parameters = new DeploymentParameters
         {
             Subscription = subscription, ResourceGroup = resource_group, Location = location, AppName = app_name, DbType = db_type,
             DbName = db_name, TtTag = tt_tag, DbPassword = db_password, TrackerPassword = tracker_password,
             TtCpu = tt_cpu, TtMemoryGi = tt_memory_gi, DbCpu = db_cpu, DbMemoryGi = db_memory_gi, RedisCpu = redis_cpu, RedisMemoryGi = redis_memory_gi,
+            PersistDb = persist_db,
         };
         var resolved = parameters.Resolve(_settings);
         var (validationTarget, targetError) = ParseTarget(target);

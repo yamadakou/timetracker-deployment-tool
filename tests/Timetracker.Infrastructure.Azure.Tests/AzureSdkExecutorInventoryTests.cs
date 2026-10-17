@@ -174,7 +174,8 @@ public class AzureSdkExecutorInventoryTests
             { "template": { "volumes": [
                 { "name": "dbdata", "storageType": "AzureFile", "storageName": "dbdata" },
                 { "name": "tmp", "storageType": "EmptyDir" },
-                { "name": "noname", "storageType": "AzureFile" } ] } }
+                { "name": "noname", "storageType": "AzureFile" },
+                { "name": "notype", "storageName": "other" } ] } }
             """;
         _apps.Setup(c => c.GetAllAsync(It.IsAny<CancellationToken>())).Returns(Pageable(App("app-db", volumes).Object, App("app-tt").Object));
 

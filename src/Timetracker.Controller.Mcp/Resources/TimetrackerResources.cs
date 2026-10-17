@@ -24,7 +24,7 @@ public sealed class TimetrackerResources
 
         | 項目 | 内容 |
         |---|---|
-        | Azure 上の DB データは永続化されない | DB はボリュームを持たないコンテナとして動作します。DB コンテナが再起動すると（設定を変えた再デプロイ、リビジョンの更新、Azure 基盤のメンテナンスなど）、DB のデータは失われます。残したいデータは事前にエクスポートしてください。ローカルの docker-compose（generate_compose）は名前付きボリュームを使うため、再起動してもデータは残ります（docker compose down -v で消えます） |
+        | Azure 上の DB データは既定では永続化されない | 既定では、DB はボリュームを持たないコンテナとして動作します。DB コンテナが再起動すると（設定を変えた再デプロイ、リビジョンの更新、Azure 基盤のメンテナンスなど）、DB のデータは失われます。残したいデータは事前にエクスポートしてください。persist_db=true を指定すると、DB のデータを Azure Files（ストレージアカウント）に置き、再起動の後も残します（ストレージの容量とトランザクションの料金がかかります。plan_deletion では keep_db_data=true を指定しない限り、ストレージアカウントも削除します。まれにデータが壊れるおそれがあるため、重要なデータはエクスポートしておいてください）。ローカルの docker-compose（generate_compose）は名前付きボリュームを使うため、再起動してもデータは残ります（docker compose down -v で消えます） |
         | SQL Server は Developer エディション | db_type=sqlserver では MSSQL_PID=Developer で起動します。開発・テスト用途に限られ、本番環境では使えません |
         | SQL Server ＋ Azure ではサンプル DB を作成できない | サンプル DB を使う場合は PostgreSQL（既定）を使ってください。SQL Server では、セットアップウィザードで「空のデータベースを作成する」を選んでください（ローカルの docker-compose では SQL Server でもサンプル DB を作成できます） |
         | Timetracker のメモリ | 3Gi 以上を推奨します |
@@ -54,9 +54,11 @@ public sealed class TimetrackerResources
         | Container App の確認・作成・更新 | Microsoft.App/containerApps/read / write、Microsoft.App/managedEnvironments/join/action |
         | Container App の削除 | Microsoft.App/containerApps/delete |
         | Container Apps Environment の削除 | Microsoft.App/managedEnvironments/delete |
+        | DB のデータの永続化（persist_db=true） | Microsoft.Storage/storageAccounts/read / write（作成する場合）/ listkeys/action、Microsoft.Storage/storageAccounts/fileServices/shares/read / write（作成する場合）、Microsoft.App/managedEnvironments/storages/read / write。永続化した DB アプリの更新では Microsoft.App/containerApps/stop/action / start/action |
+        | ストレージアカウントの削除（keep_db_data=false） | Microsoft.Storage/storageAccounts/delete |
         | 権限の事前確認 | Microsoft.Authorization/permissions/read（通常どのロールでも可） |
 
-        plan_deployment / plan_deletion は、上の権限があるかを事前に確認し、不足していれば blockers に返します（リソースグループがまだ無い場合などは確認できず、warnings に理由を返します）。拒否割り当てや Azure Policy による拒否は、この確認には反映されません。
+        plan_deployment / plan_deletion は、上の権限があるかを事前に確認し、不足していれば blockers に返します（リソースグループがまだ無い場合などは確認できず、warnings に理由を返します）。拒否割り当てや Azure Policy による拒否は、この確認には反映されません。persist_db=true では、Azure Policy でストレージアカウントのアカウントキーによるアクセス（allowSharedKeyAccess）やパブリック ネットワーク アクセスを禁止していると、DB のマウントが失敗します。
 
         ## リソースプロバイダーの登録
 
@@ -65,10 +67,12 @@ public sealed class TimetrackerResources
         - Microsoft.App（必須）
         - Microsoft.OperationalInsights（必須。Container Apps Environment が使用）
         - Microsoft.Web（任意）
+        - Microsoft.Storage（persist_db=true で DB のデータを永続化する場合）
 
         ```bash
         az provider register --namespace Microsoft.App
         az provider register --namespace Microsoft.OperationalInsights
+        az provider register --namespace Microsoft.Storage
         az provider show --namespace Microsoft.App --query "registrationState"
         ```
         """;
