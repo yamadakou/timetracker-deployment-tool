@@ -172,7 +172,7 @@ timetracker-cli delete ... [--keep-db-data [true|false]]
 
 ## 14. 実施状況
 - 実装: 11 の分担のとおり（REVIEW_ISSUES No.46）。自動テストは全件成功、分岐網羅率は正規表現の生成コードを除き 100%
-- Azure での確認（2026-10-17、japaneast、Visual Studio Enterprise サブスクリプション、確認専用のリソースグループ。CLI の `--auth-mode azure-cli`）
+- Azure での確認（2026-10-17、japaneast、Visual Studio Enterprise サブスクリプション、確認専用のリソースグループ（確認の後に削除）。CLI の `--auth-mode azure-cli`）
 
 | No. | 確認 | 結果 |
 |---|---|---|
@@ -183,7 +183,7 @@ timetracker-cli delete ... [--keep-db-data [true|false]]
 | 5 | SQL Server ＋ `--persist-db` の新規デプロイと再デプロイ | 成功。`mssql` ユーザー（uid 10001・gid 0）で起動し、再デプロイ（停止 → 更新 → 開始）の後もデータが残った |
 | 6 | SQL Server: リビジョンの再起動 | **終わらなかった**。新しいレプリカが `PAL initialization failed. Error: 101` で起動に失敗し続け、古いレプリカが動いたまま（約 20 分）。データは無事。本ツールの再デプロイ（停止 → 更新 → 開始）で回復した |
 | 7 | `delete --keep-db-data` → 同じアプリ名で `--persist-db` のデプロイ | Container App と Environment を削除し、ストレージアカウントは残った。デプロイし直すとデータが戻った |
-| 8 | `delete`（既定） | 下記の追記を参照 |
+| 8 | `delete`（既定。`--keep-db-data` なし） | PostgreSQL・SQL Server とも、DB のデータを失う警告とストレージアカウントを削除する警告を表示し、Container App → Environment → ストレージアカウントの順に削除した（Environment の削除は 7〜14 分） |
 
 - 3・6 から、永続化した DB アプリの再起動は、Azure ポータルの「再起動」や `az containerapp revision restart` ではなく、本ツールの再デプロイで行うよう README と MCP の注意事項に書いた。Azure 基盤のメンテナンスでの再起動は制御できないため、3 と同様の復旧（PostgreSQL）または 6 と同様の停滞（SQL Server）が起こりうる。6 が起きた場合も、再デプロイで回復できる
 - `mountOptions` は 4 のままで追加は不要だった（`nobrl` なしで PostgreSQL・SQL Server とも動いた）
