@@ -650,6 +650,9 @@ dotnet publish .\src\Timetracker.Controller.Cli\Timetracker.Controller.Cli.cspro
 - スケール: MinReplicas=1 / MaxReplicas=1（固定）
 - timetracker のイメージタグは `--tt-tag` で指定した値を使用（省略時は DB 種別に応じて `11.0.1-linux-postgres` / `11.0.1-linux-mssql`）
 
+### 将来の検討
+今後の機能の候補（DB データの永続化オプション、ストア配布できるデスクトップアプリなど）と優先度は [docs/ROADMAP.md](docs/ROADMAP.md) にまとめています。
+
 ### 注意点
 - 本ツールは検証環境の構築支援が目的のため、Azure Container Apps の DB/Redis には永続ボリュームを設定していません（Dry-run の docker-compose は名前付きボリュームを使用）（[本ツールの目的と注意事項](#本ツールの目的と注意事項) を参照）。
 - DB パスワード・Timetracker アプリパスワードは Container Apps の secret（`db-password` / `app-password`）として登録し、環境変数からは `secretRef` で参照します（ポータル上の環境変数一覧に平文で表示されません）。
