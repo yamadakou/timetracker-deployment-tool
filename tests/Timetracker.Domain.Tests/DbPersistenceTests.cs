@@ -69,8 +69,8 @@ public class DbPersistenceTests
 
     [Theory]
     [InlineData(false, false, "永続ボリュームを設定していないため")]
-    [InlineData(false, true, "共有にあるデータから始まります")]
-    [InlineData(true, false, "DB は空から始まります")]
+    [InlineData(false, true, "今の DB に保存されているデータは消えます")]
+    [InlineData(true, false, "これまでのデータは消えずにストレージアカウントに残り")]
     public void DataLossWarning_Should_Explain_Why_The_Data_Is_Lost(bool currentlyPersisted, bool persist, string expected)
     {
         DbPersistence.DataLossWarning("demo-db", currentlyPersisted, persist).Should().Contain("demo-db").And.Contain(expected);

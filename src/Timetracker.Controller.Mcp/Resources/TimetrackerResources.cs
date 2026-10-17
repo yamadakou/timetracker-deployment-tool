@@ -24,7 +24,7 @@ public sealed class TimetrackerResources
 
         | 項目 | 内容 |
         |---|---|
-        | Azure 上の DB データは既定では永続化されない | 既定では、DB はボリュームを持たないコンテナとして動作します。DB コンテナが再起動すると（設定を変えた再デプロイ、リビジョンの更新、Azure 基盤のメンテナンスなど）、DB のデータは失われます。残したいデータは事前にエクスポートしてください。persist_db=true を指定すると、DB のデータを Azure Files（ストレージアカウント）に置き、再起動の後も残します（ストレージの容量とトランザクションの料金がかかります。plan_deletion では keep_db_data=true を指定しない限り、ストレージアカウントも削除します。まれにデータが壊れるおそれがあるため、重要なデータはエクスポートしておいてください）。ローカルの docker-compose（generate_compose）は名前付きボリュームを使うため、再起動してもデータは残ります（docker compose down -v で消えます） |
+        | Azure 上の DB データは既定では永続化されない | 既定では、DB はボリュームを持たないコンテナとして動作します。DB コンテナが再起動すると（設定を変えた再デプロイ、リビジョンの更新、Azure 基盤のメンテナンスなど）、DB のデータは失われます。残したいデータは事前にエクスポートしてください。persist_db=true を指定すると、DB のデータを Azure Files（ストレージアカウント）に置き、再起動の後も残します（ストレージの容量とトランザクションの料金がかかります。plan_deletion では keep_db_data=true を指定しない限り、ストレージアカウントも削除します。まれにデータが壊れるおそれがあるため、重要なデータはエクスポートしておいてください。永続化した DB アプリを再起動するときは、Azure ポータルの「再起動」や az containerapp revision restart ではなく、同じ設定で plan_deployment → start_deployment を実行してください（新旧の DB が同じデータを同時に開かないよう、停止 → 更新 → 開始で再起動します））。ローカルの docker-compose（generate_compose）は名前付きボリュームを使うため、再起動してもデータは残ります（docker compose down -v で消えます） |
         | SQL Server は Developer エディション | db_type=sqlserver では MSSQL_PID=Developer で起動します。開発・テスト用途に限られ、本番環境では使えません |
         | SQL Server ＋ Azure ではサンプル DB を作成できない | サンプル DB を使う場合は PostgreSQL（既定）を使ってください。SQL Server では、セットアップウィザードで「空のデータベースを作成する」を選んでください（ローカルの docker-compose では SQL Server でもサンプル DB を作成できます） |
         | Timetracker のメモリ | 3Gi 以上を推奨します |

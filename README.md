@@ -505,7 +505,10 @@ timetracker-cli.exe deploy --subscription "<SUBSCRIPTION_ID>" --resource-group "
 
 - 作成するもの: ストレージアカウント・ファイル共有 `{アプリ名}-db`・Environment のストレージ `dbdata`（[作成される Azure リソース](#作成される-azure-リソース)）。DB コンテナの `/var/lib/postgresql/data`（PostgreSQL。データは `pgdata` の下）または `/var/opt/mssql`（SQL Server）にマウントします
 - 再デプロイ: `--persist-db` を省略すると、既存の DB アプリの今の状態を引き継ぎます（永続化していれば続ける）。永続化を続ける更新では、新旧の DB コンテナが同じデータを同時に開かないよう、**DB アプリを停止してから更新し、開始します**（その間は Timetracker から DB に接続できません）。この場合、DB のデータは失われないため、データ消失の警告は出ません（MCP の `acknowledge_data_loss` も不要です）
-- 切り替え: 永続化していない環境に `--persist-db` を付けると、今の DB のデータは引き継がれず、共有にあるデータから始まります（共有を新しく作る場合は空）。永続化をやめる（`--persist-db false`）と、DB は空から始まります（ストレージアカウントのデータは残り、もう一度 `--persist-db` を付けると戻ります）。どちらも警告を表示します
+- 切り替え（どちらも警告を表示します）:
+  - 永続化していない環境に `--persist-db` を付けると、今の DB に保存されているデータは消えます。切り替えた後の DB は、以前に永続化していたときのデータ（初めて永続化する場合は空の DB）になります。今のデータを残したい場合は、事前に Timetracker でエクスポートしてください
+  - 永続化をやめる（`--persist-db false`）と、Timetracker からは空の DB に見えます。これまでのデータは消えずにストレージアカウントに残り、もう一度 `--persist-db` を付けてデプロイすると元に戻ります
+- **再起動は本ツールの再デプロイで**: 永続化した DB アプリを再起動したいときは、同じ設定で `deploy` を実行してください（停止 → 更新 → 開始で再起動します）。Azure ポータルの「再起動」や `az containerapp revision restart` は使わないでください。Container Apps は新しいレプリカが準備できるまで古いレプリカを止めないため、同じデータを新旧の DB が同時に開こうとします。Azure での確認では、SQL Server は新しいレプリカが起動に失敗し続けて再起動が終わらなくなり（データは無事。本ツールの再デプロイで回復）、PostgreSQL は新旧が一時的に同時に動いた後、正しく停止されなかったときの自動の復旧で起動しました（データは無事）
 - 削除: `delete` は、既定でストレージアカウントも DB のデータごと削除します。`--keep-db-data` で残せます（料金はかかり続けます。同じアプリ名で `--persist-db` を付けてデプロイすると、データを引き継げます）
 - 料金: Azure Files（Standard、LRS）の保存容量とトランザクションの料金がかかります。DB は読み書きが多いため、トランザクションの料金が主になります。金額は [Azure Files の料金](https://azure.microsoft.com/ja-jp/pricing/details/storage/files/) を確認してください
 - 前提: リソースプロバイダー `Microsoft.Storage` の登録（[Azure リソースプロバイダーの登録](#azure-リソースプロバイダーの登録)）と、ストレージの権限（[必要な RBAC ロールと権限](#必要な-rbac-ロールと権限)。Contributor には含まれます）。Azure Policy でアカウントキーによるアクセスやパブリック ネットワーク アクセスを禁止している環境では使えません
