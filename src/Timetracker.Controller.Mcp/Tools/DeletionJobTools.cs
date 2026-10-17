@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using Azure.Core;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol;
 using ModelContextProtocol.Server;
@@ -22,17 +23,19 @@ public sealed class DeletionJobTools
 
     private readonly McpServerSettings _settings;
     private readonly ICallerContext _caller;
+    private readonly IAzureAccessPolicy _policy;
     private readonly IPlanStore _plans;
     private readonly JobManager _jobs;
-    private readonly Func<IDeploymentLogger, IAzureDeploymentGateway> _gatewayFactory;
+    private readonly Func<IDeploymentLogger, TokenCredential, IAzureDeploymentGateway> _gatewayFactory;
     private readonly ILogger<DeletionJobTools> _logger;
 
     public DeletionJobTools(
-        McpServerSettings settings, ICallerContext caller, IPlanStore plans, JobManager jobs,
-        Func<IDeploymentLogger, IAzureDeploymentGateway> gatewayFactory, ILogger<DeletionJobTools> logger)
+        McpServerSettings settings, ICallerContext caller, IAzureAccessPolicy policy, IPlanStore plans, JobManager jobs,
+        Func<IDeploymentLogger, TokenCredential, IAzureDeploymentGateway> gatewayFactory, ILogger<DeletionJobTools> logger)
     {
         _settings = settings;
         _caller = caller;
+        _policy = policy;
         _plans = plans;
         _jobs = jobs;
         _gatewayFactory = gatewayFactory;
@@ -51,10 +54,12 @@ public sealed class DeletionJobTools
         [Description("アプリ名（既定 timetracker）")] string? app_name = null,
         [Description("管理タグの無いリソース（本ツールの以前の版で作ったものなど）も対象にするか（既定 false）。" +
                      "別のアプリ・ツールの管理タグがあるものは対象にしない")] bool include_untagged = false,
+        [Description(DeploymentTools.AzureIdentityDescription)] string? azure_identity = null,
         CancellationToken cancellationToken = default)
     {
-        var o = ToolSupport.ResolveTarget(_settings, subscription, resource_group, app_name);
-        var plan = await PlanAsync(o.Subscription, o.ResourceGroup, o.AppName, include_untagged, cancellationToken);
+        var access = _policy.Resolve(azure_identity);
+        var o = ToolSupport.ResolveTarget(_settings, access, subscription, resource_group, app_name);
+        var plan = await PlanAsync(access, o.Subscription, o.ResourceGroup, o.AppName, include_untagged, cancellationToken);
 
         var blockers = Blockers(plan);
         var warnings = new List<string>();
@@ -66,12 +71,12 @@ public sealed class DeletionJobTools
             warnings.Add($"権限を事前に確認できませんでした: {plan.PermissionCheck.Note}");
 
         var canRun = plan.HasDeletions && blockers.Count == 0;
-        var saved = canRun ? _plans.Save(plan, _caller.CallerId) : null;
+        var saved = canRun ? _plans.Save(new IdentityPlan<DeletionPlan>(plan, access.Mode), _caller.CallerId) : null;
         return new DeletionPlanResult(
             PlanId: saved?.PlanId,
             ExpiresAt: saved?.ExpiresAt,
             Blockers: blockers,
-            Identity: new IdentityInfo(_settings.AuthMode, DeploymentJobTools.IdentityDisplays[_settings.AuthMode]),
+            Identity: access.Identity,
             PermissionCheck: DeploymentJobTools.ToPermissionCheckInfo(plan.PermissionCheck),
             Targets: plan.Targets.Select(ToTargetInfo).ToList(),
             Kept: [$"resource_group: {o.ResourceGroup}（削除しません。不要であれば Azure ポータルや az group delete で削除してください）"],
@@ -91,16 +96,21 @@ public sealed class DeletionJobTools
         [Description("確認のためのアプリ名（計画のアプリ名と完全に一致すること）")] string confirm_app_name,
         CancellationToken cancellationToken = default)
     {
-        var plan = DeploymentJobTools.RequirePlan(_plans.Find<DeletionPlan>(plan_id, _caller.CallerId), plan_id, "plan_deletion");
+        _policy.RequireAzureAccess();
+        var (plan, mode) = DeploymentJobTools.RequirePlan(_plans.Find<IdentityPlan<DeletionPlan>>(plan_id, _caller.CallerId), plan_id, "plan_deletion");
         // 一致しない場合は計画を使用済みにしない（利用者に確認して、同じ計画で実行し直せるように）
         if (confirm_app_name != plan.AppName)
             throw new McpException(
                 $"confirm_app_name '{confirm_app_name}' が計画のアプリ名 '{plan.AppName}' と一致しないため、削除しませんでした。" +
                 "削除してよいかとアプリ名を利用者に確認してください。");
-        plan = DeploymentJobTools.RequirePlan(_plans.Take<DeletionPlan>(plan_id, _caller.CallerId), plan_id, "plan_deletion");
+        // 計画を作った方式で実行する（呼び出し元がまだその方式を使えるかも確かめる）
+        var access = _policy.ForMode(mode);
+        plan = DeploymentJobTools.RequirePlan(_plans.Take<IdentityPlan<DeletionPlan>>(plan_id, _caller.CallerId), plan_id, "plan_deletion").Plan;
 
-        // 計画の後に Azure の状態が変わっていないかを、実行の直前にもう一度確かめる
-        var current = await PlanAsync(plan.Subscription, plan.ResourceGroup, plan.AppName, plan.IncludeUntagged, cancellationToken);
+        // 操作してよい範囲（サーバーの設定）と、計画の後に Azure の状態が変わっていないかを、実行の直前にもう一度確かめる
+        if (access.ResourceGroupBlocker(plan.Subscription, plan.ResourceGroup) is { } outOfScope)
+            throw new McpException(outOfScope);
+        var current = await PlanAsync(access, plan.Subscription, plan.ResourceGroup, plan.AppName, plan.IncludeUntagged, cancellationToken);
         var blockers = Blockers(current);
         if (blockers.Count > 0)
             throw new McpException("実行の直前の確認で、実行できない状態になっていました:\n- " + string.Join("\n- ", blockers));
@@ -116,7 +126,7 @@ public sealed class DeletionJobTools
                 context.ReportStep(++index, total, $"{t.Name} の削除");
                 context.Logger.Info($"削除中: {t.Name}");
             });
-            var results = await new DeletionRunner(_gatewayFactory(context.Logger)).RunAsync(plan, progress);
+            var results = await new DeletionRunner(_gatewayFactory(context.Logger, access.CreateCredential(context.Logger))).RunAsync(plan, progress);
             foreach (var r in results.Where(r => !r.Deleted))
                 context.Logger.Info($"{r.Name} は既に削除されていました。");
             context.Logger.Success($"削除が完了しました（リソースグループ {plan.ResourceGroup} は残しています）。");
@@ -134,9 +144,14 @@ public sealed class DeletionJobTools
         return new StartJobResult(started.Job.Id, "delete", "running", DeploymentJobTools.PollHint);
     }
 
-    private Task<DeletionPlan> PlanAsync(string subscription, string resourceGroup, string appName, bool includeUntagged, CancellationToken cancellationToken) =>
-        ToolSupport.CallAzureAsync(_settings, _logger, () =>
-            new DeletionPlanner(_gatewayFactory(new McpDeploymentLogger(_logger))).PlanAsync(subscription, resourceGroup, appName, includeUntagged, cancellationToken));
+    private Task<DeletionPlan> PlanAsync(
+        AzureAccess access, string subscription, string resourceGroup, string appName, bool includeUntagged, CancellationToken cancellationToken) =>
+        ToolSupport.CallAzureAsync(access, _logger, () =>
+        {
+            var logger = new McpDeploymentLogger(_logger);
+            return new DeletionPlanner(_gatewayFactory(logger, access.CreateCredential(logger)))
+                .PlanAsync(subscription, resourceGroup, appName, includeUntagged, cancellationToken);
+        });
 
     private static List<string> Blockers(DeletionPlan plan) =>
         plan.HasDeletions && plan.PermissionCheck.Status == PermissionCheckStatus.Missing

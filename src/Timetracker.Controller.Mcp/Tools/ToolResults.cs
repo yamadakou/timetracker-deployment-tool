@@ -19,9 +19,16 @@ public sealed record DefaultValues(
 public sealed record AppNameRule(int MinLength, int MaxLength, string Pattern, bool NoDoubleHyphen);
 
 /// <summary>サーバーの設定の状態。パスワードは値を返さず、環境変数が設定済みかだけを返す。</summary>
+/// <param name="AuthMode">azure_identity を省略したときに Azure を操作する ID（stdio では認証モード、HTTP では server / user）</param>
+/// <param name="AllowedResourceGroups">HTTP の server 方式で操作できるリソースグループ（stdio と、server 方式が無効な場合は null）</param>
+/// <param name="CanCreateResourceGroup">HTTP の server 方式でリソースグループを作成できるか（stdio と、server 方式が無効な場合は null）</param>
+/// <param name="IdentityModes">HTTP のサーバーで有効な方式（stdio では null）</param>
+/// <param name="CallerIdentityModes">HTTP で、呼び出し元がアプリロールで使える方式（stdio では null）</param>
 public sealed record ServerStatus(
     string Transport, string AuthMode, PasswordEnvStatus PasswordEnv,
-    bool DefaultSubscriptionSet, bool DefaultResourceGroupSet, string? OutputRoot);
+    bool DefaultSubscriptionSet, bool DefaultResourceGroupSet, string? OutputRoot,
+    IReadOnlyList<string>? AllowedResourceGroups = null, bool? CanCreateResourceGroup = null,
+    IReadOnlyList<string>? IdentityModes = null, IReadOnlyList<string>? CallerIdentityModes = null);
 
 public sealed record PasswordEnvStatus(bool DbPassword, bool TrackerPassword);
 
@@ -51,3 +58,12 @@ public sealed record ComposeResult(
 public sealed record SubscriptionsResult(string AuthMode, IReadOnlyList<SubscriptionItem> Subscriptions);
 
 public sealed record SubscriptionItem(string SubscriptionId, string DisplayName, string? State, string? TenantId);
+
+/// <summary>HTTP の generate_compose の結果（.env のパスワードはプレースホルダー）。</summary>
+public sealed record ComposeContentResult(
+    string ComposeFileName,
+    string ComposeContent,
+    string EnvFileName,
+    string EnvContent,
+    IReadOnlyList<string> Warnings,
+    IReadOnlyList<string> NextSteps);

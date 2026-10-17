@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using Azure.Core;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol;
 using ModelContextProtocol.Server;
@@ -21,30 +22,26 @@ public sealed class DeploymentJobTools
 {
     public const string PollHint = "get_job_status を 15〜30 秒の間隔で呼び、status が succeeded または failed になるまで待ってください。";
 
-    // Azure を操作する ID の説明（認証モードごと）
-    internal static readonly IReadOnlyDictionary<string, string> IdentityDisplays = new Dictionary<string, string>
-    {
-        ["azure-cli"] = "az login でサインインしているアカウント",
-        ["default"] = "DefaultAzureCredential が見つけた資格情報",
-        ["sp-env"] = "環境変数 AZURE_CLIENT_ID のサービスプリンシパル",
-        ["device-code"] = "デバイスコード認証でサインインしたアカウント",
-        ["managed-identity"] = "サーバーのマネージド ID",
-    };
+    public const string CannotCreateResourceGroup =
+        "リソースグループ {0} がありません。このサーバーではリソースグループを作成できない設定（TT_MCP_HTTP__SERVER_CAN_CREATE_RESOURCE_GROUP）のため、" +
+        "管理者にリソースグループの作成を依頼してください。";
 
     private readonly McpServerSettings _settings;
     private readonly ICallerContext _caller;
+    private readonly IAzureAccessPolicy _policy;
     private readonly IPlanStore _plans;
     private readonly JobManager _jobs;
-    private readonly Func<IDeploymentLogger, IAzureDeploymentGateway> _gatewayFactory;
+    private readonly Func<IDeploymentLogger, TokenCredential, IAzureDeploymentGateway> _gatewayFactory;
     private readonly ILogger<DeploymentJobTools> _logger;
 
-    /// <param name="gatewayFactory">渡したロガーにログを書く Azure の操作を作る（ジョブではジョブのログに書く）</param>
+    /// <param name="gatewayFactory">渡したロガーにログを書き、渡した資格情報で操作する Azure の操作を作る（ジョブではジョブのログに書く）</param>
     public DeploymentJobTools(
-        McpServerSettings settings, ICallerContext caller, IPlanStore plans, JobManager jobs,
-        Func<IDeploymentLogger, IAzureDeploymentGateway> gatewayFactory, ILogger<DeploymentJobTools> logger)
+        McpServerSettings settings, ICallerContext caller, IAzureAccessPolicy policy, IPlanStore plans, JobManager jobs,
+        Func<IDeploymentLogger, TokenCredential, IAzureDeploymentGateway> gatewayFactory, ILogger<DeploymentJobTools> logger)
     {
         _settings = settings;
         _caller = caller;
+        _policy = policy;
         _plans = plans;
         _jobs = jobs;
         _gatewayFactory = gatewayFactory;
@@ -72,8 +69,10 @@ public sealed class DeploymentJobTools
         [Description("DB のメモリ（Gi、既定 2.0）")] double? db_memory_gi = null,
         [Description("Redis の CPU（vCPU、既定 0.5）")] double? redis_cpu = null,
         [Description("Redis のメモリ（Gi、既定 1.0）")] double? redis_memory_gi = null,
+        [Description(DeploymentTools.AzureIdentityDescription)] string? azure_identity = null,
         CancellationToken cancellationToken = default)
     {
+        var access = _policy.Resolve(azure_identity);
         var resolved = new DeploymentParameters
         {
             Subscription = subscription, ResourceGroup = resource_group, Location = location, AppName = app_name, DbType = db_type,
@@ -82,8 +81,8 @@ public sealed class DeploymentJobTools
         }.Resolve(_settings);
         var o = resolved.Options;
         var advice = DeploymentAdvisor.GetWarnings(o, ValidationTarget.Azure);
-        var identity = new IdentityInfo(_settings.AuthMode, IdentityDisplays[_settings.AuthMode]);
-        var errors = DeploymentValidator.GetErrors(o, ValidationTarget.Azure).Concat(ToolSupport.PasswordHints(resolved)).ToList();
+        var identity = access.Identity;
+        var errors = DeploymentValidator.GetErrors(o, ValidationTarget.Azure).Concat(ToolSupport.PasswordHints(resolved, _settings)).ToList();
         if (errors.Count > 0)
         {
             // 設定に誤りがあれば Azure は読まない
@@ -92,8 +91,8 @@ public sealed class DeploymentJobTools
                 [], advice, false, null, ToolSupport.ToResolvedSettings(resolved), ToolSupport.ToResourceNames(o.AppName));
         }
 
-        var plan = await PlanAsync(o, cancellationToken);
-        var saved = plan.CanRun ? _plans.Save(plan, _caller.CallerId) : null;
+        var plan = await PlanAsync(access, o, cancellationToken);
+        var saved = plan.CanRun ? _plans.Save(new IdentityPlan<DeploymentPlan>(plan, access.Mode), _caller.CallerId) : null;
         return new DeploymentPlanResult(
             PlanId: saved?.PlanId,
             ExpiresAt: saved?.ExpiresAt,
@@ -118,16 +117,19 @@ public sealed class DeploymentJobTools
         [Description("DB のデータが消えるおそれがあることに利用者が同意したか（requires_data_loss_ack=true の計画では必須）")] bool acknowledge_data_loss = false,
         CancellationToken cancellationToken = default)
     {
-        var plan = RequirePlan(_plans.Find<DeploymentPlan>(plan_id, _caller.CallerId), plan_id, "plan_deployment");
+        _policy.RequireAzureAccess();
+        var (plan, mode) = RequirePlan(_plans.Find<IdentityPlan<DeploymentPlan>>(plan_id, _caller.CallerId), plan_id, "plan_deployment");
         // 同意が無い場合は計画を使用済みにしない（同意を得て、同じ計画で実行し直せるように）
         if (plan.RequiresDataLossAck && !acknowledge_data_loss)
             throw new McpException(
                 "この計画は既存の DB アプリを更新します。設定が変わると DB コンテナが再起動し、DB のデータは失われます。利用者が同意した場合だけ、" +
                 "acknowledge_data_loss=true を指定して実行してください。");
-        plan = RequirePlan(_plans.Take<DeploymentPlan>(plan_id, _caller.CallerId), plan_id, "plan_deployment");
+        // 計画を作った方式で実行する（呼び出し元がまだその方式を使えるかも確かめる）
+        var access = _policy.ForMode(mode);
+        plan = RequirePlan(_plans.Take<IdentityPlan<DeploymentPlan>>(plan_id, _caller.CallerId), plan_id, "plan_deployment").Plan;
 
         // 計画の後に Azure の状態が変わっていないかを、実行の直前にもう一度確かめる
-        var current = await PlanAsync(plan.Options, cancellationToken);
+        var current = await PlanAsync(access, plan.Options, cancellationToken);
         if (!current.CanRun)
             throw new McpException("実行の直前の確認で、実行できない状態になっていました:\n- " + string.Join("\n- ", current.Blockers));
         if (!plan.HasSameOperations(current))
@@ -136,7 +138,7 @@ public sealed class DeploymentJobTools
         var o = plan.Options;
         var started = _jobs.TryStart(JobKind.Deploy, new JobTarget(o.Subscription, o.ResourceGroup, o.AppName), _caller.CallerId, async context =>
         {
-            var gateway = _gatewayFactory(context.Logger);
+            var gateway = _gatewayFactory(context.Logger, access.CreateCredential(context.Logger));
             var progress = new ActionProgress<DeploymentProgress>(p => context.ReportStep(p.Index, p.Total, p.Description));
             return await new DeploymentRunner(gateway).RunAsync(o, progress);
         });
@@ -200,12 +202,14 @@ public sealed class DeploymentJobTools
         [Description("サブスクリプション ID（省略時はサーバーの既定値 TT_MCP_DEFAULT_SUBSCRIPTION）")] string? subscription = null,
         [Description("リソースグループ名（省略時はサーバーの既定値 TT_MCP_DEFAULT_RESOURCE_GROUP）")] string? resource_group = null,
         [Description("アプリ名（既定 timetracker）")] string? app_name = null,
+        [Description(DeploymentTools.AzureIdentityDescription)] string? azure_identity = null,
         CancellationToken cancellationToken = default)
     {
-        var o = ToolSupport.ResolveTarget(_settings, subscription, resource_group, app_name);
+        var access = _policy.Resolve(azure_identity);
+        var o = ToolSupport.ResolveTarget(_settings, access, subscription, resource_group, app_name);
 
-        var info = await ToolSupport.CallAzureAsync(_settings, _logger, () =>
-            new DeploymentInspector(_gatewayFactory(new McpDeploymentLogger(_logger))).InspectAsync(o.Subscription, o.ResourceGroup, o.AppName, cancellationToken));
+        var info = await ToolSupport.CallAzureAsync(access, _logger, () =>
+            new DeploymentInspector(CreateGateway(access)).InspectAsync(o.Subscription, o.ResourceGroup, o.AppName, cancellationToken));
         ContainerAppState? App(ContainerAppDetails? a) => a == null ? null : new ContainerAppState(
             a.Name, a.ProvisioningState, a.RunningStatus, a.Image, a.Cpu, a.Memory, a.LatestRevisionName, a.Fqdn, ManagedTags.IsManaged(a.Tags, o.AppName));
         return new DeploymentInfoResult(
@@ -217,9 +221,27 @@ public sealed class DeploymentJobTools
             info.Endpoint);
     }
 
-    private Task<DeploymentPlan> PlanAsync(DeployOptions options, CancellationToken cancellationToken) =>
-        ToolSupport.CallAzureAsync(_settings, _logger, () =>
-            new DeploymentPlanner(_gatewayFactory(new McpDeploymentLogger(_logger))).PlanAsync(options, cancellationToken));
+    // 操作してよい範囲に無いリソースグループは、Azure を読まずにブロッカーにする。リソースグループを作成できない設定では、
+    // リソースグループが無いこともブロッカーにする（計画時と実行の直前の両方で確かめる）
+    private async Task<DeploymentPlan> PlanAsync(AzureAccess access, DeployOptions options, CancellationToken cancellationToken)
+    {
+        if (access.ResourceGroupBlocker(options.Subscription, options.ResourceGroup) is { } blocker)
+            return new DeploymentPlan(options, [], [blocker], [], PermissionCheckResult.NotChecked("操作できる範囲に無いため確認していません。"));
+
+        var plan = await ToolSupport.CallAzureAsync(access, _logger, () =>
+            new DeploymentPlanner(CreateGateway(access)).PlanAsync(options, cancellationToken));
+        return !access.CanCreateResourceGroup
+               && plan.Operations.Any(op => op.Kind == PlannedResourceKind.ResourceGroup && op.Action == PlannedAction.Create)
+            ? plan with { Blockers = [.. plan.Blockers, string.Format(CannotCreateResourceGroup, options.ResourceGroup)] }
+            : plan;
+    }
+
+    // ツールのログに書き、方式の資格情報で操作する Azure の操作
+    private IAzureDeploymentGateway CreateGateway(AzureAccess access)
+    {
+        var logger = new McpDeploymentLogger(_logger);
+        return _gatewayFactory(logger, access.CreateCredential(logger));
+    }
 
     // 存在しない・期限切れ・使用済み・ほかの呼び出し元・種類の違う計画は、実行できない理由と次の手順を返す
     internal static TPlan RequirePlan<TPlan>(PlanLookup<TPlan> lookup, string planId, string planTool) where TPlan : class => lookup.Status switch

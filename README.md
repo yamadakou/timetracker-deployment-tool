@@ -342,8 +342,8 @@ az provider show --namespace Microsoft.OperationalInsights --query "registration
 #### 認証モード: `managed-identity` (ManagedIdentityCredential)
 
 ##### 前提環境
-- Azure VM、Azure App Service、Azure Container Instances、または Azure Functions 上で実行
-- 実行環境に Managed Identity が有効化されていること
+- Azure VM、Azure App Service、Azure Container Instances、Azure Container Apps、または Azure Functions 上で実行
+- 実行環境に Managed Identity が有効化されていること（環境変数 `AZURE_CLIENT_ID` があればそのクライアント ID のユーザー割り当て Managed Identity、無ければシステム割り当て Managed Identity を使います）
 - Azure 上で実行する場合の推奨認証モード（認証情報の管理が不要）
 - 必要な RBAC ロール: Managed Identity に [必要な RBAC ロールと権限](#必要な-rbac-ロールと権限) のロールを付与
 - 参考: [Managed Identity](https://learn.microsoft.com/ja-jp/azure/active-directory/managed-identities-azure-resources/overview)
@@ -481,7 +481,7 @@ az provider show --namespace Microsoft.OperationalInsights --query "registration
 
 ### MCP サーバー（AI アシスタントから使う）
 
-CLI と同じ機能を、MCP（Model Context Protocol）に対応した AI アシスタント（Claude Code、VS Code の GitHub Copilot、Claude Desktop など）から、対話しながら使えます。現在は利用者の PC で動く stdio 版を提供しています（チームで共有する HTTP 版は予定）。導入・アシスタントの設定・使い方は [MCP サーバーの利用者向けマニュアル（docs/MCP_SERVER.md）](docs/MCP_SERVER.md) を参照してください。
+CLI と同じ機能を、MCP（Model Context Protocol）に対応した AI アシスタント（Claude Code、VS Code の GitHub Copilot、Claude Desktop など）から、対話しながら使えます。現在は利用者の PC で動く stdio 版を提供しています（チームで共有する HTTP 版は開発中）。導入・アシスタントの設定・使い方は [MCP サーバーの利用者向けマニュアル（docs/MCP_SERVER.md）](docs/MCP_SERVER.md) を参照してください。
 
 ### コマンドパラメータの説明一覧
 以下は `deploy`（サブコマンドを省略した場合も `deploy`）のオプションです。`delete` のオプションは[リソースの削除（delete）](#リソースの削除delete)を参照してください。

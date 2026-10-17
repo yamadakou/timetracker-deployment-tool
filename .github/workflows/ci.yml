@@ -29,6 +29,27 @@ jobs:
     - name: Test
       run: dotnet test Timetracker.sln --configuration Release --no-build --verbosity normal
 
+  # MCP サーバー（HTTP）の配置とロールの割り当てのスクリプト（scripts/*.ps1）を、az を模擬に置き換えて確かめる（Pester）。
+  # 管理者が実行する Windows の PowerShell 7 で動かす
+  scripts:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Test PowerShell scripts
+      shell: pwsh
+      run: |
+        Install-Module Pester -MinimumVersion 5.5 -Force -Scope CurrentUser -SkipPublisherCheck
+        Import-Module Pester -MinimumVersion 5.5
+        $config = New-PesterConfiguration
+        $config.Run.Path = "tests/scripts"
+        $config.Run.Exit = $true
+        $config.Output.Verbosity = "Detailed"
+        Invoke-Pester -Configuration $config
+
   # CLI の Dry-run で作った docker-compose.yml でローカルに起動し、セットアップウィザードでサンプルデータベースを作って
   # サンプルデータベースのユーザーでログインできることをブラウザー（Playwright）で確かめる（PostgreSQL / SQL Server）。Linux コンテナを使うため ubuntu で動かす。
   # ライセンスキーとサンプルデータベースのユーザー（リポジトリのシークレット TT_E2E_*）が無い場合（フォークからの PR など）は、テストがスキップされる
@@ -74,3 +95,29 @@ jobs:
       with:
         name: e2e-local-results-${{ matrix.db-type }}
         path: TestResults
+
+  # MCP サーバー（HTTP）のコンテナイメージがビルドでき、起動して /healthz に応答し、トークンなしの /mcp を 401 にすることを確かめる（push はしない）
+  docker-mcp:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Build image
+      run: docker build -t timetracker-mcp:ci .
+
+    - name: Smoke test
+      run: |
+        docker run -d --name ttmcp -p 8080:8080 \
+          -e TT_MCP_HTTP__TENANT_ID=00000000-0000-0000-0000-000000000001 \
+          -e TT_MCP_HTTP__CLIENT_ID=00000000-0000-0000-0000-000000000002 \
+          -e TT_MCP_HTTP__PUBLIC_URL=https://mcp.example.com/mcp \
+          -e TT_MCP_HTTP__SERVER_ALLOWED_RESOURCE_GROUPS=/subscriptions/00000000-0000-0000-0000-000000000003/resourceGroups/rg \
+          timetracker-mcp:ci
+        for i in $(seq 1 30); do curl -sf http://localhost:8080/healthz && break; sleep 1; done
+        test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/healthz)" = 200
+        test "$(curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:8080/mcp -H 'Content-Type: application/json' -d '{}')" = 401
+        test "$(docker exec ttmcp id -u)" != 0
+        docker logs ttmcp

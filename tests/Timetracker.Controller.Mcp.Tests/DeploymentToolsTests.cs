@@ -1,3 +1,4 @@
+using Azure.Core;
 using System.Text.Json;
 using Azure;
 using Azure.Identity;
@@ -8,6 +9,7 @@ using Moq;
 using Timetracker.Controller.Mcp.Tools;
 using Timetracker.Domain.Deployment;
 using Timetracker.Infrastructure.Azure;
+using Timetracker.Controller.Mcp.Tests.Http;
 using Xunit;
 
 namespace Timetracker.Controller.Mcp.Tests;
@@ -26,8 +28,14 @@ public sealed class DeploymentToolsTests : IDisposable
             Directory.Delete(_root, recursive: true);
     }
 
-    private DeploymentTools Tools(McpServerSettings? settings = null, Func<ISubscriptionDirectory>? directory = null) =>
-        new(settings ?? new McpServerSettings(), directory ?? (() => _directory.Object), NullLogger<DeploymentTools>.Instance);
+    private DeploymentTools Tools(McpServerSettings? settings = null, Func<TokenCredential, ISubscriptionDirectory>? directory = null, IAzureAccessPolicy? policy = null)
+    {
+        settings ??= new McpServerSettings();
+        return new(settings, policy ?? new UnrestrictedAccessPolicy(settings), directory ?? (_ => _directory.Object), NullLogger<DeploymentTools>.Instance);
+    }
+
+    private static ComposeFileTools FileTools(McpServerSettings? settings = null) =>
+        new(settings ?? new McpServerSettings(), NullLogger<ComposeFileTools>.Instance);
 
     private static string Json(object value) => JsonSerializer.Serialize(value, McpServerHost.JsonOptions);
 
@@ -138,8 +146,8 @@ public sealed class DeploymentToolsTests : IDisposable
 
     // ---- generate_compose
 
-    private DeploymentTools ComposeTools(string? outputRoot = null) =>
-        Tools(new McpServerSettings { DbPassword = DbPassword, TrackerPassword = TrackerPassword, OutputRoot = outputRoot });
+    private static ComposeFileTools ComposeTools(string? outputRoot = null) =>
+        FileTools(new McpServerSettings { DbPassword = DbPassword, TrackerPassword = TrackerPassword, OutputRoot = outputRoot });
 
     [Theory]
     [InlineData("postgresql")]
@@ -170,7 +178,7 @@ public sealed class DeploymentToolsTests : IDisposable
     {
         var dir = Path.Combine(_root, "args");
 
-        var result = Tools().GenerateCompose(dir, db_password: "ArgDbPass1!", tracker_password: "ArgTracker1!", tt_memory_gi: 2);
+        var result = FileTools().GenerateCompose(dir, db_password: "ArgDbPass1!", tracker_password: "ArgTracker1!", tt_memory_gi: 2);
 
         File.ReadAllText(result.EnvPath).Should().Contain("DB_PASSWORD=\"ArgDbPass1!\"").And.Contain("TIMETRACKER_PASSWORD=\"ArgTracker1!\"");
         result.Warnings.Should().ContainSingle().Which.Should().Contain("OutOfMemory");
@@ -192,7 +200,7 @@ public sealed class DeploymentToolsTests : IDisposable
     {
         var dir = Path.Combine(_root, "invalid");
 
-        var act = () => Tools().GenerateCompose(dir, db_type: "mysql");
+        var act = () => FileTools().GenerateCompose(dir, db_type: "mysql");
 
         act.Should().Throw<McpException>().WithMessage("設定に誤りがあるため、ファイルを生成しませんでした:*db-type*db_password が未設定です*tracker_password が未設定です*");
         Directory.Exists(dir).Should().BeFalse();
@@ -301,7 +309,7 @@ public sealed class DeploymentToolsTests : IDisposable
             new SubscriptionInfo("bbb", "検証", null, null),
         ]);
 
-        var result = await Tools().ListSubscriptions(TestContext.Current.CancellationToken);
+        var result = await Tools().ListSubscriptions(cancellationToken: TestContext.Current.CancellationToken);
 
         result.AuthMode.Should().Be("azure-cli");
         result.Subscriptions.Should().Equal(new SubscriptionItem("aaa", "開発", "Enabled", "tenant"), new SubscriptionItem("bbb", "検証", null, null));
@@ -310,14 +318,14 @@ public sealed class DeploymentToolsTests : IDisposable
     [Theory]
     [InlineData("azure-cli", "az login")]
     [InlineData("default", "DefaultAzureCredential")]
-    [InlineData("sp-env", "AZURE_CLIENT_SECRET")]
     [InlineData("device-code", "stderr")]
     [InlineData("managed-identity", "マネージド ID")]
+    // sp-env は環境変数が無いと資格情報を作る段階で失敗するため、案内は UnrestrictedAccessPolicy のテストで確かめる
     public async Task ListSubscriptions_Should_Explain_How_To_Sign_In(string authMode, string hint)
     {
         _directory.Setup(d => d.ListAsync(It.IsAny<CancellationToken>())).ThrowsAsync(new CredentialUnavailableException("no credential"));
 
-        var act = () => Tools(new McpServerSettings { AuthMode = authMode }).ListSubscriptions(TestContext.Current.CancellationToken);
+        var act = () => Tools(new McpServerSettings { AuthMode = authMode }).ListSubscriptions(cancellationToken: TestContext.Current.CancellationToken);
 
         (await act.Should().ThrowAsync<McpException>()).WithMessage($"Azure の認証に失敗しました（認証モード: {authMode}）。*{hint}*");
     }
@@ -328,7 +336,7 @@ public sealed class DeploymentToolsTests : IDisposable
         _directory.Setup(d => d.ListAsync(It.IsAny<CancellationToken>()))
             .ThrowsAsync(new RequestFailedException(403, "forbidden", "AuthorizationFailed", null));
 
-        var act = () => Tools().ListSubscriptions(TestContext.Current.CancellationToken);
+        var act = () => Tools().ListSubscriptions(cancellationToken: TestContext.Current.CancellationToken);
 
         await act.Should().ThrowAsync<McpException>().WithMessage("Azure がエラーを返しました（403 AuthorizationFailed）: forbidden*");
     }
@@ -338,10 +346,112 @@ public sealed class DeploymentToolsTests : IDisposable
     [InlineData(typeof(ArgumentException))]
     public async Task ListSubscriptions_Should_Report_Credential_Creation_Errors(Type exceptionType)
     {
-        var tools = Tools(directory: () => throw (Exception)Activator.CreateInstance(exceptionType, "sp-env モードで必要な環境変数が不足しています。")!);
+        var tools = Tools(directory: _ => throw (Exception)Activator.CreateInstance(exceptionType, "sp-env モードで必要な環境変数が不足しています。")!);
 
-        var act = () => tools.ListSubscriptions(TestContext.Current.CancellationToken);
+        var act = () => tools.ListSubscriptions(cancellationToken: TestContext.Current.CancellationToken);
 
         await act.Should().ThrowAsync<McpException>().WithMessage("sp-env モードで必要な環境変数が不足しています。");
+    }
+
+    // ---- HTTP（server 方式）
+
+    [Fact]
+    public void GetDeploymentOptions_Should_Describe_The_Http_Server()
+    {
+        var settings = HttpTestSupport.Settings(canCreate: true);
+
+        var result = Tools(settings, policy: HttpTestSupport.Policy(settings)).GetDeploymentOptions();
+
+        result.Server.Should().BeEquivalentTo(new ServerStatus(
+            "http", "server", new PasswordEnvStatus(false, false), true, true, null, [HttpTestSupport.AllowedGroup], true, ["server"], ["server"]));
+    }
+
+    [Fact]
+    public void ValidateDeployment_Should_Ask_For_Password_Arguments_Over_Http()
+    {
+        var settings = HttpTestSupport.Settings();
+
+        var result = Tools(settings, policy: HttpTestSupport.Policy(settings)).ValidateDeployment();
+
+        result.Errors.Should().Contain(e => e.Contains("HTTP のサーバーでは、パスワードの環境変数は使えません"));
+    }
+
+    [Fact]
+    public async Task ListSubscriptions_Should_Require_The_Server_Role()
+    {
+        var settings = HttpTestSupport.Settings();
+        _directory.Setup(d => d.ListAsync(It.IsAny<CancellationToken>())).ReturnsAsync([]);
+
+        var denied = () => Tools(settings, policy: HttpTestSupport.Policy(settings, withRole: false)).ListSubscriptions(cancellationToken: TestContext.Current.CancellationToken);
+        var allowed = await Tools(settings, policy: HttpTestSupport.Policy(settings)).ListSubscriptions(cancellationToken: TestContext.Current.CancellationToken);
+
+        await denied.Should().ThrowAsync<McpException>().WithMessage("*Timetracker.Deploy.Server*");
+        allowed.AuthMode.Should().Be("server");
+    }
+
+    [Theory]
+    [InlineData("postgresql", "DB_PASSWORD に任意のパスワードを設定する")]
+    [InlineData("sqlserver", "SQL Server のパスワード要件")]
+    public void GenerateComposeContent_Should_Return_The_Files_With_Password_Placeholders(string dbType, string passwordRule)
+    {
+        var result = new ComposeContentTools(HttpTestSupport.Settings()).GenerateCompose(app_name: "Demo", db_type: dbType, db_name: "db");
+
+        var expected = DeployOptionsResolver.Resolve(new DeployInput
+        {
+            AppName = "Demo", DbType = dbType, DbName = "db",
+            DbPassword = ComposeContentTools.DbPasswordPlaceholder, TrackerPassword = ComposeContentTools.TrackerPasswordPlaceholder,
+        });
+        result.ComposeFileName.Should().Be("docker-compose.yml");
+        result.EnvFileName.Should().Be(".env");
+        result.ComposeContent.Should().Be(ComposeGenerator.GenerateCompose(expected));
+        result.EnvContent.Should().Be(ComposeGenerator.GenerateEnv(expected))
+            .And.Contain("DB_PASSWORD=\"<DB パスワードを設定>\"").And.Contain("TIMETRACKER_PASSWORD=\"<Timetracker のパスワードを設定>\"");
+        result.Warnings.Should().BeEmpty();
+        result.NextSteps.Should().Contain(s => s.Contains(passwordRule));
+        Json(result).Should().NotContain("Placeholder-Passw0rd");
+    }
+
+    [Fact]
+    public void GenerateComposeContent_Should_Reject_Invalid_Settings()
+    {
+        var act = () => new ComposeContentTools(HttpTestSupport.Settings()).GenerateCompose(db_type: "mysql");
+
+        act.Should().Throw<McpException>().WithMessage("設定に誤りがあるため、生成しませんでした:*");
+    }
+
+    // ---- HTTP（user 方式。詳細設計 Phase 4b）
+
+    [Fact]
+    public async Task ListSubscriptions_Should_List_With_The_Callers_Own_Permissions_In_The_User_Mode()
+    {
+        var settings = HttpTestSupport.Settings(modes: "server,user");
+        var credentials = new List<TokenCredential>();
+        _directory.Setup(d => d.ListAsync(It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        var tools = Tools(settings, credential => { credentials.Add(credential); return _directory.Object; },
+            HttpTestSupport.PolicyWithToken(settings, roles: HttpAccessPolicy.UserRole));
+
+        var result = await tools.ListSubscriptions(cancellationToken: TestContext.Current.CancellationToken);
+
+        result.AuthMode.Should().Be("user");
+        credentials.Should().ContainSingle().Which.Should().BeOfType<OnBehalfOfCredential>();
+    }
+
+    [Fact]
+    public void GetDeploymentOptions_Should_Show_The_Modes_The_Caller_Can_Use()
+    {
+        var both = HttpTestSupport.Settings(modes: "server,user");
+        var userOnly = HttpTestSupport.Settings(modes: "user");
+
+        var server = Tools(both, policy: HttpTestSupport.PolicyWithToken(both, roles: HttpAccessPolicy.UserRole)).GetDeploymentOptions().Server;
+        var user = Tools(userOnly, policy: HttpTestSupport.PolicyWithToken(userOnly, roles: HttpAccessPolicy.UserRole)).GetDeploymentOptions().Server;
+
+        server.AuthMode.Should().Be("user");
+        server.IdentityModes.Should().Equal("server", "user");
+        server.CallerIdentityModes.Should().Equal("user");
+        server.AllowedResourceGroups.Should().Equal(HttpTestSupport.AllowedGroup);
+        // server 方式が無効なら、server 方式の範囲は示さない
+        user.AllowedResourceGroups.Should().BeNull();
+        user.CanCreateResourceGroup.Should().BeNull();
+        user.IdentityModes.Should().Equal("user");
     }
 }

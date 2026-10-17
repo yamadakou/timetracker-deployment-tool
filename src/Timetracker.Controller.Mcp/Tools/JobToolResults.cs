@@ -21,6 +21,9 @@ public sealed record DeploymentPlanResult(
 /// <summary>Azure を操作する ID（stdio ではサーバーの認証モードの資格情報）。</summary>
 public sealed record IdentityInfo(string AuthMode, string Display);
 
+/// <summary>保存する計画と、計画を作った方式（start_* は計画の方式で実行する。詳細設計 Phase 4b）。</summary>
+public sealed record IdentityPlan<TPlan>(TPlan Plan, string IdentityMode) where TPlan : class;
+
 /// <summary>権限の事前確認。<see cref="Status"/> は ok / missing / not_checked。</summary>
 public sealed record PermissionCheckInfo(string Status, IReadOnlyList<string> Missing, string? Note);
 

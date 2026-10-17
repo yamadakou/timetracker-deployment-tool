@@ -82,9 +82,46 @@ public static class CredentialFactory
             return Task.CompletedTask;
         };
 
-    private static TokenCredential CreateManagedIdentityCredential(IDeploymentLogger logger)
+    private static TokenCredential CreateManagedIdentityCredential(IDeploymentLogger logger) =>
+        CreateManagedIdentityCredential(logger, Environment.GetEnvironmentVariable("AZURE_CLIENT_ID"));
+
+    /// <summary>
+    /// 環境変数 AZURE_CLIENT_ID があればユーザー割り当て、無ければシステム割り当てのマネージド ID を使う
+    /// （Container Apps などで、ユーザー割り当ての ID を割り当てた場合）。
+    /// </summary>
+    internal static TokenCredential CreateManagedIdentityCredential(IDeploymentLogger logger, string? clientId)
     {
-        logger.Verbose("ManagedIdentityCredential を使用します");
-        return new ManagedIdentityCredential(ManagedIdentityId.SystemAssigned);
+        if (string.IsNullOrWhiteSpace(clientId))
+        {
+            logger.Verbose("ManagedIdentityCredential を使用します（システム割り当て）");
+            return new ManagedIdentityCredential(ManagedIdentityId.SystemAssigned);
+        }
+        logger.Verbose($"ManagedIdentityCredential を使用します（ユーザー割り当て: {clientId}）");
+        return new ManagedIdentityCredential(ManagedIdentityId.FromUserAssignedClientId(clientId));
     }
+
+    /// <summary>フェデレーション資格情報（マネージド ID のトークンをクライアントアサーションにする）で要求するスコープ。</summary>
+    public const string TokenExchangeScope = "api://AzureADTokenExchange/.default";
+
+    /// <summary>
+    /// OBO（On-Behalf-Of）の資格情報: 利用者のアクセストークン（このアプリ向け）を、利用者本人の権限の Azure 用のトークンに交換する
+    /// （MCP サーバーの user 方式。詳細設計 Phase 4b）。<paramref name="clientSecret"/> が null なら、アプリ登録の資格情報として
+    /// マネージド ID（AZURE_CLIENT_ID があればユーザー割り当て）をフェデレーション資格情報で使う（シークレットを持たずに済む）。
+    /// </summary>
+    public static TokenCredential CreateOnBehalfOf(
+        string tenantId, string clientId, string? clientSecret, string userAssertion, IDeploymentLogger logger)
+    {
+        if (clientSecret != null)
+        {
+            logger.Verbose("OnBehalfOfCredential を使用します（クライアントシークレット）");
+            return new OnBehalfOfCredential(tenantId, clientId, clientSecret, userAssertion);
+        }
+        logger.Verbose("OnBehalfOfCredential を使用します（マネージド ID のフェデレーション資格情報）");
+        return new OnBehalfOfCredential(
+            tenantId, clientId, ClientAssertion(CreateManagedIdentityCredential(logger)), userAssertion, new OnBehalfOfCredentialOptions());
+    }
+
+    /// <summary>マネージド ID のトークン（対象 api://AzureADTokenExchange）を、アプリ登録のクライアントアサーションとして返す。</summary>
+    internal static Func<CancellationToken, Task<string>> ClientAssertion(TokenCredential managedIdentity) =>
+        async cancellationToken => (await managedIdentity.GetTokenAsync(new TokenRequestContext([TokenExchangeScope]), cancellationToken)).Token;
 }

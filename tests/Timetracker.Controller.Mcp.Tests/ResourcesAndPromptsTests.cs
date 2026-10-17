@@ -1,3 +1,4 @@
+using Azure.Core;
 using System.Text.Json;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
@@ -39,9 +40,10 @@ public sealed class ResourcesAndPromptsTests
         var services = new ServiceCollection()
             .AddSingleton(new McpServerSettings())
             .AddSingleton<ICallerContext, LocalCallerContext>()
+            .AddSingleton<IAzureAccessPolicy, UnrestrictedAccessPolicy>()
             .AddSingleton<IPlanStore>(new InMemoryPlanStore(TimeProvider.System))
             .AddSingleton(new JobManager(new InMemoryJobStore(), TimeProvider.System, NullLogger<JobManager>.Instance))
-            .AddSingleton<Func<IDeploymentLogger, IAzureDeploymentGateway>>(_ => gateway.Object)
+            .AddSingleton<Func<IDeploymentLogger, TokenCredential, IAzureDeploymentGateway>>(_ => (_, _) => gateway.Object)
             .AddSingleton(typeof(ILogger<>), typeof(NullLogger<>))
             .BuildServiceProvider();
         var resources = new TimetrackerResources(services);
@@ -57,10 +59,11 @@ public sealed class ResourcesAndPromptsTests
     [Fact]
     public void Prompts_Should_Embed_The_Arguments_Or_Ask_The_User()
     {
-        TimetrackerPrompts.DeployTimetracker().Should().Contain("利用者に確認する（既定は postgresql").And.Contain("acknowledge_data_loss=true");
-        TimetrackerPrompts.DeployTimetracker("sqlserver").Should().Contain("「sqlserver」");
-        TimetrackerPrompts.LocalDryRun().Should().Contain("利用者に絶対パスを確認する").And.Contain("generate_compose");
-        TimetrackerPrompts.LocalDryRun("/work/tt").Should().Contain("「/work/tt」");
+        var prompts = new TimetrackerPrompts(new McpServerSettings());
+        prompts.DeployTimetracker().Should().Contain("利用者に確認する（既定は postgresql").And.Contain("acknowledge_data_loss=true");
+        prompts.DeployTimetracker("sqlserver").Should().Contain("「sqlserver」");
+        prompts.LocalDryRun().Should().Contain("利用者に絶対パスを確認する").And.Contain("generate_compose");
+        prompts.LocalDryRun("/work/tt").Should().Contain("「/work/tt」");
         TimetrackerPrompts.DeleteTimetracker().Should().Contain("（利用者に確認する）").And.Contain("confirm_app_name");
         TimetrackerPrompts.DeleteTimetracker("demo").Should().Contain("「demo」");
     }

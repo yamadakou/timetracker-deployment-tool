@@ -93,7 +93,7 @@ public sealed class TimetrackerResources
     public async Task<string> GetDeployment(string subscription, string resource_group, string app_name, CancellationToken cancellationToken)
     {
         var tools = ActivatorUtilities.CreateInstance<DeploymentJobTools>(_services);
-        var info = await tools.GetDeploymentInfo(subscription, resource_group, app_name, cancellationToken);
+        var info = await tools.GetDeploymentInfo(subscription, resource_group, app_name, cancellationToken: cancellationToken);
         return JsonSerializer.Serialize(info, McpServerHost.JsonOptions);
     }
 }
