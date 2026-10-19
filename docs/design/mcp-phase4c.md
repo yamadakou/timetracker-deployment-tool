@@ -132,7 +132,7 @@ flowchart LR
 2. **VS Code**: Entra ID の発行者に対して、VS Code が組み込みの Microsoft 認証（VS Code のアプリの ID）を使うか、`oauth.clientId` のアプリを使うかを確かめる。組み込みを使う場合は、VS Code のアプリ（`aebc6443-996d-45c2-90f0-388ff96faa56`）をサーバーのアプリで事前承認する。`oauth.clientId` を使う場合は、VS Code のリダイレクト URI（`http://127.0.0.1:33418` と `https://vscode.dev/redirect` を想定）をクライアントのアプリに登録する → **未確認**
 3. **トークンのバージョン**: クライアントが取得したトークンが v2 になっていること → **確認済み**（発行者 `https://login.microsoftonline.com/<テナント>/v2.0`、`aud` がサーバーのアプリの appId、`scp` が `Mcp.Access`、`roles` にアプリロール）
 4. **OBO**: マネージド ID のフェデレーション資格情報でのトークン交換が成功すること、条件付きアクセスがあるテナントでの動き → **確認済み**。ただし、MFA と同意が必要（10 の 3・4）
-5. **Claude Code のコールバック**: `http://localhost:<ポート>/callback` の完全一致 → **未確認**（Claude Code からのサインインは、利用者の PC で確認する）
+5. **Claude Code のコールバック**: `http://localhost:<ポート>/callback` の完全一致 → **確認済み**（Claude Code 2.1.303 で、スクリプトが登録した `http://localhost:8765/callback` のままサインインできた。`127.0.0.1` の登録は不要だった）
 6. **アプリロールの反映**: 割り当て後、クライアントのトークンの更新までの時間 → 割り当ての後に新しくサインインしたトークンには `roles` が入っていた（更新までの時間は未確認）
 
 ## 10. 確認結果
@@ -148,7 +148,7 @@ flowchart LR
 | 1 | 200 `ok` |
 | 2 | 401。`resource_metadata` が `https://<FQDN>/.well-known/oauth-protected-resource`（Container Apps のイングレスの後ろでも https になる） |
 | 3 | 期待どおり（`scopes_supported` は下の 1 の修正の後のもの） |
-| 4 | 検証用のスクリプトで、`resource` 付きのサインインとトークンの取得を確認（下の 1 の修正の後）。Claude Code からのサインインは未確認 |
+| 4 | 成功（2026-10-19、イメージ 0.9.0、Claude Code 2.1.303）。`claude mcp add --transport http --client-id … --callback-port 8765` で登録し、`/mcp` からブラウザーでサインインして接続済みになった（MFA あり）。`get_deployment_options` と `list_subscriptions` を呼べた。サーバーのログに、要求ごとの利用者名と `{tid}/{oid}`、`Server (timetracker-deploy 0.9.0), Client (claude-code 2.1.303)` が出た。それまでは、検証用のスクリプトで `resource` 付きのサインインとトークンの取得を確認していた（下の 1 の修正の後） |
 | 5 | ロールなしでは確認していない（利用者が 1 人のため）。ロールありで `get_deployment_options` と `list_subscriptions`（server 方式）が使えた |
 | 6 | 計画（権限の事前確認は不足なし）→ デプロイ（約 2 分。Timetracker の URL が `/setup` に転送）→ `get_deployment_info` → 削除（アプリ名の不一致は拒否。約 13 分。リソースグループは残る）。アクティビティログの操作者はマネージド ID |
 | 7 | Azure を読まずにブロッカー。`azure_identity` を省略して範囲外の削除を計画した場合は、`user` 方式を案内するエラー |
@@ -162,3 +162,7 @@ flowchart LR
 2. **サーバーが版を 1.0.0 と報告する**: リリースのビルドで版を渡していなかった（EXE も同じ）。release.yml で、タグの版を EXE とイメージのビルドに渡すようにした
 3. **`user` 方式のトークン交換が AADSTS50076（MFA が必要）で失敗する**: Azure の管理 API には MFA が必須だが、MCP サーバーへのサインインで MFA が行われていなかったため。条件付きアクセスの「要求」が返らないため、クライアントにサインインし直してもらっても解消しない。サインインの要求で MFA を求める（`claims` に `amr` の `mfa`）と MFA が求められ、交換できた。ツールのエラーで、管理者に条件付きアクセスで MCP サーバーのアプリへのサインインに MFA を要求してもらうよう案内するようにした。**運用では、MCP サーバーのアプリ（エンタープライズ アプリケーション）に MFA を要求する条件付きアクセスのポリシーが必要**（Claude Code などのクライアントは `claims` を付けないため）
 4. **`user` 方式のトークン交換が AADSTS65001（同意が無い）で失敗する**: 管理者の同意が無いため。テナントの管理者でないアカウントでも、本人の分の同意（`oauth2PermissionGrants`、`consentType` は `Principal`）を Graph で作ることができ、交換できた。スクリプトで、管理者の同意に失敗した場合に、実行した本人の分の同意を作るようにした。**ほかの利用者が `user` 方式を使うには、テナントの管理者の同意が必要**
+
+### 残っている確認と後片付け
+- 当面行わない確認: VS Code からのサインイン（9 の 2）、権限の無い利用者・別の利用者でのシナリオ（6 の 9・10）。行うときは、4.1 の手順で配置し直す
+- 確認用の環境は 2026-10-19 に削除した（リソースグループ `rg-tt-mcp`（Container App・Environment・マネージド ID）と `rg-tt-mcp-demo`、アプリ登録 `Timetracker MCP (tt-mcp)` と `Timetracker MCP client (tt-mcp)`。アプリ登録の削除で、本人の分の同意とアプリロールの割り当ても消える）。HTTP 版での DB の永続化の確認（`docs/design/db-persistence-mcp-http-check.md`）も、配置し直してから行う
