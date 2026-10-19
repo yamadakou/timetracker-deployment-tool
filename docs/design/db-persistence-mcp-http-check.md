@@ -62,7 +62,7 @@ $Me = az ad signed-in-user show --query userPrincipalName -o tsv       # 自分�
   # 表示されない場合は登録する（数分かかる）
   az provider register --namespace Microsoft.Storage --wait
   ```
-- [ ] 名前を TTDeployTool に改めた版（作り直した v0.9.0 以降）のイメージ `ghcr.io/yamadakou/ttdeploytool-mcp` が公開されている（以前の名前のイメージ `ttdeploytool-mcp` は削除した）（[リリースの一覧](https://github.com/yamadakou/timetracker-deployment-tool/releases)の「ダウンロード」に `ghcr.io/yamadakou/ttdeploytool-mcp:<版>` がある）
+- [ ] 名前を TTDeployTool に改めた版（作り直した v0.9.0 以降）のイメージ `ghcr.io/yamadakou/ttdeploytool-mcp` が公開されている（以前の名前のイメージ `timetracker-mcp` は削除した）（[リリースの一覧](https://github.com/yamadakou/timetracker-deployment-tool/releases)の「ダウンロード」に `ghcr.io/yamadakou/ttdeploytool-mcp:<版>` がある）
 
 ## 3. MCP サーバー（HTTP 版）を配置し、Claude Code から接続する
 ### 3.1 名前を決める
