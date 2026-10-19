@@ -174,7 +174,7 @@ claude mcp add timetracker `
 ## HTTP 版（開発中）
 
 > [!NOTE]
-> HTTP 版は開発中で、まだ提供していません。サーバーの本体（HTTP でのやり取り、Entra ID による呼び出し元の認証、`server` 方式と `user` 方式）、コンテナイメージ、Azure Container Apps への配置と Entra ID のアプリ登録のスクリプトはできており、Azure と Entra ID で配置とツールの動作を確認しました。Claude Code と VS Code からのサインインは、まだ確認していません（下の[導入](#導入-1)）。内容は、提供までに変わることがあります。
+> HTTP 版は開発中で、まだ提供していません。サーバーの本体（HTTP でのやり取り、Entra ID による呼び出し元の認証、`server` 方式と `user` 方式）、コンテナイメージ、Azure Container Apps への配置と Entra ID のアプリ登録のスクリプトはできており、Azure と Entra ID で配置とツールの動作を確認しました。Claude Code からのサインインと接続も確認しました。VS Code からのサインインは、まだ確認していません（下の[導入](#導入-1)）。内容は、提供までに変わることがあります。
 
 ### 開発の段階
 
@@ -182,7 +182,7 @@ claude mcp add timetracker `
 |---|---|---|
 | 4a | HTTP でのやり取り、Entra ID のアクセストークンの検証、アプリロール、呼び出し元ごとの計画・ジョブ、`server` 方式（許可したリソースグループだけ）、HTTP 用の `generate_compose`、コンテナイメージ | 実装済み（自動テストとローカルの Docker で確認） |
 | 4b | `user` 方式（利用者本人の権限）と、方式を選ぶ引数 `azure_identity` | 実装済み（Entra ID でのトークンの交換も 4c で確認） |
-| 4c | Azure Container Apps への配置、Entra ID のアプリ登録、アシスタントからの接続の手順 | Azure と Entra ID で配置とツールを確認済み（Claude Code・VS Code からの接続は未確認） |
+| 4c | Azure Container Apps への配置、Entra ID のアプリ登録、アシスタントからの接続の手順 | Azure と Entra ID で配置とツール、Claude Code からの接続を確認済み（VS Code からの接続は未確認） |
 
 ### stdio 版との違い
 
@@ -234,7 +234,7 @@ claude mcp add timetracker `
 ### 導入
 
 > [!NOTE]
-> Azure と Entra ID で、配置・アプリ登録・ツール（`server` 方式と `user` 方式のデプロイと削除）を確認しました。Claude Code と VS Code からのサインインは、まだ確認していません。確認の結果は [Phase 4c の詳細設計](design/mcp-phase4c.md)の「確認結果」にまとめています。
+> Azure と Entra ID で、配置・アプリ登録・ツール（`server` 方式と `user` 方式のデプロイと削除）を確認しました。Claude Code からのサインインと接続も確認しました。VS Code からのサインインは、まだ確認していません。確認の結果は [Phase 4c の詳細設計](design/mcp-phase4c.md)の「確認結果」にまとめています。
 
 1. **サーバーを置く**（管理者）: [PowerShell 7](https://learn.microsoft.com/ja-jp/powershell/scripting/install/install-powershell-on-windows) と Azure CLI で、次を実行します。MCP サーバーを置くリソースグループ、マネージド ID、Entra ID のアプリ登録（サーバー用とクライアント用）、Container Apps の環境と Container App を作ります。`server` 方式なら、許可するリソースグループに、マネージド ID の Contributor を割り当てます
    ```powershell

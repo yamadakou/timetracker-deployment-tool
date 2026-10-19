@@ -132,7 +132,7 @@ flowchart LR
 2. **VS Code**: Entra ID の発行者に対して、VS Code が組み込みの Microsoft 認証（VS Code のアプリの ID）を使うか、`oauth.clientId` のアプリを使うかを確かめる。組み込みを使う場合は、VS Code のアプリ（`aebc6443-996d-45c2-90f0-388ff96faa56`）をサーバーのアプリで事前承認する。`oauth.clientId` を使う場合は、VS Code のリダイレクト URI（`http://127.0.0.1:33418` と `https://vscode.dev/redirect` を想定）をクライアントのアプリに登録する → **未確認**
 3. **トークンのバージョン**: クライアントが取得したトークンが v2 になっていること → **確認済み**（発行者 `https://login.microsoftonline.com/<テナント>/v2.0`、`aud` がサーバーのアプリの appId、`scp` が `Mcp.Access`、`roles` にアプリロール）
 4. **OBO**: マネージド ID のフェデレーション資格情報でのトークン交換が成功すること、条件付きアクセスがあるテナントでの動き → **確認済み**。ただし、MFA と同意が必要（10 の 3・4）
-5. **Claude Code のコールバック**: `http://localhost:<ポート>/callback` の完全一致 → **未確認**（Claude Code からのサインインは、利用者の PC で確認する）
+5. **Claude Code のコールバック**: `http://localhost:<ポート>/callback` の完全一致 → **確認済み**（Claude Code 2.1.303 で、スクリプトが登録した `http://localhost:8765/callback` のままサインインできた。`127.0.0.1` の登録は不要だった）
 6. **アプリロールの反映**: 割り当て後、クライアントのトークンの更新までの時間 → 割り当ての後に新しくサインインしたトークンには `roles` が入っていた（更新までの時間は未確認）
 
 ## 10. 確認結果
@@ -148,7 +148,7 @@ flowchart LR
 | 1 | 200 `ok` |
 | 2 | 401。`resource_metadata` が `https://<FQDN>/.well-known/oauth-protected-resource`（Container Apps のイングレスの後ろでも https になる） |
 | 3 | 期待どおり（`scopes_supported` は下の 1 の修正の後のもの） |
-| 4 | 検証用のスクリプトで、`resource` 付きのサインインとトークンの取得を確認（下の 1 の修正の後）。Claude Code からのサインインは未確認 |
+| 4 | 成功（2026-10-19、イメージ 0.9.0、Claude Code 2.1.303）。`claude mcp add --transport http --client-id … --callback-port 8765` で登録し、`/mcp` からブラウザーでサインインして接続済みになった（MFA あり）。`get_deployment_options` と `list_subscriptions` を呼べた。サーバーのログに、要求ごとの利用者名と `{tid}/{oid}`、`Server (timetracker-deploy 0.9.0), Client (claude-code 2.1.303)` が出た。それまでは、検証用のスクリプトで `resource` 付きのサインインとトークンの取得を確認していた（下の 1 の修正の後） |
 | 5 | ロールなしでは確認していない（利用者が 1 人のため）。ロールありで `get_deployment_options` と `list_subscriptions`（server 方式）が使えた |
 | 6 | 計画（権限の事前確認は不足なし）→ デプロイ（約 2 分。Timetracker の URL が `/setup` に転送）→ `get_deployment_info` → 削除（アプリ名の不一致は拒否。約 13 分。リソースグループは残る）。アクティビティログの操作者はマネージド ID |
 | 7 | Azure を読まずにブロッカー。`azure_identity` を省略して範囲外の削除を計画した場合は、`user` 方式を案内するエラー |
