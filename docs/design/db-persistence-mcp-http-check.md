@@ -180,7 +180,13 @@ MCP のツールには DB の中身を見る機能が無いため、Azure CLI �
    `caller` が 1 のプリンシパル ID と同じなら、マネージド ID の操作です。
 
 ## 5. user 方式での確認（user 方式を有効にしている場合）
-自分に Contributor があり、`server` 方式では許可していないリソースグループを使います。サブスクリプションの所有者なら、新しい名前（例: `rg-tt-mcp-user`。無ければ、自分の権限で作られます）でかまいません。依頼に「azure_identity=user で」と付けます（例: 「azure_identity=user で、リソースグループ <名前> に `ttmcp2` を DB を永続化してデプロイする計画を作って」）。
+自分に Contributor があり、`server` 方式では許可していないリソースグループを使います。サブスクリプションの所有者なら、新しい名前（例: `rg-tt-mcp-user`。無ければ、自分の権限で作られます）でかまいません。使うリソースグループの名前を変数に入れておきます（6 章の後片付けで使います）。
+
+```powershell
+$UserRg = "rg-tt-mcp-user"   # user 方式の確認に使うリソースグループ
+```
+
+依頼に「azure_identity=user で」と付けます（例: 「azure_identity=user で、リソースグループ rg-tt-mcp-user に `ttmcp2` を DB を永続化してデプロイする計画を作って」）。
 
 | # | 依頼・操作 | 期待する結果 |
 |---|---|---|
@@ -209,11 +215,11 @@ MCP のツールには DB の中身を見る機能が無いため、Azure CLI �
    ```powershell
    az group delete --name $AllowedRg --yes
    az group delete --name $McpRg --yes
-   # 5 章で新しく作ったリソースグループがあれば、それも削除する
+   az group delete --name $UserRg --yes   # 5 章で、このために新しく作った場合だけ（もともとあったリソースグループは消さない）
    ```
 4. 残っていないことを確かめます
    ```powershell
-   az group list --query "[?name=='$McpRg' || name=='$AllowedRg'].name" -o tsv   # 何も表示されない
+   az group list --query "[?name=='$McpRg' || name=='$AllowedRg' || name=='$UserRg'].name" -o tsv   # 何も表示されない（5 章でもともとあったリソースグループを使った場合は、その名前だけが表示される）
    ```
 
 ### 6.3 記録
