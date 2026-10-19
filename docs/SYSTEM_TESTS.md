@@ -1,8 +1,8 @@
 # システムテスト（Azure 上での動作確認）
 
-単体テスト（`tests/*.Tests`）では Azure SDK をモックしているため、Azure の実際の挙動（タグの扱い、権限の判定、削除の所要時間など）は確認できません。システムテスト（`tests/Timetracker.SystemTests`）は、CLI を**本物の Azure** に対して実行し、結果を Azure から直接読んで確かめます。
+単体テスト（`tests/*.Tests`）では Azure SDK をモックしているため、Azure の実際の挙動（タグの扱い、権限の判定、削除の所要時間など）は確認できません。システムテスト（`tests/TTDeployTool.SystemTests`）は、CLI を**本物の Azure** に対して実行し、結果を Azure から直接読んで確かめます。
 
-- 環境変数 `TT_SYSTEMTEST_SUBSCRIPTION_ID` が無い場合はスキップされます。通常の `dotnet test Timetracker.sln` や PR の CI では実行されません
+- 環境変数 `TT_SYSTEMTEST_SUBSCRIPTION_ID` が無い場合はスキップされます。通常の `dotnet test TTDeployTool.sln` や PR の CI では実行されません
 - **料金が発生します**（Azure Container Apps。1 回 20〜40 分。`DbPersistenceLifecycleTests` はストレージアカウントも作る）。リリース前などに実行してください
 - Timetracker のライセンスキーとサンプルデータベースのユーザー（環境変数 `TT_E2E_LICENSE_KEY` / `TT_E2E_SAMPLE_LOGIN` / `TT_E2E_SAMPLE_PASSWORD`）がある場合は、ブラウザー（Playwright）でセットアップウィザードを操作し、サンプルデータベースの作成と、そのユーザーでのログイン（管理画面のユーザー一覧にサンプルのユーザーが表示されること）まで確認します（Azure 上と、ローカルの docker compose 上）。無い場合はその確認だけを省略します
 - テスト用のリソースは、テストの最後に削除します（下記「後片付け」）
@@ -21,7 +21,7 @@
 ### 1. 権限の少ないサービスプリンシパルと専用のリソースグループ
 `LimitedPermissionTests` 用です。サービスプリンシパルの権限は、専用のリソースグループの中だけに限ります。
 ```bash
-az group create --name rg-ttst-limited --location japaneast --tags purpose=timetracker-deployment-tool-systemtest
+az group create --name rg-ttst-limited --location japaneast --tags purpose=ttdeploytool-systemtest
 az ad sp create-for-rbac --name ttcli-systemtest-limited   # 表示される appId と password（シークレット）を控える
 for role in "Reader" "Container Apps Contributor"; do
   az role assignment create --assignee <appId> --role "$role" \
@@ -34,7 +34,7 @@ done
 ### 2. CI 用（GitHub Actions から Azure への OIDC ログイン）
 シークレットを保存せずに Azure にログインできるよう、フェデレーション資格情報を使います。
 ```bash
-az ad app create --display-name timetracker-deployment-tool-ci                     # appId を控える
+az ad app create --display-name ttdeploytool-ci                     # appId を控える
 az ad sp create --id <appId>
 az ad app federated-credential create --id <appId> --parameters '{
   "name": "github-systemtest",

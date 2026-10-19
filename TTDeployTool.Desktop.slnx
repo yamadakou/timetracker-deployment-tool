@@ -1,0 +1,20 @@
+<!-- デスクトップアプリ（WinUI 3。Windows でしかビルドできない）と、それが使うプロジェクト。TTDeployTool.sln とは分ける（詳細設計 3.2） -->
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="ARM64" />
+  </Configurations>
+  <Folder Name="/src/">
+    <Project Path="src/TTDeployTool.Common/TTDeployTool.Common.csproj" />
+    <Project Path="src/TTDeployTool.Domain/TTDeployTool.Domain.csproj" />
+    <Project Path="src/TTDeployTool.Infrastructure.Azure/TTDeployTool.Infrastructure.Azure.csproj" />
+    <Project Path="src/TTDeployTool.Application/TTDeployTool.Application.csproj" />
+    <Project Path="src/TTDeployTool.Controller.Desktop.Core/TTDeployTool.Controller.Desktop.Core.csproj" />
+    <Project Path="src/TTDeployTool.Controller.Desktop/TTDeployTool.Controller.Desktop.csproj">
+      <Deploy />
+    </Project>
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/TTDeployTool.Controller.Desktop.Core.Tests/TTDeployTool.Controller.Desktop.Core.Tests.csproj" />
+  </Folder>
+</Solution>

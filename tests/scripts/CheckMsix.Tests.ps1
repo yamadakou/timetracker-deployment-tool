@@ -19,7 +19,7 @@ BeforeAll {
 <?xml version="1.0" encoding="utf-8"?>
 <Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities">
-  <Identity Name="Timetracker.DeploymentTool" Publisher="CN=Test" Version="$Version" ProcessorArchitecture="$Arch" />
+  <Identity Name="TTDeployTool" Publisher="CN=Test" Version="$Version" ProcessorArchitecture="$Arch" />
   <Dependencies><TargetDeviceFamily Name="$Family" MinVersion="$MinVersion" MaxVersionTested="10.0.26100.0" /></Dependencies>
   <Capabilities>$caps</Capabilities>
 </Package>

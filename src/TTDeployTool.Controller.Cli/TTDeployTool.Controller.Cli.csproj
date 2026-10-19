@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>ttdeploytool-cli</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\TTDeployTool.Application\TTDeployTool.Application.csproj" />
+    <ProjectReference Include="..\TTDeployTool.Infrastructure.Azure\TTDeployTool.Infrastructure.Azure.csproj" />
+    <ProjectReference Include="..\TTDeployTool.Domain\TTDeployTool.Domain.csproj" />
+    <ProjectReference Include="..\TTDeployTool.Common\TTDeployTool.Common.csproj" />
+  </ItemGroup>
+</Project>

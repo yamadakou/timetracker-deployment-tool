@@ -10,8 +10,8 @@
   Store に出すパッケージの ID は、Partner Center の値と一致しないと受け付けられないため、ビルドの前に設定する。
 
 .EXAMPLE
-  ./.github/scripts/set-msix-identity.ps1 -Manifest src/Timetracker.Controller.Desktop/Package.appxmanifest -Tag v1.2.3 `
-    -Name "12345Contoso.TimetrackerDeploymentTool" -Publisher "CN=00000000-0000-0000-0000-000000000000" -PublisherDisplayName "Contoso"
+  ./.github/scripts/set-msix-identity.ps1 -Manifest src/TTDeployTool.Controller.Desktop/Package.appxmanifest -Tag v1.2.3 `
+    -Name "12345Contoso.TTDeployTool" -Publisher "CN=00000000-0000-0000-0000-000000000000" -PublisherDisplayName "Contoso"
 #>
 #Requires -Version 7
 param(

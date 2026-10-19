@@ -37,13 +37,13 @@ fi
 cd "$repo"
 # セットアップウィザードとログインの確認は、ライセンスキー（環境変数 TT_E2E_LICENSE_KEY）とサンプルデータベースのユーザー（TT_E2E_SAMPLE_LOGIN / TT_E2E_SAMPLE_PASSWORD）がある場合だけ行う。使うブラウザーを入れる（PowerShell が必要）
 if [ -n "${TT_E2E_LICENSE_KEY:-}" ]; then
-  dotnet build "$repo/tests/Timetracker.SystemTests"
-  pwsh "$repo/tests/Timetracker.SystemTests/bin/Debug/net10.0/playwright.ps1" install chromium
+  dotnet build "$repo/tests/TTDeployTool.SystemTests"
+  pwsh "$repo/tests/TTDeployTool.SystemTests/bin/Debug/net10.0/playwright.ps1" install chromium
 else
   echo "警告: TT_E2E_LICENSE_KEY が無いため、セットアップウィザードとログインの確認はスキップします。" >&2
 fi
 
 echo "システムテストを実行します（20〜40 分かかり、Azure Container Apps の料金が発生します）。"
 # --results-directory は "=" でつなぐ（既存のディレクトリをスペース区切りで渡すと、dotnet test がプロジェクトの指定と誤解する）
-dotnet test --project "$repo/tests/Timetracker.SystemTests" -- \
+dotnet test --project "$repo/tests/TTDeployTool.SystemTests" -- \
   --output detailed --report-xunit-trx "--results-directory=$repo/TestResults/system"

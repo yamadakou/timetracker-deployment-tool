@@ -22,7 +22,7 @@ Azure にも Entra ID にも何もない状態から、次の順に進めます�
 | [Environment](https://learn.microsoft.com/ja-jp/azure/container-apps/environment) | Container App を入れる箱（Container Apps 環境）。MCP サーバー用と、確認で作る Timetracker 用の 2 つが出てくる |
 | [マネージド ID](https://learn.microsoft.com/ja-jp/entra/identity/managed-identities-azure-resources/overview) | MCP サーバーが Azure を操作するときに使う ID。パスワードを持たない |
 | [アプリ登録](https://learn.microsoft.com/ja-jp/entra/identity-platform/quickstart-register-app) | Entra ID に登録するアプリの情報。MCP サーバー用（サインインした人を確かめる）と、クライアント用（Claude Code がサインインに使う）の 2 つを作る |
-| [アプリロール](https://learn.microsoft.com/ja-jp/entra/identity-platform/howto-add-app-roles-in-apps) | MCP サーバーで Azure を操作してよい人に割り当てる役割。`Timetracker.Deploy.Server`（`server` 方式と `user` 方式）と `Timetracker.Deploy.User`（`user` 方式だけ）がある |
+| [アプリロール](https://learn.microsoft.com/ja-jp/entra/identity-platform/howto-add-app-roles-in-apps) | MCP サーバーで Azure を操作してよい人に割り当てる役割。`TTDeployTool.Deploy.Server`（`server` 方式と `user` 方式）と `TTDeployTool.Deploy.User`（`user` 方式だけ）がある |
 | `server` 方式 | MCP サーバーのマネージド ID の権限で Azure を操作する方式。操作できるのは、許可したリソースグループだけ |
 | `user` 方式 | サインインした利用者本人の Azure の権限で操作する方式 |
 | 許可したリソースグループ | `server` 方式で操作してよいリソースグループ。配置のスクリプトが作り、マネージド ID に [Contributor（共同作成者）](https://learn.microsoft.com/ja-jp/azure/role-based-access-control/built-in-roles/general#contributor)を割り当てる |
@@ -62,7 +62,7 @@ $Me = az ad signed-in-user show --query userPrincipalName -o tsv       # 自分�
   # 表示されない場合は登録する（数分かかる）
   az provider register --namespace Microsoft.Storage --wait
   ```
-- [ ] 永続化の機能を含む版（v0.9.0 以降）のイメージが公開されている（[リリースの一覧](https://github.com/yamadakou/timetracker-deployment-tool/releases)の「ダウンロード」に `ghcr.io/yamadakou/timetracker-mcp:<版>` がある）
+- [ ] 名前を TTDeployTool に改めた版（作り直した v0.9.0 以降）のイメージ `ghcr.io/yamadakou/ttdeploytool-mcp` が公開されている（以前の名前のイメージ `ttdeploytool-mcp` は削除した）（[リリースの一覧](https://github.com/yamadakou/timetracker-deployment-tool/releases)の「ダウンロード」に `ghcr.io/yamadakou/ttdeploytool-mcp:<版>` がある）
 
 ## 3. MCP サーバー（HTTP 版）を配置し、Claude Code から接続する
 ### 3.1 名前を決める
@@ -72,7 +72,7 @@ $Me = az ad signed-in-user show --query userPrincipalName -o tsv       # 自分�
 $McpRg      = "rg-tt-mcp"        # MCP サーバーを置くリソースグループ（スクリプトが作る）
 $McpName    = "tt-mcp"           # MCP サーバーの Container App の名前（Environment・マネージド ID・アプリ登録の名前の元にもなる）
 $AllowedRg  = "rg-tt-mcp-demo"   # server 方式で操作を許すリソースグループ（スクリプトが作る）。4 章の確認で Timetracker を作る場所
-$ImageTag   = "0.9.0"            # MCP サーバーのイメージの版（2.3 で確かめた版）
+$ImageTag   = "<版>"             # MCP サーバーのイメージの版（2.3 で確かめた版。例: 0.9.0）
 ```
 
 ### 3.2 配置のスクリプトを実行する
@@ -87,7 +87,7 @@ pwsh scripts/deploy-mcp-http.ps1 -SubscriptionId $Sub -ResourceGroup $McpRg -Nam
 - 最後に「完了しました。」と、次のような値が表示されれば成功です。**この 2 つは 3.4 で使います**
   ```text
   MCP のエンドポイント : https://tt-mcp.<ランダムな名前>.japaneast.azurecontainerapps.io/mcp
-  クライアントのアプリ : <クライアントのアプリの ID>（Timetracker MCP client (tt-mcp)）
+  クライアントのアプリ : <クライアントのアプリの ID>（TTDeployTool MCP client (tt-mcp)）
   ```
   ```powershell
   $Endpoint = "<表示された MCP のエンドポイント>"
@@ -97,7 +97,7 @@ pwsh scripts/deploy-mcp-http.ps1 -SubscriptionId $Sub -ResourceGroup $McpRg -Nam
 - 途中で失敗した場合は、原因を直してから同じコマンドをもう一度実行します。作成済みのものは作り直さず、続きから設定を合わせます
 
 ### 3.3 自分にアプリロールを割り当てる
-MCP サーバーで Azure を操作できるよう、自分にアプリロール `Timetracker.Deploy.Server` を割り当てます。
+MCP サーバーで Azure を操作できるよう、自分にアプリロール `TTDeployTool.Deploy.Server` を割り当てます。
 
 ```powershell
 pwsh scripts/assign-mcp-role.ps1 -Name $McpName -Role Server -UserPrincipalName $Me
@@ -119,7 +119,7 @@ pwsh scripts/assign-mcp-role.ps1 -Name $McpName -Role Server -UserPrincipalName 
 - [ ] 「timetracker で、使えるサブスクリプションの一覧を見せて」と頼むと、2.2 のサブスクリプションが表示される
 - [ ] （任意）MCP サーバーのログに、版と接続した利用者が出ている（[ログの表示](https://learn.microsoft.com/ja-jp/azure/container-apps/log-streaming)）
   ```powershell
-  az containerapp logs show -n $McpName -g $McpRg --tail 50 --type console   # Server (timetracker-deploy 0.9.0) と、自分のユーザー名が出る
+  az containerapp logs show -n $McpName -g $McpRg --tail 50 --type console   # Server (ttdeploytool <版>) と、自分のユーザー名が出る
   ```
 
 ## 4. server 方式での確認
@@ -207,7 +207,7 @@ $UserRg = "rg-tt-mcp-user"   # user 方式の確認に使うリソースグル�
    ```
 2. アプリ登録を 2 つ削除します（[az ad app delete](https://learn.microsoft.com/ja-jp/cli/azure/ad/app#az-ad-app-delete)。アプリロールの割り当てと同意も一緒に消えます）
    ```powershell
-   az ad app list --display-name "Timetracker MCP" --query "[].{name:displayName, appId:appId}" -o table   # 名前に ($McpName) が付いた 2 つ
+   az ad app list --display-name "TTDeployTool MCP" --query "[].{name:displayName, appId:appId}" -o table   # 名前に ($McpName) が付いた 2 つ
    az ad app delete --id <サーバーのアプリの appId>
    az ad app delete --id <クライアントのアプリの appId>
    ```
@@ -232,7 +232,7 @@ $UserRg = "rg-tt-mcp-user"   # user 方式の確認に使うリソースグル�
 | 3.2 のスクリプトがアプリ登録の作成で失敗する（`Insufficient privileges`） | Entra ID でアプリを登録する権限が無い。2.3 の 2 つ目を確かめる |
 | 3.4 のサインインで `AADSTS50011`（リダイレクト URI の不一致）になる | `claude mcp add` の `--callback-port` が 8765 でない。`claude mcp remove timetracker` で外して、3.4 の 1 をやり直す |
 | 3.5 で「アプリロールが必要です」というエラーになる | 3.3 の割り当ての前にサインインした。`/mcp` から `timetracker` にサインインし直す |
-| 3.5 の `constraints` に `persist_db` が無い、S3 の `persistence` が無い | イメージが古い。`az containerapp show -n $McpName -g $McpRg --query "properties.template.containers[0].image" -o tsv` で版を確かめ、`$ImageTag` を v0.9.0 以降にして 3.2 をやり直す |
+| 3.5 の `constraints` に `persist_db` が無い、S3 の `persistence` が無い | イメージが古い。`az containerapp show -n $McpName -g $McpRg --query "properties.template.containers[0].image" -o tsv` で版を確かめ、`$ImageTag` を、作り直した v0.9.0 以降にして 3.2 をやり直す |
 | S1 のブロッカーに `Microsoft.Storage/...` の権限の不足が出る | `server` 方式のマネージド ID に、許可したリソースグループの Contributor が無い。3.2 のコマンドをもう一度実行する（割り当て直す） |
 | S2 が「ストレージアカウント名は…使われているため作成できません」 | アプリ名を変える（名前はサブスクリプション・リソースグループ・アプリ名から作るため、別の組み合わせなら変わる） |
 | S2 で DB アプリの起動に失敗する、マウントのエラーが出る | [Azure Policy](https://learn.microsoft.com/ja-jp/azure/governance/policy/overview) で、ストレージアカウントのアカウントキーによるアクセス（`allowSharedKeyAccess`）やパブリック ネットワーク アクセスを禁止している。管理者に確認する |

@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 画面は ViewModel（TTDeployTool.Controller.Desktop.Core）のプロパティとコマンドに結び付けるだけにする（詳細設計 3.2・7） -->
+<Window
+    x:Class="TTDeployTool.Controller.Desktop.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:TTDeployTool.Controller.Desktop"
+    xmlns:vm="using:TTDeployTool.Controller.Desktop.Core.ViewModels"
+    Title="TTDeployTool">
+
+    <Grid x:Name="Root">
+        <Grid.Resources>
+            <!-- デプロイ・削除のジョブの進み具合、ログ、結果 -->
+            <DataTemplate x:Key="JobTemplate" x:DataType="vm:JobViewModel">
+                <StackPanel Spacing="4" Margin="0,8">
+                    <StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind Title}" /><TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text=": " /><TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind StatusText, Mode=OneWay}" /></StackPanel>
+                    <ProgressBar IsIndeterminate="True" Visibility="{x:Bind local:Ui.IfTrue(IsRunning), Mode=OneWay}" />
+                    <TextBlock Text="{x:Bind StepText, Mode=OneWay}" />
+                    <TextBlock Text="{x:Bind Error, Mode=OneWay}" TextWrapping="Wrap" Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
+                    <TextBlock Text="{x:Bind PersistenceSummary, Mode=OneWay}" TextWrapping="Wrap" />
+                    <TextBlock Text="{x:Bind DeletionSummary, Mode=OneWay}" TextWrapping="Wrap" />
+                    <HyperlinkButton Content="{x:Bind Endpoint, Mode=OneWay}" NavigateUri="{x:Bind Endpoint, Mode=OneWay}"
+                                     Visibility="{x:Bind local:Ui.IfNotNull(Endpoint), Mode=OneWay}" />
+                    <ItemsControl ItemsSource="{x:Bind Logs}" FontFamily="Consolas" />
+                </StackPanel>
+            </DataTemplate>
+        </Grid.Resources>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <InfoBar x:Name="UpdateBar" Grid.Row="0" Severity="Informational" IsClosable="True"
+                 Title="更新があります" Message="Microsoft Store から新しい版を導入できます。" />
+
+        <NavigationView Grid.Row="1" x:Name="Nav" PaneDisplayMode="Left" IsBackButtonVisible="Collapsed" IsSettingsVisible="False"
+                        SelectionChanged="OnNavigationChanged">
+            <NavigationView.MenuItems>
+                <NavigationViewItem Content="サインインと対象" Tag="target" Icon="Contact" IsSelected="True" />
+                <NavigationViewItem Content="設定" Tag="settings" Icon="Setting" />
+                <NavigationViewItem Content="デプロイ" Tag="deploy" Icon="Upload" />
+                <NavigationViewItem Content="状態の確認" Tag="status" Icon="View" />
+                <NavigationViewItem Content="削除" Tag="delete" Icon="Delete" />
+                <NavigationViewItem Content="ローカル検証（Dry-run）" Tag="dryrun" Icon="Save" />
+                <NavigationViewItem Content="実行の記録" Tag="jobs" Icon="List" />
+            </NavigationView.MenuItems>
+
+            <ScrollViewer Padding="24">
+                <Grid>
+                    <!-- サインインと対象 -->
+                    <StackPanel x:Name="TargetPanel" Spacing="12" MaxWidth="900" HorizontalAlignment="Left">
+                        <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="Azure へのサインイン" />
+                        <TextBlock Text="{x:Bind ViewModel.SignIn.AccountDisplay, Mode=OneWay}" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Content="サインイン" Command="{x:Bind ViewModel.SignIn.SignInCommand}" Style="{StaticResource AccentButtonStyle}" />
+                            <Button Content="サインアウト" Command="{x:Bind ViewModel.SignIn.SignOutCommand}" />
+                        </StackPanel>
+                        <InfoBar Severity="Error" IsOpen="True" IsClosable="False" Message="{x:Bind ViewModel.SignIn.Error, Mode=OneWay}"
+                                 Visibility="{x:Bind local:Ui.IfText(ViewModel.SignIn.Error), Mode=OneWay}" />
+
+                        <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="対象" Margin="0,16,0,0" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <ComboBox Header="サブスクリプション" MinWidth="480" ItemsSource="{x:Bind ViewModel.Target.Subscriptions}"
+                                      SelectedItem="{x:Bind ViewModel.Target.SelectedSubscription, Mode=OneWay}" SelectionChanged="OnSubscriptionChanged"
+                                      DisplayMemberPath="Display" />
+                            <Button Content="読み直す" VerticalAlignment="Bottom" Command="{x:Bind ViewModel.Target.LoadCommand}" />
+                        </StackPanel>
+                        <ItemsControl ItemsSource="{x:Bind ViewModel.Target.Notices}" />
+                        <InfoBar Severity="Error" IsOpen="True" IsClosable="False" Message="{x:Bind ViewModel.Target.Error, Mode=OneWay}"
+                                 Visibility="{x:Bind local:Ui.IfText(ViewModel.Target.Error), Mode=OneWay}" />
+                        <TextBox Header="リソースグループ名（無ければ作成します）" Text="{x:Bind ViewModel.Target.ResourceGroup, Mode=TwoWay}" MaxWidth="480" HorizontalAlignment="Left" Width="480" />
+                        <TextBox Header="アプリ名（リソース名の接頭辞）" Text="{x:Bind ViewModel.Target.AppName, Mode=TwoWay}" Width="480" HorizontalAlignment="Left" />
+                        <TextBox Header="リージョン" Text="{x:Bind ViewModel.Target.Location, Mode=TwoWay}" Width="480" HorizontalAlignment="Left" />
+                        <TextBlock Foreground="{ThemeResource SystemFillColorCautionBrush}" Text="{x:Bind ViewModel.Target.TargetError, Mode=OneWay}" />
+                    </StackPanel>
+
+                    <!-- 設定 -->
+                    <StackPanel x:Name="SettingsPanel" Spacing="12" MaxWidth="900" HorizontalAlignment="Left" Visibility="Collapsed">
+                        <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="デプロイの設定" />
+                        <ComboBox Header="DB 種別" ItemsSource="{x:Bind vm:SettingsViewModel.DbTypes}"
+                                  SelectedItem="{x:Bind ViewModel.Settings.DbType, Mode=OneWay}" SelectionChanged="OnDbTypeChanged" Width="240" />
+                        <TextBox Header="DB 名" Text="{x:Bind ViewModel.Settings.DbName, Mode=TwoWay}" Width="480" HorizontalAlignment="Left" />
+                        <TextBox Header="timetracker イメージのタグ（空なら既定のタグ）" PlaceholderText="{x:Bind ViewModel.Settings.DefaultTag, Mode=OneWay}"
+                                 Text="{x:Bind ViewModel.Settings.TtTag, Mode=TwoWay}" Width="480" HorizontalAlignment="Left" />
+                        <TextBlock Text="パスワードは保存しません（アプリを終了すると消えます）。" />
+                        <PasswordBox Header="DB のパスワード（8 文字以上）" Password="{x:Bind ViewModel.Settings.DbPassword, Mode=TwoWay}" Width="480" HorizontalAlignment="Left" />
+                        <PasswordBox Header="Timetracker のパスワード（8 文字以上）" Password="{x:Bind ViewModel.Settings.TrackerPassword, Mode=TwoWay}" Width="480" HorizontalAlignment="Left" />
+                        <ComboBox Header="DB のデータ" ItemsSource="{x:Bind vm:SettingsViewModel.PersistDbOptions}" DisplayMemberPath="Label"
+                                  SelectedItem="{x:Bind ViewModel.Settings.PersistDb, Mode=OneWay}" SelectionChanged="OnPersistDbChanged" MinWidth="480" />
+                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="CPU（vCPU）とメモリ（Gi）" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBox Header="Timetracker の CPU" Text="{x:Bind ViewModel.Settings.TtCpu, Mode=TwoWay}" Width="150" />
+                            <TextBox Header="Timetracker のメモリ" Text="{x:Bind ViewModel.Settings.TtMemoryGi, Mode=TwoWay}" Width="150" />
+                            <TextBox Header="DB の CPU" Text="{x:Bind ViewModel.Settings.DbCpu, Mode=TwoWay}" Width="150" />
+                            <TextBox Header="DB のメモリ" Text="{x:Bind ViewModel.Settings.DbMemoryGi, Mode=TwoWay}" Width="150" />
+                            <TextBox Header="Redis の CPU" Text="{x:Bind ViewModel.Settings.RedisCpu, Mode=TwoWay}" Width="150" />
+                            <TextBox Header="Redis のメモリ" Text="{x:Bind ViewModel.Settings.RedisMemoryGi, Mode=TwoWay}" Width="150" />
+                        </StackPanel>
+                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="誤り" Visibility="{x:Bind local:Ui.IfAny(ViewModel.Settings.Errors.Count), Mode=OneWay}" />
+                        <ItemsControl ItemsSource="{x:Bind ViewModel.Settings.Errors}" Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
+                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="警告" Visibility="{x:Bind local:Ui.IfAny(ViewModel.Settings.Warnings.Count), Mode=OneWay}" />
+                        <ItemsControl ItemsSource="{x:Bind ViewModel.Settings.Warnings}" Foreground="{ThemeResource SystemFillColorCautionBrush}" />
+                    </StackPanel>
+
+                    <!-- デプロイ（計画 → 確認 → 実行） -->
+                    <StackPanel x:Name="DeployPanel" Spacing="12" MaxWidth="900" HorizontalAlignment="Left" Visibility="Collapsed">
+                        <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="デプロイ" />
+                        <TextBlock TextWrapping="Wrap" Text="「計画」は Azure を読むだけで、変更しません。内容を確かめてから「実行」を押してください。" />
+                        <Button Content="計画" Command="{x:Bind ViewModel.Deployment.PlanCommand}" />
+                        <InfoBar Severity="Error" IsOpen="True" IsClosable="False" Message="{x:Bind ViewModel.Deployment.Error, Mode=OneWay}"
+                                 Visibility="{x:Bind local:Ui.IfText(ViewModel.Deployment.Error), Mode=OneWay}" />
+                        <StackPanel Spacing="8" Visibility="{x:Bind local:Ui.IfTrue(ViewModel.Deployment.HasPlan), Mode=OneWay}">
+                            <ItemsControl ItemsSource="{x:Bind ViewModel.Deployment.Operations}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:OperationRow">
+                                        <StackPanel Orientation="Horizontal"><TextBlock Text="{x:Bind Action}" /><TextBlock Text="  " /><TextBlock Text="{x:Bind Name}" /><TextBlock Text="（" /><TextBlock Text="{x:Bind Resource}" /><TextBlock Text="）" /></StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock Text="{x:Bind ViewModel.Deployment.PersistDbText, Mode=OneWay}" />
+                            <TextBlock Text="{x:Bind ViewModel.Deployment.PermissionText, Mode=OneWay}" TextWrapping="Wrap" />
+                            <TextBlock Text="{x:Bind ViewModel.Deployment.EstimatedDuration, Mode=OneWay}" />
+                            <TextBlock Text="{x:Bind local:Ui.Time(ViewModel.Deployment.ExpiresAt), Mode=OneWay}" />
+                            <ItemsControl ItemsSource="{x:Bind ViewModel.Deployment.Blockers}" Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
+                            <ItemsControl ItemsSource="{x:Bind ViewModel.Deployment.Warnings}" Foreground="{ThemeResource SystemFillColorCautionBrush}" />
+                            <CheckBox Content="DB のデータが失われることを理解しました" IsChecked="{x:Bind ViewModel.Deployment.DataLossAcknowledged, Mode=TwoWay}"
+                                      Visibility="{x:Bind local:Ui.IfTrue(ViewModel.Deployment.RequiresDataLossAck), Mode=OneWay}" />
+                            <Button Content="実行" Command="{x:Bind ViewModel.Deployment.StartCommand}" Style="{StaticResource AccentButtonStyle}" />
+                        </StackPanel>
+                        <ContentControl Content="{x:Bind ViewModel.CurrentJob, Mode=OneWay}" ContentTemplate="{StaticResource JobTemplate}" />
+                        <Button Content="Timetracker を開く" Command="{x:Bind ViewModel.OpenEndpointCommand}" />
+                    </StackPanel>
+
+                    <!-- 状態の確認 -->
+                    <StackPanel x:Name="StatusPanel" Spacing="12" MaxWidth="900" HorizontalAlignment="Left" Visibility="Collapsed">
+                        <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="状態の確認" />
+                        <Button Content="読み込む" Command="{x:Bind ViewModel.Status.RefreshCommand}" />
+                        <InfoBar Severity="Error" IsOpen="True" IsClosable="False" Message="{x:Bind ViewModel.Status.Error, Mode=OneWay}"
+                                 Visibility="{x:Bind local:Ui.IfText(ViewModel.Status.Error), Mode=OneWay}" />
+                        <TextBlock Text="{x:Bind ViewModel.Status.Summary, Mode=OneWay}" />
+                        <TextBlock Text="{x:Bind ViewModel.Status.PersistenceText, Mode=OneWay}" TextWrapping="Wrap" />
+                        <HyperlinkButton Content="{x:Bind ViewModel.Status.Endpoint, Mode=OneWay}" NavigateUri="{x:Bind ViewModel.Status.Endpoint, Mode=OneWay}"
+                                         Visibility="{x:Bind local:Ui.IfNotNull(ViewModel.Status.Endpoint), Mode=OneWay}" />
+                        <ItemsControl ItemsSource="{x:Bind ViewModel.Status.Apps}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:AppStateRow">
+                                    <StackPanel Margin="0,4">
+                                        <StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind Role}" /><TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text=": " /><TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind Name}" /></StackPanel>
+                                        <StackPanel Orientation="Horizontal"><TextBlock Text="{x:Bind State}" /><TextBlock Text="、" /><TextBlock Text="{x:Bind Resources}" /><TextBlock Text="、" /><TextBlock Text="{x:Bind Image}" /></StackPanel>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+
+                    <!-- 削除（計画 → アプリ名の入力 → 実行） -->
+                    <StackPanel x:Name="DeletePanel" Spacing="12" MaxWidth="900" HorizontalAlignment="Left" Visibility="Collapsed">
+                        <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="削除" />
+                        <TextBlock TextWrapping="Wrap" Text="本ツールで作ったリソースだけを削除します。リソースグループは削除しません。" />
+                        <CheckBox Content="管理タグの無いものも対象にする" IsChecked="{x:Bind ViewModel.Deletion.IncludeUntagged, Mode=TwoWay}" />
+                        <CheckBox Content="DB のデータを残す（ストレージアカウントを削除しない。料金がかかり続けます）" IsChecked="{x:Bind ViewModel.Deletion.KeepDbData, Mode=TwoWay}" />
+                        <Button Content="計画" Command="{x:Bind ViewModel.Deletion.PlanCommand}" />
+                        <InfoBar Severity="Error" IsOpen="True" IsClosable="False" Message="{x:Bind ViewModel.Deletion.Error, Mode=OneWay}"
+                                 Visibility="{x:Bind local:Ui.IfText(ViewModel.Deletion.Error), Mode=OneWay}" />
+                        <StackPanel Spacing="8" Visibility="{x:Bind local:Ui.IfTrue(ViewModel.Deletion.HasPlan), Mode=OneWay}">
+                            <ItemsControl ItemsSource="{x:Bind ViewModel.Deletion.Targets}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:DeletionRow">
+                                        <StackPanel Orientation="Horizontal"><TextBlock Text="{x:Bind Decision}" /><TextBlock Text="  " /><TextBlock Text="{x:Bind Name}" /><TextBlock Text="（" /><TextBlock Text="{x:Bind Resource}" /><TextBlock Text="） " /><TextBlock Text="{x:Bind Reason}" /></StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock Text="{x:Bind ViewModel.Deletion.KeptText, Mode=OneWay}" TextWrapping="Wrap" />
+                            <TextBlock Text="{x:Bind ViewModel.Deletion.Note, Mode=OneWay}" />
+                            <ItemsControl ItemsSource="{x:Bind ViewModel.Deletion.Blockers}" Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
+                            <ItemsControl ItemsSource="{x:Bind ViewModel.Deletion.Warnings}" Foreground="{ThemeResource SystemFillColorCautionBrush}" />
+                            <StackPanel Spacing="8" Visibility="{x:Bind local:Ui.IfText(ViewModel.Deletion.AppNameToConfirm), Mode=OneWay}">
+                                <StackPanel Orientation="Horizontal"><TextBlock Text="確認のため、アプリ名「" /><TextBlock Text="{x:Bind ViewModel.Deletion.AppNameToConfirm, Mode=OneWay}" /><TextBlock Text="」を入力してください。" /></StackPanel>
+                                <TextBox Text="{x:Bind ViewModel.Deletion.ConfirmAppName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="320" HorizontalAlignment="Left" />
+                                <Button Content="削除" Command="{x:Bind ViewModel.Deletion.StartCommand}" Style="{StaticResource AccentButtonStyle}" />
+                            </StackPanel>
+                        </StackPanel>
+                        <ContentControl Content="{x:Bind ViewModel.CurrentJob, Mode=OneWay}" ContentTemplate="{StaticResource JobTemplate}" />
+                    </StackPanel>
+
+                    <!-- ローカル検証（Dry-run） -->
+                    <StackPanel x:Name="DryRunPanel" Spacing="12" MaxWidth="900" HorizontalAlignment="Left" Visibility="Collapsed">
+                        <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="ローカル検証（Dry-run）" />
+                        <TextBlock TextWrapping="Wrap" Text="「設定」の内容で docker-compose.yml と .env を保存します。Azure には接続しません（サインインは不要です）。" />
+                        <InfoBar Severity="Warning" IsOpen="True" IsClosable="False" Message="{x:Bind ViewModel.DryRun.EnvWarning}" />
+                        <Button Content="保存先を選んで保存" Command="{x:Bind ViewModel.DryRun.SaveCommand}" Style="{StaticResource AccentButtonStyle}" />
+                        <InfoBar Severity="Error" IsOpen="True" IsClosable="False" Message="{x:Bind ViewModel.DryRun.Error, Mode=OneWay}"
+                                 Visibility="{x:Bind local:Ui.IfText(ViewModel.DryRun.Error), Mode=OneWay}" />
+                        <ItemsControl ItemsSource="{x:Bind ViewModel.DryRun.Warnings}" Foreground="{ThemeResource SystemFillColorCautionBrush}" />
+                        <ItemsControl ItemsSource="{x:Bind ViewModel.DryRun.NextSteps}" />
+                        <Button Content="フォルダーを開く" Command="{x:Bind ViewModel.DryRun.OpenFolderCommand}" />
+                        <TextBox Header="docker-compose.yml" Text="{x:Bind ViewModel.DryRun.ComposeContent, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True"
+                                 FontFamily="Consolas" MinHeight="200" Visibility="{x:Bind local:Ui.IfText(ViewModel.DryRun.ComposeContent), Mode=OneWay}" />
+                    </StackPanel>
+
+                    <!-- 実行の記録 -->
+                    <StackPanel x:Name="JobsPanel" Spacing="12" MaxWidth="900" HorizontalAlignment="Left" Visibility="Collapsed">
+                        <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="実行の記録（このアプリを終了すると消えます）" />
+                        <ItemsControl ItemsSource="{x:Bind ViewModel.Jobs}" ItemTemplate="{StaticResource JobTemplate}" />
+                    </StackPanel>
+                </Grid>
+            </ScrollViewer>
+        </NavigationView>
+    </Grid>
+</Window>

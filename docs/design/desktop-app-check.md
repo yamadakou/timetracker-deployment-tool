@@ -27,15 +27,15 @@
 - [ ] （Dry-run の起動の確認をする場合）Docker Desktop
 
 ### 2.2 パッケージを取得する
-CI（`ci.yml` の `desktop` ジョブ）の成果物 `timetracker-desktop-msixupload`、またはリリースの `timetracker-desktop-vX.Y.Z.msixupload` を取得します。
+CI（`ci.yml` の `desktop` ジョブ）の成果物 `ttdeploytool-desktop-msixupload`、またはリリースの `ttdeploytool-desktop-vX.Y.Z.msixupload` を取得します。
 
 `.msixupload` と中の `.msixbundle` は zip の形式です。拡張子を `.zip` に変えて展開すると、`.msixbundle` が、さらに展開すると x64 と arm64 の `.msix` が出てきます。
 
 ### 2.3 導入する
 Store の限定公開で導入できる場合は、Store から導入します（この場合 2.2 は不要）。Store を使わない場合は、次のどちらかでサイドロードします。CI とリリースのパッケージは署名されていないため、署名か開発者モードが必要です。
 
-- **開発者モード + Visual Studio**: リポジトリを取得し、`Timetracker.Desktop.slnx` を Visual Studio で開き、`Timetracker.Controller.Desktop` を x64 で実行する（[WinUI 3 の開発環境](https://learn.microsoft.com/ja-jp/windows/apps/get-started/start-here)。Windows の「設定」→「システム」→「開発者向け」で開発者モードを有効にする）
-- **自己署名の証明書で署名して導入**: [自己署名の証明書を作り](https://learn.microsoft.com/ja-jp/windows/msix/package/create-certificate-package-signing)、`.msix`（x64 または arm64）に [SignTool で署名](https://learn.microsoft.com/ja-jp/windows/msix/package/sign-app-package-using-signtool)し、証明書を「信頼されたユーザー」に入れてから、`.msix` を開いて導入する。証明書の発行者（`CN=...`）は、マニフェストの `Publisher`（CI のパッケージは `CN=TimetrackerDeploymentTool`）と同じにする
+- **開発者モード + Visual Studio**: リポジトリを取得し、`TTDeployTool.Desktop.slnx` を Visual Studio で開き、`TTDeployTool.Controller.Desktop` を x64 で実行する（[WinUI 3 の開発環境](https://learn.microsoft.com/ja-jp/windows/apps/get-started/start-here)。Windows の「設定」→「システム」→「開発者向け」で開発者モードを有効にする）
+- **自己署名の証明書で署名して導入**: [自己署名の証明書を作り](https://learn.microsoft.com/ja-jp/windows/msix/package/create-certificate-package-signing)、`.msix`（x64 または arm64）に [SignTool で署名](https://learn.microsoft.com/ja-jp/windows/msix/package/sign-app-package-using-signtool)し、証明書を「信頼されたユーザー」に入れてから、`.msix` を開いて導入する。証明書の発行者（`CN=...`）は、マニフェストの `Publisher`（CI のパッケージは `CN=TTDeployTool`）と同じにする
 
 ## 3. サインインせずに確かめる
 | # | 操作 | 確かめること |

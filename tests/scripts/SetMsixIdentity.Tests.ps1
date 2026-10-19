@@ -8,7 +8,7 @@
 BeforeAll {
     $repo = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     $script:SetIdentity = Join-Path $repo ".github/scripts/set-msix-identity.ps1"
-    $script:Original = Join-Path $repo "src/Timetracker.Controller.Desktop/Package.appxmanifest"
+    $script:Original = Join-Path $repo "src/TTDeployTool.Controller.Desktop/Package.appxmanifest"
 
     function script:Read-Manifest { [xml] (Get-Content $script:Manifest -Raw) }
 }

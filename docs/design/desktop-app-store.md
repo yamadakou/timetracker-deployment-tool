@@ -18,7 +18,7 @@
 | [Partner Center](https://learn.microsoft.com/ja-jp/windows/apps/publish/) | Microsoft Store にアプリを出すための管理画面 |
 | アプリ名の予約 | Store に出すアプリの名前を Partner Center で確保すること。予約すると、パッケージの ID（下記）が決まる |
 | パッケージの ID | パッケージのマニフェスト（`Package.appxmanifest`）の `Identity` の `Name` と `Publisher`、`Properties` の `PublisherDisplayName`。Partner Center の値と一致しないと提出できない |
-| `.msixupload` | Store に出すパッケージ（x64 と arm64 のバンドル）。リリースの GitHub Release に `timetracker-desktop-vX.Y.Z.msixupload` として載る。署名は無く、Store が認定の後に署名する |
+| `.msixupload` | Store に出すパッケージ（x64 と arm64 のバンドル）。リリースの GitHub Release に `ttdeploytool-desktop-vX.Y.Z.msixupload` として載る。署名は無く、Store が認定の後に署名する |
 | [限定公開（Private audience）](https://learn.microsoft.com/ja-jp/windows/apps/publish/publish-your-app/msix/visibility-options) | 指定した Microsoft アカウント（メールアドレスの一覧）の人だけが Store で見つけて導入できる公開の範囲。**Entra ID の職場のアカウントは対象外**。一度公開（Public）にすると限定公開に戻せない |
 | アプリ登録（クライアント ID） | 利用者が Azure にサインインするときに、アプリを Entra ID に名乗るための登録（詳細設計 5.1・Q3） |
 
@@ -26,7 +26,7 @@
 [アプリの登録](https://learn.microsoft.com/ja-jp/entra/identity-platform/quickstart-register-app)を、Entra 管理センター（または Azure ポータルの「アプリの登録」）で行います。シークレットや証明書は作りません（公開クライアント）。
 
 1. 「新規登録」で、次のように登録する
-   - 名前: `Timetracker Deployment Tool`（利用者のサインインの画面に表示される）
+   - 名前: `TTDeployTool`（利用者のサインインの画面に表示される）
    - サポートされているアカウントの種類: 「任意の組織ディレクトリ内のアカウント（マルチテナント）」（Q3。社外の利用者のテナントでもサインインできるようにする）
    - リダイレクト URI: 「パブリック クライアント/ネイティブ（モバイルとデスクトップ）」で `http://localhost`
 2. 登録した「アプリケーション（クライアント）ID」を控える（4 章で使う）
@@ -56,10 +56,10 @@
    | `TT_DESKTOP_CLIENT_ID` | 2 章の 2 の「アプリケーション（クライアント）ID」 |
 
 2. 通常どおり `vX.Y.Z` のタグを push してリリースする。`release.yml` の `desktop` ジョブが、マニフェストの版を `X.Y.Z.0` に、ID を上の変数の値にして `.msixupload` を作り（`.github/scripts/set-msix-identity.ps1`）、中身を確かめて（`check-msix.ps1`）Release に載せる
-3. Release の `timetracker-desktop-vX.Y.Z.msixupload` を取得する
+3. Release の `ttdeploytool-desktop-vX.Y.Z.msixupload` を取得する
 
 > [!NOTE]
-> 変数を設定しないでリリースした場合、パッケージの ID は仮の値（`Timetracker.DeploymentTool` / `CN=TimetrackerDeploymentTool`）のままです。ビルドと確認は通りますが、Store には出せません。
+> 変数を設定しないでリリースした場合、パッケージの ID は仮の値（`TTDeployTool` / `CN=TTDeployTool`）のままです。ビルドと確認は通りますが、Store には出せません。
 
 ## 5. 初回の提出（Partner Center）
 初回の提出は Partner Center で手作業で行う必要があります（[MSIX アプリの提出](https://learn.microsoft.com/ja-jp/windows/apps/publish/publish-your-app/msix/create-app-submission)）。予約したアプリの「申請の開始」から、次の項目を入力します。

@@ -38,8 +38,8 @@ jobs:
     # セットアップウィザードとログインの確認（TT_E2E_LICENSE_KEY がある場合）に使うブラウザー
     - name: Install Playwright browser
       run: |
-        dotnet build tests/Timetracker.SystemTests
-        pwsh tests/Timetracker.SystemTests/bin/Debug/net10.0/playwright.ps1 install --with-deps chromium
+        dotnet build tests/TTDeployTool.SystemTests
+        pwsh tests/TTDeployTool.SystemTests/bin/Debug/net10.0/playwright.ps1 install --with-deps chromium
 
     # ローカルの docker compose での確認（LocalComposeSetupTests）は CI（ci.yml）で行うため、ここでは除く
     - name: System test
@@ -54,8 +54,8 @@ jobs:
         TT_E2E_SAMPLE_LOGIN: ${{ secrets.TT_E2E_SAMPLE_LOGIN }}
         TT_E2E_SAMPLE_PASSWORD: ${{ secrets.TT_E2E_SAMPLE_PASSWORD }}
       run: >
-        dotnet test --project tests/Timetracker.SystemTests --
-        --filter-not-class Timetracker.SystemTests.E2E.LocalComposeSetupTests
+        dotnet test --project tests/TTDeployTool.SystemTests --
+        --filter-not-class TTDeployTool.SystemTests.E2E.LocalComposeSetupTests
         --output detailed --report-xunit-trx --results-directory=TestResults
 
     - name: Upload test results

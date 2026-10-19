@@ -14,7 +14,7 @@ CLI や AI アシスタントを使わない利用者が、画面の操作で次
 - 削除（計画 → アプリ名の入力 → 実行）
 - ローカル検証（Dry-run）の `docker-compose.yml` と `.env` の生成と保存
 
-CLI・MCP サーバーと同じアプリケーション層（`Timetracker.Application`）の上に、フロントエンドの一つとして載せる（README の「将来の GUI 化に備え、ドメイン層とコントローラー層を分離」の方針）。
+CLI・MCP サーバーと同じアプリケーション層（`TTDeployTool.Application`）の上に、フロントエンドの一つとして載せる（README の「将来の GUI 化に備え、ドメイン層とコントローラー層を分離」の方針）。
 
 ## 2. スコープ
 | 項目 | Phase 5 |
@@ -44,11 +44,11 @@ CLI・MCP サーバーと同じアプリケーション層（`Timetracker.Applic
 ### 3.2 プロジェクト構成（WinUI 3 の場合）
 ```
 src/
-  Timetracker.Application/              (既存) 計画 → 確認 → 実行のワークフローを追加（4.2）
-  Timetracker.Controller.Desktop.Core/  (新規・net10.0) ViewModel、画面から使うサービスのインターフェース。UI のフレームワークに依存しない
-  Timetracker.Controller.Desktop/       (新規・net10.0-windows10.0.19041.0) WinUI 3 の画面、サインイン（WAM）、ファイルの選択、MSIX
+  TTDeployTool.Application/              (既存) 計画 → 確認 → 実行のワークフローを追加（4.2）
+  TTDeployTool.Controller.Desktop.Core/  (新規・net10.0) ViewModel、画面から使うサービスのインターフェース。UI のフレームワークに依存しない
+  TTDeployTool.Controller.Desktop/       (新規・net10.0-windows10.0.19041.0) WinUI 3 の画面、サインイン（WAM）、ファイルの選択、MSIX
 tests/
-  Timetracker.Controller.Desktop.Core.Tests/  (新規) ViewModel のテスト（Linux でも動く）
+  TTDeployTool.Controller.Desktop.Core.Tests/  (新規) ViewModel のテスト（Linux でも動く）
 ```
 
 ```mermaid
@@ -72,7 +72,7 @@ flowchart TB
 
 - 画面（XAML）には処理を書かず、ViewModel のプロパティとコマンドに結び付けるだけにする。分岐のある処理はすべて `Desktop.Core` か Application に置き、テストする
 - MVVM の基盤（`ObservableObject` / `AsyncCommand`）は、CommunityToolkit.Mvvm を使わず小さな自前のクラスにする。ソース生成のコードが分岐網羅率の測定に入らないようにするため（5a で決めた）。WinUI 3 の `x:Bind` は `INotifyPropertyChanged` と `ICommand` だけを使うので、機能の差は無い
-- `Timetracker.Controller.Desktop`（WinUI 3）は `Timetracker.sln` に入れない。Windows でしかビルドできず、Linux の開発環境で `dotnet build Timetracker.sln` が失敗するため。`Timetracker.Desktop.slnx`（ソリューションファイル）に分け、CI の Windows のジョブでビルドする。`Desktop.Core` とそのテストは `Timetracker.sln` に入れる
+- `TTDeployTool.Controller.Desktop`（WinUI 3）は `TTDeployTool.sln` に入れない。Windows でしかビルドできず、Linux の開発環境で `dotnet build TTDeployTool.sln` が失敗するため。`TTDeployTool.Desktop.slnx`（ソリューションファイル）に分け、CI の Windows のジョブでビルドする。`Desktop.Core` とそのテストは `TTDeployTool.sln` に入れる
 - 依存の向きは既存と同じ（コントローラー層 → アプリケーション層 → インフラストラクチャ層 → ドメイン層）
 
 ## 4. Application の変更（Phase 5a）
@@ -109,7 +109,7 @@ MCP の `generate_compose` の書き込み（上書きの確認、書き込め�
 | 項目 | 内容 | 出典の要点 |
 |---|---|---|
 | パッケージ | `Azure.Identity` 1.21.0（既存）と `Azure.Identity.Broker` 1.7.0 | Azure.Identity 1.21.0 以降には Broker 1.6.0 以降が必須（Broker の CHANGELOG） |
-| 資格情報 | `new InteractiveBrowserCredential(new InteractiveBrowserCredentialBrokerOptions(hwnd) { ClientId, TenantId = "organizations", AdditionallyAllowedTenants = { "*" }, UseDefaultBrokerAccount = true, TokenCachePersistenceOptions = new() { Name = "timetracker-desktop" }, AuthenticationRecord = 保存したもの })` | ウィンドウハンドルは `WinRT.Interop.WindowNative.GetWindowHandle(window)` |
+| 資格情報 | `new InteractiveBrowserCredential(new InteractiveBrowserCredentialBrokerOptions(hwnd) { ClientId, TenantId = "organizations", AdditionallyAllowedTenants = { "*" }, UseDefaultBrokerAccount = true, TokenCachePersistenceOptions = new() { Name = "ttdeploytool-desktop" }, AuthenticationRecord = 保存したもの })` | ウィンドウハンドルは `WinRT.Interop.WindowNative.GetWindowHandle(window)` |
 | 次回の起動 | サインインの結果の `AuthenticationRecord`（アカウントとテナントの識別子。秘密の情報を含まない）をアプリのデータ（`ApplicationData.LocalFolder`）に保存する。トークンのキャッシュは `TokenCachePersistenceOptions` で Windows の DPAPI で保護して保存される | Azure.Identity の TokenCache のサンプル |
 | サインアウト | 保存した `AuthenticationRecord` を消し、キャッシュの名前を変える（次回は対話のサインインになる） | – |
 | WAM が使えない環境 | ブラウザーでのサインイン（`http://localhost` のリダイレクト）に自動で切り替わる | MSAL の WAM の文書 |
@@ -209,12 +209,12 @@ Store を使えない利用者（社内の PC で Store が無効など）向け
 ### 9.1 CI（`ci.yml`）
 | ジョブ | 内容 |
 |---|---|
-| `build`（既存） | `Timetracker.sln` のビルドとテスト。`Desktop.Core` とそのテストを含む |
-| `desktop`（新規・windows-latest） | `microsoft/setup-msbuild` で `Timetracker.Desktop.slnx` をビルドし、署名なしの MSIX を作る（`/p:GenerateAppxPackageOnBuild=true /p:AppxPackageSigningEnabled=false /p:UapAppxPackageBuildMode=StoreUpload /p:AppxBundle=Always /p:AppxBundlePlatforms="x64|arm64"`）。できた `.msixupload` をワークフローの成果物として保存する。Microsoft Learn の WinUI 3 の CI の例に合わせ、`dotnet publish` ではなく `msbuild` を使う |
+| `build`（既存） | `TTDeployTool.sln` のビルドとテスト。`Desktop.Core` とそのテストを含む |
+| `desktop`（新規・windows-latest） | `microsoft/setup-msbuild` で `TTDeployTool.Desktop.slnx` をビルドし、署名なしの MSIX を作る（`/p:GenerateAppxPackageOnBuild=true /p:AppxPackageSigningEnabled=false /p:UapAppxPackageBuildMode=StoreUpload /p:AppxBundle=Always /p:AppxBundlePlatforms="x64|arm64"`）。できた `.msixupload` をワークフローの成果物として保存する。Microsoft Learn の WinUI 3 の CI の例に合わせ、`dotnet publish` ではなく `msbuild` を使う |
 | 確認 | 生成した MSIX の `AppxManifest.xml` の版・機能・対象 OS を PowerShell で確かめる（パッケージの設定の誤りを、Store への提出の前に見つける） |
 
 ### 9.2 リリース（`release.yml`）
-- タグ `vX.Y.Z` で、`desktop` と同じビルドに版 `X.Y.Z.0` を渡し、`timetracker-desktop-vX.Y.Z.msixupload` を GitHub Release に CLI・MCP の zip と並べて載せる
+- タグ `vX.Y.Z` で、`desktop` と同じビルドに版 `X.Y.Z.0` を渡し、`ttdeploytool-desktop-vX.Y.Z.msixupload` を GitHub Release に CLI・MCP の zip と並べて載せる
 - Store への提出は、利用者がこのファイルを Partner Center にアップロードして行う（5c）。自動化する場合は、Partner Center の資格情報をリポジトリのシークレットに入れ、`release.yml` に提出のジョブを追加する（オーナーの判断）
 - パッケージの ID（Partner Center でアプリ名を予約したときの `Name` / `Publisher` / `PublisherDisplayName`）とアプリ登録のクライアント ID は、リポジトリの変数（`TT_DESKTOP_IDENTITY_NAME` / `TT_DESKTOP_PUBLISHER` / `TT_DESKTOP_PUBLISHER_DISPLAY_NAME` / `TT_DESKTOP_CLIENT_ID`）で渡す。リリースの `desktop` ジョブが `.github/scripts/set-msix-identity.ps1` で版（X.Y.Z.0）と ID をマニフェストに設定する。未設定なら仮の値のまま（ビルドと確認はできるが、Store には出せない）。手順は [`desktop-app-store.md`](desktop-app-store.md)
 
@@ -238,13 +238,13 @@ Store を使えない利用者（社内の PC で Store が無効など）向け
 ## 12. 実装フェーズ
 | フェーズ | 内容 | 完了条件 |
 |---|---|---|
-| 5a | ワークフロー（4.2）と `ComposeExporter`（4.3）を Application に追加し、MCP のツールをそれに置き換える。`Desktop.Core`（ViewModel とサービスのインターフェース）とテスト | 既存のテストが全件成功（MCP の結果・メッセージが変わらない）。新しいコードの分岐網羅率 100%。Linux で `dotnet test Timetracker.sln` が通る |
-| 5b | WinUI 3 のアプリ（画面、WAM でのサインイン、ファイルの選択、更新の確認）、`Timetracker.Desktop.slnx`、CI の `desktop` ジョブ | CI で MSIX ができる。Windows の実機で、サインイン → 計画 → デプロイ → 状態の確認 → 削除、Dry-run の保存が成功する（Azure での確認は利用者の確認を取ってから行う） |
+| 5a | ワークフロー（4.2）と `ComposeExporter`（4.3）を Application に追加し、MCP のツールをそれに置き換える。`Desktop.Core`（ViewModel とサービスのインターフェース）とテスト | 既存のテストが全件成功（MCP の結果・メッセージが変わらない）。新しいコードの分岐網羅率 100%。Linux で `dotnet test TTDeployTool.sln` が通る |
+| 5b | WinUI 3 のアプリ（画面、WAM でのサインイン、ファイルの選択、更新の確認）、`TTDeployTool.Desktop.slnx`、CI の `desktop` ジョブ | CI で MSIX ができる。Windows の実機で、サインイン → 計画 → デプロイ → 状態の確認 → 削除、Dry-run の保存が成功する（Azure での確認は利用者の確認を取ってから行う） |
 | 5c | `release.yml` の配布物、`docs/PRIVACY.md`、README・利用者向けの手順、Store への初回の提出（利用者が Partner Center で行う） | Release に `.msixupload` が出る。Store の認定に通る |
 
 **実施結果（5a・5b・5c の準備）**
-- 5a: Application に `DeploymentWorkflow` / `DeletionWorkflow` / `ComposeExporter` を追加し、MCP のツールをそれに置き換えた（MCP の入力・結果・メッセージは変えていない）。Infrastructure に `AzureTenantDirectory` / `TenantScopedCredential`、`Timetracker.Controller.Desktop.Core`（ViewModel）とテストを追加した。永続化オプション（7.1）も反映した
-- 5b: WinUI 3 のアプリ（`Timetracker.Controller.Desktop`、`Timetracker.Desktop.slnx`）と、CI の `desktop` ジョブを追加した。CI（作業ブランチで手動実行）で、署名なしの `.msixupload`（x64 と arm64 のバンドル、約 190MB。.NET と Windows App SDK を含む自己完結のため）ができ、マニフェストの版・対象 OS（10.0.17763.0）・機能（internetClient, runFullTrust）・アーキテクチャを `check-msix.ps1` で確かめた。CI で直したこと: ComboBox の選択は `BindBack` を使えないため選択の変更イベントで戻す、`Run` に `x:Bind` を結び付けると XBF の生成が失敗するため横に並べた `TextBlock` にする、マニフェストの `Resource` は `x-generate`、バンドルではプラットフォームごとに RID を決める
+- 5a: Application に `DeploymentWorkflow` / `DeletionWorkflow` / `ComposeExporter` を追加し、MCP のツールをそれに置き換えた（MCP の入力・結果・メッセージは変えていない）。Infrastructure に `AzureTenantDirectory` / `TenantScopedCredential`、`TTDeployTool.Controller.Desktop.Core`（ViewModel）とテストを追加した。永続化オプション（7.1）も反映した
+- 5b: WinUI 3 のアプリ（`TTDeployTool.Controller.Desktop`、`TTDeployTool.Desktop.slnx`）と、CI の `desktop` ジョブを追加した。CI（作業ブランチで手動実行）で、署名なしの `.msixupload`（x64 と arm64 のバンドル、約 190MB。.NET と Windows App SDK を含む自己完結のため）ができ、マニフェストの版・対象 OS（10.0.17763.0）・機能（internetClient, runFullTrust）・アーキテクチャを `check-msix.ps1` で確かめた。CI で直したこと: ComboBox の選択は `BindBack` を使えないため選択の変更イベントで戻す、`Run` に `x:Bind` を結び付けると XBF の生成が失敗するため横に並べた `TextBlock` にする、マニフェストの `Resource` は `x-generate`、バンドルではプラットフォームごとに RID を決める
 - 5c の準備: `release.yml` に、タグの版（X.Y.Z.0）で `.msixupload` を作って Release に載せる `desktop` ジョブを追加した（実際のリリースでは未確認）。プライバシー ポリシーの案（`docs/PRIVACY.md`）を追加した
 - 5c の準備（続き）: リリースで、リポジトリの変数からパッケージの ID とクライアント ID を設定するようにした（`set-msix-identity.ps1`。Pester 4 件、コマンドの網羅率 100%）。Store への提出の手順（[`desktop-app-store.md`](desktop-app-store.md)。アプリ登録・アカウント・アプリ名の予約・変数・初回の提出・更新）と、Windows での確認の手順（[`desktop-app-check.md`](desktop-app-check.md)）を書き、README に「デスクトップアプリ（開発中）」の節を加えた
 - 未確認: Windows の実機での動作（サインイン、テナントごとのサブスクリプションの一覧、計画 → デプロイ → 状態の確認 → 削除、Dry-run の保存、閉じる前の確認、Store の更新の確認）と 11 の確認事項。Store への提出（Partner Center のアカウント、アプリ名の予約、マニフェストの Identity の置き換え、正式なアイコン、アプリ登録のクライアント ID）

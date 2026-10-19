@@ -8,7 +8,7 @@
   - Entra ID のアプリ登録（サーバー用: スコープ Mcp.Access・アプリロール・v2 のトークン、
     クライアント用: Claude Code / VS Code からサインインする公開クライアント）
   - user 方式を使う場合: Azure Service Management の委任アクセス許可と、マネージド ID を信頼するフェデレーション資格情報
-  - Container Apps の Environment と Container App（ghcr.io/<owner>/timetracker-mcp。レプリカは 1 に固定）
+  - Container Apps の Environment と Container App（ghcr.io/<owner>/ttdeploytool-mcp。レプリカは 1 に固定）
   - server 方式を使う場合: 許可するリソースグループと、マネージド ID への Contributor の割り当て
   利用者へのアプリロールの割り当ては scripts/assign-mcp-role.ps1 で行う。
 
@@ -28,7 +28,7 @@ param(
     [string] $Location = "japaneast",
     # Container App の名前（Environment・マネージド ID・アプリ登録の名前の元にもなる）
     [string] $Name = "tt-mcp",
-    [string] $Image = "ghcr.io/yamadakou/timetracker-mcp",
+    [string] $Image = "ghcr.io/yamadakou/ttdeploytool-mcp",
     [string] $ImageTag = "latest",
     # server / user / server,user（PowerShell から server,user と書くと配列になるため、配列も受け付ける）
     [string[]] $IdentityModes = @("server"),
@@ -116,16 +116,21 @@ New-ResourceGroupIfMissing $ResourceGroup
 $identity = Invoke-AzJson identity create --resource-group $ResourceGroup --name "$Name-id" --location $Location
 
 Step "Entra ID: サーバーのアプリ登録"
-$serverName = "Timetracker MCP ($Name)"
+$serverName = "TTDeployTool MCP ($Name)"
 $serverAppId = Invoke-Az ad app list --display-name $serverName --query "[0].appId" --output tsv
+if (-not $serverAppId) {
+    # 本ツールの以前の名前の版で作ったアプリ登録を引き継ぐ（表示名は下で新しい名前にする）
+    $serverAppId = Invoke-Az ad app list --display-name "Timetracker MCP ($Name)" --query "[0].appId" --output tsv
+}
 if (-not $serverAppId) {
     $serverAppId = Invoke-Az ad app create --display-name $serverName --sign-in-audience AzureADMyOrg --query appId --output tsv
 }
 $serverApp = Invoke-AzJson ad app show --id $serverAppId
-# 再実行でスコープやロールの ID が変わらないよう、既存の ID を使う
+# 再実行でスコープやロールの ID が変わらないよう、既存の ID を使う。以前の名前の版のロール（Timetracker.Deploy.*）は、
+# 同じ ID のまま値を新しくする（利用者への割り当てはロールの ID に結び付くため、割り当て直さずに済む）
 $scopeId = ($serverApp.api.oauth2PermissionScopes | Where-Object value -eq "Mcp.Access").id ?? (New-Guid).Guid
-$serverRoleId = ($serverApp.appRoles | Where-Object value -eq "Timetracker.Deploy.Server").id ?? (New-Guid).Guid
-$userRoleId = ($serverApp.appRoles | Where-Object value -eq "Timetracker.Deploy.User").id ?? (New-Guid).Guid
+$serverRoleId = ($serverApp.appRoles | Where-Object { $_.value -in @("TTDeployTool.Deploy.Server", "Timetracker.Deploy.Server") } | Select-Object -First 1).id ?? (New-Guid).Guid
+$userRoleId = ($serverApp.appRoles | Where-Object { $_.value -in @("TTDeployTool.Deploy.User", "Timetracker.Deploy.User") } | Select-Object -First 1).id ?? (New-Guid).Guid
 
 $requiredAccess = @()
 if ($userMode) {
@@ -137,22 +142,23 @@ $api = @{
     requestedAccessTokenVersion = 2
     oauth2PermissionScopes = @(@{
         id = $scopeId; value = "Mcp.Access"; type = "User"; isEnabled = $true
-        adminConsentDisplayName = "Timetracker MCP サーバーを使う"
-        adminConsentDescription = "Timetracker のデプロイ用 MCP サーバーのツールを、サインインした利用者として呼び出します。"
-        userConsentDisplayName = "Timetracker MCP サーバーを使う"
-        userConsentDescription = "Timetracker のデプロイ用 MCP サーバーのツールを、あなたとして呼び出します。"
+        adminConsentDisplayName = "TTDeployTool MCP サーバーを使う"
+        adminConsentDescription = "TTDeployTool（Timetracker のデプロイ ツール）の MCP サーバーのツールを、サインインした利用者として呼び出します。"
+        userConsentDisplayName = "TTDeployTool MCP サーバーを使う"
+        userConsentDescription = "TTDeployTool（Timetracker のデプロイ ツール）の MCP サーバーのツールを、あなたとして呼び出します。"
     })
     # 再実行のときも、事前承認済みのクライアントを残す（下で設定する）
     preAuthorizedApplications = @($serverApp.api.preAuthorizedApplications | Where-Object { $_ })
 }
 Graph PATCH "/applications/$($serverApp.id)" @{
+    displayName = $serverName
     identifierUris = @("api://$serverAppId")
     api = $api
     appRoles = @(
-        @{ id = $serverRoleId; value = "Timetracker.Deploy.Server"; allowedMemberTypes = @("User"); isEnabled = $true
-           displayName = "Timetracker.Deploy.Server"; description = "サーバーの ID（server 方式）と、有効なら利用者本人の権限（user 方式）で Azure を操作できる" },
-        @{ id = $userRoleId; value = "Timetracker.Deploy.User"; allowedMemberTypes = @("User"); isEnabled = $true
-           displayName = "Timetracker.Deploy.User"; description = "利用者本人の権限（user 方式）で Azure を操作できる" }
+        @{ id = $serverRoleId; value = "TTDeployTool.Deploy.Server"; allowedMemberTypes = @("User"); isEnabled = $true
+           displayName = "TTDeployTool.Deploy.Server"; description = "サーバーの ID（server 方式）と、有効なら利用者本人の権限（user 方式）で Azure を操作できる" },
+        @{ id = $userRoleId; value = "TTDeployTool.Deploy.User"; allowedMemberTypes = @("User"); isEnabled = $true
+           displayName = "TTDeployTool.Deploy.User"; description = "利用者本人の権限（user 方式）で Azure を操作できる" }
     )
     requiredResourceAccess = $requiredAccess
 }
@@ -188,13 +194,18 @@ if ($userMode) {
 }
 
 Step "Entra ID: クライアント（Claude Code / VS Code）のアプリ登録"
-$clientName = "Timetracker MCP client ($Name)"
+$clientName = "TTDeployTool MCP client ($Name)"
 $clientAppId = Invoke-Az ad app list --display-name $clientName --query "[0].appId" --output tsv
+if (-not $clientAppId) {
+    # 本ツールの以前の名前の版で作ったアプリ登録を引き継ぐ（表示名は下で新しい名前にする）
+    $clientAppId = Invoke-Az ad app list --display-name "Timetracker MCP client ($Name)" --query "[0].appId" --output tsv
+}
 if (-not $clientAppId) {
     $clientAppId = Invoke-Az ad app create --display-name $clientName --sign-in-audience AzureADMyOrg --is-fallback-public-client true --query appId --output tsv
 }
 $clientApp = Invoke-AzJson ad app show --id $clientAppId
 Graph PATCH "/applications/$($clientApp.id)" @{
+    displayName = $clientName
     isFallbackPublicClient = $true
     # Claude Code（--callback-port）と VS Code のループバック。VS Code の URI は docs/design/mcp-phase4c.md の確認事項を参照
     # 管理者が後から加えたリダイレクト URI は残す

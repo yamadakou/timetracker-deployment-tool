@@ -17,19 +17,19 @@
 ## 2. 管理タグ
 | キー | 値 |
 |---|---|
-| `managed-by` | `timetracker-deployment-tool` |
+| `managed-by` | `ttdeploytool` |
 | `tt-app-name` | `--app-name` の値（小文字化後） |
 
 - 付ける対象: Environment（新規作成時のみ）と、3 つの Container App（作成時・更新時とも）
 - **既存の Environment は従来どおり変更しない**（タグも付けない）
 - Container App の更新時は、既存のタグを読み取り、そこに管理タグを上書き追加して送る。利用者が付けたタグは残る
-- 「本ツールが管理している」と判定する条件: `managed-by` が `timetracker-deployment-tool`、かつ `tt-app-name` が対象のアプリ名と一致する（値は大文字小文字を区別しない）
+- 「本ツールが管理している」と判定する条件: `managed-by` が `ttdeploytool`、かつ `tt-app-name` が対象のアプリ名と一致する（値は大文字小文字を区別しない）
 - 定数と判定は Domain の `ManagedTags` に置く。タグの組み立ては `ContainerAppSpecBuilder` で行う（送信内容をテストで検証できるようにするため）
 
 ## 3. delete コマンド
 ### 3.1 書式
 ```
-timetracker-cli delete --subscription <ID> --resource-group <RG> [--app-name <名前>]
+ttdeploytool-cli delete --subscription <ID> --resource-group <RG> [--app-name <名前>]
                        [--include-untagged] [--dry-run] [--yes] [--auth-mode <モード>] [--verbose]
 ```
 - `deploy` 専用のオプション（`--db-type`、`--db-password` など）を指定するとエラーにする。`delete` 専用のオプション（`--include-untagged`、`--yes`）を `deploy` で指定した場合もエラーにする

@@ -1,4 +1,4 @@
-# プライバシー ポリシー（Timetracker Deployment Tool デスクトップアプリ）
+# プライバシー ポリシー（TTDeployTool デスクトップアプリ）
 
 > [!NOTE]
 > Microsoft Store への提出（ポリシー 10.5.1）のための案です。提出の前に、発行元（Partner Center の開発者アカウント）の名前と問い合わせ先を確かめて公開してください。
