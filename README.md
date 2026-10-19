@@ -91,22 +91,22 @@ TimeTracker のコンテナイメージの詳細（クイックスタート、�
 
 - 3 つの Container App には、作成するときと更新するときに付けます。更新するときは、利用者が付けたほかのタグを残したまま、管理タグを加えます
 - Container Apps 環境とストレージアカウントには、新しく作成するときだけ付けます（既存のものは変更しないため）
-- v0.9.0 までの版（本ツールの以前の名前 timetracker-deployment-tool の版）は `managed-by` に `timetracker-deployment-tool` を付けていました。この値のリソースも本ツールのものとして扱い、削除の対象にします。更新すると `ttdeploytool` に置き換わります
+- 以前の名前（timetracker-deployment-tool）の版（v0.8.1 まで）は `managed-by` に `timetracker-deployment-tool` を付けていました。この値のリソースも本ツールのものとして扱い、削除の対象にします。更新すると `ttdeploytool` に置き換わります
 - タグは誤って削除しないための目印で、セキュリティの制限ではありません（削除できるかどうかは、Azure の RBAC で決まります）
 - 本ツールで作ったリソースは、タグで一覧できます（[`az resource list`](https://learn.microsoft.com/ja-jp/cli/azure/resource#az-resource-list) は `--tag` と `--resource-group` を同時に指定できないため、リソースグループは `--query` で絞り込みます）:
   ```bash
   az resource list --tag managed-by=ttdeploytool --query "[?resourceGroup=='<リソースグループ名>'].{name:name, type:type}" -o table
   ```
 
-### 名前の変更（v0.9.0 の次の版から）
+### 名前の変更（v0.9.0 から）
 
-本ツールの名前を、Timetracker（デプロイする製品の名前）と区別するため、TTDeployTool に改めました。v0.9.0 までの版から移る場合は、次の点に注意してください。
+本ツールの名前を、Timetracker（デプロイする製品の名前）と区別するため、TTDeployTool に改めました（v0.9.0 から。v0.9.0 は、名前を改めて作り直しました）。v0.8.1 までの版から移る場合は、次の点に注意してください。
 
-| 変わったもの | v0.9.0 まで | 次の版から | 必要な作業 |
+| 変わったもの | v0.8.1 まで | v0.9.0 から | 必要な作業 |
 |---|---|---|---|
 | CLI の実行ファイル・Release の zip | `timetracker-cli.exe`・`timetracker-cli-vX.Y.Z.zip` | `ttdeploytool-cli.exe`・`ttdeploytool-cli-vX.Y.Z.zip` | スクリプトなどで実行ファイル名を指定していれば直す |
 | MCP サーバー（stdio）の実行ファイル | `timetracker-mcp.exe` | `ttdeploytool-mcp.exe` | AI アシスタントの設定の `command` を直す（[MCP サーバーの利用者向けマニュアル](docs/MCP_SERVER.md)） |
-| MCP サーバー（HTTP）のイメージ | `ghcr.io/yamadakou/timetracker-mcp` | `ghcr.io/yamadakou/ttdeploytool-mcp` | `scripts/deploy-mcp-http.ps1` を再実行する（下記）。GHCR では別のパッケージになるため、最初のリリースの後に、パッケージの公開設定（public にするか）をし直す |
+| MCP サーバー（HTTP）のイメージ | `ghcr.io/yamadakou/timetracker-mcp` | `ghcr.io/yamadakou/ttdeploytool-mcp` | `scripts/deploy-mcp-http.ps1` を再実行する（下記）。以前のイメージ（`timetracker-mcp`）は GHCR から削除しました |
 | MCP サーバーの名前・Resources の URI | `timetracker-deploy`・`timetracker://…` | `ttdeploytool`・`ttdeploytool://…` | 不要（AI アシスタントはツールの一覧から読み直す） |
 | Entra ID のアプリ登録・アプリロール（HTTP 版） | `Timetracker MCP (<名前>)`・`Timetracker.Deploy.Server` / `.User` | `TTDeployTool MCP (<名前>)`・`TTDeployTool.Deploy.Server` / `.User` | `scripts/deploy-mcp-http.ps1` を同じ引数で再実行する。既存のアプリ登録を引き継ぎ、表示名とロールの値を新しくする（ロールの ID は変えないため、利用者への割り当てはそのまま） |
 | 管理タグ `managed-by` の値 | `timetracker-deployment-tool` | `ttdeploytool` | 不要（以前の値も本ツールのものとして扱う） |

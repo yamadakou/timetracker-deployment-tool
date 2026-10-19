@@ -62,7 +62,7 @@ $Me = az ad signed-in-user show --query userPrincipalName -o tsv       # 自分�
   # 表示されない場合は登録する（数分かかる）
   az provider register --namespace Microsoft.Storage --wait
   ```
-- [ ] 名前を TTDeployTool に改めた版（v0.9.0 の次のリリース以降。イメージ名とアプリロールの値が変わったため、v0.9.0 以前のイメージはこの手順の配置スクリプトでは使えない）のイメージが公開されている（[リリースの一覧](https://github.com/yamadakou/timetracker-deployment-tool/releases)の「ダウンロード」に `ghcr.io/yamadakou/ttdeploytool-mcp:<版>` がある）
+- [ ] 名前を TTDeployTool に改めた版（作り直した v0.9.0 以降）のイメージ `ghcr.io/yamadakou/ttdeploytool-mcp` が公開されている（以前の名前のイメージ `timetracker-mcp` は削除した）（[リリースの一覧](https://github.com/yamadakou/timetracker-deployment-tool/releases)の「ダウンロード」に `ghcr.io/yamadakou/ttdeploytool-mcp:<版>` がある）
 
 ## 3. MCP サーバー（HTTP 版）を配置し、Claude Code から接続する
 ### 3.1 名前を決める
@@ -72,7 +72,7 @@ $Me = az ad signed-in-user show --query userPrincipalName -o tsv       # 自分�
 $McpRg      = "rg-tt-mcp"        # MCP サーバーを置くリソースグループ（スクリプトが作る）
 $McpName    = "tt-mcp"           # MCP サーバーの Container App の名前（Environment・マネージド ID・アプリ登録の名前の元にもなる）
 $AllowedRg  = "rg-tt-mcp-demo"   # server 方式で操作を許すリソースグループ（スクリプトが作る）。4 章の確認で Timetracker を作る場所
-$ImageTag   = "<版>"             # MCP サーバーのイメージの版（2.3 で確かめた版。例: 0.10.0）
+$ImageTag   = "<版>"             # MCP サーバーのイメージの版（2.3 で確かめた版。例: 0.9.0）
 ```
 
 ### 3.2 配置のスクリプトを実行する
@@ -232,7 +232,7 @@ $UserRg = "rg-tt-mcp-user"   # user 方式の確認に使うリソースグル�
 | 3.2 のスクリプトがアプリ登録の作成で失敗する（`Insufficient privileges`） | Entra ID でアプリを登録する権限が無い。2.3 の 2 つ目を確かめる |
 | 3.4 のサインインで `AADSTS50011`（リダイレクト URI の不一致）になる | `claude mcp add` の `--callback-port` が 8765 でない。`claude mcp remove timetracker` で外して、3.4 の 1 をやり直す |
 | 3.5 で「アプリロールが必要です」というエラーになる | 3.3 の割り当ての前にサインインした。`/mcp` から `timetracker` にサインインし直す |
-| 3.5 の `constraints` に `persist_db` が無い、S3 の `persistence` が無い | イメージが古い。`az containerapp show -n $McpName -g $McpRg --query "properties.template.containers[0].image" -o tsv` で版を確かめ、`$ImageTag` を名前を改めた版（v0.9.0 の次のリリース）以降にして 3.2 をやり直す |
+| 3.5 の `constraints` に `persist_db` が無い、S3 の `persistence` が無い | イメージが古い。`az containerapp show -n $McpName -g $McpRg --query "properties.template.containers[0].image" -o tsv` で版を確かめ、`$ImageTag` を、作り直した v0.9.0 以降にして 3.2 をやり直す |
 | S1 のブロッカーに `Microsoft.Storage/...` の権限の不足が出る | `server` 方式のマネージド ID に、許可したリソースグループの Contributor が無い。3.2 のコマンドをもう一度実行する（割り当て直す） |
 | S2 が「ストレージアカウント名は…使われているため作成できません」 | アプリ名を変える（名前はサブスクリプション・リソースグループ・アプリ名から作るため、別の組み合わせなら変わる） |
 | S2 で DB アプリの起動に失敗する、マウントのエラーが出る | [Azure Policy](https://learn.microsoft.com/ja-jp/azure/governance/policy/overview) で、ストレージアカウントのアカウントキーによるアクセス（`allowSharedKeyAccess`）やパブリック ネットワーク アクセスを禁止している。管理者に確認する |
