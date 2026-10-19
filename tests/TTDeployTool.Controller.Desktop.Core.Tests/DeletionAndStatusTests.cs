@@ -233,7 +233,7 @@ public class InitialStateTests
     {
         var signIn = new FakeSignIn();
         var azure = new FakeAzure();
-        var target = new TargetViewModel(signIn, azure) { ResourceGroup = "rg" };
+        var target = new TargetViewModel(signIn, azure, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance) { ResourceGroup = "rg" };
 
         target.CreateSession().CreateGateway(new DesktopDeploymentLogger(Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance));
 

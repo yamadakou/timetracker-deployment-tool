@@ -18,9 +18,9 @@ internal sealed class Harness
     public FakeLauncher Launcher { get; } = new();
     public MainViewModel Main { get; }
 
-    public Harness()
+    public Harness(Microsoft.Extensions.Logging.ILoggerFactory? loggers = null)
     {
-        Main = new MainViewModel(SignIn, Azure, Dialogs, Launcher, TimeProvider.System, NullLoggerFactory.Instance, TimeSpan.FromMilliseconds(5));
+        Main = new MainViewModel(SignIn, Azure, Dialogs, Launcher, TimeProvider.System, loggers ?? NullLoggerFactory.Instance, TimeSpan.FromMilliseconds(5));
     }
 
     /// <summary>サインインして、対象（sub / rg / demo）と正しい設定を入れる。</summary>

@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using TTDeployTool.Controller.Desktop.Core.Mvvm;
 using TTDeployTool.Controller.Desktop.Core.Services;
 
@@ -8,14 +9,16 @@ public sealed class SignInViewModel : ObservableObject
 {
     private readonly ISignInService _signIn;
     private readonly Func<bool, Task> _accountChanged;
+    private readonly ILogger _logger;
     private SignedInAccount? _account;
     private string? _error;
 
     /// <param name="accountChanged">サインイン（true）・サインアウト（false）したときの処理（対象の一覧を読み直す・消す）</param>
-    public SignInViewModel(ISignInService signIn, Func<bool, Task> accountChanged)
+    public SignInViewModel(ISignInService signIn, Func<bool, Task> accountChanged, ILogger logger)
     {
         _signIn = signIn;
         _accountChanged = accountChanged;
+        _logger = logger;
         SignInCommand = new AsyncCommand(SignInAsync, () => !IsSignedIn);
         SignOutCommand = new AsyncCommand(SignOutAsync, () => IsSignedIn);
     }
@@ -45,6 +48,7 @@ public sealed class SignInViewModel : ObservableObject
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "前回のサインインを復元できませんでした");
             Error = DesktopMessages.ForAzure(ex);
         }
     }
@@ -59,9 +63,11 @@ public sealed class SignInViewModel : ObservableObject
         catch (OperationCanceledException)
         {
             // 利用者がサインインの画面を閉じた
+            _logger.LogInformation("サインインが取り消されました");
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "サインインに失敗しました");
             Error = DesktopMessages.ForAzure(ex);
         }
     }
@@ -75,6 +81,7 @@ public sealed class SignInViewModel : ObservableObject
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "サインアウトに失敗しました");
             Error = DesktopMessages.ForAzure(ex);
         }
         // サインアウトに失敗しても、このアプリでは使わない（次回は対話でサインインする）
@@ -89,6 +96,8 @@ public sealed class SignInViewModel : ObservableObject
         OnPropertyChanged(nameof(AccountDisplay));
         SignInCommand.RaiseCanExecuteChanged();
         SignOutCommand.RaiseCanExecuteChanged();
+        // アカウント名は書かない（ホームのテナントだけ）
+        _logger.LogInformation("サインインの状態: {State}（ホームのテナント {TenantId}）", account != null ? "サインイン" : "サインアウト", account?.HomeTenantId);
         await _accountChanged(account != null);
     }
 }

@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using Azure.Core;
+using Microsoft.Extensions.Logging;
 using TTDeployTool.Application.Workflows;
 using TTDeployTool.Controller.Desktop.Core.Mvvm;
 using TTDeployTool.Controller.Desktop.Core.Services;
@@ -19,16 +20,18 @@ public sealed class TargetViewModel : ObservableObject
 {
     private readonly ISignInService _signIn;
     private readonly IAzureClients _clients;
+    private readonly ILogger _logger;
     private SubscriptionChoice? _selected;
     private string _resourceGroup = "";
     private string _appName = Defaults.DefaultAppName;
     private string _location = Defaults.DefaultLocation;
     private string? _error;
 
-    public TargetViewModel(ISignInService signIn, IAzureClients clients)
+    public TargetViewModel(ISignInService signIn, IAzureClients clients, ILogger logger)
     {
         _signIn = signIn;
         _clients = clients;
+        _logger = logger;
         LoadCommand = new AsyncCommand(LoadAsync);
     }
 
@@ -90,22 +93,27 @@ public sealed class TargetViewModel : ObservableObject
         try
         {
             var credential = _signIn.Credential;
-            foreach (var tenant in await _clients.Tenants(credential).ListAsync())
+            var tenants = await _clients.Tenants(credential).ListAsync();
+            _logger.LogInformation("テナント {Count} 件", tenants.Count);
+            foreach (var tenant in tenants)
             {
                 var name = tenant.DisplayName ?? tenant.DefaultDomain ?? tenant.TenantId;
                 try
                 {
                     var subscriptions = await _clients.Subscriptions(new TenantScopedCredential(credential, tenant.TenantId)).ListAsync();
                     choices.AddRange(subscriptions.Select(s => new SubscriptionChoice(s.SubscriptionId, s.DisplayName, s.State, tenant.TenantId, name)));
+                    _logger.LogInformation("テナント {TenantId}: サブスクリプション {Count} 件", tenant.TenantId, subscriptions.Count);
                 }
                 catch (Exception ex)
                 {
+                    _logger.LogWarning(ex, "テナント {TenantId} のサブスクリプションを読めませんでした", tenant.TenantId);
                     Notices.Add($"テナント {name} のサブスクリプションを読めませんでした（MFA などで、サインインし直すと読める場合があります）: {DesktopMessages.ForAzure(ex)}");
                 }
             }
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "テナントの一覧を読めませんでした");
             Error = DesktopMessages.ForAzure(ex);
         }
 

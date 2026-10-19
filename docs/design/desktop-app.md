@@ -176,6 +176,19 @@ CLI の `--persist-db` / `--keep-db-data`、MCP の `persist_db` / `keep_db_data
 | 状態の確認 | 永続化しているか、永続化していないが以前のデータのストレージアカウントが残っているか、を表示する |
 | 削除 | 「DB のデータを残す」のチェック（既定は外す。データごと削除する）。チェックが無ければ、ストレージアカウントも削除することと元に戻せないことを警告に出す。チェックがあれば、残すもの（料金がかかり続けること、同じアプリ名で永続化してデプロイすると引き継げること）を表示し、完了のログにも添える |
 
+### 7.2 診断用のログ
+Windows の実機で、サインインの後にサブスクリプションを読めないなど、画面のメッセージだけでは原因が分からないことがあったため、診断用のログをファイルに残す（オーナー判断。UI テストより先に入れる）。
+
+| 項目 | 内容 |
+|---|---|
+| 置き場所 | アプリのデータのフォルダー（MSIX ではパッケージごとの `LocalState`、パッケージにしない場合は `%LOCALAPPDATA%\TTDeployTool`）の `logs`。日ごとのファイル `ttdeploytool-desktop-yyyyMMdd.log`。起動時に 7 日より古いファイルを消す。「実行の記録」の画面にフォルダーを示し、「ログのフォルダーを開く」で開ける |
+| 書くこと | 起動（版）、サインインの状態（サインイン・サインアウトとホームのテナント。アカウント名は書かない）、復元・サインイン・サインアウトの失敗、テナントの件数とテナントごとのサブスクリプションの件数、読めなかったテナントと例外、計画・状態の確認での Azure の読み込み（`DesktopDeploymentLogger`）、ジョブの進み具合、処理されなかった例外。情報（Information）以上 |
+| Azure SDK のイベント | `AzureEventSourceListener` で、`Azure-Identity`（サインインとトークンの取得。MSAL・WAM のログを含む）は情報以上、それ以外（`Azure-Core` の HTTP など）は警告とエラーだけを書く。Azure SDK は既定で、ヘッダーとクエリの値から個人のデータを除き、要求と応答の本文を書かず、Azure.Identity は PII のログ（`IsUnsafeSupportLoggingEnabled`）を無効のままにする。レベルの対応は Microsoft Learn の表（`AzureEventSourceLogForwarder`）と同じ |
+| 書かないこと | パスワード、トークン、アカウント名。ファイルはこの PC にだけ置き、送信しない |
+| 失敗したとき | ログを書けない・古いファイルを消せない場合は、何もせずに続ける（アプリの動作を止めない） |
+
+実装は `TTDeployTool.Controller.Desktop.Core` の `DiagnosticLog`（`ILoggerFactory`。Linux でもテストできる）で、`App` が起動時に作って `MainViewModel` に渡す。
+
 ## 8. Microsoft Store での配布
 ### 8.1 パッケージ
 | 項目 | 内容 |
@@ -247,6 +260,7 @@ Store を使えない利用者（社内の PC で Store が無効など）向け
 - 5b: WinUI 3 のアプリ（`TTDeployTool.Controller.Desktop`、`TTDeployTool.Desktop.slnx`）と、CI の `desktop` ジョブを追加した。CI（作業ブランチで手動実行）で、署名なしの `.msixupload`（x64 と arm64 のバンドル、約 190MB。.NET と Windows App SDK を含む自己完結のため）ができ、マニフェストの版・対象 OS（10.0.17763.0）・機能（internetClient, runFullTrust）・アーキテクチャを `check-msix.ps1` で確かめた。CI で直したこと: ComboBox の選択は `BindBack` を使えないため選択の変更イベントで戻す、`Run` に `x:Bind` を結び付けると XBF の生成が失敗するため横に並べた `TextBlock` にする、マニフェストの `Resource` は `x-generate`、バンドルではプラットフォームごとに RID を決める
 - 5c の準備: `release.yml` に、タグの版（X.Y.Z.0）で `.msixupload` を作って Release に載せる `desktop` ジョブを追加した（実際のリリースでは未確認）。プライバシー ポリシーの案（`docs/PRIVACY.md`）を追加した
 - 5c の準備（続き）: リリースで、リポジトリの変数からパッケージの ID とクライアント ID を設定するようにした（`set-msix-identity.ps1`。Pester 4 件、コマンドの網羅率 100%）。Store への提出の手順（[`desktop-app-store.md`](desktop-app-store.md)。アプリ登録・アカウント・アプリ名の予約・変数・初回の提出・更新）と、Windows での確認の手順（[`desktop-app-check.md`](desktop-app-check.md)）を書き、README に「デスクトップアプリ（開発中）」の節を加えた
+- Windows の実機での確認（オーナー）: Visual Studio 2026 でビルド・起動できるよう、`.slnx` のプラットフォームの対応付けと MSIX の起動プロファイルを直した（REVIEW_ISSUES No.49）。起動後、サインインの後にサブスクリプションを読めないなど不安定なことがあったため、原因を調べる診断用のログ（7.2）を加えた
 - 未確認: Windows の実機での動作（サインイン、テナントごとのサブスクリプションの一覧、計画 → デプロイ → 状態の確認 → 削除、Dry-run の保存、閉じる前の確認、Store の更新の確認）と 11 の確認事項。Store への提出（Partner Center のアカウント、アプリ名の予約、マニフェストの Identity の置き換え、正式なアイコン、アプリ登録のクライアント ID）
 
 - 5a は Windows が無くても進められる（この開発環境でも実装とテストができる）。5b の画面とサインインは Windows の実機での確認が要る
@@ -284,5 +298,6 @@ Store を使えない利用者（社内の PC で Store が無効など）向け
 - テナントの一覧: https://learn.microsoft.com/rest/api/resources/tenants/list
 - claims challenge: https://learn.microsoft.com/entra/identity-platform/claims-challenge
 - Azure の必須 MFA: https://learn.microsoft.com/entra/identity/authentication/concept-mandatory-multifactor-authentication
+- Azure SDK のログ（AzureEventSourceListener・レベルの対応・既定で除く情報。2026-10-19 に確認）: https://learn.microsoft.com/dotnet/azure/sdk/logging
 - 資格情報の保管庫: https://learn.microsoft.com/windows/apps/develop/security/credential-locker
 - PasswordBox.Password: https://learn.microsoft.com/windows/windows-app-sdk/api/winrt/microsoft.ui.xaml.controls.passwordbox.password

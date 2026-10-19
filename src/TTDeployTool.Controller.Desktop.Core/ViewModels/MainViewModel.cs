@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using Microsoft.Extensions.Logging;
 using TTDeployTool.Application.Jobs;
 using TTDeployTool.Application.Workflows;
+using TTDeployTool.Controller.Desktop.Core.Diagnostics;
 using TTDeployTool.Controller.Desktop.Core.Mvvm;
 using TTDeployTool.Controller.Desktop.Core.Services;
 
@@ -30,19 +31,25 @@ public sealed class MainViewModel : ObservableObject
         var jobs = new JobManager(new InMemoryJobStore(), time, loggers.CreateLogger<JobManager>());
         var caller = new LocalCallerContext();
 
-        Target = new TargetViewModel(signIn, clients);
+        Target = new TargetViewModel(signIn, clients, loggers.CreateLogger("TTDeployTool.Desktop.Target"));
         SignIn = new SignInViewModel(signIn, async signedIn =>
         {
             if (signedIn)
                 await Target.LoadAsync();
             else
                 Target.Clear();
-        });
+        }, loggers.CreateLogger("TTDeployTool.Desktop.SignIn"));
         Settings = new SettingsViewModel(Target);
         Deployment = new DeploymentViewModel(new DeploymentWorkflow(plans, jobs, caller, logger), Target, Settings, WatchAsync);
         Deletion = new DeletionViewModel(new DeletionWorkflow(plans, jobs, caller, logger), Target, WatchAsync);
         Status = new StatusViewModel(Target, logger);
         DryRun = new DryRunViewModel(Settings, dialogs, launcher);
+        LogDirectory = (loggers as DiagnosticLog)?.Directory;
+        OpenLogFolderCommand = new AsyncCommand(() =>
+        {
+            launcher.OpenFolder(LogDirectory!);
+            return Task.CompletedTask;
+        }, () => LogDirectory != null);
         OpenEndpointCommand = new AsyncCommand(() =>
         {
             launcher.OpenUri(CurrentJob!.Endpoint!);
@@ -63,6 +70,12 @@ public sealed class MainViewModel : ObservableObject
     public StatusViewModel Status { get; }
 
     public DryRunViewModel DryRun { get; }
+
+    /// <summary>診断用のログのフォルダー（ファイルに書かない場合は null）。</summary>
+    public string? LogDirectory { get; }
+
+    /// <summary>診断用のログのフォルダーを開く（問い合わせのときに、ファイルを添付してもらう）。</summary>
+    public AsyncCommand OpenLogFolderCommand { get; }
 
     /// <summary>デプロイが成功した後に、Timetracker を既定のブラウザーで開く。</summary>
     public AsyncCommand OpenEndpointCommand { get; }

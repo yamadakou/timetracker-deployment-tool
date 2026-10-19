@@ -202,6 +202,11 @@
                     <StackPanel x:Name="JobsPanel" Spacing="12" MaxWidth="900" HorizontalAlignment="Left" Visibility="Collapsed">
                         <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="実行の記録（このアプリを終了すると消えます）" />
                         <ItemsControl ItemsSource="{x:Bind ViewModel.Jobs}" ItemTemplate="{StaticResource JobTemplate}" />
+
+                        <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="診断用のログ" Margin="0,16,0,0" />
+                        <TextBlock TextWrapping="Wrap" Text="サインインや読み込みがうまくいかないときの調査に使います。この PC にだけ保存し（7 日で削除）、パスワードとトークンは書きません。" />
+                        <TextBlock IsTextSelectionEnabled="True" Text="{x:Bind ViewModel.LogDirectory}" />
+                        <Button Content="ログのフォルダーを開く" Command="{x:Bind ViewModel.OpenLogFolderCommand}" />
                     </StackPanel>
                 </Grid>
             </ScrollViewer>
