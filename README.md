@@ -14,6 +14,7 @@ TimeTracker のコンテナイメージの詳細（クイックスタート、�
 - 設定の指定: Timetracker のイメージのバージョン（タグ）と、コンテナごとの CPU・メモリを指定できます。台数は 1 台に固定です
 - DB のデータの永続化（`--persist-db`）: 既定では、DB のデータは DB コンテナの再起動で消えます。指定すると、Azure Files に置いて残します（[DB のデータの扱い](#db-のデータの扱いと永続化--persist-db)）
 - AI アシスタントからの操作: MCP サーバー（`timetracker-mcp`）で、同じ操作を AI アシスタントとの対話で行えます（[MCP サーバーの利用者向けマニュアル](docs/MCP_SERVER.md)）
+- 画面での操作（開発中）: Windows のデスクトップアプリで、同じ操作を画面から行えるようにします（[デスクトップアプリ（開発中）](#デスクトップアプリ開発中)）
 
 > [!NOTE]
 > DB と Redis も **コンテナ** として Container Apps の中で動かします。Azure Database for PostgreSQL や Azure SQL Database などの PaaS の DB、Azure Cache for Redis は作りません。
@@ -533,6 +534,16 @@ Azure を使わずに、自分の PC の Docker で Timetracker・DB・Redis を
 
 CLI と同じ機能を、[MCP（Model Context Protocol）](https://modelcontextprotocol.io/)に対応した AI アシスタント（Claude Code、VS Code の GitHub Copilot、Claude Desktop など）から、対話しながら使えます。提供しているのは、利用者の PC で動く stdio 版です（チームで共有する HTTP 版は開発中です）。導入、アシスタントの設定、使い方は [MCP サーバーの利用者向けマニュアル（docs/MCP_SERVER.md）](docs/MCP_SERVER.md) を参照してください。
 
+### デスクトップアプリ（開発中）
+
+CLI や AI アシスタントを使わずに、Windows の画面の操作で同じことを行うアプリを開発しています（WinUI 3。Microsoft Store の限定公開で配布する予定です）。まだ Store では配布していません。
+
+- できること: Azure へのサインイン（Windows のアカウント。`az login` は不要）、サブスクリプションの選択、デプロイ（計画 → 確認 → 実行）、状態の確認、削除（アプリ名の入力で確認）、ローカル検証（Dry-run）の docker-compose.yml と .env の保存
+- 安全策は CLI・MCP サーバーと同じです（実行の前に計画を示す、DB のデータが失われる更新は同意のチェックが必要、実行の直前に計画を作り直して状態が変わっていれば実行しない）
+- パスワードは保存しません（アプリを終了すると消えます）
+- 対象: Windows 10（1809 以降）、Windows 11（x64 / arm64）
+- 設計: [docs/design/desktop-app.md](docs/design/desktop-app.md)、Windows での確認の手順: [docs/design/desktop-app-check.md](docs/design/desktop-app-check.md)、Store への提出の手順: [docs/design/desktop-app-store.md](docs/design/desktop-app-store.md)、プライバシー ポリシー（案）: [docs/PRIVACY.md](docs/PRIVACY.md)
+
 ### コマンドパラメータの説明一覧
 `deploy`（サブコマンドを省略した場合も `deploy`）のオプションです。`delete` のオプションは[リソースの削除（delete）](#リソースの削除delete)を参照してください。
 
@@ -671,12 +682,13 @@ dotnet publish .\src\Timetracker.Controller.Cli\Timetracker.Controller.Cli.cspro
 - 配布する成果物は、CLI プロジェクト（と MCP サーバーのプロジェクト）を publish して作る[単一ファイルの EXE](https://learn.microsoft.com/ja-jp/dotnet/core/deploying/single-file/overview) だけです
 - Timetracker.Domain / Timetracker.Application / Timetracker.Infrastructure.Azure / Timetracker.Common はクラスライブラリ（実行ファイルを作らない）で、単一ファイルの publish の対象ではありません。ライブラリとして配布する必要が出た場合は、`dotnet pack` で NuGet パッケージにすることなどを検討してください
 - ほかの OS 向けには、`-r` を `linux-x64` や `osx-arm64` などに変えて publish します
+- デスクトップアプリ（WinUI 3）は Windows でしかビルドできないため、`Timetracker.sln` には入れず、`Timetracker.Desktop.slnx` を Visual Studio で開いてビルドします。Store 用のパッケージ（`.msixupload`）は、CI の `desktop` ジョブと同じく `msbuild src\Timetracker.Controller.Desktop\Timetracker.Controller.Desktop.csproj /restore /p:Configuration=Release /p:Platform=x64 /p:AppxBundlePlatforms="x64|arm64" /p:AppxBundle=Always /p:UapAppxPackageBuildMode=StoreUpload /p:AppxPackageSigningEnabled=false /p:GenerateAppxPackageOnBuild=true` で作ります。画面の状態と操作（`Timetracker.Controller.Desktop.Core`）とそのテストは `Timetracker.sln` に入っていて、Linux でもビルド・テストできます
 
 ### テスト
 - 単体テスト: `dotnet test Timetracker.sln`（Azure には接続しません）
 - システムテスト（本物の Azure に対するテスト。料金がかかります）: 準備と実行の方法は [docs/SYSTEM_TESTS.md](docs/SYSTEM_TESTS.md) を参照してください。ローカルでは `scripts/run-system-tests.ps1`（または `.sh`）、CI では GitHub Actions の **System Test** ワークフローを手動で実行します
 - セットアップウィザードとログインの確認（ブラウザーを使う E2E テスト。Playwright）: Timetracker のライセンスキーとサンプルデータベースのユーザー（`TT_E2E_LICENSE_KEY` / `TT_E2E_SAMPLE_LOGIN` / `TT_E2E_SAMPLE_PASSWORD`）がある場合に、サンプルデータベースの作成と、そのユーザーでのログインまでを確かめます。ローカルの docker compose（PostgreSQL / SQL Server）では PR の CI（ubuntu）で毎回、Azure ではシステムテストの中で実行します（[docs/SYSTEM_TESTS.md](docs/SYSTEM_TESTS.md)）
-- CI（`.github/workflows/ci.yml`）: PR と `main` への push のたびに、ビルドと単体テスト・スクリプトのテスト・上の E2E テスト・MCP サーバーのイメージの確認を実行します。変更がドキュメント（`docs/` の下と `*.md`）だけのときは省きます（Actions の **CI** → Run workflow で手動実行すると、変更にかかわらずすべて実行します）
+- CI（`.github/workflows/ci.yml`）: PR と `main` への push のたびに、ビルドと単体テスト・スクリプトのテスト・上の E2E テスト・MCP サーバーのイメージの確認・デスクトップアプリの Store 用のパッケージの作成と確認を実行します。変更がドキュメント（`docs/` の下と `*.md`）だけのときは省きます（Actions の **CI** → Run workflow で手動実行すると、変更にかかわらずすべて実行します）
 - リンク切れのチェック（[lychee](https://github.com/lycheeverse/lychee)。設定は `lychee.toml`）: Markdown の中のファイルと見出し（`#...`）へのリンクは、CI の `links` ジョブで PR と `main` への push のたびに確かめます（ドキュメントだけの変更でも省きません）。外部のサイトへのリンクは、相手の都合で一時的に失敗することがあるため、**Links** ワークフロー（`.github/workflows/links.yml`）で月 1 回確かめ、切れていればラベル `link-check` の Issue で知らせます（Actions の **Links** → Run workflow で手動でも実行できます）
 
 ### 設計概要

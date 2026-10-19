@@ -94,14 +94,15 @@ jobs:
     - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v2
 
-    # パッケージの版はタグから X.Y.Z.0 にする（Store では 4 つ目を 0 にする必要がある）
-    - name: Set package version
+    # パッケージの版をタグから X.Y.Z.0 にし、Partner Center でアプリ名を予約したときの ID と発行元を設定する。
+    # ID はリポジトリの変数（Settings → Secrets and variables → Actions → Variables）で渡す。未設定なら仮の値のまま
+    # （Store には出せないが、ビルドと確認はできる）。手順は docs/design/desktop-app-store.md
+    - name: Set package identity
       shell: pwsh
-      run: |
-        $path = "src/Timetracker.Controller.Desktop/Package.appxmanifest"
-        [xml] $manifest = Get-Content $path
-        $manifest.Package.Identity.Version = "$($env:RELEASE_TAG.TrimStart('v')).0"
-        $manifest.Save((Resolve-Path $path).Path)
+      run: >
+        ./.github/scripts/set-msix-identity.ps1 -Manifest src/Timetracker.Controller.Desktop/Package.appxmanifest -Tag $env:RELEASE_TAG
+        -Name "${{ vars.TT_DESKTOP_IDENTITY_NAME }}" -Publisher "${{ vars.TT_DESKTOP_PUBLISHER }}"
+        -PublisherDisplayName "${{ vars.TT_DESKTOP_PUBLISHER_DISPLAY_NAME }}"
 
     - name: Build MSIX for the Store
       run: >
@@ -109,6 +110,7 @@ jobs:
         /p:Configuration=Release /p:Platform=x64 /p:AppxBundlePlatforms="x64|arm64" /p:AppxBundle=Always
         /p:UapAppxPackageBuildMode=StoreUpload /p:AppxPackageSigningEnabled=false /p:GenerateAppxPackageOnBuild=true
         /p:AppxPackageDir=${{ github.workspace }}\AppPackages\
+        /p:DesktopClientId=${{ vars.TT_DESKTOP_CLIENT_ID }}
 
     - name: Check package manifest
       shell: pwsh
