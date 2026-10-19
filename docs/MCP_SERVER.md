@@ -1,8 +1,8 @@
-# Timetracker デプロイ MCP サーバー
+# TTDeployTool MCP サーバー
 
 [README に戻る](../README.md)
 
-CLI（`timetracker-cli.exe`）と同じ機能を、AI アシスタント（Claude Code、VS Code の GitHub Copilot、Claude Desktop など）との対話で使えるようにするサーバーです。「Timetracker の検証環境を Azure に作って」のように頼むと、アシスタントがこのサーバーの機能（ツール）を呼び出して、計画の作成 → 利用者の確認 → 実行の順に進めます。
+CLI（`ttdeploytool-cli.exe`）と同じ機能を、AI アシスタント（Claude Code、VS Code の GitHub Copilot、Claude Desktop など）との対話で使えるようにするサーバーです。「Timetracker の検証環境を Azure に作って」のように頼むと、アシスタントがこのサーバーの機能（ツール）を呼び出して、計画の作成 → 利用者の確認 → 実行の順に進めます。
 
 アシスタントとの接続には、[MCP（Model Context Protocol）](https://modelcontextprotocol.io/)という共通の仕組みを使います。MCP に対応したアシスタントなら、どれからでも使えます。
 
@@ -10,24 +10,24 @@ CLI（`timetracker-cli.exe`）と同じ機能を、AI アシスタント（Claud
 
 | 形態 | 状況 | 動く場所 | 向いている使い方 |
 |---|---|---|---|
-| [stdio 版](#stdio-版) | **提供中** | 利用者の PC（アシスタントが `timetracker-mcp.exe` を起動し、標準入出力でやり取りします） | 自分の Azure の権限（`az login` など）で、自分の PC から使う |
+| [stdio 版](#stdio-版) | **提供中** | 利用者の PC（アシスタントが `ttdeploytool-mcp.exe` を起動し、標準入出力でやり取りします） | 自分の Azure の権限（`az login` など）で、自分の PC から使う |
 | [HTTP 版](#http-版開発中) | 開発中（未提供） | Azure Container Apps などのサーバー（アシスタントは URL で接続します） | チームで 1 つのサーバーを共有し、決まったリソースグループに検証環境を作る |
 
 ---
 
 ## stdio 版
 
-アシスタントが `timetracker-mcp.exe` を子プロセスとして起動し、標準入出力（[stdio](https://modelcontextprotocol.io/specification/latest/basic/transports)）でやり取りします。Azure の操作には、利用者の PC の資格情報（既定は Azure CLI の `az login` のサインイン）を使います。必要な Azure の権限、リソースプロバイダーの登録、認証モードは CLI と同じです（README の[利用者向けマニュアル](../README.md#利用者向けマニュアル)）。
+アシスタントが `ttdeploytool-mcp.exe` を子プロセスとして起動し、標準入出力（[stdio](https://modelcontextprotocol.io/specification/latest/basic/transports)）でやり取りします。Azure の操作には、利用者の PC の資格情報（既定は Azure CLI の `az login` のサインイン）を使います。必要な Azure の権限、リソースプロバイダーの登録、認証モードは CLI と同じです（README の[利用者向けマニュアル](../README.md#利用者向けマニュアル)）。
 
 ### 使い始めるまでの流れ
 
-1. [導入](#導入): `timetracker-mcp.exe` を入手し、Azure の準備をして、`az login` でサインインします
+1. [導入](#導入): `ttdeploytool-mcp.exe` を入手し、Azure の準備をして、`az login` でサインインします
 2. [アシスタントへの登録](#アシスタントの設定例): 使うアシスタントの設定に、このサーバーを登録します（必要なら[環境変数](#サーバーの設定環境変数)も設定します）
 3. [使う](#使い方の例): アシスタントに、やりたいことを日本語で頼みます。Azure を変更する前に、計画の内容が示されるので、確認してから実行を指示します
 
 ### 導入
 
-1. [Releases](https://github.com/yamadakou/timetracker-deployment-tool/releases) から `timetracker-mcp-vX.Y.Z.zip` を取得し、任意のフォルダーに展開します（例: `C:\tools\timetracker-mcp\timetracker-mcp.exe`）。Windows 用の単一ファイルで、.NET のインストールは不要です
+1. [Releases](https://github.com/yamadakou/timetracker-deployment-tool/releases) から `ttdeploytool-mcp-vX.Y.Z.zip` を取得し、任意のフォルダーに展開します（例: `C:\tools\ttdeploytool-mcp\ttdeploytool-mcp.exe`）。Windows 用の単一ファイルで、.NET のインストールは不要です
 2. Azure を使う場合は、README の[必要な RBAC ロールと権限](../README.md#必要な-rbac-ロールと権限)と[リソースプロバイダーの登録](../README.md#azure-リソースプロバイダーの登録)を確かめます
 3. [Azure CLI](https://learn.microsoft.com/ja-jp/cli/azure/install-azure-cli) で `az login` を実行し、サインインしておきます（既定の認証モード `azure-cli` の場合）
 4. 使うアシスタントに、サーバーを登録します（[アシスタントの設定例](#アシスタントの設定例)）
@@ -50,7 +50,7 @@ Azure を使わずに、ローカル用の `docker-compose.yml` を作るだけ�
 | `get_deployment_info` | デプロイ済みの環境の状態と URL | しない |
 
 ツールのほかに、次のものも用意しています。対応していないアシスタントでも、ツールだけで同じことができます。
-- [Resources](https://modelcontextprotocol.io/specification/latest/server/resources)（アシスタントが読む文書やデータ）: `timetracker://docs/constraints`（目的と注意事項）、`timetracker://docs/rbac`（必要な権限）、`timetracker://deployments/{subscription}/{resource_group}/{app_name}`（環境の状態）
+- [Resources](https://modelcontextprotocol.io/specification/latest/server/resources)（アシスタントが読む文書やデータ）: `ttdeploytool://docs/constraints`（目的と注意事項）、`ttdeploytool://docs/rbac`（必要な権限）、`ttdeploytool://deployments/{subscription}/{resource_group}/{app_name}`（環境の状態）
 - [Prompts](https://modelcontextprotocol.io/specification/latest/server/prompts)（手順の案内。アシスタントのメニューから選べます）: `deploy-timetracker`、`local-dry-run`、`delete-timetracker`
 
 ### 安全策
@@ -89,17 +89,17 @@ Azure を使わずに、ローカル用の `docker-compose.yml` を作るだけ�
 
 コマンドで登録します（[Claude Code での MCP の使い方](https://code.claude.com/docs/ja/mcp)）。`-e` の値は、Claude Code の設定ファイルに平文で保存されます。
 ```powershell
-claude mcp add timetracker `
+claude mcp add ttdeploytool `
   -e TT_MCP_DEFAULT_SUBSCRIPTION=<サブスクリプション ID> `
   -e TT_MCP_OUTPUT_ROOT=C:\work\timetracker `
-  -- C:\tools\timetracker-mcp\timetracker-mcp.exe
+  -- C:\tools\ttdeploytool-mcp\ttdeploytool-mcp.exe
 ```
 パスワードを設定ファイルに書きたくない場合は、プロジェクトの `.mcp.json` で環境変数を参照できます（Claude Code を起動する前に、端末で `TT_DB_PASSWORD` などを設定しておきます）。
 ```json
 {
   "mcpServers": {
-    "timetracker": {
-      "command": "C:\\tools\\timetracker-mcp\\timetracker-mcp.exe",
+    "ttdeploytool": {
+      "command": "C:\\tools\\ttdeploytool-mcp\\ttdeploytool-mcp.exe",
       "env": {
         "TT_MCP_DB_PASSWORD": "${TT_DB_PASSWORD}",
         "TT_MCP_TRACKER_PASSWORD": "${TT_TRACKER_PASSWORD}"
@@ -124,9 +124,9 @@ claude mcp add timetracker `
     { "type": "promptString", "id": "tracker-password", "description": "Timetracker のパスワード", "password": true }
   ],
   "servers": {
-    "timetracker": {
+    "ttdeploytool": {
       "type": "stdio",
-      "command": "C:\\tools\\timetracker-mcp\\timetracker-mcp.exe",
+      "command": "C:\\tools\\ttdeploytool-mcp\\ttdeploytool-mcp.exe",
       "env": {
         "TT_MCP_DB_PASSWORD": "${input:db-password}",
         "TT_MCP_TRACKER_PASSWORD": "${input:tracker-password}"
@@ -148,8 +148,8 @@ claude mcp add timetracker `
 ```json
 {
   "mcpServers": {
-    "timetracker": {
-      "command": "C:\\tools\\timetracker-mcp\\timetracker-mcp.exe",
+    "ttdeploytool": {
+      "command": "C:\\tools\\ttdeploytool-mcp\\ttdeploytool-mcp.exe",
       "env": { "TT_MCP_DEFAULT_SUBSCRIPTION": "<サブスクリプション ID>" }
     }
   }
@@ -188,11 +188,11 @@ claude mcp add timetracker `
 
 | 項目 | stdio 版 | HTTP 版 |
 |---|---|---|
-| 配布の形 | 単一ファイルの EXE（GitHub Releases の zip） | コンテナイメージ `ghcr.io/yamadakou/timetracker-mcp`（リリースのタグで [GitHub Container Registry](https://docs.github.com/ja/packages/working-with-a-github-packages-registry/working-with-the-container-registry) に公開）。Azure Container Apps などに置く |
+| 配布の形 | 単一ファイルの EXE（GitHub Releases の zip） | コンテナイメージ `ghcr.io/yamadakou/ttdeploytool-mcp`（リリースのタグで [GitHub Container Registry](https://docs.github.com/ja/packages/working-with-a-github-packages-registry/working-with-the-container-registry) に公開）。Azure Container Apps などに置く |
 | アシスタントの接続 | 子プロセスとして起動する（`command` にパスを指定） | URL で接続する（`https://<サーバー>/mcp`。[Streamable HTTP](https://modelcontextprotocol.io/specification/latest/basic/transports)）。TLS は手前（Container Apps のイングレスなど）で終端し、コンテナはポート 8080 で待ち受ける |
 | 利用者の認証 | 不要（PC の利用者がそのまま使う） | **必須**。Microsoft Entra ID の[アクセストークン](https://learn.microsoft.com/ja-jp/entra/identity-platform/access-tokens)（スコープ `Mcp.Access`）で認証する（[MCP の認可の仕組み](https://modelcontextprotocol.io/specification/latest/basic/authorization)）。Entra ID は動的なクライアント登録に対応していないため、アシスタントには、事前に登録したクライアント ID を設定する |
 | Azure を操作する権限 | 利用者の PC の資格情報（`TT_MCP_AUTH_MODE`） | サーバーの設定で、次のどちらか、または両方を使えるようにする<br/>・`server` 方式: サーバーの[マネージド ID](https://learn.microsoft.com/ja-jp/azure/container-apps/managed-identity)（またはサービスプリンシパル）の権限で、管理者が許可したリソースグループだけを操作する<br/>・`user` 方式: サインインした利用者本人の権限で操作する（範囲は本人の Azure のロールで決まる）<br/>両方を使える場合は、ツールの引数 `azure_identity` で選ぶ。計画に方式を記録し、実行は計画の方式で行う |
-| だれが使えるか | PC の利用者 | Entra ID の[アプリロール](https://learn.microsoft.com/ja-jp/entra/identity-platform/howto-add-app-roles-in-apps)で決める。`Timetracker.Deploy.Server` は両方の方式、`Timetracker.Deploy.User` は `user` 方式だけ。どちらも無ければ、Azure を操作しないツール（`get_deployment_options` / `validate_deployment` / `generate_compose`）と文書だけ |
+| だれが使えるか | PC の利用者 | Entra ID の[アプリロール](https://learn.microsoft.com/ja-jp/entra/identity-platform/howto-add-app-roles-in-apps)で決める。`TTDeployTool.Deploy.Server` は両方の方式、`TTDeployTool.Deploy.User` は `user` 方式だけ。どちらも無ければ、Azure を操作しないツール（`get_deployment_options` / `validate_deployment` / `generate_compose`）と文書だけ |
 | パスワードの渡し方 | 環境変数（推奨）または引数 | 引数だけ（サーバーの環境変数は全員で共有になるため読まない） |
 | `generate_compose`（Dry-run） | 利用者の PC にファイルを書く | ファイルは書かず、`docker-compose.yml` と `.env` の内容を返す（パスワードはプレースホルダー） |
 | 計画・ジョブ | サーバーのプロセスの中だけに保存 | 同じ。利用者ごとに分かれ、作った本人だけが実行・参照できる。レプリカは 1 つに固定する |
@@ -227,7 +227,7 @@ claude mcp add timetracker `
 
 - 利用者本人に、CLI を自分で実行する場合と同じロールが必要です（README の[必要な RBAC ロールと権限](../README.md#必要な-rbac-ロールと権限)）。権限が足りない場合は、計画の段階で示されます
 - サーバーは、利用者のアクセストークンを [OBO（On-Behalf-Of）](https://learn.microsoft.com/ja-jp/entra/identity-platform/v2-oauth2-on-behalf-of-flow)で Azure 用のトークンに交換します。そのため、MCP サーバーのアプリ登録に、Azure Service Management の委任アクセス許可（`user_impersonation`）を加え、[テナントの管理者の同意](https://learn.microsoft.com/ja-jp/entra/identity/enterprise-apps/grant-admin-consent)を得ておきます。同意が無いと、AADSTS65001 で失敗します（スクリプトを実行した本人の分だけは、管理者でなくても同意できることがあります）
-- [Azure の管理 API には MFA（多要素認証）が必須](https://learn.microsoft.com/ja-jp/entra/identity/authentication/concept-mandatory-multifactor-authentication)です。MCP サーバーへのサインインで MFA を行っていないと、交換が AADSTS50076 で失敗し、サインインし直しても解消しません。テナントの管理者が、[条件付きアクセス](https://learn.microsoft.com/ja-jp/entra/identity/conditional-access/overview)で、MCP サーバーのアプリ（エンタープライズ アプリケーション「Timetracker MCP (…)」）へのサインインに MFA を求めるポリシーを設定してください
+- [Azure の管理 API には MFA（多要素認証）が必須](https://learn.microsoft.com/ja-jp/entra/identity/authentication/concept-mandatory-multifactor-authentication)です。MCP サーバーへのサインインで MFA を行っていないと、交換が AADSTS50076 で失敗し、サインインし直しても解消しません。テナントの管理者が、[条件付きアクセス](https://learn.microsoft.com/ja-jp/entra/identity/conditional-access/overview)で、MCP サーバーのアプリ（エンタープライズ アプリケーション「TTDeployTool MCP (…)」）へのサインインに MFA を求めるポリシーを設定してください
 - 計画の結果には「サインインした利用者本人の権限（user 方式）」と表示され、Azure のアクティビティログにも本人の操作として残ります
 - エラーコード（AADSTS…）の意味は、[Microsoft Entra の認証と認可のエラーコード](https://learn.microsoft.com/ja-jp/entra/identity-platform/reference-error-codes)で確かめられます
 

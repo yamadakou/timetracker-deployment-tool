@@ -75,8 +75,8 @@ Azure 上の DB のデータを、DB コンテナの再起動（設定を変え�
 ## 5. 引数
 ### 5.1 CLI
 ```
-timetracker-cli deploy ... [--persist-db [true|false]]
-timetracker-cli delete ... [--keep-db-data [true|false]]
+ttdeploytool-cli deploy ... [--persist-db [true|false]]
+ttdeploytool-cli delete ... [--keep-db-data [true|false]]
 ```
 - `--persist-db`: DB のデータを Azure Files に置く。既存の bool フラグと同じ書式（`--persist-db`、`--persist-db true`、`--persist-db=false`）
 - 【決定 Q3】指定しない場合は、既存の DB アプリの今の状態を引き継ぐ（永続化していれば続け、していなければ永続化しない。新規は永続化しない）。永続化をやめるには `--persist-db false` を明示する。このため `DeployOptions.PersistDb` は `bool?`（null は「今の状態を引き継ぐ」）とし、計画（`DeploymentPlanner`）と実行（`DeploymentRunner`）が、既存の DB アプリのボリュームを読んで実際に永続化するかを決める

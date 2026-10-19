@@ -4,7 +4,7 @@
 
 .DESCRIPTION
   Azure CLI にサインインしていなければデバイスコード認証でサインインし、環境変数を設定して
-  tests/Timetracker.SystemTests を実行する。権限不足のシナリオは、権限の少ないサービスプリンシパルの
+  tests/TTDeployTool.SystemTests を実行する。権限不足のシナリオは、権限の少ないサービスプリンシパルの
   クライアント ID とシークレットがある場合だけ実行する（シークレットは環境変数か、入力で渡す）。
 
 .EXAMPLE
@@ -54,9 +54,9 @@ try {
 
     # セットアップウィザードとログインの確認は、ライセンスキー（環境変数 TT_E2E_LICENSE_KEY）とサンプルデータベースのユーザー（TT_E2E_SAMPLE_LOGIN / TT_E2E_SAMPLE_PASSWORD）がある場合だけ行う。使うブラウザーを入れる
     if ($env:TT_E2E_LICENSE_KEY) {
-        dotnet build (Join-Path $repo "tests/Timetracker.SystemTests")
+        dotnet build (Join-Path $repo "tests/TTDeployTool.SystemTests")
         if ($LASTEXITCODE -ne 0) { throw "ビルドに失敗しました。" }
-        & (Join-Path $repo "tests/Timetracker.SystemTests/bin/Debug/net10.0/playwright.ps1") install chromium
+        & (Join-Path $repo "tests/TTDeployTool.SystemTests/bin/Debug/net10.0/playwright.ps1") install chromium
         if ($LASTEXITCODE -ne 0) { throw "Playwright のブラウザーを入れられませんでした。" }
     } else {
         Write-Warning "TT_E2E_LICENSE_KEY が無いため、セットアップウィザードとログインの確認はスキップします。"
@@ -65,7 +65,7 @@ try {
     Write-Host "システムテストを実行します（20〜40 分かかり、Azure Container Apps の料金が発生します）。"
     # --results-directory は "=" でつなぐ（既存のディレクトリをスペース区切りで渡すと、dotnet test がプロジェクトの指定と誤解する）
     $results = Join-Path $repo "TestResults/system"
-    dotnet test --project (Join-Path $repo "tests/Timetracker.SystemTests") -- `
+    dotnet test --project (Join-Path $repo "tests/TTDeployTool.SystemTests") -- `
         --output detailed --report-xunit-trx "--results-directory=$results"
     $exitCode = $LASTEXITCODE
 }

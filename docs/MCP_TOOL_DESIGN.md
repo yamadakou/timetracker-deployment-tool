@@ -1,4 +1,4 @@
-# MCP ツール設計案（Timetracker.Controller.Mcp）
+# MCP ツール設計案（TTDeployTool.Controller.Mcp）
 
 - ステータス: 第 4.4 版。Phase 0〜2 は main にマージ済み。Phase 3a〜3c を `MCP-Tool` ブランチで実装した（8.2）
 - 対象ブランチ: `MCP-Tool`
@@ -22,7 +22,7 @@
 ## 1. 目的とスコープ
 
 ### 1.1 目的
-既存の CLI（`Timetracker.Controller.Cli`）と同じ機能を、**MCP（Model Context Protocol）サーバー**として公開する。Claude Code などの MCP クライアントから、対話しながら以下を行えるようにする。
+既存の CLI（`TTDeployTool.Controller.Cli`）と同じ機能を、**MCP（Model Context Protocol）サーバー**として公開する。Claude Code などの MCP クライアントから、対話しながら以下を行えるようにする。
 
 - パラメータの確認・検証（既定値、命名規則、DB 種別とタグの組み合わせなど）
 - Dry-run（`docker-compose.yml` / `.env` の生成）
@@ -75,7 +75,7 @@ flowchart LR
 
 | # | 現状 | MCP 化での課題 |
 |---|---|---|
-| A | `AzureSdkExecutor` / `ContainerAppSpecBuilder` / `CredentialFactory` が **`Timetracker.Controller.Cli` プロジェクト内**にある | MCP プロジェクトから CLI（Exe）プロジェクトを参照するのは不適切。共有ライブラリへの切り出しが必要 |
+| A | `AzureSdkExecutor` / `ContainerAppSpecBuilder` / `CredentialFactory` が **`TTDeployTool.Controller.Cli` プロジェクト内**にある | MCP プロジェクトから CLI（Exe）プロジェクトを参照するのは不適切。共有ライブラリへの切り出しが必要 |
 | B | デプロイの手順（検証 → RG → Environment → DB/Redis/TT）が `Program.cs` のトップレベル文に直書き | MCP・WebAPI からも同じ手順を呼べるよう、アプリケーションサービスに切り出す必要がある |
 | C | 既定値の解決（DB 種別に応じたタグ、アプリ名の小文字化、スペック既定値）も `Program.cs` にある | CLI と MCP で解決ロジックがずれる恐れ（No.28 と同種の問題）。共通化が必要 |
 | D | `SimpleLogger` が `Console.Out`（stdout）に出力 | **stdio トランスポートでは stdout が JSON-RPC 専用**。stdout に 1 行でもログが出るとプロトコルが壊れる。ログ出力先の抽象化が必須 |
@@ -95,30 +95,30 @@ flowchart LR
 
 ```
 src/
-  Timetracker.Common/                   (既存) ロガー抽象 + 実装
-  Timetracker.Domain/                   (既存) DeployOptions, Defaults, 検証, Compose 生成, 命名, 警告
-  Timetracker.Application/              (新規) ユースケース（計画・実行・状態・削除）、ジョブ管理、ストア抽象
-  Timetracker.Infrastructure.Azure/     (新規) Azure SDK 呼び出し、仕様生成、資格情報
-  Timetracker.Controller.Cli/           (既存) CLI フロントエンド（薄くなる）
-  Timetracker.Controller.Mcp/           (新規) MCP フロントエンド（stdio / HTTP を起動引数で切り替え）
-  Timetracker.Controller.WebApi/        (将来) WebAPI フロントエンド
+  TTDeployTool.Common/                   (既存) ロガー抽象 + 実装
+  TTDeployTool.Domain/                   (既存) DeployOptions, Defaults, 検証, Compose 生成, 命名, 警告
+  TTDeployTool.Application/              (新規) ユースケース（計画・実行・状態・削除）、ジョブ管理、ストア抽象
+  TTDeployTool.Infrastructure.Azure/     (新規) Azure SDK 呼び出し、仕様生成、資格情報
+  TTDeployTool.Controller.Cli/           (既存) CLI フロントエンド（薄くなる）
+  TTDeployTool.Controller.Mcp/           (新規) MCP フロントエンド（stdio / HTTP を起動引数で切り替え）
+  TTDeployTool.Controller.WebApi/        (将来) WebAPI フロントエンド
 tests/
-  Timetracker.Domain.Tests/             (既存)
-  Timetracker.Application.Tests/        (新規)
-  Timetracker.Infrastructure.Azure.Tests/ (新規) 既存の Azure 系テストを移設
-  Timetracker.Controller.Cli.Tests/     (既存) CLI 固有のテストのみ残す
-  Timetracker.Controller.Mcp.Tests/     (新規)
+  TTDeployTool.Domain.Tests/             (既存)
+  TTDeployTool.Application.Tests/        (新規)
+  TTDeployTool.Infrastructure.Azure.Tests/ (新規) 既存の Azure 系テストを移設
+  TTDeployTool.Controller.Cli.Tests/     (既存) CLI 固有のテストのみ残す
+  TTDeployTool.Controller.Mcp.Tests/     (新規)
 ```
 
-命名は既存の `Timetracker.Controller.Cli` に合わせて `Timetracker.Controller.Mcp`（アセンブリ名 `timetracker-mcp`）とする。
+命名は既存の `TTDeployTool.Controller.Cli` に合わせて `TTDeployTool.Controller.Mcp`（アセンブリ名 `ttdeploytool-mcp`）とする。
 
 ### 3.2 依存関係
 
 ```mermaid
 flowchart TB
   subgraph Frontends["コントローラー層（フロントエンド）"]
-    CLI["Controller.Cli<br/>timetracker-cli"]
-    MCP["Controller.Mcp<br/>timetracker-mcp<br/>(stdio | http)"]
+    CLI["Controller.Cli<br/>ttdeploytool-cli"]
+    MCP["Controller.Mcp<br/>ttdeploytool-mcp<br/>(stdio | http)"]
     API["Controller.WebApi<br/>(将来)"]
   end
   APP["Application<br/>DeploymentPlanner / DeploymentRunner<br/>DeletionPlanner / DeletionRunner<br/>DeploymentInspector / JobManager<br/>IPlanStore / IJobStore / ICallerContext"]
@@ -143,8 +143,8 @@ flowchart TB
 - 言語・ランタイム: C# / .NET 10（既存と同じ。ドメイン層を直接再利用できるため）
 - SDK: 公式 MCP C# SDK（NuGet `ModelContextProtocol`、HTTP 用に `ModelContextProtocol.AspNetCore`）。バージョンは実装時点の最新安定版を確認して固定する
 - 起動引数でトランスポートを切り替える:
-  - `timetracker-mcp`（既定）または `timetracker-mcp --transport stdio` … `WithStdioServerTransport()`
-  - `timetracker-mcp --transport http --urls http://0.0.0.0:8080` … `WithHttpTransport()` + `MapMcp("/mcp")`
+  - `ttdeploytool-mcp`（既定）または `ttdeploytool-mcp --transport stdio` … `WithStdioServerTransport()`
+  - `ttdeploytool-mcp --transport http --urls http://0.0.0.0:8080` … `WithHttpTransport()` + `MapMcp("/mcp")`
 - ツールの実装（`Tools/` 配下）はトランスポートに依存させない。トランスポートごとの違い（資格情報、パスワードの取得元、ファイル出力の可否）は **`McpHostProfile`**（stdio 用 / HTTP 用）として DI で差し替える
 
 | 項目 | stdio | HTTP |
@@ -444,8 +444,8 @@ stdio では利用者の PC の資格情報（`az login` 等）をそのまま�
 
 | アプリロール | 使える方式 |
 |---|---|
-| `Timetracker.Deploy.User` | `user` のみ（本人の Azure 権限で操作） |
-| `Timetracker.Deploy.Server` | `server`（と、`user` が有効なら `user`） |
+| `TTDeployTool.Deploy.User` | `user` のみ（本人の Azure 権限で操作） |
+| `TTDeployTool.Deploy.Server` | `server`（と、`user` が有効なら `user`） |
 | どちらもない | ツールを使えない（`get_deployment_options` など、Azure を操作しないものだけ使える） |
 
 #### 方式の選び方（両方が有効な場合）
@@ -491,7 +491,7 @@ Azure のほぼすべてのリソースには、**タグ**（`キー=値` の形
 
 | タグのキー | 値の例 | 意味 |
 |---|---|---|
-| `managed-by` | `timetracker-deployment-tool` | 本ツールが作った（管理している）リソースであること |
+| `managed-by` | `ttdeploytool` | 本ツールが作った（管理している）リソースであること |
 | `tt-app-name` | `timetracker` | どのアプリ名（`--app-name`）の一式に属するか |
 | `tt-tool-version` | `0.7.0` | 最後にデプロイしたツールのバージョン（問い合わせ時の調査用。判定には使わない） |
 
@@ -511,10 +511,10 @@ Azure のほぼすべてのリソースには、**タグ**（`キー=値` の形
 **A. 通常の利用（タグ導入後のバージョンで作った環境を消す）**
 ```powershell
 # 1. デプロイ（管理タグが自動で付く）
-timetracker-cli deploy --subscription <ID> --resource-group rg-tt-verify --app-name demo1 ...
+ttdeploytool-cli deploy --subscription <ID> --resource-group rg-tt-verify --app-name demo1 ...
 
 # 2. 削除対象の確認（何も変更しない）
-timetracker-cli delete --subscription <ID> --resource-group rg-tt-verify --app-name demo1 --dry-run
+ttdeploytool-cli delete --subscription <ID> --resource-group rg-tt-verify --app-name demo1 --dry-run
 ```
 ```
 [INFO] 削除計画（リソースグループ rg-tt-verify は削除しません）
@@ -525,7 +525,7 @@ timetracker-cli delete --subscription <ID> --resource-group rg-tt-verify --app-n
 ```
 ```powershell
 # 3. 削除（確認のためアプリ名の入力を求める）
-timetracker-cli delete --subscription <ID> --resource-group rg-tt-verify --app-name demo1
+ttdeploytool-cli delete --subscription <ID> --resource-group rg-tt-verify --app-name demo1
 ```
 MCP では、`plan_deletion` が同じ内容を返し、LLM がそれを示してユーザーの同意を得てから `start_deletion` を呼ぶ。
 
@@ -545,16 +545,16 @@ MCP では、`plan_deletion` が同じ内容を返し、LLM がそれを示し�
 2. 先に Azure CLI でタグを付けてから、通常どおり削除する（`Microsoft.Resources/tags/write` が必要。Contributor にはあるが、Container Apps Contributor にはない）
    ```powershell
    az tag update --resource-id <リソース ID> --operation merge `
-     --tags managed-by=timetracker-deployment-tool tt-app-name=demo1
+     --tags managed-by=ttdeploytool tt-app-name=demo1
    ```
 
 **D. 特定の環境を削除から守りたい**
 `managed-by` タグをポータルで外す（または値を変える）と、本ツールの削除対象から外れる。デモ用に残しておきたい環境を、誤った削除操作から守る手段として使える。
 
 **E. 本ツールで作った環境を一覧したい**
-タグで絞り込める。ポータルのリソース一覧で「タグ: managed-by = timetracker-deployment-tool」のフィルターを使うか、次のコマンドを使う。
+タグで絞り込める。ポータルのリソース一覧で「タグ: managed-by = ttdeploytool」のフィルターを使うか、次のコマンドを使う。
 ```powershell
-az resource list --resource-group rg-tt-verify --tag managed-by=timetracker-deployment-tool -o table
+az resource list --resource-group rg-tt-verify --tag managed-by=ttdeploytool -o table
 ```
 Azure のコスト分析でもタグごとに費用を集計できるため、「本ツールで作った検証環境にいくらかかっているか」も確認できる。
 
@@ -599,10 +599,10 @@ Azure のコスト分析でもタグごとに費用を集計できるため、�
 #### CLI 側（先行実装）のコマンド案
 ```powershell
 # 削除対象を表示するだけ（変更しない）
-timetracker-cli delete --subscription <ID> --resource-group <RG> --app-name timetracker --dry-run
+ttdeploytool-cli delete --subscription <ID> --resource-group <RG> --app-name timetracker --dry-run
 
 # 削除する（確認のためアプリ名の入力を求める。--yes で省略）
-timetracker-cli delete --subscription <ID> --resource-group <RG> --app-name timetracker [--include-untagged] [--yes]
+ttdeploytool-cli delete --subscription <ID> --resource-group <RG> --app-name timetracker [--include-untagged] [--yes]
 ```
 - 現在の `CliArgs` は書式 `[deploy] --option ...` なので、サブコマンド `delete` を追加し、サブコマンドごとに使えるオプションを分ける
 - CLI の `delete` と MCP の `plan_deletion` / `start_deletion` は、同じ `DeletionPlanner` / `DeletionRunner`（Application）を使う
@@ -664,9 +664,9 @@ README の「必要な RBAC ロールと権限」（`docs/fix-rbac-requirements`
 - SQL Server + Azure ではサンプル DB を作れないこと、Timetracker のメモリは 3Gi 以上を推奨すること
 
 ### 5.2 Resources（任意・Phase 3 の後半）
-- `timetracker://docs/constraints`: 「本ツールの目的と注意事項」
-- `timetracker://docs/rbac`: 必要な RBAC ロールとリソースプロバイダーの登録手順
-- `timetracker://deployments/{subscription}/{rg}/{app}`: `get_deployment_info` と同じ内容
+- `ttdeploytool://docs/constraints`: 「本ツールの目的と注意事項」
+- `ttdeploytool://docs/rbac`: 必要な RBAC ロールとリソースプロバイダーの登録手順
+- `ttdeploytool://deployments/{subscription}/{rg}/{app}`: `get_deployment_info` と同じ内容
 
 ### 5.3 Prompts（任意・Phase 3 の後半）
 - `deploy-timetracker`: サブスクリプションの選択 → DB 種別 → 検証 → 計画 → 実行までを案内する定型プロンプト
@@ -730,12 +730,12 @@ README の「必要な RBAC ロールと権限」（`docs/fix-rbac-requirements`
 | 形態 | 想定する利用方法 | メリット | デメリット |
 |---|---|---|---|
 | **(a) 単一ファイルの EXE**（GitHub Release の zip。CLI と同じ） | Release から zip を取得して任意の場所に置き、クライアントの設定で `command` にパスを指定する | ・.NET のインストールが不要（self-contained）<br/>・CLI と同じ release.yml の流れで作れる<br/>・ネットワークのない環境やプロキシのある社内環境でも、置くだけで動く<br/>・使うバージョンがはっきりする | ・更新は手作業（新しい zip を取得して置き換える）<br/>・OS ごとにビルドが必要（今は win-x64 のみ。macOS / Linux 向けは RID を追加）<br/>・ファイルが大きい（数十〜100MB 程度。HTTP 対応で ASP.NET Core を含むとさらに増える）<br/>・署名していない EXE は SmartScreen 等で警告が出ることがある<br/>・単一ファイルの初回起動が遅い（README の FAQ と同じ）。クライアントがサーバーを起動するたびに影響する |
-| **(b) NuGet の .NET ツール**（MCP サーバー用パッケージ） | クライアントの設定で `dnx Timetracker.Mcp@1.0.0 --yes` のように指定すると、初回に自動で取得して起動する。`dotnet tool install -g` で入れることもできる | ・設定にバージョンを書くだけで導入・更新できる（手作業の置き換えが不要）<br/>・パッケージ 1 つで複数 OS に対応できる<br/>・NuGet や VS Code の MCP サーバー一覧から見つけてもらえる<br/>・パッケージが小さい | ・利用者の PC に **.NET 10 SDK** が必要（`dnx` は SDK に含まれる）。開発者以外には負担<br/>・nuget.org に出すと**一般公開**になる。社内だけで使うなら Azure Artifacts や GitHub Packages の非公開フィードが必要で、その認証設定を利用者に求めることになる<br/>・初回起動時にダウンロードが走る（プロキシ環境では失敗することがある）<br/>・パッケージ ID の予約・管理が必要 |
+| **(b) NuGet の .NET ツール**（MCP サーバー用パッケージ） | クライアントの設定で `dnx TTDeployTool.Mcp@1.0.0 --yes` のように指定すると、初回に自動で取得して起動する。`dotnet tool install -g` で入れることもできる | ・設定にバージョンを書くだけで導入・更新できる（手作業の置き換えが不要）<br/>・パッケージ 1 つで複数 OS に対応できる<br/>・NuGet や VS Code の MCP サーバー一覧から見つけてもらえる<br/>・パッケージが小さい | ・利用者の PC に **.NET 10 SDK** が必要（`dnx` は SDK に含まれる）。開発者以外には負担<br/>・nuget.org に出すと**一般公開**になる。社内だけで使うなら Azure Artifacts や GitHub Packages の非公開フィードが必要で、その認証設定を利用者に求めることになる<br/>・初回起動時にダウンロードが走る（プロキシ環境では失敗することがある）<br/>・パッケージ ID の予約・管理が必要 |
 | **(c) コンテナイメージ**（参考。HTTP 公開向け） | HTTP 公開: Container Apps 等に置いて URL で接続する。stdio: `docker run -i --rm ...` を `command` に指定する | ・HTTP 公開・将来の WebAPI と同じ配布物にできる<br/>・実行環境の差が出ない | ・stdio で使うには利用者の PC に Docker が必要<br/>・コンテナ内から利用者の `az login` を使いにくい（`~/.azure` のマウントか `sp-env` が必要）<br/>・Dry-run の出力をホストに書き出すにはボリュームのマウントが必要 |
 | **(d) Claude Desktop 拡張（.mcpb）**（参考） | Claude Desktop でファイルを開くだけで導入する | ・導入が最も簡単。パスワードなどの設定値を入力欄から渡せる | ・Claude Desktop 専用（ほかのクライアントでは使えない）<br/>・中身は (a) の EXE を同梱する形になるので、(a) の作業も必要 |
 
 推奨:
-- **stdio は (a) から始める**。CLI と同じリリース手順で作れ、利用者の PC に前提ソフトを求めないため。release.yml に `timetracker-mcp` の publish を追加し、`timetracker-cli-vX.Y.Z.zip` と並べて `timetracker-mcp-vX.Y.Z.zip` を出す
+- **stdio は (a) から始める**。CLI と同じリリース手順で作れ、利用者の PC に前提ソフトを求めないため。release.yml に `ttdeploytool-mcp` の publish を追加し、`ttdeploytool-cli-vX.Y.Z.zip` と並べて `ttdeploytool-mcp-vX.Y.Z.zip` を出す
 - **HTTP 公開は (c)**。Phase 4 で Dockerfile とデプロイ手順を用意する
 - **(b) は、利用者が .NET SDK を持つ開発者中心で、パッケージを公開してよい（または非公開フィードを用意できる）場合に追加する**。(a) と同じプロジェクトから作れるため、後から追加しても手戻りはない
 
@@ -778,18 +778,18 @@ README の「必要な RBAC ロールと権限」（`docs/fix-rbac-requirements`
 ### 8.2 MCP のブランチ（main を取り込んでから）
 | フェーズ | 内容 | 完了条件 |
 |---|---|---|
-| Phase 3a（`MCP-Tool`） | `Timetracker.Controller.Mcp` の新設（stdio）。`get_deployment_options` / `validate_deployment` / `generate_compose` / `list_subscriptions` | MCP Inspector と Claude Code で呼び出せる。生成したファイルで `docker compose up` が成功する |
+| Phase 3a（`MCP-Tool`） | `TTDeployTool.Controller.Mcp` の新設（stdio）。`get_deployment_options` / `validate_deployment` / `generate_compose` / `list_subscriptions` | MCP Inspector と Claude Code で呼び出せる。生成したファイルで `docker compose up` が成功する |
 | Phase 3b（`MCP-Tool`） | `plan_deployment` / `start_deployment` / `get_job_status` / `list_jobs` / `get_deployment_info`、ジョブ管理（進捗は `get_job_status` で返す） | Azure で新規デプロイと再デプロイ（データ消失の確認あり）が成功し、URL が返る |
 | Phase 3c（`MCP-Tool`） | `plan_deletion` / `start_deletion`、instructions、Resources / Prompts、配布（release.yml）、README の MCP の章 | Release に MCP の配布物が出る。リリース前確認（6.1）を完了 |
 | Phase 4（`feature/mcp-http`） | HTTP トランスポート、呼び出し元の認証（Entra ID・アプリロール）、`server` / `user` の両方式の資格情報プロバイダー（4.11）、Dockerfile とコンテナイメージ | Container Apps 上の MCP サーバーに OAuth 対応のクライアントから接続し、両方式でそれぞれ一連のシナリオが成功する。範囲外のリソースグループへの `server` 方式の操作が拒否される |
 
 **実施結果（Phase 3a）**: 詳細設計は `docs/design/mcp-phase3a.md`。
-- `Timetracker.Controller.Mcp`（`timetracker-mcp`）を新設した。SDK は `ModelContextProtocol` 2.2.0。ログはすべて stderr に出し、stdout は JSON-RPC だけにした
+- `TTDeployTool.Controller.Mcp`（`ttdeploytool-mcp`）を新設した。SDK は `ModelContextProtocol` 2.2.0。ログはすべて stderr に出し、stdout は JSON-RPC だけにした
 - 4 つのツールの結果は `structuredContent`（snake_case）と同じ内容のテキストで返す。入力の誤りは、`validate_deployment` では `valid: false`、`generate_compose` / `list_subscriptions` では `isError: true` で返す
 - Domain に `DeploymentValidator`（全エラーの列挙）と `DeploymentAdvisor`（警告）を追加した。`ComposeGenerator.Validate` は `DeploymentValidator` の最初のエラーを投げるようにし、CLI の挙動とメッセージは変えていない
 - サブスクリプションの一覧は Infrastructure の `AzureSubscriptionDirectory` で読む。資格情報は使うときに作る（`sp-env` の環境変数が足りない場合なども、ツールの結果として返すため）
 - MCP は Application をまだ参照しない（Phase 3a のツールでは使わないため。Phase 3b で参照する）
-- 確認: 単体テストとプロトコル結合テスト（ビルドした `timetracker-mcp` を SDK のクライアントで stdio 接続）、MCP Inspector（CLI モード）での `tools/list` と `tools/call`、Claude Code（`claude mcp list` で接続を確認）。`generate_compose` で生成したファイルで `docker compose up` し、Timetracker のセットアップ画面が表示されることを確認した
+- 確認: 単体テストとプロトコル結合テスト（ビルドした `ttdeploytool-mcp` を SDK のクライアントで stdio 接続）、MCP Inspector（CLI モード）での `tools/list` と `tools/call`、Claude Code（`claude mcp list` で接続を確認）。`generate_compose` で生成したファイルで `docker compose up` し、Timetracker のセットアップ画面が表示されることを確認した
 
 **実施結果（Phase 3b）**: 詳細設計は `docs/design/mcp-phase3b.md`。
 - `plan_deployment` / `start_deployment` / `get_job_status` / `list_jobs` / `get_deployment_info` を追加した（ツールは 9 つ）。MCP は Application を参照するようにした
@@ -801,20 +801,20 @@ README の「必要な RBAC ロールと権限」（`docs/fix-rbac-requirements`
 
 **実施結果（Phase 3c）**: 詳細設計は `docs/design/mcp-phase3c.md`。
 - `plan_deletion` / `start_deletion` を追加した（ツールは 11）。削除の規則は CLI の `delete` と同じ `DeletionPlanner` / `DeletionRunner` を使う。`start_deletion` は計画と同じアプリ名（`confirm_app_name`）が無ければ実行しない（一致しない場合は計画を使用済みにしない）。実行の直前に計画を作り直し、権限の不足や対象の変化があれば始めない
-- Resources（`timetracker://docs/constraints`、`timetracker://docs/rbac`、`timetracker://deployments/{subscription}/{resource_group}/{app_name}`）と Prompts（`deploy-timetracker`、`local-dry-run`、`delete-timetracker`）を追加した。文書はサーバーに埋め込み、README の主な記述が含まれることをテストで確かめる
-- release.yml で `timetracker-mcp-vX.Y.Z.zip`（win-x64 の単一ファイル EXE）を CLI の zip と並べて Release に載せる。同じ `dotnet publish` で EXE ができることを確認した（約 86MB）。実際の Release は次のリリースで確認する
+- Resources（`ttdeploytool://docs/constraints`、`ttdeploytool://docs/rbac`、`ttdeploytool://deployments/{subscription}/{resource_group}/{app_name}`）と Prompts（`deploy-timetracker`、`local-dry-run`、`delete-timetracker`）を追加した。文書はサーバーに埋め込み、README の主な記述が含まれることをテストで確かめる
+- release.yml で `ttdeploytool-mcp-vX.Y.Z.zip`（win-x64 の単一ファイル EXE）を CLI の zip と並べて Release に載せる。同じ `dotnet publish` で EXE ができることを確認した（約 86MB）。実際の Release は次のリリースで確認する
 - README に「MCP サーバー（AI アシスタントから使う）」の章を追加した（ツール、安全策、導入、環境変数、Claude Code / VS Code / Claude Desktop の設定例）
 - 確認: 単体テストとプロトコル結合テスト（Resources / Prompts を含む）。分岐網羅率は Program.cs を除き 100%
-- Azure（japaneast、`azure-cli` 認証）での確認: SDK のクライアントから stdio で接続し、Resources / Prompts の一覧、`plan_deployment` → `start_deployment`（約 2 分 30 秒で成功）、デプロイの Resource（`timetracker://deployments/...`。`exists: true` と URL）、`plan_deletion`（4 つとも削除の対象、リソースグループは kept、DB の警告、権限は ok）→ アプリ名の不一致の `start_deletion` が拒否される → 一致で成功（約 12 分。Environment の削除に時間がかかる）、`deletion_result` に 4 つ、`get_deployment_info` で `exists: false`、もう一度 `plan_deletion` で「削除するリソースはありません」（plan_id は null）を確認した。結果・ログにパスワードが含まれないことも確認した
+- Azure（japaneast、`azure-cli` 認証）での確認: SDK のクライアントから stdio で接続し、Resources / Prompts の一覧、`plan_deployment` → `start_deployment`（約 2 分 30 秒で成功）、デプロイの Resource（`ttdeploytool://deployments/...`。`exists: true` と URL）、`plan_deletion`（4 つとも削除の対象、リソースグループは kept、DB の警告、権限は ok）→ アプリ名の不一致の `start_deletion` が拒否される → 一致で成功（約 12 分。Environment の削除に時間がかかる）、`deletion_result` に 4 つ、`get_deployment_info` で `exists: false`、もう一度 `plan_deletion` で「削除するリソースはありません」（plan_id は null）を確認した。結果・ログにパスワードが含まれないことも確認した
 - 未確認: リリース前確認（6.1）のうち VS Code（GitHub Copilot）での確認（この環境では動かせないため、オーナーに依頼する）。Release の配布物は次のリリースで確認する
 
 ### 8.3 共有層のリファクタリング内容（Phase 0）
 | # | 変更 | 対応する課題 |
 |---|---|---|
-| R1 | `Timetracker.Infrastructure.Azure` を新設し、`AzureSdkExecutor` / `ContainerAppSpecBuilder` / `CredentialFactory` を移動する。Azure 系のテストも新しいテストプロジェクトへ移動する | A |
-| R2 | `Timetracker.Common` に `IDeploymentLogger`（Info / Verbose / Warn / Success / Error / Exception）を追加し、`SimpleLogger` が実装する。Application と Infrastructure は `IDeploymentLogger` に依存する | D |
+| R1 | `TTDeployTool.Infrastructure.Azure` を新設し、`AzureSdkExecutor` / `ContainerAppSpecBuilder` / `CredentialFactory` を移動する。Azure 系のテストも新しいテストプロジェクトへ移動する | A |
+| R2 | `TTDeployTool.Common` に `IDeploymentLogger`（Info / Verbose / Warn / Success / Error / Exception）を追加し、`SimpleLogger` が実装する。Application と Infrastructure は `IDeploymentLogger` に依存する | D |
 | R3 | `DeployOptionsResolver`（Domain）を新設し、`Program.cs` の既定値の解決（タグ、小文字化、スペック既定値）を移す。CLI はこれを呼ぶ | C |
-| R4 | `Timetracker.Application` を新設し、`DeploymentRunner.RunAsync(DeployOptions, IProgress<DeploymentProgress>?, CancellationToken)` → `DeploymentResult`（エンドポイント URL、各アプリ名）を作る。`Program.cs` の手順をこれに置き換え、`CreateOrUpdateContainerAppAsync` は結果を返すようにする | B, E |
+| R4 | `TTDeployTool.Application` を新設し、`DeploymentRunner.RunAsync(DeployOptions, IProgress<DeploymentProgress>?, CancellationToken)` → `DeploymentResult`（エンドポイント URL、各アプリ名）を作る。`Program.cs` の手順をこれに置き換え、`CreateOrUpdateContainerAppAsync` は結果を返すようにする | B, E |
 | R5 | `DeploymentPlanner.PlanAsync` → `DeploymentPlan`（読み取りのみ）を新設する。リージョンの判定は `AzureSdkExecutor` と共通の関数にする（CLI では使わなくてもよいが、Application に置いてテストする） | F |
 | R6 | Azure の呼び出しに `CancellationToken` を通す | 4.8 |
 | R7 | `ResourceNaming`（Domain）を新設し、`{app}-env/-db/-redis/-tt` の組み立てを 1 か所にまとめる（今は `Program.cs` と `AzureSdkExecutor` に分散） | 4.12 |
@@ -847,12 +847,12 @@ README の「必要な RBAC ロールと権限」（`docs/fix-rbac-requirements`
 
 Claude Code（stdio）:
 ```powershell
-claude mcp add timetracker-deploy `
+claude mcp add ttdeploytool `
   --env TT_MCP_AUTH_MODE=azure-cli `
   --env TT_MCP_DEFAULT_SUBSCRIPTION=<サブスクリプションID> `
   --env TT_MCP_DB_PASSWORD=<DB パスワード> `
   --env TT_MCP_TRACKER_PASSWORD=<Timetracker パスワード> `
-  -- C:\tools\timetracker-mcp.exe
+  -- C:\tools\ttdeploytool-mcp.exe
 ```
 ※ 設定ファイルにパスワードが平文で残るため、共有するプロジェクト単位の設定（`.mcp.json`）ではなく、ユーザー単位の設定に追加する。
 
@@ -860,9 +860,9 @@ VS Code（`.vscode/mcp.json`、stdio。パスワードは起動時に入力さ�
 ```json
 {
   "servers": {
-    "timetracker-deploy": {
+    "ttdeploytool": {
       "type": "stdio",
-      "command": "C:\\tools\\timetracker-mcp.exe",
+      "command": "C:\\tools\\ttdeploytool-mcp.exe",
       "env": {
         "TT_MCP_AUTH_MODE": "azure-cli",
         "TT_MCP_DB_PASSWORD": "${input:dbPassword}",
@@ -881,7 +881,7 @@ HTTP（Phase 4。クライアントが OAuth でサインインする）:
 ```json
 {
   "servers": {
-    "timetracker-deploy": { "type": "http", "url": "https://timetracker-mcp.<環境>.japaneast.azurecontainerapps.io/mcp" }
+    "ttdeploytool": { "type": "http", "url": "https://ttdeploytool-mcp.<環境>.japaneast.azurecontainerapps.io/mcp" }
   }
 }
 ```

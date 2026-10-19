@@ -66,13 +66,13 @@ jobs:
         dotnet-version: 10.0.x
     
     - name: Restore dependencies
-      run: dotnet restore Timetracker.sln
+      run: dotnet restore TTDeployTool.sln
     
     - name: Build
-      run: dotnet build Timetracker.sln --configuration Release --no-restore
+      run: dotnet build TTDeployTool.sln --configuration Release --no-restore
     
     - name: Test
-      run: dotnet test Timetracker.sln --configuration Release --no-build --verbosity normal
+      run: dotnet test TTDeployTool.sln --configuration Release --no-build --verbosity normal
 
   # MCP サーバー（HTTP）の配置とロールの割り当てのスクリプト（scripts/*.ps1）を、az を模擬に置き換えて確かめる（Pester）。
   # 管理者が実行する Windows の PowerShell 7 で動かす
@@ -127,8 +127,8 @@ jobs:
     - name: Install Playwright browser
       if: needs.changes.outputs.code == 'true'
       run: |
-        dotnet build tests/Timetracker.SystemTests
-        pwsh tests/Timetracker.SystemTests/bin/Debug/net10.0/playwright.ps1 install --with-deps chromium
+        dotnet build tests/TTDeployTool.SystemTests
+        pwsh tests/TTDeployTool.SystemTests/bin/Debug/net10.0/playwright.ps1 install --with-deps chromium
 
     # すべてスキップされた場合の終了コード 8（テストが 0 件）は失敗にしない
     - name: Setup wizard and login (docker compose)
@@ -139,8 +139,8 @@ jobs:
         TT_E2E_SAMPLE_LOGIN: ${{ secrets.TT_E2E_SAMPLE_LOGIN }}
         TT_E2E_SAMPLE_PASSWORD: ${{ secrets.TT_E2E_SAMPLE_PASSWORD }}
       run: >
-        dotnet test --project tests/Timetracker.SystemTests --no-build --
-        --filter-class Timetracker.SystemTests.E2E.LocalComposeSetupTests
+        dotnet test --project tests/TTDeployTool.SystemTests --no-build --
+        --filter-class TTDeployTool.SystemTests.E2E.LocalComposeSetupTests
         --output detailed --report-xunit-trx --results-directory=TestResults --ignore-exit-code 8
 
     - name: Upload test results
@@ -162,7 +162,7 @@ jobs:
     - uses: actions/checkout@v6
 
     - name: Build image
-      run: docker build -t timetracker-mcp:ci .
+      run: docker build -t ttdeploytool-mcp:ci .
 
     - name: Smoke test
       run: |
@@ -171,7 +171,7 @@ jobs:
           -e TT_MCP_HTTP__CLIENT_ID=00000000-0000-0000-0000-000000000002 \
           -e TT_MCP_HTTP__PUBLIC_URL=https://mcp.example.com/mcp \
           -e TT_MCP_HTTP__SERVER_ALLOWED_RESOURCE_GROUPS=/subscriptions/00000000-0000-0000-0000-000000000003/resourceGroups/rg \
-          timetracker-mcp:ci
+          ttdeploytool-mcp:ci
         for i in $(seq 1 30); do curl -sf http://localhost:8080/healthz && break; sleep 1; done
         test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/healthz)" = 200
         test "$(curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:8080/mcp -H 'Content-Type: application/json' -d '{}')" = 401

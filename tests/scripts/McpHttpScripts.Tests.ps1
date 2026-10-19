@@ -23,6 +23,7 @@ BeforeAll {
             Groups = @()                     # 既にあるリソースグループ
             ServerApp = $null                # 既にあるサーバーのアプリ（ad app show の結果）
             ClientApp = $null                # 既にあるクライアントのアプリ
+            LegacyNames = $false             # 既にあるアプリが、本ツールの以前の名前（Timetracker MCP …）で登録されているか
             SpExists = $false
             Fics = @()                       # 既にあるフェデレーション資格情報の名前
             ConsentFails = $false
@@ -48,16 +49,18 @@ BeforeAll {
         $global:LASTEXITCODE = 0
         if ($s.FailOn -and $line.StartsWith($s.FailOn)) { $global:LASTEXITCODE = 1; return }
 
-        # 最初に一致したものだけを使う（「Timetracker MCP *」が「Timetracker MCP client …」にも一致するため、各項目で break する）
+        # 最初に一致したものだけを使う（「TTDeployTool MCP *」が「TTDeployTool MCP client …」にも一致するため、各項目で break する）
         switch -Wildcard ($line) {
             "account show --output none" { if (-not $s.LoggedIn) { $global:LASTEXITCODE = 1 }; break }
             "account show --query tenantId*" { "tenant-1"; break }
             "group exists --name *" { if ($s.Groups -contains $Arguments[3]) { "true" } else { "false" }; break }
             "identity create *" { '{"clientId":"mi-client","principalId":"mi-principal","id":"/subscriptions/sub-1/resourceGroups/rg-mcp/providers/Microsoft.ManagedIdentity/userAssignedIdentities/tt-mcp-id"}'; break }
-            "ad app list --display-name Timetracker MCP client *" { if ($s.ClientApp) { "client-app" }; break }
-            "ad app list --display-name Timetracker MCP *" { if ($s.ServerApp) { "server-app" }; break }
-            "ad app create --display-name Timetracker MCP client *" { $s.ClientApp = @{ id = "client-obj" }; "client-app"; break }
-            "ad app create --display-name Timetracker MCP *" { $s.ServerApp = @{ id = "server-obj"; api = @{}; appRoles = @() }; "server-app"; break }
+            "ad app list --display-name TTDeployTool MCP client *" { if ($s.ClientApp -and -not $s.LegacyNames) { "client-app" }; break }
+            "ad app list --display-name TTDeployTool MCP *" { if ($s.ServerApp -and -not $s.LegacyNames) { "server-app" }; break }
+            "ad app list --display-name Timetracker MCP client *" { if ($s.ClientApp -and $s.LegacyNames) { "client-app" }; break }
+            "ad app list --display-name Timetracker MCP *" { if ($s.ServerApp -and $s.LegacyNames) { "server-app" }; break }
+            "ad app create --display-name TTDeployTool MCP client *" { $s.ClientApp = @{ id = "client-obj" }; "client-app"; break }
+            "ad app create --display-name TTDeployTool MCP *" { $s.ServerApp = @{ id = "server-obj"; api = @{}; appRoles = @() }; "server-app"; break }
             "ad app show --id server-app --query *" { ($s.ServerApp.appRoles | Where-Object value -eq ($line -replace ".*value=='([^']+)'.*", '$1')).id; break }
             "ad app show --id server-app --output json" { $s.ServerApp | ConvertTo-Json -Depth 10; break }
             "ad app show --id client-app --output json" { $s.ClientApp | ConvertTo-Json -Depth 10; break }
@@ -110,7 +113,7 @@ BeforeAll {
                     @{ appId = "vscode-app"; delegatedPermissionIds = @("scope-1") },
                     @{ appId = "client-app"; delegatedPermissionIds = @("old-scope") })
             }
-            appRoles = @(@{ id = "role-server"; value = "Timetracker.Deploy.Server" }, @{ id = "role-user"; value = "Timetracker.Deploy.User" })
+            appRoles = @(@{ id = "role-server"; value = "TTDeployTool.Deploy.Server" }, @{ id = "role-user"; value = "TTDeployTool.Deploy.User" })
         }
         $s.ClientApp = @{ id = "client-obj"; publicClient = @{ redirectUris = @("https://admin-added/callback", "http://127.0.0.1:33418") } }
         $s.SpExists = $true
@@ -149,7 +152,7 @@ Describe "deploy-mcp-http.ps1" {
             # 公開 URL もアプリケーション ID の URI にする（MCP のクライアントが付ける resource と、スコープの対象を合わせるため）
             $identifierUris = ($global:FakeAzState.Bodies | Where-Object { $_.Call -like "*applications/server-obj*" -and $_.Body.identifierUris } | Select-Object -Last 1).Body.identifierUris
             $identifierUris | Should -Be @("api://server-app", "https://tt-mcp.happy-sea.japaneast.azurecontainerapps.io/mcp")
-            $first.appRoles.value | Should -Be @("Timetracker.Deploy.Server", "Timetracker.Deploy.User")
+            $first.appRoles.value | Should -Be @("TTDeployTool.Deploy.Server", "TTDeployTool.Deploy.User")
             $first.requiredResourceAccess[0].resourceAppId | Should -Be "797f4846-ba00-4fd7-ba43-dac1f8f63013"
             $first.requiredResourceAccess[0].resourceAccess[0].id | Should -Be "41094075-9dad-400e-a0bd-54e686782033"
 
@@ -168,7 +171,7 @@ Describe "deploy-mcp-http.ps1" {
 
             $create = @(Calls "containerapp create *")
             $create | Should -HaveCount 1
-            $create[0] | Should -BeLike "*--image ghcr.io/yamadakou/timetracker-mcp:latest --target-port 8080 --ingress external --min-replicas 1 --max-replicas 1 *"
+            $create[0] | Should -BeLike "*--image ghcr.io/yamadakou/ttdeploytool-mcp:latest --target-port 8080 --ingress external --min-replicas 1 --max-replicas 1 *"
             $create[0] | Should -BeLike "*--user-assigned /subscriptions/sub-1/resourceGroups/rg-mcp/providers/Microsoft.ManagedIdentity/userAssignedIdentities/tt-mcp-id *"
             $vars = EnvVars
             $vars.TT_MCP_HTTP__TENANT_ID | Should -Be "tenant-1"
@@ -205,8 +208,8 @@ Describe "deploy-mcp-http.ps1" {
             Calls "ad app federated-credential *" | Should -HaveCount 0
             Calls "ad app permission admin-consent *" | Should -HaveCount 0
             Calls "group create --name rg-mcp --location westus --output none" | Should -HaveCount 1
-            Calls "ad app list --display-name Timetracker MCP (team-mcp) *" | Should -HaveCount 1
-            @(Calls "containerapp create *")[0] | Should -BeLike "*--name team-mcp --environment team-mcp-env --image ghcr.io/yamadakou/timetracker-mcp:1.2.3 *"
+            Calls "ad app list --display-name TTDeployTool MCP (team-mcp) *" | Should -HaveCount 1
+            @(Calls "containerapp create *")[0] | Should -BeLike "*--name team-mcp --environment team-mcp-env --image ghcr.io/yamadakou/ttdeploytool-mcp:1.2.3 *"
             (Body "*applications/client-obj*").publicClient.redirectUris | Should -Contain "http://localhost:9000/callback"
             $vars = EnvVars
             $vars.TT_MCP_HTTP__IDENTITY_MODES | Should -Be "server"
@@ -258,13 +261,14 @@ Describe "deploy-mcp-http.ps1" {
             Calls "role assignment create *" | Should -HaveCount 0
             $update = @(Calls "containerapp update *")
             $update | Should -HaveCount 1
-            $update[0] | Should -BeLike "*--image ghcr.io/yamadakou/timetracker-mcp:2.0.0 --min-replicas 1 --max-replicas 1 --set-env-vars *"
+            $update[0] | Should -BeLike "*--image ghcr.io/yamadakou/ttdeploytool-mcp:2.0.0 --min-replicas 1 --max-replicas 1 --set-env-vars *"
 
             # スコープとロールの ID は変えない
             $server = ServerApiBody
             $server.api.oauth2PermissionScopes[0].id | Should -Be "scope-1"
             $first = ($global:FakeAzState.Bodies | Where-Object { $_.Call -like "*applications/server-obj*" } | Select-Object -First 1).Body
             ($first.appRoles | ForEach-Object { $_.id }) | Should -Be @("role-server", "role-user")
+            $first.displayName | Should -Be "TTDeployTool MCP (tt-mcp)"
             # 別のクライアント（VS Code など）の事前承認は残し、このスクリプトのクライアントだけを置き換える
             $preAuthorized = @($server.api.preAuthorizedApplications | ForEach-Object { "$($_.appId):$($_.delegatedPermissionIds -join '+')" })
             $preAuthorized | Should -Be @("vscode-app:scope-1", "client-app:scope-1")
@@ -274,6 +278,21 @@ Describe "deploy-mcp-http.ps1" {
             # 管理者が加えたリダイレクト URI は残し、必要なものを重複なしで加える
             (Body "*applications/client-obj*").publicClient.redirectUris | Should -Be @(
                 "https://admin-added/callback", "http://127.0.0.1:33418", "http://localhost:8765/callback")
+        }
+
+        It "以前の名前（Timetracker MCP …・Timetracker.Deploy.*）で作ったアプリ登録を引き継ぎ、表示名とロールの値を新しくする" {
+            $global:FakeAzState.LegacyNames = $true
+            $global:FakeAzState.ServerApp.appRoles = @(
+                @{ id = "role-server"; value = "Timetracker.Deploy.Server" }, @{ id = "role-user"; value = "Timetracker.Deploy.User" })
+
+            & $script:Deploy -SubscriptionId sub-1 -ResourceGroup rg-mcp -IdentityModes server, user -AllowedResourceGroups rg-a
+
+            Calls "ad app create *" | Should -HaveCount 0
+            $first = ($global:FakeAzState.Bodies | Where-Object { $_.Call -like "*applications/server-obj*" } | Select-Object -First 1).Body
+            $first.displayName | Should -Be "TTDeployTool MCP (tt-mcp)"
+            # 利用者への割り当てが外れないよう、ロールの ID はそのままにする
+            ($first.appRoles | ForEach-Object { "$($_.id):$($_.value)" }) | Should -Be @("role-server:TTDeployTool.Deploy.Server", "role-user:TTDeployTool.Deploy.User")
+            (Body "*applications/client-obj*").displayName | Should -Be "TTDeployTool MCP client (tt-mcp)"
         }
 
         It "場所の違う既存のリソースグループも、作り直そうとしない" {
@@ -412,7 +431,7 @@ Describe "assign-mcp-role.ps1" {
     It "アプリ登録が無ければ、先に配置するよう案内する" {
         $global:FakeAzState.ServerApp = $null
 
-        { & $script:Assign -Role Server -UserPrincipalName alice@example.com } | Should -Throw "アプリ登録「Timetracker MCP (tt-mcp)」が見つかりません。*"
+        { & $script:Assign -Role Server -UserPrincipalName alice@example.com } | Should -Throw "アプリ登録「TTDeployTool MCP (tt-mcp)」が見つかりません。*"
     }
 
     It "az が失敗したら止める" {

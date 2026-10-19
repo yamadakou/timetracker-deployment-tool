@@ -10,9 +10,9 @@
 | `plan_deletion` / `start_deletion`（計画 → 確認 → 実行。実行は非同期ジョブ） | ✔ |
 | `get_job_status` / `list_jobs` で削除のジョブも扱う | ✔ |
 | instructions（削除の手順を追加） | ✔ |
-| Resources: `timetracker://docs/constraints`、`timetracker://docs/rbac`、`timetracker://deployments/{subscription}/{resource_group}/{app_name}` | ✔ |
+| Resources: `ttdeploytool://docs/constraints`、`ttdeploytool://docs/rbac`、`ttdeploytool://deployments/{subscription}/{resource_group}/{app_name}` | ✔ |
 | Prompts: `deploy-timetracker`、`local-dry-run`、`delete-timetracker` | ✔（`delete-timetracker` は全体設計 5.3 に追加する） |
-| 配布: release.yml で `timetracker-mcp-vX.Y.Z.zip`（win-x64 の単一ファイル EXE）を出す | ✔ |
+| 配布: release.yml で `ttdeploytool-mcp-vX.Y.Z.zip`（win-x64 の単一ファイル EXE）を出す | ✔ |
 | README の MCP の章（導入・クライアントの設定例・ツール・安全策） | ✔ |
 | リリース前確認（全体設計 6.1。利用者が使うクライアントで一連のシナリオ） | Claude Code で確認する。VS Code（GitHub Copilot）はこの環境で動かせないため、オーナーに依頼する |
 
@@ -49,9 +49,9 @@ CLI の `delete` で使っている `DeletionPlanner` / `DeletionRunner`（Phase
 ## 3. Resources
 | URI | 内容 | MIME |
 |---|---|---|
-| `timetracker://docs/constraints` | 本ツールの目的と注意事項（README の「本ツールの目的と注意事項」の要約） | text/markdown |
-| `timetracker://docs/rbac` | 必要な RBAC ロールと権限、リソースプロバイダーの登録手順（README の該当節の要約） | text/markdown |
-| `timetracker://deployments/{subscription}/{resource_group}/{app_name}`（テンプレート） | `get_deployment_info` と同じ JSON | application/json |
+| `ttdeploytool://docs/constraints` | 本ツールの目的と注意事項（README の「本ツールの目的と注意事項」の要約） | text/markdown |
+| `ttdeploytool://docs/rbac` | 必要な RBAC ロールと権限、リソースプロバイダーの登録手順（README の該当節の要約） | text/markdown |
+| `ttdeploytool://deployments/{subscription}/{resource_group}/{app_name}`（テンプレート） | `get_deployment_info` と同じ JSON | application/json |
 
 - 文書の Resources はサーバーに埋め込む（README のファイルを配布物に含めないため）。README と内容がずれないよう、テストで主要な記述（ロール名・権限名・プロバイダー名）が含まれることを確かめる
 - デプロイの Resource は `get_deployment_info` と同じ処理を呼ぶ（入力の確認とエラーも同じ）
@@ -67,8 +67,8 @@ CLI の `delete` で使っている `DeletionPlanner` / `DeletionRunner`（Phase
 - 引数は会話から渡る未検証の値なので、プロンプトの文に埋め込むだけにし、ツールの呼び出しには使わない（LLM がツールに渡すときに、ツール側で検証される）
 
 ## 5. 配布（release.yml）
-- タグのプッシュで動く既存のワークフローに、`timetracker-mcp` の publish（CLI と同じ `win-x64`・単一ファイル・self-contained）と zip を追加し、`timetracker-cli-vX.Y.Z.zip` と並べて Release に載せる
-- zip の中身: `timetracker-mcp.exe` だけ（CLI と同じ）
+- タグのプッシュで動く既存のワークフローに、`ttdeploytool-mcp` の publish（CLI と同じ `win-x64`・単一ファイル・self-contained）と zip を追加し、`ttdeploytool-cli-vX.Y.Z.zip` と並べて Release に載せる
+- zip の中身: `ttdeploytool-mcp.exe` だけ（CLI と同じ）
 - 確認: ワークフローはタグのプッシュでしか動かないため、同じ `dotnet publish` をこの環境（Linux から win-x64 へのクロス publish）とローカルで実行して、EXE ができることを確かめる。実際の Release は次のリリースで確認する
 
 ## 6. README の MCP の章

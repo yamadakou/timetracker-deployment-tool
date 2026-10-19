@@ -26,15 +26,15 @@ HTTP のサーバーで、サーバーの ID（`server` 方式）のほかに、
 ## 3. アプリロールと方式
 | アプリロール | 使える方式 |
 |---|---|
-| `Timetracker.Deploy.User` | `user`（`user` が有効な場合） |
-| `Timetracker.Deploy.Server` | `server`（`server` が有効な場合）と、`user` が有効なら `user` |
+| `TTDeployTool.Deploy.User` | `user`（`user` が有効な場合） |
+| `TTDeployTool.Deploy.Server` | `server`（`server` が有効な場合）と、`user` が有効なら `user` |
 | どちらもない | 4a と同じく、Azure を操作しないツールと文書だけ |
 
 - サーバーで有効でない方式は、ロールがあっても使えない
 
 ## 4. 方式の選び方（`azure_identity` 引数）
 - `list_subscriptions` / `plan_deployment` / `plan_deletion` / `get_deployment_info` に任意の引数 `azure_identity`（`server` | `user`）を追加する
-- 省略した場合: 既定の方式（`DEFAULT_IDENTITY_MODE`）を、呼び出し元が使えればそれを、使えなければ呼び出し元が使えるもう一方を使う（`Timetracker.Deploy.User` だけを持つ利用者が毎回指定しなくて済むように）。どちらも使えなければ、必要なロールを示すエラー
+- 省略した場合: 既定の方式（`DEFAULT_IDENTITY_MODE`）を、呼び出し元が使えればそれを、使えなければ呼び出し元が使えるもう一方を使う（`TTDeployTool.Deploy.User` だけを持つ利用者が毎回指定しなくて済むように）。どちらも使えなければ、必要なロールを示すエラー
 - 指定した方式がサーバーで無効、またはロールが無い場合はエラー（使える方式を示す）
 - stdio では指定できない（指定するとエラー。stdio はサーバーの認証モードだけ）
 - **計画に方式を記録する**。`start_deployment` / `start_deletion` は計画の方式で実行し、方式を指定する引数は持たない。実行の直前に、呼び出し元がその方式をまだ使えるかを確かめ直す
@@ -65,5 +65,5 @@ HTTP のサーバーで、サーバーの ID（`server` 方式）のほかに、
 - 自動テスト: 全件成功（ソリューション全体 626 件、うち Azure と E2E のシステムテスト 4 件はスキップ）。分岐網羅率は `Program.cs` の終了処理と正規表現の生成コードを除き 100%
 - 単体: 設定（既定は server だけ、user だけなら許可するリソースグループは不要、両方と既定、無効な方式・既定、client-secret のシークレットの要否、`ToString` にシークレットを出さない）、ロールと有効な方式の組み合わせごとに使える方式、省略時の方式（既定を使えなければ使えるほう）、方式の指定（大文字小文字、無効、サーバーで無効、ロールなし）、stdio での指定の拒否、user 方式の範囲・表示・OBO の資格情報（マネージド ID とクライアントシークレット）、トークンが無い要求の拒否、Authorization ヘッダーの読み取り（空白なしの `Bearer`、間の空白が 2 つ、ヘッダーが複数ある場合は使わない）、server 方式の範囲外のメッセージで user 方式を案内すること、instructions と Prompts の方式ごとの説明
 - ツール: user 方式で許可したリソースグループの外を計画できること、`start_deployment` / `start_deletion` が計画の方式の資格情報で実行の直前の確認とジョブを行うこと、計画の後にロールが外れた場合に計画を使用済みにせずエラーにすること、`start_*` が計画のときではなく実行の要求のトークンを交換すること（計画と実行でトークンを変え、実行の直前の確認とジョブで実行のトークンだけが使われること。計画のトークンを使うように変えるとテストが失敗することも確認）、トークン交換の失敗で再サインインと同意の確認を案内すること、`get_deployment_info` と `list_subscriptions` の `azure_identity`、`get_deployment_options` の方式の表示
-- 結合（TestServer。server と user の両方を有効にしたサーバー）: `Timetracker.Deploy.User` だけを持つ利用者が、`azure_identity` を省略して user 方式で計画できること（OBO の資格情報が使われる）、`azure_identity=server` を指定するとロールのエラーになること、instructions に方式の説明があること。既存の server 方式のテストも、両方を有効にしたサーバーで成功
+- 結合（TestServer。server と user の両方を有効にしたサーバー）: `TTDeployTool.Deploy.User` だけを持つ利用者が、`azure_identity` を省略して user 方式で計画できること（OBO の資格情報が使われる）、`azure_identity=server` を指定するとロールのエラーになること、instructions に方式の説明があること。既存の server 方式のテストも、両方を有効にしたサーバーで成功
 - 4c で確認: Container Apps 上で、マネージド ID のフェデレーション資格情報でのトークン交換（OBO）が成功し、利用者本人の権限でデプロイ・削除できた。交換には MFA 済みのサインインと同意が必要（`docs/design/mcp-phase4c.md` の 10）
