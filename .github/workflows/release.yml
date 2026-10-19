@@ -25,27 +25,27 @@ jobs:
         dotnet-version: 10.0.x
 
     - name: Test
-      run: dotnet test Timetracker.sln --configuration Release
+      run: dotnet test TTDeployTool.sln --configuration Release
 
     # README 記載と同じ単一ファイル・self-contained の EXE を生成（.NET ランタイム不要）
     - name: Publish
-      run: dotnet publish src/Timetracker.Controller.Cli/Timetracker.Controller.Cli.csproj --configuration Release -r win-x64 -p:PublishSingleFile=true -p:SelfContained=true -p:UseAppHost=true -p:DebugType=None -p:Version=$($env:RELEASE_TAG.TrimStart("v")) --output publish
+      run: dotnet publish src/TTDeployTool.Controller.Cli/TTDeployTool.Controller.Cli.csproj --configuration Release -r win-x64 -p:PublishSingleFile=true -p:SelfContained=true -p:UseAppHost=true -p:DebugType=None -p:Version=$($env:RELEASE_TAG.TrimStart("v")) --output publish
 
     # MCP サーバー（stdio）も CLI と同じ形式の単一ファイル EXE にする（MCP クライアントの設定で command に指定する）
     - name: Publish MCP server
-      run: dotnet publish src/Timetracker.Controller.Mcp/Timetracker.Controller.Mcp.csproj --configuration Release -r win-x64 -p:PublishSingleFile=true -p:SelfContained=true -p:UseAppHost=true -p:DebugType=None -p:Version=$($env:RELEASE_TAG.TrimStart("v")) --output publish-mcp
+      run: dotnet publish src/TTDeployTool.Controller.Mcp/TTDeployTool.Controller.Mcp.csproj --configuration Release -r win-x64 -p:PublishSingleFile=true -p:SelfContained=true -p:UseAppHost=true -p:DebugType=None -p:Version=$($env:RELEASE_TAG.TrimStart("v")) --output publish-mcp
 
     - name: Zip artifacts
       run: |
-        Compress-Archive -Path publish\* -DestinationPath timetracker-cli-${{ github.ref_name }}.zip
-        Compress-Archive -Path publish-mcp\* -DestinationPath timetracker-mcp-${{ github.ref_name }}.zip
+        Compress-Archive -Path publish\* -DestinationPath ttdeploytool-cli-${{ github.ref_name }}.zip
+        Compress-Archive -Path publish-mcp\* -DestinationPath ttdeploytool-mcp-${{ github.ref_name }}.zip
 
     - name: Create GitHub Release
-      run: gh release create ${{ github.ref_name }} timetracker-cli-${{ github.ref_name }}.zip timetracker-mcp-${{ github.ref_name }}.zip --title "${{ github.ref_name }}" --generate-notes
+      run: gh release create ${{ github.ref_name }} ttdeploytool-cli-${{ github.ref_name }}.zip ttdeploytool-mcp-${{ github.ref_name }}.zip --title "${{ github.ref_name }}" --generate-notes
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # MCP サーバー（HTTP）のコンテナイメージを GHCR に push する（ghcr.io/<owner>/timetracker-mcp:<バージョン> と latest）。
+  # MCP サーバー（HTTP）のコンテナイメージを GHCR に push する（ghcr.io/<owner>/ttdeploytool-mcp:<バージョン> と latest）。
   # 初回の push の後、GHCR のパッケージの公開設定（public にするか）は手動で行う
   image:
     # テスト（release ジョブ）が成功した場合だけ公開する
@@ -63,7 +63,7 @@ jobs:
 
     - name: Build and push
       run: |
-        image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/timetracker-mcp
+        image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/ttdeploytool-mcp
         version=${GITHUB_REF_NAME#v}
         docker build -t $image:$version -t $image:latest --build-arg MCP_VERSION=$version \
           --label org.opencontainers.image.source=https://github.com/${{ github.repository }} \

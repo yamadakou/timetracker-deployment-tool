@@ -1,6 +1,6 @@
 <a href="https://github.com/yamadakou/timetracker-deployment-tool/actions/workflows/ci.yml"><img src="https://github.com/yamadakou/timetracker-deployment-tool/actions/workflows/ci.yml/badge.svg"></a>
 
-# Timetracker デプロイ CLI
+# TTDeployTool
 
 ## ツールの概要
 [TimeTracker](https://www.timetracker.jp/)（Docker Hub の [`densocreate/timetracker`](https://hub.docker.com/r/densocreate/timetracker) イメージ）を、[Azure Container Apps](https://learn.microsoft.com/ja-jp/azure/container-apps/overview) の上に、DB（PostgreSQL または SQL Server）と Redis と一緒に、コマンド 1 つで用意するツールです。Timetracker の検証環境（評価・動作確認・デモ）を手早く作ることを目的としています。
@@ -13,7 +13,7 @@ TimeTracker のコンテナイメージの詳細（クイックスタート、�
 - ローカルでの検証（Dry-run）: Azure を使わずに、Docker Compose で起動するための `docker-compose.yml` と `.env` を作ります（[Docker Hub の TimeTracker のページ](https://hub.docker.com/r/densocreate/timetracker)の「クイックスタート」に沿った構成）
 - 設定の指定: Timetracker のイメージのバージョン（タグ）と、コンテナごとの CPU・メモリを指定できます。台数は 1 台に固定です
 - DB のデータの永続化（`--persist-db`）: 既定では、DB のデータは DB コンテナの再起動で消えます。指定すると、Azure Files に置いて残します（[DB のデータの扱い](#db-のデータの扱いと永続化--persist-db)）
-- AI アシスタントからの操作: MCP サーバー（`timetracker-mcp`）で、同じ操作を AI アシスタントとの対話で行えます（[MCP サーバーの利用者向けマニュアル](docs/MCP_SERVER.md)）
+- AI アシスタントからの操作: MCP サーバー（`ttdeploytool-mcp`）で、同じ操作を AI アシスタントとの対話で行えます（[MCP サーバーの利用者向けマニュアル](docs/MCP_SERVER.md)）
 
 > [!NOTE]
 > DB と Redis も **コンテナ** として Container Apps の中で動かします。Azure Database for PostgreSQL や Azure SQL Database などの PaaS の DB、Azure Cache for Redis は作りません。
@@ -44,14 +44,14 @@ TimeTracker のコンテナイメージの詳細（クイックスタート、�
 
 初めて使う場合は、次の順に進めてください。
 
-1. **ツールの入手**: [Releases](https://github.com/yamadakou/timetracker-deployment-tool/releases) から `timetracker-cli-vX.Y.Z.zip` を取得し、任意のフォルダーに展開します（`timetracker-cli.exe`。Windows 用の単一ファイルで、.NET のインストールは不要です）
+1. **ツールの入手**: [Releases](https://github.com/yamadakou/timetracker-deployment-tool/releases) から `ttdeploytool-cli-vX.Y.Z.zip` を取得し、任意のフォルダーに展開します（`ttdeploytool-cli.exe`。Windows 用の単一ファイルで、.NET のインストールは不要です）
 2. **Azure の準備**（初回だけ。管理者に依頼する場合があります）
    - [リソースプロバイダーの登録](#azure-リソースプロバイダーの登録)
    - 実行する人（または ID）への[ロールの割り当て](#必要な-rbac-ロールと権限)（通常は Contributor）
 3. **Azure へのサインイン**: 通常は [Azure CLI](https://learn.microsoft.com/ja-jp/cli/azure/install-azure-cli) で `az login` を実行します（ほかの方法は[認証モード](#認証モード別の前提環境と利用方法)を参照）
 4. **デプロイ**:
    ```powershell
-   timetracker-cli.exe deploy `
+   ttdeploytool-cli.exe deploy `
      --subscription "<サブスクリプション ID>" `
      --resource-group "rg-tt-demo" `
      --db-password "Str0ngP@ssw0rd!" `
@@ -86,16 +86,30 @@ TimeTracker のコンテナイメージの詳細（クイックスタート、�
 
 | タグのキー | 値 |
 |---|---|
-| `managed-by` | `timetracker-deployment-tool` |
+| `managed-by` | `ttdeploytool` |
 | `tt-app-name` | アプリ名（`--app-name`） |
 
 - 3 つの Container App には、作成するときと更新するときに付けます。更新するときは、利用者が付けたほかのタグを残したまま、管理タグを加えます
 - Container Apps 環境とストレージアカウントには、新しく作成するときだけ付けます（既存のものは変更しないため）
+- 以前の名前（timetracker-deployment-tool）の版（v0.8.1 まで）は `managed-by` に `timetracker-deployment-tool` を付けていました。この値のリソースも本ツールのものとして扱い、削除の対象にします。更新すると `ttdeploytool` に置き換わります
 - タグは誤って削除しないための目印で、セキュリティの制限ではありません（削除できるかどうかは、Azure の RBAC で決まります）
 - 本ツールで作ったリソースは、タグで一覧できます（[`az resource list`](https://learn.microsoft.com/ja-jp/cli/azure/resource#az-resource-list) は `--tag` と `--resource-group` を同時に指定できないため、リソースグループは `--query` で絞り込みます）:
   ```bash
-  az resource list --tag managed-by=timetracker-deployment-tool --query "[?resourceGroup=='<リソースグループ名>'].{name:name, type:type}" -o table
+  az resource list --tag managed-by=ttdeploytool --query "[?resourceGroup=='<リソースグループ名>'].{name:name, type:type}" -o table
   ```
+
+### 名前の変更（v0.9.0 から）
+
+本ツールの名前を、Timetracker（デプロイする製品の名前）と区別するため、TTDeployTool に改めました（v0.9.0 から。v0.9.0 は、名前を改めて作り直しました）。v0.8.1 までの版から移る場合は、次の点に注意してください。
+
+| 変わったもの | v0.8.1 まで | v0.9.0 から | 必要な作業 |
+|---|---|---|---|
+| CLI の実行ファイル・Release の zip | `timetracker-cli.exe`・`timetracker-cli-vX.Y.Z.zip` | `ttdeploytool-cli.exe`・`ttdeploytool-cli-vX.Y.Z.zip` | スクリプトなどで実行ファイル名を指定していれば直す |
+| MCP サーバー（stdio）の実行ファイル | `timetracker-mcp.exe` | `ttdeploytool-mcp.exe` | AI アシスタントの設定の `command` を直す（[MCP サーバーの利用者向けマニュアル](docs/MCP_SERVER.md)） |
+| MCP サーバー（HTTP）のイメージ | `ghcr.io/yamadakou/timetracker-mcp` | `ghcr.io/yamadakou/ttdeploytool-mcp` | `scripts/deploy-mcp-http.ps1` を再実行する（下記）。以前のイメージ（`timetracker-mcp`）は GHCR から削除しました |
+| MCP サーバーの名前・Resources の URI | `timetracker-deploy`・`timetracker://…` | `ttdeploytool`・`ttdeploytool://…` | 不要（AI アシスタントはツールの一覧から読み直す） |
+| Entra ID のアプリ登録・アプリロール（HTTP 版） | `Timetracker MCP (<名前>)`・`Timetracker.Deploy.Server` / `.User` | `TTDeployTool MCP (<名前>)`・`TTDeployTool.Deploy.Server` / `.User` | `scripts/deploy-mcp-http.ps1` を同じ引数で再実行する。既存のアプリ登録を引き継ぎ、表示名とロールの値を新しくする（ロールの ID は変えないため、利用者への割り当てはそのまま） |
+| 管理タグ `managed-by` の値 | `timetracker-deployment-tool` | `ttdeploytool` | 不要（以前の値も本ツールのものとして扱う） |
 
 ### 必要な RBAC ロールと権限
 
@@ -178,7 +192,7 @@ az provider show --namespace Microsoft.OperationalInsights --query "registration
 - [`az provider register`](https://learn.microsoft.com/ja-jp/cli/azure/provider#az-provider-register)
 
 ### 共通の前提環境
-- Windows 10 / 11（配布している `timetracker-cli.exe` は Windows 用です。ほかの OS では、[ソースからビルド](#ビルド方法前提準備含む)して使えます）
+- Windows 10 / 11（配布している `ttdeploytool-cli.exe` は Windows 用です。ほかの OS では、[ソースからビルド](#ビルド方法前提準備含む)して使えます）
 - インターネットに接続できること（Azure と Docker Hub）
 - Azure にデプロイするだけなら、Docker は不要です（Docker は[ローカルの検証](#ローカル検証dry-run)だけで使います）
 
@@ -231,7 +245,7 @@ az provider show --namespace Microsoft.OperationalInsights --query "registration
 
 3. **デプロイの実行**
    ```powershell
-   timetracker-cli.exe deploy `
+   ttdeploytool-cli.exe deploy `
      --subscription "<サブスクリプション ID>" `
      --resource-group "rg-tt-demo" `
      --db-type "postgresql" `
@@ -261,7 +275,7 @@ az provider show --namespace Microsoft.OperationalInsights --query "registration
 
 3. **デプロイの実行**
    ```powershell
-   timetracker-cli.exe deploy `
+   ttdeploytool-cli.exe deploy `
      --subscription "<サブスクリプション ID>" `
      --resource-group "rg-tt-demo" `
      --location "japaneast" `
@@ -313,7 +327,7 @@ az provider show --namespace Microsoft.OperationalInsights --query "registration
 
 3. **デプロイの実行**
    ```powershell
-   timetracker-cli.exe deploy `
+   ttdeploytool-cli.exe deploy `
      --subscription "<サブスクリプション ID>" `
      --resource-group "rg-tt-demo" `
      --db-type "postgresql" `
@@ -335,7 +349,7 @@ az provider show --namespace Microsoft.OperationalInsights --query "registration
 
 1. **デプロイの実行**
    ```powershell
-   timetracker-cli.exe deploy `
+   ttdeploytool-cli.exe deploy `
      --subscription "<サブスクリプション ID>" `
      --resource-group "rg-tt-demo" `
      --db-type "postgresql" `
@@ -390,11 +404,11 @@ az provider show --namespace Microsoft.OperationalInsights --query "registration
      --scope /subscriptions/<サブスクリプション ID>
    ```
 
-2. **ツールを Azure のリソースに置く**: Azure VM、App Service、Container Instances などに `timetracker-cli.exe` を置きます
+2. **ツールを Azure のリソースに置く**: Azure VM、App Service、Container Instances などに `ttdeploytool-cli.exe` を置きます
 
 3. **デプロイの実行**（環境変数や資格情報の設定は不要です）
    ```powershell
-   timetracker-cli.exe deploy `
+   ttdeploytool-cli.exe deploy `
      --subscription "<サブスクリプション ID>" `
      --resource-group "rg-tt-demo" `
      --db-type "postgresql" `
@@ -419,7 +433,7 @@ Azure 上の DB のデータを、DB コンテナの再起動の後も残すか�
 | `delete` での扱い | DB アプリと一緒にデータも消えます | 既定でストレージアカウントもデータごと削除します。`--keep-db-data` で残せます |
 
 ```powershell
-timetracker-cli.exe deploy --subscription "<サブスクリプション ID>" --resource-group "rg-tt-demo" `
+ttdeploytool-cli.exe deploy --subscription "<サブスクリプション ID>" --resource-group "rg-tt-demo" `
   --db-password "<DB のパスワード>" --tracker-password "<Timetracker のパスワード>" --persist-db
 ```
 
@@ -449,7 +463,7 @@ Azure を使わずに、自分の PC の Docker で Timetracker・DB・Redis を
 
 1. **Dry-run でファイルを作る**（Azure を使わないため、`--subscription` と `--resource-group` は不要です）
    ```powershell
-   timetracker-cli.exe deploy `
+   ttdeploytool-cli.exe deploy `
      --db-type "postgresql" `
      --db-password "Str0ngP@ssw0rd!" `
      --tracker-password "AppLoginP@ss!" `
@@ -478,7 +492,7 @@ Azure を使わずに、自分の PC の Docker で Timetracker・DB・Redis を
 
 1. **削除する対象を確認する**（何も変更しません）
    ```powershell
-   timetracker-cli.exe delete `
+   ttdeploytool-cli.exe delete `
      --subscription "<サブスクリプション ID>" `
      --resource-group "rg-tt-demo" `
      --app-name "timetracker" `
@@ -497,7 +511,7 @@ Azure を使わずに、自分の PC の Docker で Timetracker・DB・Redis を
 
 2. **削除する**（確認のため、アプリ名の入力を求めます。`--yes` で省略できます）
    ```powershell
-   timetracker-cli.exe delete --subscription "<サブスクリプション ID>" --resource-group "rg-tt-demo" --app-name "timetracker"
+   ttdeploytool-cli.exe delete --subscription "<サブスクリプション ID>" --resource-group "rg-tt-demo" --app-name "timetracker"
    ```
    `{アプリ名}-tt` → `-redis` → `-db` → `-env` → ストレージアカウント（`--persist-db` で作ったもの）の順に削除します。途中で失敗した場合は、もう一度実行すると残りを削除します（削除済みのものは飛ばします）。
    Container Apps 環境の削除は、終わるまで十数分かかることがあります。
@@ -511,7 +525,7 @@ Azure を使わずに、自分の PC の Docker で Timetracker・DB・Redis を
 - 先に Azure CLI で管理タグを付けてから削除する（[`az tag update`](https://learn.microsoft.com/ja-jp/cli/azure/tag#az-tag-update)）
   ```bash
   az tag update --resource-id <リソース ID> --operation merge \
-    --tags managed-by=timetracker-deployment-tool tt-app-name=<アプリ名>
+    --tags managed-by=ttdeploytool tt-app-name=<アプリ名>
   ```
 
 逆に、特定の環境を削除から守りたい場合は、ポータルなどで `managed-by` タグを外してください。
@@ -588,7 +602,7 @@ CLI と同じ機能を、[MCP（Model Context Protocol）](https://modelcontextp
 各コンテナの CPU とメモリを、個別に指定できます。
 
 ```powershell
-timetracker-cli.exe deploy `
+ttdeploytool-cli.exe deploy `
   --subscription "<サブスクリプション ID>" `
   --resource-group "rg-tt-demo" `
   --location "japaneast" `
@@ -664,16 +678,16 @@ timetracker-cli.exe deploy `
 
 ### ビルド方法（前提準備含む）
 ```powershell
-dotnet build .\Timetracker.sln
-dotnet publish .\src\Timetracker.Controller.Cli\Timetracker.Controller.Cli.csproj -c Release -r win-x64 `
+dotnet build .\TTDeployTool.sln
+dotnet publish .\src\TTDeployTool.Controller.Cli\TTDeployTool.Controller.Cli.csproj -c Release -r win-x64 `
   -p:PublishSingleFile=true -p:SelfContained=true -p:UseAppHost=true
 ```
 - 配布する成果物は、CLI プロジェクト（と MCP サーバーのプロジェクト）を publish して作る[単一ファイルの EXE](https://learn.microsoft.com/ja-jp/dotnet/core/deploying/single-file/overview) だけです
-- Timetracker.Domain / Timetracker.Application / Timetracker.Infrastructure.Azure / Timetracker.Common はクラスライブラリ（実行ファイルを作らない）で、単一ファイルの publish の対象ではありません。ライブラリとして配布する必要が出た場合は、`dotnet pack` で NuGet パッケージにすることなどを検討してください
+- TTDeployTool.Domain / TTDeployTool.Application / TTDeployTool.Infrastructure.Azure / TTDeployTool.Common はクラスライブラリ（実行ファイルを作らない）で、単一ファイルの publish の対象ではありません。ライブラリとして配布する必要が出た場合は、`dotnet pack` で NuGet パッケージにすることなどを検討してください
 - ほかの OS 向けには、`-r` を `linux-x64` や `osx-arm64` などに変えて publish します
 
 ### テスト
-- 単体テスト: `dotnet test Timetracker.sln`（Azure には接続しません）
+- 単体テスト: `dotnet test TTDeployTool.sln`（Azure には接続しません）
 - システムテスト（本物の Azure に対するテスト。料金がかかります）: 準備と実行の方法は [docs/SYSTEM_TESTS.md](docs/SYSTEM_TESTS.md) を参照してください。ローカルでは `scripts/run-system-tests.ps1`（または `.sh`）、CI では GitHub Actions の **System Test** ワークフローを手動で実行します
 - セットアップウィザードとログインの確認（ブラウザーを使う E2E テスト。Playwright）: Timetracker のライセンスキーとサンプルデータベースのユーザー（`TT_E2E_LICENSE_KEY` / `TT_E2E_SAMPLE_LOGIN` / `TT_E2E_SAMPLE_PASSWORD`）がある場合に、サンプルデータベースの作成と、そのユーザーでのログインまでを確かめます。ローカルの docker compose（PostgreSQL / SQL Server）では PR の CI（ubuntu）で毎回、Azure ではシステムテストの中で実行します（[docs/SYSTEM_TESTS.md](docs/SYSTEM_TESTS.md)）
 - CI（`.github/workflows/ci.yml`）: PR と `main` への push のたびに、ビルドと単体テスト・スクリプトのテスト・上の E2E テスト・MCP サーバーのイメージの確認を実行します。変更がドキュメント（`docs/` の下と `*.md`）だけのときは省きます（Actions の **CI** → Run workflow で手動実行すると、変更にかかわらずすべて実行します）
@@ -682,18 +696,18 @@ dotnet publish .\src\Timetracker.Controller.Cli\Timetracker.Controller.Cli.cspro
 ### 設計概要
 将来の GUI（デスクトップ / ウェブ）に備えて、層を分けています。
 
-- ドメイン層（Timetracker.Domain）
+- ドメイン層（TTDeployTool.Domain）
   - パラメーターのモデル（DeployOptions）、既定値（Defaults）と既定値の適用（DeployOptionsResolver）、検証（DeploymentValidator。すべてのエラーを列挙する）と警告（DeploymentAdvisor）、リソース名の規則（ResourceNaming）、管理タグ（ManagedTags）、権限の判定（PermissionEvaluator）、Compose と .env の生成（Dry-run 用）
-- アプリケーション層（Timetracker.Application）
+- アプリケーション層（TTDeployTool.Application）
   - デプロイの手順の実行（DeploymentRunner: リソースグループ → 環境 →（--persist-db の場合）DB のストレージ → DB / Redis / Timetracker）と結果（DeploymentResult）
   - 削除の計画の作成と削除の実行（DeletionPlanner / DeletionRunner）、権限の事前確認（PermissionChecker / DeploymentPlanner）
-- インフラストラクチャ層（Timetracker.Infrastructure.Azure）
+- インフラストラクチャ層（TTDeployTool.Infrastructure.Azure）
   - Azure SDK による実行（AzureSdkExecutor / IAzureDeploymentGateway）、Container Apps のコンテナの仕様の生成（ContainerAppSpecBuilder）、認証（CredentialFactory）
-- コントローラー層（Timetracker.Controller.Cli）
+- コントローラー層（TTDeployTool.Controller.Cli）
   - CLI の入出力、オプションの解析（CliArgs）
-- コントローラー層（Timetracker.Controller.Mcp）
-  - MCP サーバー（`timetracker-mcp`。stdio と HTTP）。ツール・Resources・Prompts と、計画 → 確認 → 実行の流れは [MCP サーバーの利用者向けマニュアル](docs/MCP_SERVER.md) を参照してください（設計は [docs/MCP_TOOL_DESIGN.md](docs/MCP_TOOL_DESIGN.md) と [docs/design/](docs/design/) の mcp-phase*.md）
-- 共通（Timetracker.Common）
+- コントローラー層（TTDeployTool.Controller.Mcp）
+  - MCP サーバー（`ttdeploytool-mcp`。stdio と HTTP）。ツール・Resources・Prompts と、計画 → 確認 → 実行の流れは [MCP サーバーの利用者向けマニュアル](docs/MCP_SERVER.md) を参照してください（設計は [docs/MCP_TOOL_DESIGN.md](docs/MCP_TOOL_DESIGN.md) と [docs/design/](docs/design/) の mcp-phase*.md）
+- 共通（TTDeployTool.Common）
   - ロガー（IDeploymentLogger / SimpleLogger）などのユーティリティ
 
 依存の向きは「コントローラー層 → アプリケーション層 → インフラストラクチャ層 → ドメイン層」です。CLI 以外のフロントエンド（MCP サーバーなど）を加える場合も、アプリケーション層から下を共有します。

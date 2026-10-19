@@ -7,7 +7,7 @@
 ## 1. スコープ
 | 項目 | Phase 3a |
 |---|---|
-| `Timetracker.Controller.Mcp`（アセンブリ名 `timetracker-mcp`）の新設。stdio トランスポート | ✔ |
+| `TTDeployTool.Controller.Mcp`（アセンブリ名 `ttdeploytool-mcp`）の新設。stdio トランスポート | ✔ |
 | `get_deployment_options` / `validate_deployment` / `generate_compose` / `list_subscriptions` | ✔ |
 | サーバーの設定（環境変数 `TT_MCP_*`。4.0） | ✔（HTTP 用の設定は除く） |
 | サーバー instructions（5.1） | ✔（Phase 3a で使えるツールの範囲） |
@@ -28,7 +28,7 @@
 
 ## 3. プロジェクト構成
 ```
-src/Timetracker.Controller.Mcp/          (新規) timetracker-mcp（Exe）
+src/TTDeployTool.Controller.Mcp/          (新規) ttdeploytool-mcp（Exe）
   Program.cs                             McpServerHost を作って実行するだけ
   McpServerHost.cs                       Generic Host の組み立て（ログを stderr に、ツールの登録、instructions）
   McpServerSettings.cs                   環境変数 TT_MCP_* の読み取りと検証
@@ -36,12 +36,12 @@ src/Timetracker.Controller.Mcp/          (新規) timetracker-mcp（Exe）
   Tools/DeploymentTools.cs               4 つのツール（[McpServerToolType]）
   Tools/ToolResults.cs                   ツールの結果の型（outputSchema の元）
   ServerInstructions.cs                  instructions の文面
-src/Timetracker.Domain/Deployment/
+src/TTDeployTool.Domain/Deployment/
   DeploymentValidator.cs                 (新規) 全エラーの列挙（ComposeGenerator.Validate はこれを使う）
   DeploymentAdvisor.cs                   (新規) 警告
-src/Timetracker.Infrastructure.Azure/
+src/TTDeployTool.Infrastructure.Azure/
   ISubscriptionDirectory.cs / AzureSubscriptionDirectory.cs   (新規) サブスクリプションの一覧
-tests/Timetracker.Controller.Mcp.Tests/  (新規) ツールの単体テストと、プロセスを起動するプロトコル結合テスト
+tests/TTDeployTool.Controller.Mcp.Tests/  (新規) ツールの単体テストと、プロセスを起動するプロトコル結合テスト
 ```
 - MCP は Application を参照しない（Phase 3a のツールは Domain と Infrastructure だけで足りる。Phase 3b で参照を追加する）
 - `Program.cs` は 1 行だけにし、組み立ては `McpServerHost` に置いてテストする（CLI と同じ考え方）
@@ -126,5 +126,5 @@ tests/Timetracker.Controller.Mcp.Tests/  (新規) ツールの単体テストと
 - Domain: `DeploymentValidator`（全エラーの列挙、前のエラーで省く確認、`ComposeGenerator.Validate` と最初のエラーが一致すること）、`DeploymentAdvisor`
 - Infrastructure: `AzureSubscriptionDirectory`（`ArmClient` のモック）
 - MCP（単体）: 設定の読み取り、引数の変換とパスワードの取得元、各ツールの正常・エラーの分岐、出力先の制限、上書きの禁止、パスワードが結果に含まれないこと
-- MCP（プロトコル結合）: ビルドした `timetracker-mcp` を SDK の `StdioClientTransport` で起動し、`initialize`（instructions）・`tools/list`（スキーマ・annotations）・`tools/call` を確かめる。stdout に JSON-RPC 以外が出ないことは、プロトコルが成立することで確かめる
+- MCP（プロトコル結合）: ビルドした `ttdeploytool-mcp` を SDK の `StdioClientTransport` で起動し、`initialize`（instructions）・`tools/list`（スキーマ・annotations）・`tools/call` を確かめる。stdout に JSON-RPC 以外が出ないことは、プロトコルが成立することで確かめる
 - 手動: MCP Inspector（CLI モード）で `tools/list` と `tools/call`。`generate_compose` で生成したファイルで `docker compose up` が成功し、Timetracker が応答すること

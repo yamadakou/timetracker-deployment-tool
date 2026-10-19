@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.12" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\TTDeployTool.Domain\TTDeployTool.Domain.csproj" />
+    <ProjectReference Include="..\TTDeployTool.Common\TTDeployTool.Common.csproj" />
+    <ProjectReference Include="..\TTDeployTool.Infrastructure.Azure\TTDeployTool.Infrastructure.Azure.csproj" />
+  </ItemGroup>
+</Project>

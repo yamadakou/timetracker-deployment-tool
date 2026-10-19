@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="TTDeployTool.Infrastructure.Azure.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Azure.Identity" Version="1.21.0" />
+    <PackageReference Include="Azure.ResourceManager" Version="1.14.0" />
+    <PackageReference Include="Azure.ResourceManager.AppContainers" Version="1.6.0" />
+    <PackageReference Include="Azure.ResourceManager.Authorization" Version="1.1.7" />
+    <PackageReference Include="Azure.ResourceManager.Storage" Version="1.7.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\TTDeployTool.Domain\TTDeployTool.Domain.csproj" />
+    <ProjectReference Include="..\TTDeployTool.Common\TTDeployTool.Common.csproj" />
+  </ItemGroup>
+</Project>

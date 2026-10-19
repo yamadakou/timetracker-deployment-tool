@@ -12,8 +12,8 @@
 | 4c | Container Apps への配置、Entra ID のアプリ登録の手順、Claude Code（と VS Code の確認できる範囲）からの接続、README | Azure 上で両方式の一連のシナリオ、範囲外のリソースグループの拒否 |
 
 ## 2. 起動とトランスポート
-- `timetracker-mcp`（引数なし）または `--transport stdio`: 従来どおり（変更なし）
-- `timetracker-mcp --transport http`（または環境変数 `TT_MCP_TRANSPORT=http`）: ASP.NET Core（Kestrel）で起動し、`/mcp` で Streamable HTTP を受ける。待ち受けは `ASPNETCORE_URLS`（既定 `http://+:8080`）。TLS は前段（Container Apps のイングレス）で終端する
+- `ttdeploytool-mcp`（引数なし）または `--transport stdio`: 従来どおり（変更なし）
+- `ttdeploytool-mcp --transport http`（または環境変数 `TT_MCP_TRANSPORT=http`）: ASP.NET Core（Kestrel）で起動し、`/mcp` で Streamable HTTP を受ける。待ち受けは `ASPNETCORE_URLS`（既定 `http://+:8080`）。TLS は前段（Container Apps のイングレス）で終端する
 - **ステートレスモード**にする（`HttpServerTransportOptions.Stateless = true`）。計画とジョブは ID だけで続けられるため、MCP のセッションに状態を持たない（全体設計 3.4 の 4）。ただし計画・ジョブ自体はプロセス内のメモリにあるため、レプリカは 1 に固定する（4c）
 - `/healthz`: 認証なしで 200 を返す（Container Apps のプローブ用）
 - ログは標準出力（コンテナのログ）
@@ -36,9 +36,9 @@
 ### 3.2 アプリロール
 | アプリロール | 4a で使えるもの |
 |---|---|
-| `Timetracker.Deploy.Server` | すべてのツール（Azure の操作は `server` 方式） |
-| （4b）`Timetracker.Deploy.User` | 4b で `user` 方式を追加する |
-| どちらもない | Azure を操作しないツール（`get_deployment_options` / `validate_deployment` / `generate_compose`）と Resources・Prompts の文書。Azure を読む・変更するツールは「アプリロール `Timetracker.Deploy.Server` が必要です」のエラー |
+| `TTDeployTool.Deploy.Server` | すべてのツール（Azure の操作は `server` 方式） |
+| （4b）`TTDeployTool.Deploy.User` | 4b で `user` 方式を追加する |
+| どちらもない | Azure を操作しないツール（`get_deployment_options` / `validate_deployment` / `generate_compose`）と Resources・Prompts の文書。Azure を読む・変更するツールは「アプリロール `TTDeployTool.Deploy.Server` が必要です」のエラー |
 
 - 確認はツールの中で行う（`IAzureAccessPolicy`。下記）。ツールの一覧からは隠さない（何が使えないかを LLM が利用者に説明できるように）
 
@@ -83,9 +83,9 @@
 - 単一ファイルの EXE（stdio）にも ASP.NET Core が含まれるため、サイズが増える（全体設計 6.2 で想定済み。win-x64 で約 115MB。IIS 用の `aspnetcorev2_inprocess.dll` も出力に含まれるが、使わない）
 
 ## 7. コンテナイメージ
-- `Dockerfile`（リポジトリの直下）: `mcr.microsoft.com/dotnet/sdk:10.0` でビルドし、`mcr.microsoft.com/dotnet/aspnet:10.0` で実行する。非 root（`APP_UID`）、ポート 8080、`ENTRYPOINT ["dotnet", "timetracker-mcp.dll", "--transport", "http"]`
+- `Dockerfile`（リポジトリの直下）: `mcr.microsoft.com/dotnet/sdk:10.0` でビルドし、`mcr.microsoft.com/dotnet/aspnet:10.0` で実行する。非 root（`APP_UID`）、ポート 8080、`ENTRYPOINT ["dotnet", "ttdeploytool-mcp.dll", "--transport", "http"]`
 - CI（`ci.yml`）: PR ごとにイメージのビルドだけを確かめる（push しない）
-- リリース（`release.yml`）: テスト（`release` ジョブ）が成功した場合だけ、タグの push で `ghcr.io/yamadakou/timetracker-mcp:{バージョン}` と `latest` を push する（`packages: write`）。公開の設定（GHCR のパッケージを public にする）は初回だけ手動
+- リリース（`release.yml`）: テスト（`release` ジョブ）が成功した場合だけ、タグの push で `ghcr.io/yamadakou/ttdeploytool-mcp:{バージョン}` と `latest` を push する（`packages: write`）。公開の設定（GHCR のパッケージを public にする）は初回だけ手動
 
 ## 8. テスト
 - C1（分岐網羅）100% を維持する（`Program.cs` の終了処理を除く）
@@ -96,7 +96,7 @@
 
 ## 9. 確認結果
 - 自動テスト: 全件成功（ソリューション全体 578 件、うち Azure と E2E のシステムテスト 4 件はスキップ）。分岐網羅率は `Program.cs` の終了処理を除き 100%
-- 子プロセス: ビルドした `timetracker-mcp.dll` を `--transport http` で起動し、設定が無ければ終了コード 1 と理由、設定があれば実際の Kestrel で `/healthz` が 200、トークンなしの `/mcp` が 401 になることを確認（Program から起動引数が渡ること）
+- 子プロセス: ビルドした `ttdeploytool-mcp.dll` を `--transport http` で起動し、設定が無ければ終了コード 1 と理由、設定があれば実際の Kestrel で `/healthz` が 200、トークンなしの `/mcp` が 401 になることを確認（Program から起動引数が渡ること）
 - TestServer: トークンなし・対象の違うトークン・発行者の違うトークン・署名の違うトークンが 401 と `resource_metadata` になること、`scp` に `Mcp.Access` が無いトークン（ID トークンを想定したもの、ほかのスコープ、似た名前）が 403 になること、保護リソースのメタデータ、ロールなしで Azure のツールがエラーになること、範囲外のリソースグループが Azure を読まずにブロッカーになること、別の利用者の計画・ジョブが見えないこと、開始したジョブを同じ利用者が別のリクエストで最後まで追えること、デプロイの Resource がロールなし・範囲外で拒否されること、リクエストのログに `preferred_username`（無ければ省略）と `{tid}/{oid}` が出て、認証のないリクエストは出ないことを確認
 - Docker（ローカル）: `aspnet:10.0` のイメージで、非 root（`app`）で起動し、`/healthz` が 200、`X-Forwarded-*` 付きのトークンなしの `/mcp` が 401（`resource_metadata="https://…"`）、必須の設定が無ければ理由を出して終了することを確認。開発環境ではビルド用のコンテナから NuGet に接続できない（プロキシの証明書）ため、ホストで発行した成果物を同じ実行用のステージに載せて確認した。`sdk:10.0` でのビルドは CI で確認する
 - 未確認（4c）: Entra ID の実際のトークン、Container Apps 上での動作、MCP クライアントからの接続

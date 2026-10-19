@@ -13,10 +13,10 @@
 |---|---|---|
 | リソースグループ | `-ResourceGroup` で指定 | MCP サーバーを置く（検証環境を作るリソースグループとは分ける） |
 | ユーザー割り当てのマネージド ID | `tt-mcp-id` | `server` 方式で Azure を操作する ID。`user` 方式では、アプリ登録のフェデレーション資格情報としてトークン交換に使う |
-| アプリ登録（サーバー） | `Timetracker MCP (tt-mcp)` | アクセストークンの対象（アプリケーション ID の URI は `api://<appId>` と公開 URL）。スコープ `<公開 URL>/Mcp.Access`、アプリロール 2 つ、v2 のトークン。`user` 方式なら Azure Service Management の委任アクセス許可とフェデレーション資格情報 |
-| アプリ登録（クライアント） | `Timetracker MCP client (tt-mcp)` | Claude Code / VS Code がサインインに使う公開クライアント（シークレットなし）。サーバーのアプリで事前承認する |
+| アプリ登録（サーバー） | `TTDeployTool MCP (tt-mcp)` | アクセストークンの対象（アプリケーション ID の URI は `api://<appId>` と公開 URL）。スコープ `<公開 URL>/Mcp.Access`、アプリロール 2 つ、v2 のトークン。`user` 方式なら Azure Service Management の委任アクセス許可とフェデレーション資格情報 |
+| アプリ登録（クライアント） | `TTDeployTool MCP client (tt-mcp)` | Claude Code / VS Code がサインインに使う公開クライアント（シークレットなし）。サーバーのアプリで事前承認する |
 | Container Apps の Environment | `tt-mcp-env` | ログの送信先は既定でなし（`az containerapp logs show` で見る） |
-| Container App | `tt-mcp` | `ghcr.io/yamadakou/timetracker-mcp:<タグ>`、外部イングレス（HTTPS）、ポート 8080、レプリカ 1 固定、0.5 vCPU / 1Gi |
+| Container App | `tt-mcp` | `ghcr.io/yamadakou/ttdeploytool-mcp:<タグ>`、外部イングレス（HTTPS）、ポート 8080、レプリカ 1 固定、0.5 vCPU / 1Gi |
 | `server` 方式の許可するリソースグループ | `-AllowedResourceGroups` | 無ければ作成し、マネージド ID に Contributor を割り当てる |
 
 ```mermaid
@@ -32,7 +32,7 @@ flowchart LR
 ## 3. 前提
 - 実行する人: サブスクリプションの所有者（ロールの割り当てができること）と、Entra ID でアプリを登録できる権限。`user` 方式の管理者の同意には、テナントの管理者（特権ロール管理者など）。管理者でない場合、スクリプトは実行した本人の分だけ同意する（ほかの利用者の分は、後で管理者が同意する）
 - PowerShell 7 以上と Azure CLI（`az login` 済み、または実行時にサインイン）
-- コンテナイメージ: リリース（タグの push）で GHCR に公開される。初回だけ、GHCR のパッケージ `timetracker-mcp` を public にする（4a の 7）。private のままにする場合は、Container App にレジストリの資格情報を設定する
+- コンテナイメージ: リリース（タグの push）で GHCR に公開される。初回だけ、GHCR のパッケージ `ttdeploytool-mcp` を public にする（4a の 7）。private のままにする場合は、Container App にレジストリの資格情報を設定する
 - リソースプロバイダー: `Microsoft.App`（スクリプトで登録する）。検証環境のデプロイに必要な登録は README の「Azure リソースプロバイダーの登録」のとおり
 
 ## 4. 手順（スクリプト）
@@ -68,7 +68,7 @@ flowchart LR
 ./scripts/assign-mcp-role.ps1 -Role Server -UserPrincipalName alice@example.com   # server 方式（と user 方式）
 ./scripts/assign-mcp-role.ps1 -Role User -GroupObjectId <グループの ID>             # user 方式だけ（グループは Entra ID P1 以上）
 ```
-割り当ては、利用者が次にサインインしたトークンから有効になる。Entra 管理センターの「エンタープライズ アプリケーション」→「Timetracker MCP (tt-mcp)」→「ユーザーとグループ」からも割り当てられる。
+割り当ては、利用者が次にサインインしたトークンから有効になる。Entra 管理センターの「エンタープライズ アプリケーション」→「TTDeployTool MCP (tt-mcp)」→「ユーザーとグループ」からも割り当てられる。
 
 ### 4.3 クライアントの設定
 - Claude Code（Entra ID は動的クライアント登録に対応していないため、クライアントのアプリの ID を指定する。コールバックのポートはスクリプトの `-ClaudeCodeCallbackPort`（既定 8765）と同じにする）
@@ -80,7 +80,7 @@ flowchart LR
   ```json
   {
     "servers": {
-      "timetracker": {
+      "ttdeploytool": {
         "type": "http",
         "url": "https://<FQDN>/mcp",
         "oauth": { "clientId": "<クライアントのアプリの appId>" }
@@ -91,7 +91,7 @@ flowchart LR
 
 ## 5. 手作業で行う場合の要点
 スクリプトを使わない場合（ポータルで作る場合）も、次を満たすこと。
-- サーバーのアプリ: アプリケーション ID の URI に `api://<appId>` と公開 URL（`https://<FQDN>/mcp`。10 の確認結果 1 のとおり、無いとサインインが AADSTS9010010 で失敗する）、スコープ `Mcp.Access`（管理者と利用者が同意できる）、アプリロール `Timetracker.Deploy.Server` / `Timetracker.Deploy.User`（メンバーの種類はユーザー）、**マニフェストの `api.requestedAccessTokenVersion` を 2** にする（1 のままだと発行者が `https://sts.windows.net/...` になり、サーバーが 401 を返す）
+- サーバーのアプリ: アプリケーション ID の URI に `api://<appId>` と公開 URL（`https://<FQDN>/mcp`。10 の確認結果 1 のとおり、無いとサインインが AADSTS9010010 で失敗する）、スコープ `Mcp.Access`（管理者と利用者が同意できる）、アプリロール `TTDeployTool.Deploy.Server` / `TTDeployTool.Deploy.User`（メンバーの種類はユーザー）、**マニフェストの `api.requestedAccessTokenVersion` を 2** にする（1 のままだと発行者が `https://sts.windows.net/...` になり、サーバーが 401 を返す）
 - `user` 方式: API のアクセス許可に Azure Service Management の `user_impersonation`（委任）を追加して管理者の同意を付与し、「証明書とシークレット」→「フェデレーション資格情報」に、マネージド ID（発行者 `https://login.microsoftonline.com/<テナント>/v2.0`、サブジェクトはマネージド ID のオブジェクト（プリンシパル）ID、対象 `api://AzureADTokenExchange`）を追加する
 - クライアントのアプリ: 「パブリック クライアント フローを許可する」を有効にし、モバイル アプリとデスクトップ アプリのリダイレクト URI に `http://localhost:8765/callback`（Claude Code）を追加する。サーバーのアプリの「API の公開」で、このクライアントを `Mcp.Access` について承認済みクライアントにする
 - Container App: 外部イングレス、ターゲット ポート 8080、レプリカの最小・最大を 1、ユーザー割り当てのマネージド ID、4.1 の環境変数
@@ -104,9 +104,9 @@ flowchart LR
 | 3 | `GET /.well-known/oauth-protected-resource` | `resource` が `https://<FQDN>/mcp`、`authorization_servers` がテナントの v2 の発行者、`scopes_supported` が `https://<FQDN>/mcp/Mcp.Access` |
 | 4 | Claude Code で `/mcp` からサインイン | ブラウザーでサインインでき、`timetracker` が接続済みになる。サーバーのログ（`az containerapp logs show`）に利用者名と `{tid}/{oid}` が出る |
 | 5 | ロールなしで `get_deployment_options` と `list_subscriptions` | 前者は使え、後者はアプリロールが必要というエラー |
-| 6 | `Timetracker.Deploy.Server` で、許可したリソースグループに計画 → デプロイ → 状態の確認 → 削除 | `identity` が「MCP サーバーのマネージド ID（server 方式）」で、Timetracker の URL が返り、削除できる。アクティビティログの操作者がマネージド ID |
+| 6 | `TTDeployTool.Deploy.Server` で、許可したリソースグループに計画 → デプロイ → 状態の確認 → 削除 | `identity` が「MCP サーバーのマネージド ID（server 方式）」で、Timetracker の URL が返り、削除できる。アクティビティログの操作者がマネージド ID |
 | 7 | `server` 方式で許可していないリソースグループに計画 | Azure を読まずにブロッカー |
-| 8 | （`user` 方式）`Timetracker.Deploy.User` で、自分に Contributor があるリソースグループに計画 → デプロイ → 削除 | `identity` が「サインインした利用者本人の権限（user 方式）」。アクティビティログの操作者が本人 |
+| 8 | （`user` 方式）`TTDeployTool.Deploy.User` で、自分に Contributor があるリソースグループに計画 → デプロイ → 削除 | `identity` が「サインインした利用者本人の権限（user 方式）」。アクティビティログの操作者が本人 |
 | 9 | （`user` 方式）自分に権限の無いリソースグループに計画 | 権限の事前確認で不足が示され、`plan_id` が null |
 | 10 | 別の利用者で、6 の `plan_id` / `job_id` を使う | 見つからないというエラー |
 | 11 | `generate_compose` | ファイルを書かず、`.env` のパスワードがプレースホルダー |
@@ -136,11 +136,11 @@ flowchart LR
 6. **アプリロールの反映**: 割り当て後、クライアントのトークンの更新までの時間 → 割り当ての後に新しくサインインしたトークンには `roles` が入っていた（更新までの時間は未確認）
 
 ## 10. 確認結果
-2026-10-17、Azure（japaneast、Visual Studio Enterprise のサブスクリプション）と Entra ID（テナントの管理者ではない、サブスクリプションの所有者のアカウント）で、イメージ `ghcr.io/yamadakou/timetracker-mcp:0.8.0` を `server,user` で配置して確認した。MCP のクライアントは、デバイスコードでトークンを取得する検証用のスクリプト（クライアントのアプリの ID を使い、`resource` に公開 URL を付ける）と、Streamable HTTP の最小のクライアントを使った。
+2026-10-17、Azure（japaneast、Visual Studio Enterprise のサブスクリプション）と Entra ID（テナントの管理者ではない、サブスクリプションの所有者のアカウント）で、イメージ `ghcr.io/yamadakou/ttdeploytool-mcp:0.8.0` を `server,user` で配置して確認した。MCP のクライアントは、デバイスコードでトークンを取得する検証用のスクリプト（クライアントのアプリの ID を使い、`resource` に公開 URL を付ける）と、Streamable HTTP の最小のクライアントを使った。
 
 ### 配置とアプリ登録（スクリプト）
 - `deploy-mcp-http.ps1` で、リソースグループ・マネージド ID・アプリ登録（サーバーとクライアント）・フェデレーション資格情報・Environment・Container App・許可したリソースグループへの Contributor の割り当てを作成できた。管理者の同意は権限が無いため失敗し、警告して続いた
-- `assign-mcp-role.ps1` で、利用者に `Timetracker.Deploy.Server` を割り当てられた
+- `assign-mcp-role.ps1` で、利用者に `TTDeployTool.Deploy.Server` を割り当てられた
 
 ### 確認のシナリオ（6）
 | # | 結果 |
@@ -148,7 +148,7 @@ flowchart LR
 | 1 | 200 `ok` |
 | 2 | 401。`resource_metadata` が `https://<FQDN>/.well-known/oauth-protected-resource`（Container Apps のイングレスの後ろでも https になる） |
 | 3 | 期待どおり（`scopes_supported` は下の 1 の修正の後のもの） |
-| 4 | 成功（2026-10-19、イメージ 0.9.0、Claude Code 2.1.303）。`claude mcp add --transport http --client-id … --callback-port 8765` で登録し、`/mcp` からブラウザーでサインインして接続済みになった（MFA あり）。`get_deployment_options` と `list_subscriptions` を呼べた。サーバーのログに、要求ごとの利用者名と `{tid}/{oid}`、`Server (timetracker-deploy 0.9.0), Client (claude-code 2.1.303)` が出た。それまでは、検証用のスクリプトで `resource` 付きのサインインとトークンの取得を確認していた（下の 1 の修正の後） |
+| 4 | 成功（2026-10-19、イメージ 0.9.0、Claude Code 2.1.303）。`claude mcp add --transport http --client-id … --callback-port 8765` で登録し、`/mcp` からブラウザーでサインインして接続済みになった（MFA あり）。`get_deployment_options` と `list_subscriptions` を呼べた。サーバーのログに、要求ごとの利用者名と `{tid}/{oid}`、`Server (ttdeploytool 0.9.0), Client (claude-code 2.1.303)` が出た。それまでは、検証用のスクリプトで `resource` 付きのサインインとトークンの取得を確認していた（下の 1 の修正の後） |
 | 5 | ロールなしでは確認していない（利用者が 1 人のため）。ロールありで `get_deployment_options` と `list_subscriptions`（server 方式）が使えた |
 | 6 | 計画（権限の事前確認は不足なし）→ デプロイ（約 2 分。Timetracker の URL が `/setup` に転送）→ `get_deployment_info` → 削除（アプリ名の不一致は拒否。約 13 分。リソースグループは残る）。アクティビティログの操作者はマネージド ID |
 | 7 | Azure を読まずにブロッカー。`azure_identity` を省略して範囲外の削除を計画した場合は、`user` 方式を案内するエラー |
@@ -165,4 +165,4 @@ flowchart LR
 
 ### 残っている確認と後片付け
 - 当面行わない確認: VS Code からのサインイン（9 の 2）、権限の無い利用者・別の利用者でのシナリオ（6 の 9・10）。行うときは、4.1 の手順で配置し直す
-- 確認用の環境は 2026-10-19 に削除した（リソースグループ `rg-tt-mcp`（Container App・Environment・マネージド ID）と `rg-tt-mcp-demo`、アプリ登録 `Timetracker MCP (tt-mcp)` と `Timetracker MCP client (tt-mcp)`。アプリ登録の削除で、本人の分の同意とアプリロールの割り当ても消える）。HTTP 版での DB の永続化の確認（`docs/design/db-persistence-mcp-http-check.md`）も、配置し直してから行う
+- 確認用の環境は 2026-10-19 に削除した（リソースグループ `rg-tt-mcp`（Container App・Environment・マネージド ID）と `rg-tt-mcp-demo`、アプリ登録 `TTDeployTool MCP (tt-mcp)` と `TTDeployTool MCP client (tt-mcp)`。アプリ登録の削除で、本人の分の同意とアプリロールの割り当ても消える）。HTTP 版での DB の永続化の確認（`docs/design/db-persistence-mcp-http-check.md`）も、配置し直してから行う
