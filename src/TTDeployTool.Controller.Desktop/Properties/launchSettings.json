@@ -1,0 +1,7 @@
+{
+  "profiles": {
+    "TTDeployTool.Controller.Desktop (Package)": {
+      "commandName": "MsixPackage"
+    }
+  }
+}

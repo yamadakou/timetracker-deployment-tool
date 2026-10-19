@@ -10,7 +10,10 @@
     <Project Path="src/TTDeployTool.Infrastructure.Azure/TTDeployTool.Infrastructure.Azure.csproj" />
     <Project Path="src/TTDeployTool.Application/TTDeployTool.Application.csproj" />
     <Project Path="src/TTDeployTool.Controller.Desktop.Core/TTDeployTool.Controller.Desktop.Core.csproj" />
+    <!-- C# のプロジェクトは既定でソリューションのどのプラットフォームでも Any CPU を使うため、このプロジェクト（x64 / ARM64 だけ）は明示する -->
     <Project Path="src/TTDeployTool.Controller.Desktop/TTDeployTool.Controller.Desktop.csproj">
+      <Platform Solution="*|x64" Project="x64" />
+      <Platform Solution="*|ARM64" Project="ARM64" />
       <Deploy />
     </Project>
   </Folder>
