@@ -1,0 +1,117 @@
+name: Desktop System Test
+
+# デスクトップアプリの UI テストを、本物の Azure に対して実行する（docs/design/desktop-ui-tests.md の 7）。
+# アプリはテスト用のビルド（/p:UiTestSignIn=true）で、WAM の対話の代わりに Azure CLI のサインイン（下の azure/login の OIDC）を使う。
+# 20〜30 分かかり料金が発生するため、PR ごとには実行せず、手動で実行する。OIDC の準備は System Test（docs/SYSTEM_TESTS.md）と同じ
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: desktop-system-test
+  cancel-in-progress: false
+
+permissions:
+  id-token: write   # Azure への OIDC ログイン
+  contents: read
+
+jobs:
+  desktop-system-test:
+    runs-on: windows-latest
+    # System Test と同じ環境（承認と、OIDC のフェデレーション資格情報の subject）を使う
+    environment: systemtest
+    timeout-minutes: 90
+    env:
+      TT_UITEST_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      TT_UITEST_RESOURCE_GROUP: rg-ttui-${{ github.run_id }}
+      TT_UITEST_APP_NAME: ttui
+      TT_UITEST_LOCATION: ${{ vars.TT_SYSTEMTEST_LOCATION || 'japaneast' }}
+      TT_UITEST_RESULTS_DIRECTORY: ${{ github.workspace }}\TestResults
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: 10.0.x
+
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Azure login (OIDC)
+      uses: azure/login@v3
+      with:
+        client-id: ${{ vars.AZURE_CLIENT_ID }}
+        tenant-id: ${{ vars.AZURE_TENANT_ID }}
+        subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+    # CI の desktop-ui ジョブと同じく、一時的な自己署名の証明書で署名して導入する（証明書はこのジョブの中だけで使う）
+    - name: Create a temporary signing certificate
+      id: cert
+      shell: pwsh
+      run: |
+        $cert = New-SelfSignedCertificate -Type Custom -Subject "CN=TTDeployTool" -KeyUsage DigitalSignature `
+          -FriendlyName "TTDeployTool UI test" -CertStoreLocation "Cert:\CurrentUser\My" `
+          -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.3", "2.5.29.19={text}")
+        $cer = Join-Path $env:RUNNER_TEMP "uitest.cer"
+        Export-Certificate -Cert $cert -FilePath $cer | Out-Null
+        Import-Certificate -FilePath $cer -CertStoreLocation "Cert:\LocalMachine\TrustedPeople" | Out-Null
+        "thumbprint=$($cert.Thumbprint)" >> $env:GITHUB_OUTPUT
+
+    - name: Build and sign MSIX for the UI test (x64, Azure CLI sign-in)
+      run: >
+        msbuild src/TTDeployTool.Controller.Desktop/TTDeployTool.Controller.Desktop.csproj /restore
+        /p:Configuration=Release /p:Platform=x64 /p:AppxBundle=Never /p:UapAppxPackageBuildMode=SideloadOnly
+        /p:GenerateAppxPackageOnBuild=true /p:AppxPackageSigningEnabled=true /p:UiTestSignIn=true
+        /p:PackageCertificateThumbprint=${{ steps.cert.outputs.thumbprint }}
+        /p:AppxPackageDir=${{ github.workspace }}\UiPackages\
+
+    - name: Install MSIX
+      shell: pwsh
+      run: |
+        $all = Get-ChildItem UiPackages -Recurse -Filter *.msix
+        $package = $all | Where-Object { $_.FullName -notmatch '\\Dependencies\\' } | Select-Object -First 1
+        $dependencies = @($all | Where-Object { $_.FullName -match '\\Dependencies\\x64\\' } | ForEach-Object FullName)
+        if ($dependencies.Count -gt 0) {
+          Add-AppxPackage -Path $package.FullName -DependencyPath $dependencies
+        } else {
+          Add-AppxPackage -Path $package.FullName
+        }
+        Get-AppxPackage -Name TTDeployTool | Format-List Name, PackageFamilyName, Version
+
+    - name: UI test on Azure
+      run: >
+        dotnet test --project tests/TTDeployTool.Controller.Desktop.UITests --
+        --filter-class TTDeployTool.Controller.Desktop.UITests.AzureUiTests
+        --output detailed --report-xunit-trx --results-directory=${{ github.workspace }}\TestResults
+
+    # アプリの診断用のログ（パスワード・トークン・アカウント名は含まない）を結果に入れる
+    - name: Copy the diagnostic log
+      if: always()
+      shell: pwsh
+      run: |
+        $package = Get-AppxPackage -Name TTDeployTool | Select-Object -First 1
+        if ($package) {
+          $logs = Join-Path $env:LOCALAPPDATA "Packages\$($package.PackageFamilyName)\LocalState\logs"
+          if (Test-Path $logs) {
+            New-Item -ItemType Directory -Force -Path TestResults | Out-Null
+            Copy-Item (Join-Path $logs "ttdeploytool-desktop-*.log") TestResults
+          }
+        }
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: desktop-system-test-results
+        path: TestResults
+
+    # テストが途中で失敗しても、作ったリソースを残さない（本ツールは既存のリソースグループを消さないため、この専用のものを消す）
+    - name: Delete the resource group
+      if: always()
+      shell: pwsh
+      run: |
+        if ((az group exists --name $env:TT_UITEST_RESOURCE_GROUP) -eq "true") {
+          az group delete --name $env:TT_UITEST_RESOURCE_GROUP --yes --no-wait
+          Write-Host "リソースグループ $($env:TT_UITEST_RESOURCE_GROUP) の削除を始めました。"
+        }
