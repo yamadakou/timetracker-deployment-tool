@@ -169,6 +169,13 @@
 | 7c | 5（常駐と通知） | オーナーの実機で、閉じても続き、通知から開けること |
 | 7d | 6（利用可能期限とデプロイの一覧） | 単体テスト（分岐網羅率 100%）と UI テスト（CI）が成功。半自動の UI テストで、期限での自動の削除とパスワードの表示を確かめる。CLI・MCP の既存のテストが成功し、再デプロイで期限日のタグが残る |
 
+**実施結果（7a）**
+- P1: エラー（6 か所）・Dry-run の docker-compose.yml・状態の確認とジョブの URL・削除のアプリ名の入力欄の表示を、ViewModel の bool（`HasError` / `HasComposeContent` / `HasEndpoint` / `NeedsAppNameConfirmation`）で切り替えるようにし、null を引数にする関数（`Ui.IfText` / `Ui.IfNotNull`）を消した。実装の途中で、値から決まるプロパティを通知するために足した `SetProperty` の多重定義が、既存の `SetProperty`（通知するプロパティの名前を省略できる）と区別されず、`Error` の変更を通知しなくなることが単体テストで分かったため、`Dependent` 型の引数で区別した
+- P2: 環境が無ければ永続化の行を出さない。対象のジョブが実行中なら注意を添える（`StatusViewModel.Note`）
+- P3: `BusyState`（処理中と段階）を、計画（デプロイ・削除）・状態の確認・サブスクリプションの読み込みに加えた。段階は、Azure の窓口を包む `ReportingGateway`（`DispatchProxy`）が読み取りの前に知らせる（Application・CLI・MCP は変えていない）。経過時間は、`ProgressRing` が動き続けることで処理中と分かるため出さないことにした（画面の更新のための時計を ViewModel に持たない）
+- P4: `MainViewModel.CurrentDeployment` / `CurrentDeletion` を分け、同じ対象の削除を始めたらデプロイの結果を外す
+- テスト: `Desktop.Core` に 10 件（分岐網羅率 100%）、UI テスト（CI）に P1 の確認（Dry-run のエラーの後に保存すると、エラーの領域が消える）を加えた。CI（run 39389230295）で全件成功。修正前の画面で、この UI テストが失敗することは確かめていない。オーナーの実機での確認は未実施
+
 ## 11. 出典（2026-10-20 に確認）
 - x:Bind の関数の結び付け: https://learn.microsoft.com/windows/apps/develop/data-binding/function-bindings
 - アプリの通知（AppNotificationManager）: https://learn.microsoft.com/windows/apps/develop/notifications/app-notifications/app-notifications-quickstart
