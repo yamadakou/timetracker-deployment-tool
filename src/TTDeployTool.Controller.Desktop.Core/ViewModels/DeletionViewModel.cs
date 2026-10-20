@@ -31,6 +31,7 @@ public sealed class DeletionViewModel : ObservableObject
     private DeletionPlanTicket? _ticket;
     private bool _includeUntagged;
     private bool _keepDbData;
+    private bool _deleteResourceGroup;
     private string _confirmAppName = "";
     private string? _error;
     private string? _note;
@@ -92,6 +93,17 @@ public sealed class DeletionViewModel : ObservableObject
         }
     }
 
+    /// <summary>リソースグループも削除するか（本ツールのリソースを削除した後に空になる場合だけ削除する）。</summary>
+    public bool DeleteResourceGroup
+    {
+        get => _deleteResourceGroup;
+        set
+        {
+            if (SetProperty(ref _deleteResourceGroup, value))
+                Ticket = null;
+        }
+    }
+
     /// <summary>確認のためのアプリ名の入力。</summary>
     public string ConfirmAppName
     {
@@ -118,6 +130,7 @@ public sealed class DeletionViewModel : ObservableObject
     {
         null => null,
         { Plan.KeepsDbData: true } t => $"{KeptResourceGroup(t.Plan)}\n{KeptDbDataNotice(t.Plan)}",
+        { Plan.DeletesResourceGroup: true } => null,
         { } t => KeptResourceGroup(t.Plan),
     };
 
@@ -166,8 +179,12 @@ public sealed class DeletionViewModel : ObservableObject
                         t.WillDelete ? "削除する" : "削除しない",
                         t.Reason == DeletionPlanner.KeptReason ? KeptReason : t.Reason,
                         t.WillDelete));
+                if (plan.ResourceGroupTarget is { } rg)
+                    Targets.Add(new DeletionRow(plan.ResourceGroup, "リソースグループ", rg.WillDelete ? "削除する" : "削除しない", rg.Reason, rg.WillDelete));
                 foreach (var blocker in value.Blockers)
-                    Blockers.Add(blocker);
+                    Blockers.Add(blocker.Replace("リソースグループの削除の指定を外して", "「リソースグループも削除する」のチェックを外して"));
+                if (plan.DeletesResourceGroup)
+                    Warnings.Add($"リソースグループ {plan.ResourceGroup} も削除します。元に戻せません。");
                 if (plan.LosesDbData)
                     Warnings.Add(DbDataLossWarning);
                 if (plan.DeletesDbData)
@@ -190,7 +207,7 @@ public sealed class DeletionViewModel : ObservableObject
     }
 
     private static string KeptResourceGroup(DeletionPlan plan) =>
-        $"リソースグループ {plan.ResourceGroup} は削除しません（不要であれば Azure ポータルや az group delete で削除してください）。";
+        $"リソースグループ {plan.ResourceGroup} は削除しません（不要であれば「リソースグループも削除する」にチェックを入れて計画し直してください）。";
 
     // 完了のログに添える案内（メソッドのグループを何度も渡すと、そのたびに委譲の作成の確かめが入るため、1 つにする）
     private static readonly Func<DeletionPlan, string> KeptNotice = KeptDbDataNotice;
@@ -217,7 +234,8 @@ public sealed class DeletionViewModel : ObservableObject
         try
         {
             Ticket = await _workflow.PlanAsync(
-                _target.CreateSession(Busy), _target.Subscription, _target.ResourceGroup, _target.AppName.ToLowerInvariant(), IncludeUntagged, KeepDbData);
+                _target.CreateSession(Busy), _target.Subscription, _target.ResourceGroup, _target.AppName.ToLowerInvariant(), IncludeUntagged, KeepDbData,
+                deleteResourceGroup: DeleteResourceGroup);
         }
         catch (Exception ex)
         {
@@ -265,7 +283,8 @@ public sealed class DeletionViewModel : ObservableObject
         catch (WorkflowException ex) when (ex.Failure == WorkflowFailure.PlanExpired)
         {
             var plan = ticket.Plan;
-            var fresh = await _workflow.PlanAsync(session, plan.Subscription, plan.ResourceGroup, plan.AppName, plan.IncludeUntagged, plan.KeepDbData);
+            var fresh = await _workflow.PlanAsync(session, plan.Subscription, plan.ResourceGroup, plan.AppName, plan.IncludeUntagged, plan.KeepDbData,
+                deleteResourceGroup: plan.DeleteResourceGroupRequested);
             if (!fresh.CanRun)
                 throw new WorkflowException(WorkflowFailure.Blocked, fresh.Blockers);
             if (!plan.HasSameDeletions(fresh.Plan))

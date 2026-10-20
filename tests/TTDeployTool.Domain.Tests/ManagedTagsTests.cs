@@ -17,6 +17,17 @@ public class ManagedTagsTests
     }
 
     [Fact]
+    public void Resource_Group_Tags_Should_Show_That_The_Tool_Created_It()
+    {
+        ManagedTags.ForResourceGroup().Should().Equal(new Dictionary<string, string> { ["managed-by"] = "ttdeploytool" });
+        ManagedTags.IsCreatedByTool(ManagedTags.ForResourceGroup()).Should().BeTrue();
+        ManagedTags.IsCreatedByTool(new Dictionary<string, string> { ["Managed-By"] = "timetracker-deployment-tool" }).Should().BeTrue("以前の名前の値");
+        ManagedTags.IsCreatedByTool(new Dictionary<string, string> { ["managed-by"] = "other" }).Should().BeFalse();
+        ManagedTags.IsCreatedByTool(new Dictionary<string, string>()).Should().BeFalse();
+        ManagedTags.IsCreatedByTool(null).Should().BeFalse();
+    }
+
+    [Fact]
     public void Merge_Should_Keep_User_Tags_And_Overwrite_Managed_Tags()
     {
         var existing = new Dictionary<string, string>

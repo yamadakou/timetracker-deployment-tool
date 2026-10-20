@@ -94,6 +94,9 @@ internal sealed class FakeAzure : IAzureClients
     public List<TokenCredential> Credentials { get; } = [];
     public bool HasStorageAccount { get; set; }
 
+    /// <summary>リソースグループの中のリソースの一覧（削除しても変わらない。テストで入れ替える）。</summary>
+    public List<AzureResourceInfo> Resources { get; } = [];
+
     /// <summary>DB のデータを置くストレージアカウントの名前（サブスクリプション・リソースグループ・アプリ名から決まる）。</summary>
     public static string StorageAccountName => ResourceNaming.StorageAccount("sub", "rg", "demo");
 
@@ -125,6 +128,8 @@ internal sealed class FakeAzure : IAzureClients
                 return true;
             });
         GatewayMock.Setup(g => g.DeleteEnvironmentAsync("sub", "rg", It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        GatewayMock.Setup(g => g.ListResourcesAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync(() => Resources.ToList());
+        GatewayMock.Setup(g => g.DeleteResourceGroupAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync(true);
     }
 
     public static IReadOnlyDictionary<string, string> Managed => ManagedTags.For("demo");

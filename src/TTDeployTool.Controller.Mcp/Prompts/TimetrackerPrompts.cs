@@ -86,12 +86,13 @@ public sealed class TimetrackerPrompts
         [Description("削除するアプリ名（省略時は利用者に確認する）")] string? app_name = null) => $"""
         Azure 上の Timetracker の検証環境を削除します。次の順に進めてください。
         1. 対象のサブスクリプション・リソースグループ・アプリ名（{(string.IsNullOrWhiteSpace(app_name) ? "利用者に確認する" : $"「{app_name}」")}）を利用者に確認する。
-        2. plan_deletion で計画を作り、targets（削除するもの・しないものと理由）、kept（リソースグループは削除しない）、warnings、blockers を利用者に示す。
+        2. plan_deletion で計画を作り、targets（削除するもの・しないものと理由）、kept（リソースグループは既定では削除しない）、warnings、blockers を利用者に示す。
            DB アプリを削除する場合は、DB のデータがすべて失われることを伝える。persist_db で永続化したストレージアカウントがある場合は、
            既定ではそれも削除されること、残すなら keep_db_data=true で計画を作り直すこと（料金はかかり続ける）を伝えて、利用者に選んでもらう。
         3. 削除してよいか確認し、利用者にアプリ名を入力してもらう。入力されたアプリ名を start_deletion の confirm_app_name に渡す
            （利用者の入力なしに、計画のアプリ名をそのまま渡さないこと）。
         4. get_job_status を 15〜30 秒の間隔で呼び、deletion_result を伝える。
-        5. 課金を完全に止めたい場合は、ほかのリソースを巻き込まないことを確かめてから、リソースグループごと削除する方法（Azure ポータルや az group delete）を案内する。
+        5. リソースグループも不要な場合は、delete_resource_group=true で計画を作り直せることを伝える（本ツールのリソースを削除した後に空になる場合だけ削除する。
+           元に戻せない）。ほかのリソースが残る場合は、Azure ポータルや az group delete で、巻き込まないことを確かめてから削除する方法を案内する。
         """;
 }

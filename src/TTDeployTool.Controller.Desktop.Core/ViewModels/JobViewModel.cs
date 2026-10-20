@@ -207,7 +207,8 @@ public sealed class JobViewModel : ObservableObject
 
     /// <summary>削除が成功した場合の結果。</summary>
     public string? DeletionSummary => _snapshot?.Result is DeletionOutcome d
-        ? $"削除したもの: {Join(d.Deleted)}。既に無かったもの: {Join(d.AlreadyDeleted)}。リソースグループ {d.ResourceGroup} は残しています。"
+        ? $"削除したもの: {Join(d.Deleted)}。既に無かったもの: {Join(d.AlreadyDeleted)}。" +
+          (d.ResourceGroupDeleted ? $"リソースグループ {d.ResourceGroup} も削除しました。" : $"リソースグループ {d.ResourceGroup} は残しています。")
         : null;
 
     /// <summary>ジョブが終わるまで状態を読み直す（呼んだスレッドで画面の項目を更新する）。始めたジョブだけで使う。</summary>

@@ -1,3 +1,4 @@
+using Azure;
 using TTDeployTool.Infrastructure.Azure;
 
 namespace TTDeployTool.Application.Deletion;
@@ -14,11 +15,19 @@ public sealed record DeletionResult(string Name, DeletionResourceKind Kind, bool
 /// </summary>
 public sealed class DeletionRunner
 {
-    private readonly IAzureDeploymentGateway _gateway;
+    /// <summary>リソースを削除した直後は一覧に反映されないことがあるため、リソースグループが空になるまで待つ上限。</summary>
+    public static readonly TimeSpan EmptyWaitTimeout = TimeSpan.FromMinutes(2);
 
-    public DeletionRunner(IAzureDeploymentGateway gateway)
+    /// <summary>リソースグループが空になったかを読み直す間隔。</summary>
+    public static readonly TimeSpan EmptyPollInterval = TimeSpan.FromSeconds(10);
+
+    private readonly IAzureDeploymentGateway _gateway;
+    private readonly TimeProvider _time;
+
+    public DeletionRunner(IAzureDeploymentGateway gateway, TimeProvider? time = null)
     {
         _gateway = gateway;
+        _time = time ?? TimeProvider.System;
     }
 
     /// <param name="progress">削除を始める対象の通知</param>
@@ -55,5 +64,38 @@ public sealed class DeletionRunner
             results.Add(new DeletionResult(target.Name, target.Kind, deleted));
         }
         return results;
+    }
+
+    /// <summary>
+    /// 計画でリソースグループも削除するとした場合に、<see cref="RunAsync"/> の後に呼ぶ。リソースグループが空になったのを確かめてから削除する
+    /// （空にならなければ削除しない。計画の後にリソースが加わっても巻き込まない）。
+    /// </summary>
+    /// <returns>削除した場合 true（既に無かった場合 false）</returns>
+    /// <exception cref="InvalidOperationException">リソースが残った、またはリソースグループを削除できなかった（ロックなど）</exception>
+    public async Task<bool> DeleteResourceGroupAsync(DeletionPlan plan, CancellationToken cancellationToken = default)
+    {
+        var deadline = _time.GetUtcNow() + EmptyWaitTimeout;
+        IReadOnlyList<AzureResourceInfo> remaining;
+        while ((remaining = await _gateway.ListResourcesAsync(plan.Subscription, plan.ResourceGroup, cancellationToken)).Count > 0
+               && _time.GetUtcNow() < deadline)
+        {
+            await Task.Delay(EmptyPollInterval, _time, cancellationToken);
+        }
+        if (remaining.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"リソースグループ {plan.ResourceGroup} にリソースが残っているため、リソースグループは削除しませんでした" +
+                $"（{DeletionPlanner.RemainingReason(remaining.Select(r => $"{r.Name}（{r.Type}）").ToList())}）。本ツールのリソースの削除は終わっています。");
+        }
+        try
+        {
+            return await _gateway.DeleteResourceGroupAsync(plan.Subscription, plan.ResourceGroup, cancellationToken);
+        }
+        catch (RequestFailedException ex)
+        {
+            throw new InvalidOperationException(
+                $"リソースグループ {plan.ResourceGroup} を削除できませんでした（{ex.Message}）。ロックが付いていないかを確かめてください。" +
+                "本ツールのリソースの削除は終わっています。もう一度実行すると、リソースグループの削除だけを行います。", ex);
+        }
     }
 }

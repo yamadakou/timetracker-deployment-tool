@@ -96,6 +96,68 @@ public sealed class CliApplicationDeleteTests
 
     private static readonly string Account = ResourceNaming.StorageAccount("sub", "rg", "demo");
 
+    private readonly List<AzureResourceInfo> _resources = [];
+
+    // リソースグループの中の一覧は、削除したものが消える
+    private void ResourceGroupContents(params AzureResourceInfo[] others)
+    {
+        _resources.AddRange([
+            new("demo-tt", "Microsoft.App/containerApps"), new("demo-redis", "Microsoft.App/containerApps"),
+            new("demo-db", "Microsoft.App/containerApps"), new("demo-env", "Microsoft.App/managedEnvironments")]);
+        _resources.AddRange(others);
+        _gateway.Setup(g => g.ListResourcesAsync("sub", "rg", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => _resources.Where(r => !_deleted.Contains(r.Name)).ToList());
+    }
+
+    [Fact]
+    public async Task Delete_Resource_Group_Should_Delete_It_Last_When_It_Becomes_Empty()
+    {
+        AllManaged();
+        ResourceGroupContents();
+        _gateway.Setup(g => g.DeleteResourceGroupAsync("sub", "rg", It.IsAny<CancellationToken>()))
+            .Callback(() => _deleted.Add("rg")).ReturnsAsync(true);
+
+        var code = await Run(["--delete-resource-group"], input: "demo\n");
+
+        code.Should().Be(0);
+        _deleted.Should().Equal("demo-tt", "demo-redis", "demo-db", "demo-env", "rg");
+        var output = _out.ToString();
+        output.Should().Contain("削除計画\n").And.NotContain("リソースグループ rg は削除しません")
+            .And.Contain("削除する     rg (リソースグループ)")
+            .And.Contain("[WARN] リソースグループ rg も削除します。元に戻せません。")
+            .And.Contain("削除中: リソースグループ rg")
+            .And.Contain("[SUCCESS] 削除が完了しました（リソースグループ rg も削除しました）。");
+    }
+
+    [Fact]
+    public async Task Delete_Resource_Group_Should_Report_One_That_Was_Already_Deleted()
+    {
+        ResourceGroupContents();
+        _resources.Clear();
+        _gateway.Setup(g => g.DeleteResourceGroupAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync(false);
+
+        var code = await Run(["--delete-resource-group", "--yes"]);
+
+        code.Should().Be(0);
+        _out.ToString().Should().Contain("リソースグループ rg は既に削除されていました。");
+    }
+
+    [Fact]
+    public async Task Delete_Resource_Group_Should_Delete_Nothing_When_Other_Resources_Remain()
+    {
+        AllManaged();
+        ResourceGroupContents(new AzureResourceInfo("vm1", "Microsoft.Compute/virtualMachines"));
+
+        var dryRun = await Run(["--delete-resource-group", "--dry-run"]);
+        var code = await Run(["--delete-resource-group", "--yes"]);
+
+        dryRun.Should().Be(0);
+        _out.ToString().Should().Contain("削除しない   rg (リソースグループ): ほかのリソースが残ります: vm1（Microsoft.Compute/virtualMachines）");
+        code.Should().Be(1);
+        _err.ToString().Should().Contain("リソースグループ rg は削除できません").And.Contain("--delete-resource-group の指定を外してください");
+        _deleted.Should().BeEmpty();
+    }
+
     private void StorageAccount()
     {
         _gateway.Setup(g => g.GetStorageAccountAsync("sub", "rg", Account, It.IsAny<CancellationToken>()))

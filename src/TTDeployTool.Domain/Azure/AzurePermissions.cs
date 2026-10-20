@@ -23,6 +23,9 @@ public static class AzurePermissions
     public const string FileShareRead = "Microsoft.Storage/storageAccounts/fileServices/shares/read";
     public const string FileShareWrite = "Microsoft.Storage/storageAccounts/fileServices/shares/write";
 
+    /// <summary>リソースグループの削除（中のリソースを個別に削除する権限は要らない）。</summary>
+    public const string ResourceGroupDelete = "Microsoft.Resources/subscriptions/resourceGroups/delete";
+
     /// <summary>デプロイで常に必要な権限（Environment を新規作成する場合は <see cref="EnvironmentWrite"/> も必要）。</summary>
     public static readonly IReadOnlyList<string> Deploy = [ContainerAppRead, ContainerAppWrite, EnvironmentRead, EnvironmentJoin];
 }

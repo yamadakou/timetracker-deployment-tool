@@ -164,7 +164,9 @@ public sealed class DeploymentJobTools
                 ? new DeploymentJobResult(
                     r.ResourceGroup, r.EnvironmentName, r.TimetrackerAppName, r.DbAppName, r.RedisAppName, r.TimetrackerUrl, r.StorageAccountName)
                 : null,
-            s.Result is DeletionOutcome d ? new DeletionJobResult(d.ResourceGroup, d.Deleted, d.AlreadyDeleted, d.ResourceGroup) : null,
+            s.Result is DeletionOutcome d
+                ? new DeletionJobResult(d.ResourceGroup, d.Deleted, d.AlreadyDeleted, d.ResourceGroupDeleted ? null : d.ResourceGroup, d.ResourceGroupDeleted)
+                : null,
             s.Error,
             s.DeviceCodeMessage);
     }

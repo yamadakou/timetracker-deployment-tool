@@ -48,7 +48,10 @@ public class AzureSdkExecutor : IAzureDeploymentGateway
             return;
         }
 
-        await rgs.CreateOrUpdateAsync(WaitUntil.Completed, rgName, new ResourceGroupData(location), cancellationToken);
+        var data = new ResourceGroupData(location);
+        foreach (var (key, value) in ManagedTags.ForResourceGroup())
+            data.Tags[key] = value;
+        await rgs.CreateOrUpdateAsync(WaitUntil.Completed, rgName, data, cancellationToken);
         _logger.Info($"ResourceGroup を作成: {rgName}");
     }
 
@@ -276,7 +279,9 @@ public class AzureSdkExecutor : IAzureDeploymentGateway
     {
         var sub = _arm.GetSubscriptionResource(new ResourceIdentifier($"/subscriptions/{subscriptionId}"));
         var existing = await sub.GetResourceGroups().GetIfExistsAsync(rgName, cancellationToken);
-        return existing.HasValue ? new ResourceGroupInfo(existing.Value!.Data.Name, existing.Value.Data.Location.Name) : null;
+        return existing.HasValue
+            ? new ResourceGroupInfo(existing.Value!.Data.Name, existing.Value.Data.Location.Name, new Dictionary<string, string>(existing.Value.Data.Tags))
+            : null;
     }
 
     public async Task<ManagedEnvironmentInfo?> GetEnvironmentAsync(
@@ -394,6 +399,24 @@ public class AzureSdkExecutor : IAzureDeploymentGateway
         if (!existing.HasValue)
             return false;
         await existing.Value!.DeleteAsync(WaitUntil.Completed, cancellationToken);
+        return true;
+    }
+
+    public async Task<IReadOnlyList<AzureResourceInfo>> ListResourcesAsync(string subscriptionId, string rgName, CancellationToken cancellationToken = default)
+    {
+        var result = new List<AzureResourceInfo>();
+        await foreach (var resource in ResourceGroup(subscriptionId, rgName).GetGenericResourcesAsync(cancellationToken: cancellationToken))
+            result.Add(new AzureResourceInfo(resource.Data.Name, resource.Data.ResourceType.ToString()));
+        return result;
+    }
+
+    public async Task<bool> DeleteResourceGroupAsync(string subscriptionId, string rgName, CancellationToken cancellationToken = default)
+    {
+        var sub = _arm.GetSubscriptionResource(new ResourceIdentifier($"/subscriptions/{subscriptionId}"));
+        var existing = await sub.GetResourceGroups().GetIfExistsAsync(rgName, cancellationToken);
+        if (!existing.HasValue)
+            return false;
+        await existing.Value!.DeleteAsync(WaitUntil.Completed, cancellationToken: cancellationToken);
         return true;
     }
 

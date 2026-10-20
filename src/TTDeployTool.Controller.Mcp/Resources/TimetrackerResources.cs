@@ -30,7 +30,7 @@ public sealed class TimetrackerResources
         | Timetracker のメモリ | 3Gi 以上を推奨します |
         | スケールは 1 台固定 | 各コンテナとも 1 台で動作し、冗長化・スケールアウトは行いません |
         | 機密情報の取り扱い | generate_compose で生成する .env には DB パスワードなどが平文で書かれます。共有やリポジトリへのコミットは避けてください。Azure 上ではパスワードを Container Apps の secret として登録します |
-        | 不要になった環境の削除 | plan_deletion / start_deletion で、本ツールが作ったリソース（Container App と Environment）を削除できます。リソースグループは削除しません。課金を完全に止めるには、ほかのリソースを巻き込まないことを確かめてから、リソースグループごと削除してください（例: az group delete --name <リソースグループ名>） |
+        | 不要になった環境の削除 | plan_deletion / start_deletion で、本ツールが作ったリソース（Container App と Environment）を削除できます。リソースグループは既定では削除しません。plan_deletion に delete_resource_group=true を指定すると、本ツールのリソースを削除した後にリソースグループが空になる場合だけ、リソースグループも削除します（ほかのリソースが残る場合は削除しません。元に戻せません） |
         """;
 
     public const string Rbac = """
@@ -56,6 +56,7 @@ public sealed class TimetrackerResources
         | Container Apps Environment の削除 | Microsoft.App/managedEnvironments/delete |
         | DB のデータの永続化（persist_db=true） | Microsoft.Storage/storageAccounts/read / write（作成する場合）/ listkeys/action、Microsoft.Storage/storageAccounts/fileServices/shares/read / write（作成する場合）、Microsoft.App/managedEnvironments/storages/read / write。永続化した DB アプリの更新では Microsoft.App/containerApps/stop/action / start/action |
         | ストレージアカウントの削除（keep_db_data=false） | Microsoft.Storage/storageAccounts/delete |
+        | リソースグループの削除（delete_resource_group=true） | Microsoft.Resources/subscriptions/resourceGroups/delete、中のリソースの一覧に Microsoft.Resources/subscriptions/resourceGroups/resources/read |
         | 権限の事前確認 | Microsoft.Authorization/permissions/read（通常どのロールでも可） |
 
         plan_deployment / plan_deletion は、上の権限があるかを事前に確認し、不足していれば blockers に返します（リソースグループがまだ無い場合などは確認できず、warnings に理由を返します）。拒否割り当てや Azure Policy による拒否は、この確認には反映されません。persist_db=true では、Azure Policy でストレージアカウントのアカウントキーによるアクセス（allowSharedKeyAccess）やパブリック ネットワーク アクセスを禁止していると、DB のマウントが失敗します。

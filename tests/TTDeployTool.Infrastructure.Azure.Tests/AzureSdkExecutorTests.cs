@@ -72,7 +72,8 @@ public class AzureSdkExecutorTests
         await sut.EnsureResourceGroupAsync(SubscriptionId, RgName, "japaneast", TestContext.Current.CancellationToken);
 
         rgs.Verify(c => c.CreateOrUpdateAsync(WaitUntil.Completed, RgName,
-            It.Is<ResourceGroupData>(d => d.Location == new AzureLocation("japaneast")), It.IsAny<CancellationToken>()), Times.Once);
+            It.Is<ResourceGroupData>(d => d.Location == new AzureLocation("japaneast") && d.Tags["managed-by"] == "ttdeploytool" && d.Tags.Count == 1),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     private static (Mock<ArmClient> arm, Mock<ContainerAppManagedEnvironmentCollection> envs) SetupEnvironments()

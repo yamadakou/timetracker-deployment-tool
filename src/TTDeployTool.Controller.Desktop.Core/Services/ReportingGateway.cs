@@ -21,6 +21,7 @@ public class ReportingGateway : DispatchProxy
         [nameof(IAzureDeploymentGateway.IsStorageAccountNameAvailableAsync)] = "ストレージアカウントの名前を確認しています",
         [nameof(IAzureDeploymentGateway.FileShareExistsAsync)] = "ファイル共有を確認しています",
         [nameof(IAzureDeploymentGateway.EnvironmentStorageExistsAsync)] = "Environment のストレージを確認しています",
+        [nameof(IAzureDeploymentGateway.ListResourcesAsync)] = "リソースグループの中のリソースを読んでいます",
         [nameof(IAzureDeploymentGateway.GetPermissionsAsync)] = "権限を確認しています",
         [nameof(IAzureDeploymentGateway.GetResourcePermissionsAsync)] = "権限を確認しています",
     };

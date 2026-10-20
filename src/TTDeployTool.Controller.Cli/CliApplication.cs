@@ -1,6 +1,7 @@
 using TTDeployTool.Application.Deletion;
 using TTDeployTool.Application.Deployment;
 using TTDeployTool.Application.Permissions;
+using TTDeployTool.Application.Workflows;
 using TTDeployTool.Common;
 using TTDeployTool.Domain.Deployment;
 using TTDeployTool.Infrastructure.Azure;
@@ -23,7 +24,7 @@ public static class CliApplication
     // 入出力先などの実行環境（RunAsync の引数をまとめたもの）
     private sealed record Context(
         TextWriter Output, TextWriter Error, TextWriter? OutputWriter, TextWriter? ErrorWriter,
-        TextReader Input, string WorkingDirectory, GatewayFactory GatewayFactory);
+        TextReader Input, string WorkingDirectory, GatewayFactory GatewayFactory, TimeProvider Time);
 
     /// <param name="args">コマンドライン引数</param>
     /// <param name="outputWriter">標準出力（省略時は Console.Out）</param>
@@ -31,6 +32,7 @@ public static class CliApplication
     /// <param name="workingDirectory">Dry-run のファイルの出力先（既定の "" はカレントディレクトリ）</param>
     /// <param name="gatewayFactory">Azure の操作（省略時は <see cref="DefaultGatewayFactory"/>）</param>
     /// <param name="inputReader">delete の確認の入力（省略時は Console.In）</param>
+    /// <param name="time">delete でリソースグループが空になるのを待つときの時刻（省略時はシステムの時刻）</param>
     /// <returns>終了コード（成功 0 / 失敗・中止 1）</returns>
     public static async Task<int> RunAsync(
         string[] args,
@@ -38,11 +40,12 @@ public static class CliApplication
         TextWriter? errorWriter = null,
         string workingDirectory = "",
         GatewayFactory? gatewayFactory = null,
-        TextReader? inputReader = null)
+        TextReader? inputReader = null,
+        TimeProvider? time = null)
     {
         var ctx = new Context(
             outputWriter ?? Console.Out, errorWriter ?? Console.Error, outputWriter, errorWriter,
-            inputReader ?? Console.In, workingDirectory, gatewayFactory ?? DefaultGatewayFactory);
+            inputReader ?? Console.In, workingDirectory, gatewayFactory ?? DefaultGatewayFactory, time ?? TimeProvider.System);
 
         CliArgs cli;
         try
@@ -174,13 +177,19 @@ public static class CliApplication
         {
             var gateway = ctx.GatewayFactory(opts, log);
             var plan = await new DeletionPlanner(gateway).PlanAsync(
-                opts.Subscription, opts.ResourceGroup, opts.AppName, cli.GetBool("--include-untagged"), cli.GetBool("--keep-db-data"));
+                opts.Subscription, opts.ResourceGroup, opts.AppName, cli.GetBool("--include-untagged"), cli.GetBool("--keep-db-data"),
+                cli.GetBool("--delete-resource-group"));
             WritePlan(plan, log);
 
             if (cli.GetBool("--dry-run"))
             {
                 log.Warn("Dry-run のため削除は行いません。");
                 return 0;
+            }
+            if (plan.ResourceGroupBlocker is { } resourceGroupBlocker)
+            {
+                log.Error(resourceGroupBlocker.Replace("リソースグループの削除の指定", "--delete-resource-group の指定"));
+                return 1;
             }
             if (!plan.HasDeletions)
             {
@@ -200,13 +209,20 @@ public static class CliApplication
                 }
             }
 
-            var results = await new DeletionRunner(gateway).RunAsync(
+            var runner = new DeletionRunner(gateway, ctx.Time);
+            var results = await runner.RunAsync(
                 plan, new LogProgress<DeletionTarget>(t => log.Info($"削除中: {t.Name}")));
             foreach (var result in results.Where(r => !r.Deleted))
             {
                 log.Info($"{result.Name} は既に削除されていました。");
             }
-            log.Success($"削除が完了しました（リソースグループ {opts.ResourceGroup} は残しています）。");
+            if (plan.DeletesResourceGroup)
+            {
+                log.Info($"削除中: リソースグループ {plan.ResourceGroup}");
+                if (!await runner.DeleteResourceGroupAsync(plan))
+                    log.Info($"リソースグループ {plan.ResourceGroup} は既に削除されていました。");
+            }
+            log.Success(DeletionWorkflow.CompletedMessage(plan));
             if (plan.KeepsDbData)
                 log.Info(KeptDbDataNotice(plan));
             return 0;
@@ -263,7 +279,7 @@ public static class CliApplication
 
     private static void WritePlan(DeletionPlan plan, IDeploymentLogger log)
     {
-        log.Info($"削除計画（リソースグループ {plan.ResourceGroup} は削除しません）");
+        log.Info(plan.DeleteResourceGroupRequested ? "削除計画" : $"削除計画（リソースグループ {plan.ResourceGroup} は削除しません）");
         foreach (var t in plan.Targets)
         {
             var kind = t.Kind switch
@@ -276,8 +292,14 @@ public static class CliApplication
                 ? $"  削除する     {t.Name} ({kind}){(t.Managed ? "" : " ※管理タグなし")}"
                 : $"  削除しない   {t.Name} ({kind}): {t.Reason}");
         }
+        if (plan.ResourceGroupTarget is { } rg)
+            log.Info(rg.WillDelete
+                ? $"  削除する     {plan.ResourceGroup} (リソースグループ)"
+                : $"  削除しない   {plan.ResourceGroup} (リソースグループ): {rg.Reason}");
         if (plan.HasUnmanaged)
             log.Info("  管理タグの無いリソースも削除するには --include-untagged を指定してください。");
+        if (plan.DeletesResourceGroup)
+            log.Warn($"リソースグループ {plan.ResourceGroup} も削除します。元に戻せません。");
         if (plan.LosesDbData)
             log.Warn("DB アプリを削除すると DB のデータはすべて失われます。");
         if (plan.DeletesDbData)

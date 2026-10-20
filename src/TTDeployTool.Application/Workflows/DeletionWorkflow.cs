@@ -11,8 +11,11 @@ public sealed record DeletionPlanTicket(DeletionPlan Plan, IReadOnlyList<string>
     public bool CanRun => Saved != null;
 }
 
-/// <summary>削除のジョブの結果。<see cref="AlreadyDeleted"/> は、実行の時点で既に無かったもの。リソースグループは削除しない。</summary>
-public sealed record DeletionOutcome(string ResourceGroup, IReadOnlyList<string> Deleted, IReadOnlyList<string> AlreadyDeleted);
+/// <summary>
+/// 削除のジョブの結果。<see cref="AlreadyDeleted"/> は、実行の時点で既に無かったもの。
+/// <see cref="ResourceGroupDeleted"/> は、リソースグループも削除したか（選ばなかった場合と、既に無かった場合は false）。
+/// </summary>
+public sealed record DeletionOutcome(string ResourceGroup, IReadOnlyList<string> Deleted, IReadOnlyList<string> AlreadyDeleted, bool ResourceGroupDeleted = false);
 
 /// <summary>
 /// 削除の計画 → 確認 → 実行（MCP の plan_deletion / start_deletion とデスクトップアプリで共通）。削除の規則は CLI の delete と同じ
@@ -27,10 +30,13 @@ public sealed class DeletionWorkflow
     private readonly JobManager _jobs;
     private readonly ICallerContext _caller;
     private readonly IDeploymentLogger _logger;
+    private readonly TimeProvider _time;
 
     /// <param name="logger">計画で Azure を読むときのログの出力先（ジョブではジョブのログに書く）</param>
-    public DeletionWorkflow(IPlanStore plans, JobManager jobs, ICallerContext caller, IDeploymentLogger logger)
+    /// <param name="time">リソースグループが空になるのを待つときの時刻（省略時はシステムの時刻）</param>
+    public DeletionWorkflow(IPlanStore plans, JobManager jobs, ICallerContext caller, IDeploymentLogger logger, TimeProvider? time = null)
     {
+        _time = time ?? TimeProvider.System;
         _plans = plans;
         _jobs = jobs;
         _caller = caller;
@@ -40,12 +46,13 @@ public sealed class DeletionWorkflow
     /// <summary>削除の計画を作り、実行できれば保存する（Azure は変更しない）。</summary>
     /// <param name="keepDbData">DB のデータを置いたストレージアカウントを残すか</param>
     /// <param name="context">計画に付ける情報（実行のときに <see cref="StartAsync"/> の sessionFor に渡る）</param>
+    /// <param name="deleteResourceGroup">本ツールのリソースを削除した後に空になる場合、リソースグループも削除するか</param>
     public async Task<DeletionPlanTicket> PlanAsync(
         IAzureSession session, string subscription, string resourceGroup, string appName, bool includeUntagged, bool keepDbData,
-        string? context = null, CancellationToken cancellationToken = default)
+        string? context = null, CancellationToken cancellationToken = default, bool deleteResourceGroup = false)
     {
         var plan = await new DeletionPlanner(session.CreateGateway(_logger))
-            .PlanAsync(subscription, resourceGroup, appName, includeUntagged, keepDbData, cancellationToken);
+            .PlanAsync(subscription, resourceGroup, appName, includeUntagged, keepDbData, deleteResourceGroup, cancellationToken);
         var blockers = Blockers(plan);
         var saved = plan.HasDeletions && blockers.Count == 0
             ? _plans.Save(new StoredPlan<DeletionPlan>(plan, context), _caller.CallerId)
@@ -79,14 +86,15 @@ public sealed class DeletionWorkflow
         if (session.ScopeBlocker(plan.Subscription, plan.ResourceGroup) is { } outOfScope)
             throw new WorkflowException(WorkflowFailure.OutOfScope, [outOfScope]);
         var current = await new DeletionPlanner(session.CreateGateway(_logger))
-            .PlanAsync(plan.Subscription, plan.ResourceGroup, plan.AppName, plan.IncludeUntagged, plan.KeepDbData, cancellationToken);
+            .PlanAsync(plan.Subscription, plan.ResourceGroup, plan.AppName, plan.IncludeUntagged, plan.KeepDbData, plan.DeleteResourceGroupRequested,
+                cancellationToken);
         var blockers = Blockers(current);
         if (blockers.Count > 0)
             throw new WorkflowException(WorkflowFailure.Blocked, blockers);
         if (!plan.HasSameDeletions(current))
             throw new WorkflowException(WorkflowFailure.Changed);
 
-        var total = plan.Targets.Count(t => t.WillDelete);
+        var total = plan.Targets.Count(t => t.WillDelete) + (plan.DeletesResourceGroup ? 1 : 0);
         var target = new JobTarget(plan.Subscription, plan.ResourceGroup, plan.AppName);
         var started = _jobs.TryStart(JobKind.Delete, target, _caller.CallerId, async context =>
         {
@@ -96,22 +104,43 @@ public sealed class DeletionWorkflow
                 context.ReportStep(++index, total, $"{t.Name} の削除");
                 context.Logger.Info($"削除中: {t.Name}");
             });
-            var results = await new DeletionRunner(session.CreateGateway(context.Logger)).RunAsync(plan, progress);
+            var runner = new DeletionRunner(session.CreateGateway(context.Logger), _time);
+            var results = await runner.RunAsync(plan, progress);
             foreach (var r in results.Where(r => !r.Deleted))
                 context.Logger.Info($"{r.Name} は既に削除されていました。");
-            context.Logger.Success($"削除が完了しました（リソースグループ {plan.ResourceGroup} は残しています）。");
+            var resourceGroupDeleted = false;
+            if (plan.DeletesResourceGroup)
+            {
+                context.ReportStep(++index, total, $"リソースグループ {plan.ResourceGroup} の削除");
+                context.Logger.Info($"削除中: リソースグループ {plan.ResourceGroup}");
+                resourceGroupDeleted = await runner.DeleteResourceGroupAsync(plan);
+                if (!resourceGroupDeleted)
+                    context.Logger.Info($"リソースグループ {plan.ResourceGroup} は既に削除されていました。");
+            }
+            context.Logger.Success(CompletedMessage(plan));
             if (plan.KeepsDbData)
                 context.Logger.Info(keptDbDataNotice(plan));
             return new DeletionOutcome(
                 plan.ResourceGroup,
                 results.Where(r => r.Deleted).Select(r => r.Name).ToList(),
-                results.Where(r => !r.Deleted).Select(r => r.Name).ToList());
+                results.Where(r => !r.Deleted).Select(r => r.Name).ToList(),
+                resourceGroupDeleted);
         });
         return started.Job ?? throw new WorkflowException(WorkflowFailure.Conflict, target: target, conflictingJobId: started.ConflictingJobId);
     }
 
-    private static List<string> Blockers(DeletionPlan plan) =>
-        plan.HasDeletions && plan.PermissionCheck.Status == PermissionCheckStatus.Missing
-            ? [string.Format(PermissionBlocker, string.Join(", ", plan.PermissionCheck.MissingActions))]
-            : [];
+    /// <summary>削除が終わったときのメッセージ（CLI と同じ）。</summary>
+    public static string CompletedMessage(DeletionPlan plan) => plan.DeletesResourceGroup
+        ? $"削除が完了しました（リソースグループ {plan.ResourceGroup} も削除しました）。"
+        : $"削除が完了しました（リソースグループ {plan.ResourceGroup} は残しています）。";
+
+    private static List<string> Blockers(DeletionPlan plan)
+    {
+        var blockers = new List<string>();
+        if (plan.ResourceGroupBlocker is { } resourceGroup)
+            blockers.Add(resourceGroup);
+        if (plan.HasDeletions && plan.PermissionCheck.Status == PermissionCheckStatus.Missing)
+            blockers.Add(string.Format(PermissionBlocker, string.Join(", ", plan.PermissionCheck.MissingActions)));
+        return blockers;
+    }
 }

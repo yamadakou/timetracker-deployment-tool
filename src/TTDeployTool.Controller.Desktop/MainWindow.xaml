@@ -201,9 +201,10 @@
                     <!-- 削除（計画 → アプリ名の入力 → 実行） -->
                     <StackPanel x:Name="DeletePanel" Spacing="12" MaxWidth="900" HorizontalAlignment="Left" Visibility="Collapsed">
                         <TextBlock AutomationProperties.AutomationId="Panel.Delete" Style="{StaticResource SubtitleTextBlockStyle}" Text="削除" />
-                        <TextBlock TextWrapping="Wrap" Text="本ツールで作ったリソースだけを削除します。リソースグループは削除しません。" />
+                        <TextBlock TextWrapping="Wrap" Text="本ツールで作ったリソースだけを削除します。リソースグループは、「リソースグループも削除する」を選んだ場合だけ、中が空になれば削除します。" />
                         <CheckBox AutomationProperties.AutomationId="Delete.IncludeUntagged" Content="管理タグの無いものも対象にする" IsChecked="{x:Bind ViewModel.Deletion.IncludeUntagged, Mode=TwoWay}" />
                         <CheckBox AutomationProperties.AutomationId="Delete.KeepDbData" Content="DB のデータを残す（ストレージアカウントを削除しない。料金がかかり続けます）" IsChecked="{x:Bind ViewModel.Deletion.KeepDbData, Mode=TwoWay}" />
+                        <CheckBox AutomationProperties.AutomationId="Delete.DeleteResourceGroup" Content="リソースグループも削除する（本ツールのリソースを削除した後に、中が空になる場合だけ。元に戻せません）" IsChecked="{x:Bind ViewModel.Deletion.DeleteResourceGroup, Mode=TwoWay}" />
                         <Button AutomationProperties.AutomationId="Delete.Plan" Content="計画" Command="{x:Bind ViewModel.Deletion.PlanCommand}" />
                         <StackPanel Orientation="Horizontal" Spacing="8" Visibility="{x:Bind ViewModel.Deletion.Busy.IsBusy, Mode=OneWay}"><ProgressRing IsActive="{x:Bind ViewModel.Deletion.Busy.IsBusy, Mode=OneWay}" Width="20" Height="20" /><TextBlock AutomationProperties.AutomationId="Delete.Busy" VerticalAlignment="Center" Text="{x:Bind ViewModel.Deletion.Busy.Text, Mode=OneWay}" /></StackPanel>
                         <InfoBar AutomationProperties.AutomationId="Delete.Error" AutomationProperties.Name="{x:Bind ViewModel.Deletion.Error, Mode=OneWay}" Severity="Error" IsOpen="True" IsClosable="False" Message="{x:Bind ViewModel.Deletion.Error, Mode=OneWay}"

@@ -232,4 +232,13 @@ public class CliArgsTests
         var act = () => CliArgs.Parse(["deploy", "--keep-db-data"]);
         act.Should().Throw<ArgumentException>().WithMessage("*'--keep-db-data' は deploy では使えません*");
     }
+
+    [Fact]
+    public void Delete_Resource_Group_Should_Be_A_Delete_Flag_Only()
+    {
+        CliArgs.Parse(["delete", "--delete-resource-group"]).GetBool("--delete-resource-group").Should().BeTrue();
+        var act = () => CliArgs.Parse(["deploy", "--delete-resource-group"]);
+        act.Should().Throw<ArgumentException>().WithMessage("*'--delete-resource-group' は deploy では使えません*");
+        CliArgs.HelpText.Should().Contain("--delete-resource-group");
+    }
 }

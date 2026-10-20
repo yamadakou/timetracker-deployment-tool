@@ -60,6 +60,50 @@ public class DeletionViewModelTests
     }
 
     [Fact]
+    public async Task The_Resource_Group_Should_Be_Deleted_Last_When_Chosen()
+    {
+        var h = await new Harness().ReadyAsync();
+        h.Azure.Deployed();
+        var vm = h.Main.Deletion;
+        await vm.PlanCommand.ExecuteAsync();
+        vm.KeptText.Should().Contain("「リソースグループも削除する」にチェックを入れて");
+
+        vm.DeleteResourceGroup = true;
+        vm.DeleteResourceGroup = true;
+        vm.HasPlan.Should().BeFalse("選び直したら計画し直す");
+        await vm.PlanCommand.ExecuteAsync();
+
+        vm.Targets.Last().Should().Be(new DeletionRow("rg", "リソースグループ", "削除する", null, true));
+        vm.Warnings.Should().Contain("リソースグループ rg も削除します。元に戻せません。");
+        vm.KeptText.Should().BeNull();
+        vm.ConfirmAppName = "demo";
+        await vm.StartCommand.ExecuteAsync();
+        await h.Main.Queue.WhenIdleAsync();
+
+        var job = h.Main.CurrentJob!;
+        job.StatusText.Should().Be("完了");
+        job.DeletionSummary.Should().EndWith("リソースグループ rg も削除しました。");
+        h.Azure.GatewayMock.Verify(g => g.DeleteResourceGroupAsync("sub", "rg", It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task The_Resource_Group_Should_Not_Be_Deleted_With_Other_Resources()
+    {
+        var h = await new Harness().ReadyAsync();
+        h.Azure.Deployed();
+        h.Azure.Resources.Add(new AzureResourceInfo("vm1", "Microsoft.Compute/virtualMachines"));
+        var vm = h.Main.Deletion;
+        vm.DeleteResourceGroup = true;
+
+        await vm.PlanCommand.ExecuteAsync();
+
+        vm.Targets.Last().Should().Be(new DeletionRow("rg", "リソースグループ", "削除しない", "ほかのリソースが残ります: vm1（Microsoft.Compute/virtualMachines）", false));
+        vm.Blockers.Should().ContainSingle().Which.Should().EndWith("「リソースグループも削除する」のチェックを外してください。");
+        vm.AppNameToConfirm.Should().BeNull("実行できない");
+        vm.KeptText.Should().StartWith("リソースグループ rg は削除しません");
+    }
+
+    [Fact]
     public async Task Untagged_Resources_Should_Be_Kept_Unless_Included()
     {
         var h = await new Harness().ReadyAsync();

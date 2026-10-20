@@ -9,7 +9,7 @@ TimeTracker のコンテナイメージの詳細（クイックスタート、�
 
 できること:
 - Azure へのデプロイ（`deploy`）: Timetracker・DB・Redis の 3 つのコンテナを、Azure Container Apps のアプリとして作成・更新します。リソースグループが無ければ作成します
-- 作ったリソースの削除（`delete`）: 本ツールで作ったものだけを削除します（リソースグループは削除しません）
+- 作ったリソースの削除（`delete`）: 本ツールで作ったものだけを削除します（リソースグループは、`--delete-resource-group` を付けた場合だけ、中が空になれば削除します）
 - ローカルでの検証（Dry-run）: Azure を使わずに、Docker Compose で起動するための `docker-compose.yml` と `.env` を作ります（[Docker Hub の TimeTracker のページ](https://hub.docker.com/r/densocreate/timetracker)の「クイックスタート」に沿った構成）
 - 設定の指定: Timetracker のイメージのバージョン（タグ）と、コンテナごとの CPU・メモリを指定できます。台数は 1 台に固定です
 - DB のデータの永続化（`--persist-db`）: 既定では、DB のデータは DB コンテナの再起動で消えます。指定すると、Azure Files に置いて残します（[DB のデータの扱い](#db-のデータの扱いと永続化--persist-db)）
@@ -35,7 +35,7 @@ TimeTracker のコンテナイメージの詳細（クイックスタート、�
 | Azure 上の SQL Server ではサンプル DB を作れない | サンプル DB を使う場合は、PostgreSQL（`--db-type` の既定値）を使ってください。SQL Server では、セットアップウィザードで「空のデータベースを作成する」を選んで評価してください（SQL Server の復元は DB コンテナの中のファイルを読みますが、Azure では Timetracker のコンテナの中にあるサンプル DB のファイルを DB コンテナから読めないため）。ローカルの検証（Dry-run の docker-compose）では、SQL Server でもサンプル DB を作れます |
 | 台数は 1 台に固定 | どのコンテナも 1 台で動きます。冗長化や台数の増減（スケールアウト）は行いません |
 | パスワードの扱い | Azure 上では、パスワードを Container Apps の[シークレット](https://learn.microsoft.com/ja-jp/azure/container-apps/manage-secrets)として登録します。Dry-run で作る `.env` には、DB のパスワードなどが平文で書かれます。共有したり、リポジトリにコミットしたりしないでください |
-| 使い終わったら削除する | Azure のリソースは、置いてある間は料金がかかります（[Container Apps の料金](https://azure.microsoft.com/ja-jp/pricing/details/container-apps/)）。検証が終わったら [`delete`](#リソースの削除delete) で削除するか、リソースグループごと削除してください（例: [`az group delete --name <リソースグループ名>`](https://learn.microsoft.com/ja-jp/cli/azure/group#az-group-delete)）。既存のリソースグループを使った場合は、他のリソースを巻き込まないようご注意ください |
+| 使い終わったら削除する | Azure のリソースは、置いてある間は料金がかかります（[Container Apps の料金](https://azure.microsoft.com/ja-jp/pricing/details/container-apps/)）。検証が終わったら [`delete`](#リソースの削除delete) で削除してください（`--delete-resource-group` で、空になったリソースグループも削除できます）。リソースグループごと削除することもできます（例: [`az group delete --name <リソースグループ名>`](https://learn.microsoft.com/ja-jp/cli/azure/group#az-group-delete)）。既存のリソースグループを使った場合は、他のリソースを巻き込まないようご注意ください |
 
 ---
 
@@ -92,6 +92,7 @@ TimeTracker のコンテナイメージの詳細（クイックスタート、�
 
 - 3 つの Container App には、作成するときと更新するときに付けます。更新するときは、利用者が付けたほかのタグを残したまま、管理タグを加えます
 - Container Apps 環境とストレージアカウントには、新しく作成するときだけ付けます（既存のものは変更しないため）
+- リソースグループは、本ツールが新しく作成したときだけ `managed-by` を付けます（`tt-app-name` は付けません。同じリソースグループに複数のアプリ名でデプロイできるため）。既存のリソースグループは変更しません
 - 以前の名前（timetracker-deployment-tool）の版（v0.8.1 まで）は `managed-by` に `timetracker-deployment-tool` を付けていました。この値のリソースも本ツールのものとして扱い、削除の対象にします。更新すると `ttdeploytool` に置き換わります
 - タグは誤って削除しないための目印で、セキュリティの制限ではありません（削除できるかどうかは、Azure の RBAC で決まります）
 - 本ツールで作ったリソースは、タグで一覧できます（[`az resource list`](https://learn.microsoft.com/ja-jp/cli/azure/resource#az-resource-list) は `--tag` と `--resource-group` を同時に指定できないため、リソースグループは `--query` で絞り込みます）:
@@ -142,6 +143,7 @@ TimeTracker のコンテナイメージの詳細（クイックスタート、�
 | DB のデータの永続化: Container Apps 環境へのストレージの登録 | `Microsoft.App/managedEnvironments/storages/read` / `write` | リソースグループ |
 | 永続化した DB アプリの更新（停止 → 更新 → 開始） | `Microsoft.App/containerApps/stop/action` / `start/action` | リソースグループ |
 | ストレージアカウントの削除（`delete`。`--keep-db-data` なし） | `Microsoft.Storage/storageAccounts/delete` | リソースグループ |
+| リソースグループの削除（`delete --delete-resource-group`） | `Microsoft.Resources/subscriptions/resourceGroups/delete`（中のリソースの一覧に `Microsoft.Resources/subscriptions/resourceGroups/resources/read`） | リソースグループ |
 | 権限の事前確認（下記） | `Microsoft.Authorization/permissions/read`（自分の権限の一覧。通常はどのロールにも含まれます） | リソースグループ |
 
 **権限の事前確認**: `deploy` と `delete` は、Azure のリソースを変更する前に、上の表の権限が実行する ID にあるかを確かめます。足りなければ、足りない権限を表示して、何も変更せずに終了します（途中で権限のエラーになり、一部のリソースだけが作成・削除された状態になるのを防ぐため）。既存のリソースの更新・削除は、リソースグループでの権限に加えて、そのリソースに割り当てられたロールでも判定します（例: リソースグループでは閲覧者で、各 Container App と環境に共同作成者が割り当てられている場合）。新しく作るリソースには、リソースグループでの権限が必要です。次の場合は、確認をせずに続けます（`--verbose` で理由を表示します）。
@@ -489,7 +491,7 @@ Azure を使わずに、自分の PC の Docker で Timetracker・DB・Redis を
    - 終わったら `docker compose down` で停止します。[`docker compose down -v`](https://docs.docker.com/reference/cli/docker/compose/down/) にすると、ボリュームごと（DB のデータも）削除します
 
 ### リソースの削除（delete）
-`deploy` で作ったリソースを削除します。**リソースグループは削除しません**（他のリソースを巻き込まないため。不要であれば、ポータルや `az group delete` で削除してください）。
+`deploy` で作ったリソースを削除します。**リソースグループは、既定では削除しません**（他のリソースを巻き込まないため）。`--delete-resource-group` を付けると、本ツールのリソースを削除した後にリソースグループが空になる場合だけ、最後にリソースグループも削除します（下の「リソースグループの削除」）。
 
 1. **削除する対象を確認する**（何も変更しません）
    ```powershell
@@ -531,6 +533,12 @@ Azure を使わずに、自分の PC の Docker で Timetracker・DB・Redis を
 
 逆に、特定の環境を削除から守りたい場合は、ポータルなどで `managed-by` タグを外してください。
 
+**リソースグループの削除**（`--delete-resource-group`）:
+- 計画の時点で、リソースグループの中のリソースを一覧し、今回削除するもの以外のリソース（別のアプリ名の環境、本ツール以外のリソース、`--keep-db-data` で残すストレージアカウントなど）が 1 つでもあれば、何も削除せずに終了します（残るリソースの名前と種類を表示します）
+- 本ツールのリソースを削除した後に、リソースグループが空になったのを確かめてから削除します（削除の直後は一覧に反映されないことがあるため、最大 2 分待ちます）。空にならなければ、リソースグループは削除せずにエラーで終了します
+- リソースグループの削除は元に戻せません（[Microsoft Learn](https://learn.microsoft.com/ja-jp/azure/azure-resource-manager/management/delete-resource-group)）。[ロック](https://learn.microsoft.com/ja-jp/azure/azure-resource-manager/management/lock-resources)があると削除できません。その場合は、本ツールのリソースは削除済みで、リソースグループだけが残ります（ロックを外してもう一度実行すると、リソースグループだけを削除します）
+- 以前に本ツールのリソースだけを削除した空のリソースグループも、同じアプリ名を指定して `--delete-resource-group` を付けて実行すると削除できます
+
 `delete` のオプション:
 - `--subscription`（必須）: Azure のサブスクリプション ID
 - `--resource-group`（必須）: リソースグループ名
@@ -538,6 +546,7 @@ Azure を使わずに、自分の PC の Docker で Timetracker・DB・Redis を
 - `--auth-mode`（任意）: 認証モード（`deploy` と同じ）
 - `--include-untagged`（任意）: 管理タグの無いリソースも削除の対象にする（別のアプリ名や、別のツールの管理タグ（例: `managed-by=terraform`）が付いているものは、指定しても削除しません）
 - `--keep-db-data`（任意）: `--persist-db` で DB のデータを置いたストレージアカウントを残す（既定ではデータごと削除します）。残すと料金がかかり続けますが、同じアプリ名で `--persist-db` を付けてデプロイすると、データを引き継げます
+- `--delete-resource-group`（任意）: 本ツールのリソースを削除した後にリソースグループが空になる場合、リソースグループも削除する（上の「リソースグループの削除」）
 - `--dry-run`（任意）: 削除する対象を表示するだけで、削除しない
 - `--yes`（任意）: 確認の入力（アプリ名）を省略する
 - `--verbose`（任意）: 詳しいログを出力する

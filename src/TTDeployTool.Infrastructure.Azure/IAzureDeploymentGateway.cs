@@ -10,7 +10,7 @@ namespace TTDeployTool.Infrastructure.Azure;
 /// </summary>
 public interface IAzureDeploymentGateway
 {
-    /// <summary>リソースグループが無ければ作成する（既存なら変更しない）。</summary>
+    /// <summary>リソースグループが無ければ作成する（既存なら変更しない）。作成した場合は、本ツールが作ったことを示すタグを付ける。</summary>
     Task EnsureResourceGroupAsync(string subscriptionId, string rgName, string location, CancellationToken cancellationToken = default);
 
     /// <summary>アプリ名に対応する Container Apps Environment が無ければ作成する（既存なら変更しない）。</summary>
@@ -75,6 +75,13 @@ public interface IAzureDeploymentGateway
     /// <returns>削除した場合 true</returns>
     Task<bool> DeleteStorageAccountAsync(string subscriptionId, string rgName, string name, CancellationToken cancellationToken = default);
 
+    /// <summary>リソースグループの中のリソース（入れ子でないもの）の一覧。</summary>
+    Task<IReadOnlyList<AzureResourceInfo>> ListResourcesAsync(string subscriptionId, string rgName, CancellationToken cancellationToken = default);
+
+    /// <summary>リソースグループを削除する（中に残っているリソースもすべて消える）。存在しなければ何もしない。</summary>
+    /// <returns>削除した場合 true</returns>
+    Task<bool> DeleteResourceGroupAsync(string subscriptionId, string rgName, CancellationToken cancellationToken = default);
+
     /// <summary>実行している ID が、リソースグループで持つ権限の一覧。</summary>
     Task<IReadOnlyList<PermissionSet>> GetPermissionsAsync(string subscriptionId, string rgName, CancellationToken cancellationToken = default);
 
@@ -90,7 +97,15 @@ public interface IAzureDeploymentGateway
 /// <summary>作成・更新した Container App の名前と、Timetracker のエンドポイント URL（取得できなければ null）。</summary>
 public sealed record ContainerAppsDeployment(string TimetrackerAppName, string DbAppName, string RedisAppName, string? TimetrackerUrl);
 
-public sealed record ResourceGroupInfo(string Name, string Location);
+/// <summary>リソースグループの情報。<see cref="Tags"/> は取得しなければ null。</summary>
+public sealed record ResourceGroupInfo(string Name, string Location, IReadOnlyDictionary<string, string>? Tags = null)
+{
+    /// <summary>本ツールがデプロイのときに作ったリソースグループか（作ったときに管理タグの managed-by を付ける）。</summary>
+    public bool CreatedByTool => ManagedTags.IsCreatedByTool(Tags);
+}
+
+/// <summary>リソースグループの中のリソース。<see cref="Type"/> は「Microsoft.App/containerApps」のような種類。</summary>
+public sealed record AzureResourceInfo(string Name, string Type);
 
 /// <summary>Container Apps Environment の情報。<see cref="ProvisioningState"/> は取得できなければ null。</summary>
 public sealed record ManagedEnvironmentInfo(

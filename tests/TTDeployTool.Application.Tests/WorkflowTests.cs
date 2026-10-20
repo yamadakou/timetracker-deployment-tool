@@ -401,6 +401,65 @@ public class DeletionWorkflowTests
         outcome.AlreadyDeleted.Should().Equal("demo-redis");
     }
 
+    private readonly List<AzureResourceInfo> _resources = [];
+
+    private Task<DeletionPlanTicket> PlanWithResourceGroup()
+    {
+        _gateway.Setup(g => g.ListResourcesAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync(() => _resources.ToList());
+        return _workflow.PlanAsync(_session, "sub", "rg", "demo", includeUntagged: false, keepDbData: false, cancellationToken: Ct, deleteResourceGroup: true);
+    }
+
+    [Fact]
+    public async Task Plan_Should_Block_When_The_Resource_Group_Would_Not_Become_Empty()
+    {
+        TwoApps();
+        _resources.Add(new AzureResourceInfo("vm1", "Microsoft.Compute/virtualMachines"));
+
+        var ticket = await PlanWithResourceGroup();
+
+        ticket.CanRun.Should().BeFalse();
+        ticket.Blockers.Should().ContainSingle().Which.Should().StartWith("リソースグループ rg は削除できません（ほかのリソースが残ります: vm1（Microsoft.Compute/virtualMachines））");
+    }
+
+    [Fact]
+    public async Task Start_Should_Delete_The_Resource_Group_As_The_Last_Step()
+    {
+        // 一覧には、本ツールのリソースが削除の前にあり、削除の後には無い
+        TwoApps();
+        _resources.AddRange([new("demo-tt", "Microsoft.App/containerApps"), new("demo-redis", "Microsoft.App/containerApps")]);
+        _gateway.Setup(g => g.DeleteContainerAppAsync("sub", "rg", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string _, string _, string name, CancellationToken _) =>
+            {
+                _apps.RemoveAll(a => a.Name == name);
+                _resources.RemoveAll(r => r.Name == name);
+                return true;
+            });
+        _gateway.Setup(g => g.DeleteResourceGroupAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        var ticket = await PlanWithResourceGroup();
+
+        var job = await _workflow.StartAsync(ticket.Saved!.PlanId, "demo", SessionFor(), Notice, Ct);
+        await job.Completion;
+
+        var s = job.Snapshot();
+        s.Status.Should().Be(JobStatus.Succeeded);
+        s.CurrentStep.Should().Be(new JobStep(3, 3, "リソースグループ rg の削除"));
+        s.Logs.Select(l => l.Message).Should().EndWith(["削除中: リソースグループ rg", "削除が完了しました（リソースグループ rg も削除しました）。"]);
+        s.Result.Should().BeOfType<DeletionOutcome>().Which.ResourceGroupDeleted.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Start_Should_Report_A_Resource_Group_That_Was_Already_Deleted()
+    {
+        _gateway.Setup(g => g.DeleteResourceGroupAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        var ticket = await PlanWithResourceGroup();
+
+        var job = await _workflow.StartAsync(ticket.Saved!.PlanId, "demo", SessionFor(), Notice, Ct);
+        await job.Completion;
+
+        job.Snapshot().Logs.Select(l => l.Message).Should().Contain("リソースグループ rg は既に削除されていました。");
+        job.Snapshot().Result.Should().BeOfType<DeletionOutcome>().Which.ResourceGroupDeleted.Should().BeFalse();
+    }
+
     [Fact]
     public async Task Start_Should_Add_The_Notice_When_The_Db_Data_Is_Kept()
     {

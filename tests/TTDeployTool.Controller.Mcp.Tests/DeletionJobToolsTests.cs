@@ -84,6 +84,55 @@ public sealed class DeletionJobToolsTests
 
     // ---- plan_deletion
 
+    private readonly List<AzureResourceInfo> _resources = [];
+
+    // リソースグループの中には、本ツールのリソースと others があり、削除したものは一覧から消える
+    private void ResourceGroupContents(params AzureResourceInfo[] others)
+    {
+        _resources.AddRange([
+            new("demo-tt", "Microsoft.App/containerApps"), new("demo-redis", "Microsoft.App/containerApps"),
+            new("demo-db", "Microsoft.App/containerApps"), new("demo-env", "Microsoft.App/managedEnvironments")]);
+        _resources.AddRange(others);
+        _gateway.Setup(g => g.ListResourcesAsync("sub", "rg", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => _resources.Where(r => !_deleted.Contains(r.Name)).ToList());
+        _gateway.Setup(g => g.DeleteResourceGroupAsync("sub", "rg", It.IsAny<CancellationToken>())).Callback(() => _deleted.Add("rg")).ReturnsAsync(true);
+    }
+
+    [Fact]
+    public async Task Delete_Resource_Group_Should_Delete_It_As_The_Last_Target()
+    {
+        ResourceGroupContents();
+        var tools = Tools();
+
+        var plan = await tools.PlanDeletion(app_name: "demo", delete_resource_group: true, cancellationToken: Ct);
+        var started = await tools.StartDeletion(plan.PlanId!, "demo", Ct);
+        var status = await WaitForJob(started.JobId);
+
+        plan.Targets.Last().Should().Be(new DeletionTargetInfo("rg", "resource_group", true, false, true, null));
+        plan.DeletesResourceGroup.Should().BeTrue();
+        plan.Kept.Should().BeEmpty();
+        plan.Warnings.Should().Contain("リソースグループ rg も削除します。元に戻せません。");
+        _deleted.Should().Equal("demo-tt", "demo-redis", "demo-db", "demo-env", "rg");
+        status.CurrentStep.Should().Be(new JobStepInfo(5, 5, "リソースグループ rg の削除"));
+        status.Logs.Select(l => l.Message).Should().Contain("削除が完了しました（リソースグループ rg も削除しました）。");
+        status.DeletionResult.Should().BeEquivalentTo(new DeletionJobResult("rg", ["demo-tt", "demo-redis", "demo-db", "demo-env"], [], null, true));
+    }
+
+    [Fact]
+    public async Task Delete_Resource_Group_Should_Be_Blocked_When_Other_Resources_Remain()
+    {
+        ResourceGroupContents(new AzureResourceInfo("other-env", "Microsoft.App/managedEnvironments"));
+
+        var plan = await Tools().PlanDeletion(app_name: "demo", delete_resource_group: true, cancellationToken: Ct);
+
+        plan.PlanId.Should().BeNull();
+        plan.Blockers.Should().ContainSingle().Which.Should().StartWith("リソースグループ rg は削除できません（ほかのリソースが残ります: other-env");
+        plan.Targets.Last().Should().Be(new DeletionTargetInfo("rg", "resource_group", true, false, false,
+            "ほかのリソースが残ります: other-env（Microsoft.App/managedEnvironments）"));
+        plan.DeletesResourceGroup.Should().BeFalse();
+        plan.Kept.Should().ContainSingle().Which.Should().Contain("delete_resource_group=true");
+    }
+
     [Fact]
     public async Task PlanDeletion_Should_Require_The_Target_Without_Reading_Azure()
     {

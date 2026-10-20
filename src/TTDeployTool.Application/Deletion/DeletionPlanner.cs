@@ -9,6 +9,7 @@ namespace TTDeployTool.Application.Deletion;
 /// 削除計画を作る（読み取りのみ）。本ツールの命名規則に一致し、かつ管理タグがあるリソースだけを削除の対象にする
 /// （includeUntagged の場合は管理タグが無くても対象にする。別のアプリ・ツールの管理タグがあるものは対象にしない）。リソースグループは削除しない。
 /// DB のデータを置いたストレージアカウントも同じ規則で削除の対象にする（keepDbData の場合は残す）。
+/// deleteResourceGroup の場合は、本ツールのリソースを削除した後にリソースグループが空になるなら、リソースグループも削除の対象にする。
 /// </summary>
 public sealed class DeletionPlanner
 {
@@ -16,6 +17,17 @@ public sealed class DeletionPlanner
     public const string UnmanagedReason = "管理タグがありません";
     public const string OtherOwnerReason = "別のアプリまたは別のツールの管理タグがあります（--include-untagged でも対象にしません）";
     public const string KeptReason = "--keep-db-data の指定により残します（DB のデータ）";
+
+    /// <summary>リソースグループの削除の判定で、残るリソースとして名前を示す数の上限。</summary>
+    public const int RemainingShown = 10;
+
+    // 削除の対象の種類と、Azure のリソースの種類
+    private static readonly IReadOnlyDictionary<DeletionResourceKind, string> ResourceTypes = new Dictionary<DeletionResourceKind, string>
+    {
+        [DeletionResourceKind.ContainerApp] = "Microsoft.App/containerApps",
+        [DeletionResourceKind.Environment] = "Microsoft.App/managedEnvironments",
+        [DeletionResourceKind.StorageAccount] = "Microsoft.Storage/storageAccounts",
+    };
 
     private readonly IAzureDeploymentGateway _gateway;
 
@@ -25,10 +37,11 @@ public sealed class DeletionPlanner
     }
 
     public async Task<DeletionPlan> PlanAsync(
-        string subscriptionId, string rgName, string appName, bool includeUntagged, bool keepDbData = false,
+        string subscriptionId, string rgName, string appName, bool includeUntagged, bool keepDbData = false, bool deleteResourceGroup = false,
         CancellationToken cancellationToken = default)
     {
         var targets = await PlanTargetsAsync(subscriptionId, rgName, appName, includeUntagged, keepDbData, cancellationToken);
+        var resourceGroup = deleteResourceGroup ? await PlanResourceGroupAsync(subscriptionId, rgName, targets, cancellationToken) : null;
 
         var requirements = targets.Where(t => t.WillDelete)
             .Select(t => t.Kind switch
@@ -38,12 +51,40 @@ public sealed class DeletionPlanner
                 _ => new PermissionRequirement(AzurePermissions.StorageAccountDelete, TargetResource.StorageAccount(t.Name)),
             })
             .ToList();
+        if (resourceGroup?.WillDelete == true)
+            requirements.Add(new PermissionRequirement(AzurePermissions.ResourceGroupDelete));
         var permissionCheck = requirements.Count == 0
             ? PermissionCheckResult.Ok
             : await new PermissionChecker(_gateway).CheckAsync(subscriptionId, rgName, requirements, cancellationToken);
 
-        return new DeletionPlan(subscriptionId, rgName, appName, targets, permissionCheck, includeUntagged, keepDbData);
+        return new DeletionPlan(subscriptionId, rgName, appName, targets, permissionCheck, includeUntagged, keepDbData, resourceGroup);
     }
+
+    /// <summary>
+    /// 削除の対象（<paramref name="targets"/> の <see cref="DeletionTarget.WillDelete"/> のもの）を消した後に、リソースグループが空になるかを確かめる
+    /// （ほかのアプリ名の環境や、本ツール以外のリソースが 1 つでも残れば削除しない）。
+    /// </summary>
+    public async Task<ResourceGroupDeletion> PlanResourceGroupAsync(
+        string subscriptionId, string rgName, IReadOnlyList<DeletionTarget> targets, CancellationToken cancellationToken = default)
+    {
+        if (await _gateway.GetResourceGroupAsync(subscriptionId, rgName, cancellationToken) == null)
+            return new ResourceGroupDeletion(false, false, NotFoundReason, []);
+
+        var deleting = targets.Where(t => t.WillDelete).Select(t => (t.Name, Type: ResourceTypes[t.Kind])).ToList();
+        var remaining = (await _gateway.ListResourcesAsync(subscriptionId, rgName, cancellationToken))
+            .Where(r => !deleting.Any(d => string.Equals(d.Name, r.Name, StringComparison.OrdinalIgnoreCase)
+                                           && string.Equals(d.Type, r.Type, StringComparison.OrdinalIgnoreCase)))
+            .Select(r => $"{r.Name}（{r.Type}）")
+            .ToList();
+        return remaining.Count == 0
+            ? new ResourceGroupDeletion(true, true, null, [])
+            : new ResourceGroupDeletion(true, false, RemainingReason(remaining), remaining);
+    }
+
+    /// <summary>リソースグループに残るリソースの説明（多ければ、先頭の <see cref="RemainingShown"/> 件と残りの数）。</summary>
+    public static string RemainingReason(IReadOnlyList<string> remaining) =>
+        $"ほかのリソースが残ります: {string.Join(", ", remaining.Take(RemainingShown))}" +
+        (remaining.Count > RemainingShown ? $" ほか {remaining.Count - RemainingShown} 件" : "");
 
     /// <summary>現在の Azure の状態から、各対象を削除するかを決める（権限は確認しない）。</summary>
     public async Task<IReadOnlyList<DeletionTarget>> PlanTargetsAsync(

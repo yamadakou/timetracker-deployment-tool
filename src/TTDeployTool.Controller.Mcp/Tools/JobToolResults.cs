@@ -112,10 +112,18 @@ public sealed record DeletionPlanResult(
     string? ConfirmationRequired,
     string? Note,
     bool DeletesDbData = false,
-    bool KeepsDbData = false);
+    bool KeepsDbData = false,
+    bool DeletesResourceGroup = false);
 
-/// <summary>削除計画の対象。<see cref="Resource"/> は container_app / environment / storage_account。<see cref="Reason"/> は削除しない理由。</summary>
+/// <summary>
+/// 削除計画の対象。<see cref="Resource"/> は container_app / environment / storage_account / resource_group（delete_resource_group の場合）。
+/// <see cref="Reason"/> は削除しない理由。
+/// </summary>
 public sealed record DeletionTargetInfo(string Name, string Resource, bool Exists, bool Managed, bool WillDelete, string? Reason);
 
-/// <summary>削除のジョブが成功したときの結果。<see cref="AlreadyDeleted"/> は計画の後に既に無かったもの。</summary>
-public sealed record DeletionJobResult(string ResourceGroup, IReadOnlyList<string> Deleted, IReadOnlyList<string> AlreadyDeleted, string KeptResourceGroup);
+/// <summary>
+/// 削除のジョブが成功したときの結果。<see cref="AlreadyDeleted"/> は計画の後に既に無かったもの。
+/// <see cref="KeptResourceGroup"/> は残したリソースグループ（削除した場合は null）。
+/// </summary>
+public sealed record DeletionJobResult(
+    string ResourceGroup, IReadOnlyList<string> Deleted, IReadOnlyList<string> AlreadyDeleted, string? KeptResourceGroup, bool ResourceGroupDeleted = false);

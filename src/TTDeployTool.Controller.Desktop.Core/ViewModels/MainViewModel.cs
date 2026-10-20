@@ -50,7 +50,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         }, loggers.CreateLogger("TTDeployTool.Desktop.SignIn"));
         Settings = new SettingsViewModel(Target);
         Deployment = new DeploymentViewModel(new DeploymentWorkflow(plans, jobs, caller, logger), Target, Settings, Queue, Show, time);
-        Deletion = new DeletionViewModel(new DeletionWorkflow(plans, jobs, caller, logger), Target, Queue, Show, time);
+        Deletion = new DeletionViewModel(new DeletionWorkflow(plans, jobs, caller, logger, time), Target, Queue, Show, time);
         Status = new StatusViewModel(Target, logger,
             () => Queue.ActiveFor(Target.Subscription, Target.ResourceGroup, Target.AppName.ToLowerInvariant())?.IsRunning == true);
         DryRun = new DryRunViewModel(Settings, dialogs, launcher);

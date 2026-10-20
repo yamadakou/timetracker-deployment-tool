@@ -1,4 +1,6 @@
+using Azure;
 using FluentAssertions;
+using Microsoft.Extensions.Time.Testing;
 using Moq;
 using TTDeployTool.Application.Deletion;
 using TTDeployTool.Application.Permissions;
@@ -52,7 +54,7 @@ public class DeletionPlannerTests
     }
 
     private Task<DeletionPlan> Plan(bool includeUntagged = false, bool keepDbData = false) =>
-        new DeletionPlanner(_gateway.Object).PlanAsync("sub", "rg", "demo", includeUntagged, keepDbData, Ct);
+        new DeletionPlanner(_gateway.Object).PlanAsync("sub", "rg", "demo", includeUntagged, keepDbData, cancellationToken: Ct);
 
     private static DeletionTarget Target(DeletionPlan plan, string name) => plan.Targets.Single(t => t.Name == name);
 
@@ -298,6 +300,125 @@ public class DeletionPlannerTests
         (await Plan()).IncludeUntagged.Should().BeFalse();
         (await Plan(includeUntagged: true)).IncludeUntagged.Should().BeTrue();
     }
+
+    private readonly List<AzureResourceInfo> _resources = [];
+
+    private Task<DeletionPlan> PlanWithResourceGroup(bool keepDbData = false)
+    {
+        _gateway.Setup(g => g.ListResourcesAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync(() => _resources.ToList());
+        return new DeletionPlanner(_gateway.Object).PlanAsync("sub", "rg", "demo", false, keepDbData, deleteResourceGroup: true, Ct);
+    }
+
+    // 本ツールのリソース（3 つのアプリと Environment）が、リソースグループの中の一覧にもある
+    private void AllManagedInResourceGroup()
+    {
+        AllManaged();
+        foreach (var name in new[] { "demo-tt", "demo-redis", "demo-db" })
+            _resources.Add(new AzureResourceInfo(name, "Microsoft.App/containerApps"));
+        _resources.Add(new AzureResourceInfo("DEMO-ENV", "microsoft.app/managedEnvironments"));
+    }
+
+    [Fact]
+    public async Task Should_Not_Plan_The_Resource_Group_Unless_Requested()
+    {
+        AllManaged();
+
+        var plan = await Plan();
+
+        plan.ResourceGroupTarget.Should().BeNull();
+        plan.DeleteResourceGroupRequested.Should().BeFalse();
+        plan.DeletesResourceGroup.Should().BeFalse();
+        plan.ResourceGroupBlocker.Should().BeNull();
+        _gateway.Verify(g => g.ListResourcesAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Should_Delete_The_Resource_Group_When_It_Becomes_Empty_And_Check_The_Permission()
+    {
+        // 名前と種類は大文字と小文字を区別せずに比べる
+        AllManagedInResourceGroup();
+        _gateway.Setup(g => g.GetPermissionsAsync("sub", "rg", It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new PermissionSet(["Microsoft.App/*"], [])]);
+
+        var plan = await PlanWithResourceGroup();
+
+        plan.ResourceGroupTarget.Should().BeEquivalentTo(new ResourceGroupDeletion(true, true, null, []));
+        plan.DeleteResourceGroupRequested.Should().BeTrue();
+        plan.DeletesResourceGroup.Should().BeTrue();
+        plan.ResourceGroupBlocker.Should().BeNull();
+        plan.PermissionCheck.MissingActions.Should().Equal(AzurePermissions.ResourceGroupDelete);
+    }
+
+    [Fact]
+    public async Task Should_Plan_Only_The_Resource_Group_When_Nothing_Else_Is_Left()
+    {
+        // 以前に本ツールのリソースだけを削除し、空のリソースグループが残っている
+        var plan = await PlanWithResourceGroup();
+
+        plan.Targets.Should().OnlyContain(t => !t.WillDelete);
+        plan.HasDeletions.Should().BeTrue();
+        plan.DeletesResourceGroup.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Should_Block_When_Other_Resources_Remain()
+    {
+        AllManagedInResourceGroup();
+        // 別のアプリ名の環境と、名前が同じでも種類の違うリソース
+        _resources.Add(new AzureResourceInfo("other-env", "Microsoft.App/managedEnvironments"));
+        _resources.Add(new AzureResourceInfo("demo-tt", "Microsoft.Web/sites"));
+
+        var plan = await PlanWithResourceGroup();
+
+        plan.ResourceGroupTarget!.WillDelete.Should().BeFalse();
+        plan.ResourceGroupTarget.Remaining.Should().Equal("other-env（Microsoft.App/managedEnvironments）", "demo-tt（Microsoft.Web/sites）");
+        plan.ResourceGroupTarget.Reason.Should().Be("ほかのリソースが残ります: other-env（Microsoft.App/managedEnvironments）, demo-tt（Microsoft.Web/sites）");
+        plan.DeletesResourceGroup.Should().BeFalse();
+        plan.ResourceGroupBlocker.Should().Be(
+            $"リソースグループ rg は削除できません（{plan.ResourceGroupTarget.Reason}）。リソースグループを残して削除する場合は、リソースグループの削除の指定を外してください。");
+    }
+
+    [Fact]
+    public async Task Should_Count_A_Kept_Storage_Account_As_Remaining()
+    {
+        AllManagedInResourceGroup();
+        StorageAccount(Managed);
+        _resources.Add(new AzureResourceInfo(Account, "Microsoft.Storage/storageAccounts"));
+
+        (await PlanWithResourceGroup()).DeletesResourceGroup.Should().BeTrue("ストレージアカウントも削除する");
+        (await PlanWithResourceGroup(keepDbData: true)).ResourceGroupTarget!.Remaining.Should().Equal($"{Account}（Microsoft.Storage/storageAccounts）");
+    }
+
+    [Fact]
+    public async Task Should_Not_Block_When_The_Resource_Group_Does_Not_Exist()
+    {
+        _gateway.Setup(g => g.GetResourceGroupAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync((ResourceGroupInfo?)null);
+
+        var plan = await PlanWithResourceGroup();
+
+        plan.ResourceGroupTarget.Should().BeEquivalentTo(new ResourceGroupDeletion(false, false, DeletionPlanner.NotFoundReason, []));
+        plan.ResourceGroupBlocker.Should().BeNull();
+        plan.HasDeletions.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Remaining_Reason_Should_Show_At_Most_Ten_Names()
+    {
+        var names = Enumerable.Range(1, 12).Select(i => $"r{i}").ToList();
+
+        DeletionPlanner.RemainingReason(names).Should().Be($"ほかのリソースが残ります: {string.Join(", ", names.Take(10))} ほか 2 件");
+    }
+
+    [Fact]
+    public async Task Same_Deletions_Should_Include_The_Resource_Group()
+    {
+        AllManagedInResourceGroup();
+        var withGroup = await PlanWithResourceGroup();
+        var withoutGroup = withGroup with { ResourceGroupTarget = null };
+
+        withGroup.HasSameDeletions(withGroup with { }).Should().BeTrue();
+        withGroup.HasSameDeletions(withoutGroup).Should().BeFalse();
+    }
 }
 
 public class DeletionRunnerTests
@@ -359,6 +480,84 @@ public class DeletionRunnerTests
 
     private static DeletionPlan Plan(bool includeUntagged, params DeletionTarget[] targets) =>
         new("sub", "rg", "demo", targets, PermissionCheckResult.Ok, includeUntagged);
+
+    private readonly FakeTimeProvider _time = new();
+    private readonly Queue<IReadOnlyList<AzureResourceInfo>> _listings = new();
+
+    private static readonly AzureResourceInfo Leftover = new("demo-env", "Microsoft.App/managedEnvironments");
+    private static readonly IReadOnlyList<AzureResourceInfo> Empty = [];
+
+    // リソースグループの中の一覧を、読むたびに順に返す（最後のものは繰り返す）
+    private void Listings(params IReadOnlyList<AzureResourceInfo>[] listings)
+    {
+        foreach (var listing in listings)
+            _listings.Enqueue(listing);
+        _gateway.Setup(g => g.ListResourcesAsync("sub", "rg", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => _listings.Count > 1 ? _listings.Dequeue() : _listings.Peek());
+    }
+
+    // 待っている間は、偽の時刻を読み直しの間隔ずつ進める
+    private async Task<T> Drive<T>(Task<T> task)
+    {
+        while (!task.IsCompleted)
+        {
+            await Task.Delay(1, Ct);
+            _time.Advance(DeletionRunner.EmptyPollInterval);
+        }
+        return await task;
+    }
+
+    private Task<bool> DeleteResourceGroup() =>
+        Drive(new DeletionRunner(_gateway.Object, _time).DeleteResourceGroupAsync(Plan(false), Ct));
+
+    [Fact]
+    public async Task Should_Delete_The_Resource_Group_After_It_Becomes_Empty()
+    {
+        // 削除の直後は、一覧にまだ残っている
+        Listings([Leftover], [Leftover], Empty);
+        _gateway.Setup(g => g.DeleteResourceGroupAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync(true);
+
+        (await DeleteResourceGroup()).Should().BeTrue();
+
+        _gateway.Verify(g => g.ListResourcesAsync("sub", "rg", It.IsAny<CancellationToken>()), Times.Exactly(3));
+    }
+
+    [Fact]
+    public async Task Should_Report_A_Resource_Group_That_Was_Already_Deleted()
+    {
+        Listings(Empty);
+        _gateway.Setup(g => g.DeleteResourceGroupAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync(false);
+
+        (await DeleteResourceGroup()).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Should_Not_Delete_The_Resource_Group_When_Resources_Remain()
+    {
+        Listings([Leftover]);
+
+        var act = () => DeleteResourceGroup();
+
+        (await act.Should().ThrowAsync<InvalidOperationException>()).Which.Message.Should().Be(
+            "リソースグループ rg にリソースが残っているため、リソースグループは削除しませんでした" +
+            "（ほかのリソースが残ります: demo-env（Microsoft.App/managedEnvironments））。本ツールのリソースの削除は終わっています。");
+        _time.GetUtcNow().Should().BeOnOrAfter(_time.Start + DeletionRunner.EmptyWaitTimeout, "上限まで待つ");
+    }
+
+    [Fact]
+    public async Task Should_Explain_When_The_Resource_Group_Cannot_Be_Deleted()
+    {
+        Listings(Empty);
+        _gateway.Setup(g => g.DeleteResourceGroupAsync("sub", "rg", It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new RequestFailedException(409, "The scope is locked.", "ScopeLocked", null));
+
+        var act = () => DeleteResourceGroup();
+
+        var error = (await act.Should().ThrowAsync<InvalidOperationException>()).Which;
+        error.Message.Should().StartWith("リソースグループ rg を削除できませんでした（The scope is locked.").And.Contain("ロック")
+            .And.EndWith("もう一度実行すると、リソースグループの削除だけを行います。");
+        error.InnerException.Should().BeOfType<RequestFailedException>();
+    }
 
     [Fact]
     public async Task Should_Delete_The_Storage_Account_After_The_Environment()

@@ -37,6 +37,16 @@ public static class ManagedTags
         return merged;
     }
 
+    /// <summary>
+    /// 本ツールがデプロイのときに作ったリソースグループに付けるタグ。リソースグループは複数のアプリ名で共有できるため、アプリ名は付けない
+    /// （期限での自動の削除で、空になったリソースグループを消してよいかの判断に使う）。
+    /// </summary>
+    public static IReadOnlyDictionary<string, string> ForResourceGroup() => new Dictionary<string, string> { [ManagedByKey] = ManagedByValue };
+
+    /// <summary>本ツールが作ったリソースグループか（<see cref="ForResourceGroup"/> のタグがある）。</summary>
+    public static bool IsCreatedByTool(IReadOnlyDictionary<string, string>? tags) =>
+        tags != null && TryGet(tags, ManagedByKey, out var managedBy) && IsOurValue(managedBy);
+
     /// <summary>指定したアプリ名の一式として本ツールが管理しているリソースか。</summary>
     public static bool IsManaged(IReadOnlyDictionary<string, string>? tags, string appName) =>
         tags != null

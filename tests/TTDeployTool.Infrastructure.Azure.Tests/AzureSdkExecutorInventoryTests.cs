@@ -91,12 +91,44 @@ public class AzureSdkExecutorInventoryTests
         _arm.Setup(a => a.GetSubscriptionResource(It.IsAny<ResourceIdentifier>())).Returns(sub.Object);
         sub.Setup(s => s.GetResourceGroups()).Returns(rgs.Object);
         var existing = new Mock<ResourceGroupResource>();
-        existing.SetupGet(r => r.Data).Returns(ResourceManagerModelFactory.ResourceGroupData(name: RgName, location: AzureLocation.JapanEast));
+        existing.SetupGet(r => r.Data).Returns(ResourceManagerModelFactory.ResourceGroupData(
+            name: RgName, location: AzureLocation.JapanEast, tags: new Dictionary<string, string> { ["managed-by"] = "ttdeploytool" }));
         rgs.Setup(c => c.GetIfExistsAsync(RgName, It.IsAny<CancellationToken>())).ReturnsAsync(Found(existing.Object));
         rgs.Setup(c => c.GetIfExistsAsync("missing", It.IsAny<CancellationToken>())).ReturnsAsync(NotFound<ResourceGroupResource>());
 
-        (await Sut().GetResourceGroupAsync(SubscriptionId, RgName, Ct)).Should().Be(new ResourceGroupInfo(RgName, "japaneast"));
+        var rg = await Sut().GetResourceGroupAsync(SubscriptionId, RgName, Ct);
+        (rg!.Name, rg.Location).Should().Be((RgName, "japaneast"));
+        rg.Tags.Should().Equal(new Dictionary<string, string> { ["managed-by"] = "ttdeploytool" });
+        rg.CreatedByTool.Should().BeTrue();
         (await Sut().GetResourceGroupAsync(SubscriptionId, "missing", Ct)).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ListResources_Should_Return_Names_And_Types()
+    {
+        var resource = new Mock<GenericResource>();
+        resource.SetupGet(r => r.Data).Returns(ResourceManagerModelFactory.GenericResourceData(
+            name: "app-env", resourceType: new ResourceType("Microsoft.App/managedEnvironments")));
+        _rg.Setup(r => r.GetGenericResourcesAsync(null, null, null, It.IsAny<CancellationToken>())).Returns(Pageable(resource.Object));
+
+        (await Sut().ListResourcesAsync(SubscriptionId, RgName, Ct)).Should().Equal(new AzureResourceInfo("app-env", "Microsoft.App/managedEnvironments"));
+    }
+
+    [Fact]
+    public async Task DeleteResourceGroup_Should_Delete_Existing_Resource_Group_Only()
+    {
+        var sub = new Mock<SubscriptionResource>();
+        var rgs = new Mock<ResourceGroupCollection>();
+        _arm.Setup(a => a.GetSubscriptionResource(It.IsAny<ResourceIdentifier>())).Returns(sub.Object);
+        sub.Setup(s => s.GetResourceGroups()).Returns(rgs.Object);
+        var existing = new Mock<ResourceGroupResource>();
+        existing.Setup(r => r.DeleteAsync(WaitUntil.Completed, null, It.IsAny<CancellationToken>())).ReturnsAsync(Mock.Of<ArmOperation>());
+        rgs.Setup(c => c.GetIfExistsAsync(RgName, It.IsAny<CancellationToken>())).ReturnsAsync(Found(existing.Object));
+        rgs.Setup(c => c.GetIfExistsAsync("missing", It.IsAny<CancellationToken>())).ReturnsAsync(NotFound<ResourceGroupResource>());
+
+        (await Sut().DeleteResourceGroupAsync(SubscriptionId, RgName, Ct)).Should().BeTrue();
+        (await Sut().DeleteResourceGroupAsync(SubscriptionId, "missing", Ct)).Should().BeFalse();
+        existing.Verify(r => r.DeleteAsync(WaitUntil.Completed, null, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

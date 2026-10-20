@@ -26,9 +26,9 @@ public sealed class ResourcesAndPromptsTests
     public void Documents_Should_Contain_The_Key_Facts_From_The_Readme()
     {
         TimetrackerResources.GetConstraints().Should().Contain("検証環境").And.Contain("DB のデータは失われます")
-            .And.Contain("Developer").And.Contain("サンプル DB").And.Contain("リソースグループは削除しません");
+            .And.Contain("Developer").And.Contain("サンプル DB").And.Contain("リソースグループは既定では削除しません").And.Contain("delete_resource_group=true");
         TimetrackerResources.GetRbac().Should().Contain("Contributor").And.Contain("Container Apps Contributor")
-            .And.Contain(AzurePermissions.ContainerAppDelete).And.Contain(AzurePermissions.EnvironmentDelete)
+            .And.Contain(AzurePermissions.ContainerAppDelete).And.Contain(AzurePermissions.EnvironmentDelete).And.Contain(AzurePermissions.ResourceGroupDelete)
             .And.Contain("Microsoft.App").And.Contain("Microsoft.OperationalInsights");
     }
 

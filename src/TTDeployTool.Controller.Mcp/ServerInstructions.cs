@@ -26,7 +26,9 @@ internal static class ServerInstructions
         - デプロイ済みの環境の状態や URL は get_deployment_info で確認できます。
         - Azure から削除する場合も、必ず次の順に行ってください。
           1. plan_deletion で計画を作る（Azure は変更しない）。
-          2. 結果の targets・kept・warnings・blockers を利用者に示す。リソースグループは削除しないこと、DB アプリを削除すると DB のデータがすべて失われることを伝える。
+          2. 結果の targets・kept・warnings・blockers を利用者に示す。リソースグループは既定では削除しないこと、DB アプリを削除すると DB のデータがすべて失われることを伝える。
+             利用者がリソースグループも削除したい場合だけ、delete_resource_group=true で計画を作る（本ツールのリソースを削除した後に空になる場合だけ削除し、
+             ほかのリソースが残る場合は blockers に理由が出る。元に戻せないことを伝える）。
              persist_db で永続化したストレージアカウントも既定で削除されるため、データを残したい場合は keep_db_data=true で計画を作り直す（料金はかかり続ける）。
           3. 削除してよいか確認し、利用者にアプリ名を入力してもらい、その値を start_deletion の confirm_app_name に渡す（利用者の入力なしに計画のアプリ名をそのまま渡さない）。
           4. get_job_status を 15〜30 秒の間隔で呼び、結果を伝える。
@@ -66,7 +68,9 @@ internal static class ServerInstructions
         - デプロイ済みの環境の状態や URL は get_deployment_info で確認できます。
         - Azure から削除する場合も、必ず次の順に行ってください。
           1. plan_deletion で計画を作る（Azure は変更しない）。
-          2. 結果の targets・kept・warnings・blockers を利用者に示す。リソースグループは削除しないこと、DB アプリを削除すると DB のデータがすべて失われることを伝える。
+          2. 結果の targets・kept・warnings・blockers を利用者に示す。リソースグループは既定では削除しないこと、DB アプリを削除すると DB のデータがすべて失われることを伝える。
+             利用者がリソースグループも削除したい場合だけ、delete_resource_group=true で計画を作る（本ツールのリソースを削除した後に空になる場合だけ削除し、
+             ほかのリソースが残る場合は blockers に理由が出る。元に戻せないことを伝える）。
              persist_db で永続化したストレージアカウントも既定で削除されるため、データを残したい場合は keep_db_data=true で計画を作り直す（料金はかかり続ける）。
           3. 削除してよいか確認し、利用者にアプリ名を入力してもらい、その値を start_deletion の confirm_app_name に渡す（利用者の入力なしに計画のアプリ名をそのまま渡さない）。
           4. get_job_status を 15〜30 秒の間隔で呼び、結果を伝える。

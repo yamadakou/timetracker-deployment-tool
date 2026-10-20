@@ -34,7 +34,7 @@ public sealed class CliArgs
 
     private static readonly IReadOnlySet<string> DeleteBoolFlags = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
-        "--dry-run", "--verbose", "--include-untagged", "--yes", "--keep-db-data",
+        "--dry-run", "--verbose", "--include-untagged", "--yes", "--keep-db-data", "--delete-resource-group",
     };
 
     private static readonly IReadOnlyDictionary<string, CliCommand> Commands = new Dictionary<string, CliCommand>(StringComparer.OrdinalIgnoreCase)
@@ -80,11 +80,13 @@ public sealed class CliArgs
 
         delete のオプション:
           --subscription <ID>         Azure サブスクリプション ID（必須）
-          --resource-group <名前>     リソースグループ名（必須。リソースグループ自体は削除しません）
+          --resource-group <名前>     リソースグループ名（必須。--delete-resource-group を付けなければ、リソースグループ自体は削除しません）
           --app-name <名前>           既定: timetracker
           --auth-mode <モード>        deploy と同じ
           --include-untagged [true|false] 管理タグの無いリソースも削除の対象にする
           --keep-db-data [true|false] --persist-db で DB のデータを置いたストレージアカウントを残す（既定では削除する）
+          --delete-resource-group [true|false] 削除した後にリソースグループが空になる場合、リソースグループも削除する
+                                      （ほかのリソースが残る場合は、何も削除せずに終了する。元に戻せません）
           --dry-run [true|false]      削除計画を表示するだけで、削除しない
           --yes [true|false]          確認の入力（アプリ名）を省略する
           --verbose [true|false]      詳細ログを出力

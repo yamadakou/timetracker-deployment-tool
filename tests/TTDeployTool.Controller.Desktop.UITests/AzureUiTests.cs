@@ -184,6 +184,22 @@ public class AzureUiTests
                 app.Invoke("Status.Refresh");
                 app.WaitForText("Status.Summary", t => t.Contains("ありません"), $"削除した後は {name} の環境が無い", LoadTimeout);
             }
+
+            // No.53: 本ツールのリソースを消した後の空のリソースグループを、「リソースグループも削除する」で消す
+            app.Show("Delete");
+            app.SetChecked("Delete.DeleteResourceGroup", true);
+            app.Invoke("Delete.Plan");
+            app.Find("Delete.ConfirmAppName", LoadTimeout);
+            app.ScreenText().Should().Contain($"リソースグループ {resourceGroup} も削除します。元に戻せません。");
+            app.SetText("Delete.ConfirmAppName", appName);
+            app.Invoke("Delete.Start");
+            // 削除の画面には、同じ対象の前の削除のジョブ（完了）が出ているため、リソースグループを削除した結果の文を待つ
+            app.WaitForScreenText(t => t.Contains($"リソースグループ {resourceGroup} も削除しました。") || t.Contains("失敗"),
+                "リソースグループの削除が終わる", JobTimeout);
+            app.ScreenText().Should().Contain($"リソースグループ {resourceGroup} も削除しました。", app.Exists("Job.Error") ? app.TextOf("Job.Error") : "");
+            app.Show("Status");
+            app.Invoke("Status.Refresh");
+            app.WaitForText("Status.Summary", t => t.Contains("デプロイされた環境はありません"), "リソースグループが無い", LoadTimeout);
         });
     }
 
