@@ -111,8 +111,16 @@ public class PersistenceTests
         var vm = h.Main.Status;
         vm.PersistenceText.Should().BeNull();
 
+        // 環境が無ければ、永続化の行は出さない（デプロイの途中などで、誤解されないように）
+        await vm.RefreshCommand.ExecuteAsync();
+        vm.Summary.Should().Be("デプロイされた環境はありません。");
+        vm.PersistenceText.Should().BeNull();
+
+        h.Azure.Deployed();
         await vm.RefreshCommand.ExecuteAsync();
         vm.PersistenceText.Should().Be("DB のデータ: 永続化していません（DB コンテナの再起動でデータが失われます）");
+        h.Azure.Apps.Clear();
+        h.Azure.Environment = null;
 
         h.Azure.HasStorageAccount = true;
         await vm.RefreshCommand.ExecuteAsync();

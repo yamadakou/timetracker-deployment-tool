@@ -40,6 +40,9 @@ public sealed class TargetViewModel : ObservableObject
 
     public AsyncCommand LoadCommand { get; }
 
+    /// <summary>サブスクリプションの読み込みの処理中の表示。</summary>
+    public BusyState Busy { get; } = new();
+
     public ObservableCollection<SubscriptionChoice> Subscriptions { get; } = [];
 
     /// <summary>読めなかったテナントなど、一覧についての注意。</summary>
@@ -72,8 +75,11 @@ public sealed class TargetViewModel : ObservableObject
     public string? Error
     {
         get => _error;
-        private set => SetProperty(ref _error, value);
+        private set => SetProperty(ref _error, value, new Dependent(nameof(HasError)));
     }
+
+    /// <summary>エラーを表示するか（画面の表示の切り替えに使う）。</summary>
+    public bool HasError => Error != null;
 
     public string Subscription => SelectedSubscription?.SubscriptionId ?? "";
 
@@ -84,7 +90,9 @@ public sealed class TargetViewModel : ObservableObject
         : AppNameValidator.GetError(AppName.ToLowerInvariant());
 
     /// <summary>テナントごとにサブスクリプションを読む。読めないテナントがあっても、ほかのテナントの一覧は続ける。</summary>
-    public async Task LoadAsync()
+    public Task LoadAsync() => Busy.RunAsync("テナントの一覧を読んでいます", LoadCoreAsync);
+
+    private async Task LoadCoreAsync()
     {
         Error = null;
         Notices.Clear();
@@ -95,9 +103,11 @@ public sealed class TargetViewModel : ObservableObject
             var credential = _signIn.Credential;
             var tenants = await _clients.Tenants(credential).ListAsync();
             _logger.LogInformation("テナント {Count} 件", tenants.Count);
-            foreach (var tenant in tenants)
+            for (var i = 0; i < tenants.Count; i++)
             {
+                var tenant = tenants[i];
                 var name = tenant.DisplayName ?? tenant.DefaultDomain ?? tenant.TenantId;
+                Busy.Report($"テナント {i + 1} / {tenants.Count}（{name}）のサブスクリプションを読んでいます");
                 try
                 {
                     var subscriptions = await _clients.Subscriptions(new TenantScopedCredential(credential, tenant.TenantId)).ListAsync();
@@ -131,13 +141,18 @@ public sealed class TargetViewModel : ObservableObject
         SelectedSubscription = null;
     }
 
-    /// <summary>選んだサブスクリプションのテナントで、サインインしたアカウントの権限で Azure を操作する接続。</summary>
-    public IAzureSession CreateSession()
+    /// <summary>
+    /// 選んだサブスクリプションのテナントで、サインインしたアカウントの権限で Azure を操作する接続。
+    /// <paramref name="progress"/> を渡すと、Azure を読む前に段階を知らせる（計画・状態の確認の画面で使う。ジョブの中では渡さない）。
+    /// </summary>
+    public IAzureSession CreateSession(IProgress<string>? progress = null)
     {
         TokenCredential credential = SelectedSubscription?.TenantId is { } tenantId
             ? new TenantScopedCredential(_signIn.Credential, tenantId)
             : _signIn.Credential;
-        return new UnrestrictedAzureSession(logger => _clients.Gateway(logger, credential));
+        return new UnrestrictedAzureSession(logger => progress == null
+            ? _clients.Gateway(logger, credential)
+            : ReportingGateway.Wrap(_clients.Gateway(logger, credential), progress));
     }
 
     private void Set<T>(ref T field, T value, [System.Runtime.CompilerServices.CallerMemberName] string propertyName = "")

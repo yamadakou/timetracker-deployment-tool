@@ -75,6 +75,11 @@ public class CiUiTests
         Directory.CreateDirectory(folder);
         try
         {
+            // まず誤った設定（パスワードなし）で保存し、エラーを出す
+            app.Show("DryRun");
+            app.Invoke("DryRun.Save");
+            app.Find("DryRun.Error");
+
             // コンボボックスの選択（選択の変更イベントで ViewModel に戻す）と、パスワードの入力
             app.Show("Settings");
             app.Select("Settings.DbType", "sqlserver");
@@ -91,6 +96,8 @@ public class CiUiTests
             File.ReadAllText(Path.Combine(folder, ".env")).Should().Contain("UiTestDbPass1!");
             app.ScreenText().Should().Contain("persist-db は Azure 向けの設定のため").And.Contain("docker compose up -d");
             app.IsEnabled("DryRun.OpenFolder").Should().BeTrue();
+            // 保存できたら、前のエラーの表示（領域ごと）が消える（実機の確認の P1）
+            app.Exists("DryRun.Error").Should().BeFalse();
         }
         finally
         {

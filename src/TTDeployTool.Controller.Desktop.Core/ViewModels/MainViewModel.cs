@@ -18,6 +18,8 @@ public sealed class MainViewModel : ObservableObject
     private readonly TimeProvider _time;
     private readonly TimeSpan _pollInterval;
     private JobViewModel? _currentJob;
+    private JobViewModel? _currentDeployment;
+    private JobViewModel? _currentDeletion;
 
     public MainViewModel(
         ISignInService signIn, IAzureClients clients, IDialogService dialogs, ISystemLauncher launcher, TimeProvider time, ILoggerFactory loggers,
@@ -42,7 +44,8 @@ public sealed class MainViewModel : ObservableObject
         Settings = new SettingsViewModel(Target);
         Deployment = new DeploymentViewModel(new DeploymentWorkflow(plans, jobs, caller, logger), Target, Settings, WatchAsync);
         Deletion = new DeletionViewModel(new DeletionWorkflow(plans, jobs, caller, logger), Target, WatchAsync);
-        Status = new StatusViewModel(Target, logger);
+        Status = new StatusViewModel(Target, logger,
+            () => Jobs.Any(j => j.IsRunning && j.IsFor(Target.Subscription, Target.ResourceGroup, Target.AppName.ToLowerInvariant())));
         DryRun = new DryRunViewModel(Settings, dialogs, launcher);
         LogDirectory = (loggers as DiagnosticLog)?.Directory;
         OpenLogFolderCommand = new AsyncCommand(() =>
@@ -52,9 +55,9 @@ public sealed class MainViewModel : ObservableObject
         }, () => LogDirectory != null);
         OpenEndpointCommand = new AsyncCommand(() =>
         {
-            launcher.OpenUri(CurrentJob!.Endpoint!);
+            launcher.OpenUri(CurrentDeployment!.Endpoint!);
             return Task.CompletedTask;
-        }, () => CurrentJob?.Endpoint != null);
+        }, () => CurrentDeployment?.Endpoint != null);
     }
 
     public SignInViewModel SignIn { get; }
@@ -83,11 +86,25 @@ public sealed class MainViewModel : ObservableObject
     /// <summary>このアプリで実行したジョブ（新しい順）。</summary>
     public ObservableCollection<JobViewModel> Jobs { get; } = [];
 
-    /// <summary>最後に始めたジョブ（実行の画面に表示する）。</summary>
+    /// <summary>最後に始めたジョブ。</summary>
     public JobViewModel? CurrentJob
     {
         get => _currentJob;
         private set => SetProperty(ref _currentJob, value);
+    }
+
+    /// <summary>最後に始めたデプロイのジョブ（デプロイの画面に表示する）。</summary>
+    public JobViewModel? CurrentDeployment
+    {
+        get => _currentDeployment;
+        private set => SetProperty(ref _currentDeployment, value);
+    }
+
+    /// <summary>最後に始めた削除のジョブ（削除の画面に表示する）。</summary>
+    public JobViewModel? CurrentDeletion
+    {
+        get => _currentDeletion;
+        private set => SetProperty(ref _currentDeletion, value);
     }
 
     public bool HasRunningJob => Jobs.Any(j => j.IsRunning);
@@ -106,6 +123,18 @@ public sealed class MainViewModel : ObservableObject
     private async Task WatchAsync(JobViewModel job)
     {
         CurrentJob = job;
+        if (job.IsDeployment)
+        {
+            CurrentDeployment = job;
+        }
+        else
+        {
+            CurrentDeletion = job;
+            // 同じ対象の削除を始めたら、デプロイの結果（URL）は使えなくなるため、デプロイの画面から外す
+            if (CurrentDeployment?.IsSameTarget(job) == true)
+                CurrentDeployment = null;
+        }
+        OpenEndpointCommand.RaiseCanExecuteChanged();
         Jobs.Insert(0, job);
         OnPropertyChanged(nameof(HasRunningJob));
         await job.WatchAsync(_time, _pollInterval);

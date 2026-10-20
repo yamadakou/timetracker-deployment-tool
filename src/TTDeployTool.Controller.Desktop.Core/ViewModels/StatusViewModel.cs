@@ -16,18 +16,32 @@ public sealed class StatusViewModel : ObservableObject
 {
     private readonly TargetViewModel _target;
     private readonly IDeploymentLogger _logger;
+    private readonly Func<bool> _targetHasRunningJob;
     private DeploymentInfo? _info;
     private string? _error;
+    private string? _note;
 
-    public StatusViewModel(TargetViewModel target, IDeploymentLogger logger)
+    /// <param name="targetHasRunningJob">対象のデプロイ・削除が実行中か（実行中なら、まだ反映されていない場合がある旨を添える）</param>
+    public StatusViewModel(TargetViewModel target, IDeploymentLogger logger, Func<bool> targetHasRunningJob)
     {
         _target = target;
         _logger = logger;
-        RefreshCommand = new AsyncCommand(RefreshAsync);
+        _targetHasRunningJob = targetHasRunningJob;
+        RefreshCommand = new AsyncCommand(() => Busy.RunAsync("状態を読んでいます", RefreshAsync));
         _target.Changed += (_, _) => Info = null;
     }
 
     public AsyncCommand RefreshCommand { get; }
+
+    /// <summary>状態の確認の処理中の表示。</summary>
+    public BusyState Busy { get; } = new();
+
+    /// <summary>実行中のデプロイ・削除がある場合の注意（無ければ null）。</summary>
+    public string? Note
+    {
+        get => _note;
+        private set => SetProperty(ref _note, value);
+    }
 
     public ObservableCollection<AppStateRow> Apps { get; } = [];
 
@@ -41,10 +55,12 @@ public sealed class StatusViewModel : ObservableObject
 
     public Uri? Endpoint => _info?.Endpoint is { } url ? new Uri(url) : null;
 
-    /// <summary>DB のデータの永続化の状態。</summary>
+    public bool HasEndpoint => Endpoint != null;
+
+    /// <summary>DB のデータの永続化の状態（環境が無ければ出さない）。</summary>
     public string? PersistenceText => _info switch
     {
-        null => null,
+        null or { Exists: false } => null,
         { DbPersisted: true } i => $"DB のデータ: Azure Files に永続化しています（ストレージアカウント {ResourceNaming.StorageAccount(i.Subscription, i.ResourceGroup, i.AppName)}）",
         { StorageAccount: { } account } => $"DB のデータ: 永続化していません（以前の DB のデータがストレージアカウント {account.Name} に残っています）",
         _ => "DB のデータ: 永続化していません（DB コンテナの再起動でデータが失われます）",
@@ -53,8 +69,11 @@ public sealed class StatusViewModel : ObservableObject
     public string? Error
     {
         get => _error;
-        private set => SetProperty(ref _error, value);
+        private set => SetProperty(ref _error, value, new Dependent(nameof(HasError)));
     }
+
+    /// <summary>エラーを表示するか（画面の表示の切り替えに使う）。</summary>
+    public bool HasError => Error != null;
 
     private DeploymentInfo? Info
     {
@@ -70,6 +89,7 @@ public sealed class StatusViewModel : ObservableObject
             }
             OnPropertyChanged(nameof(Summary));
             OnPropertyChanged(nameof(Endpoint));
+            OnPropertyChanged(nameof(HasEndpoint));
             OnPropertyChanged(nameof(PersistenceText));
         }
     }
@@ -78,6 +98,7 @@ public sealed class StatusViewModel : ObservableObject
     {
         Error = null;
         Info = null;
+        Note = null;
         if (_target.TargetError is { } targetError)
         {
             Error = targetError;
@@ -85,8 +106,10 @@ public sealed class StatusViewModel : ObservableObject
         }
         try
         {
-            var gateway = _target.CreateSession().CreateGateway(_logger);
+            var gateway = _target.CreateSession(Busy).CreateGateway(_logger);
             Info = await new DeploymentInspector(gateway).InspectAsync(_target.Subscription, _target.ResourceGroup, _target.AppName.ToLowerInvariant());
+            if (_targetHasRunningJob())
+                Note = "この対象のデプロイまたは削除を実行中のため、まだ反映されていない場合があります。完了してから、もう一度読み込んでください。";
         }
         catch (Exception ex)
         {

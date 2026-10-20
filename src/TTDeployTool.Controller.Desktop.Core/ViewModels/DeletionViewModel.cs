@@ -38,12 +38,15 @@ public sealed class DeletionViewModel : ObservableObject
         _workflow = workflow;
         _target = target;
         _watch = watch;
-        PlanCommand = new AsyncCommand(PlanAsync);
+        PlanCommand = new AsyncCommand(() => Busy.RunAsync("計画を作っています", PlanAsync));
         StartCommand = new AsyncCommand(StartAsync, () => CanStart);
         _target.Changed += (_, _) => Ticket = null;
     }
 
     public AsyncCommand PlanCommand { get; }
+
+    /// <summary>計画の処理中の表示。</summary>
+    public BusyState Busy { get; } = new();
 
     public AsyncCommand StartCommand { get; }
 
@@ -94,6 +97,9 @@ public sealed class DeletionViewModel : ObservableObject
     /// <summary>入力してもらうアプリ名（計画のアプリ名）。</summary>
     public string? AppNameToConfirm => _ticket?.CanRun == true ? _ticket.Plan.AppName : null;
 
+    /// <summary>アプリ名の入力欄を表示するか。</summary>
+    public bool NeedsAppNameConfirmation => AppNameToConfirm != null;
+
     public string? KeptText => _ticket switch
     {
         null => null,
@@ -113,8 +119,11 @@ public sealed class DeletionViewModel : ObservableObject
     public string? Error
     {
         get => _error;
-        private set => SetProperty(ref _error, value);
+        private set => SetProperty(ref _error, value, new Dependent(nameof(HasError)));
     }
+
+    /// <summary>エラーを表示するか（画面の表示の切り替えに使う）。</summary>
+    public bool HasError => Error != null;
 
     private DeletionPlanTicket? Ticket
     {
@@ -158,6 +167,7 @@ public sealed class DeletionViewModel : ObservableObject
             }
             OnPropertyChanged(nameof(HasPlan));
             OnPropertyChanged(nameof(AppNameToConfirm));
+            OnPropertyChanged(nameof(NeedsAppNameConfirmation));
             OnPropertyChanged(nameof(KeptText));
             OnPropertyChanged(nameof(CanStart));
             StartCommand.RaiseCanExecuteChanged();
@@ -184,7 +194,7 @@ public sealed class DeletionViewModel : ObservableObject
         try
         {
             Ticket = await _workflow.PlanAsync(
-                _target.CreateSession(), _target.Subscription, _target.ResourceGroup, _target.AppName.ToLowerInvariant(), IncludeUntagged, KeepDbData);
+                _target.CreateSession(Busy), _target.Subscription, _target.ResourceGroup, _target.AppName.ToLowerInvariant(), IncludeUntagged, KeepDbData);
         }
         catch (Exception ex)
         {

@@ -31,7 +31,7 @@ public sealed class DeploymentViewModel : ObservableObject
         _target = target;
         _settings = settings;
         _watch = watch;
-        PlanCommand = new AsyncCommand(PlanAsync);
+        PlanCommand = new AsyncCommand(() => Busy.RunAsync("計画を作っています", PlanAsync));
         StartCommand = new AsyncCommand(StartAsync, () => CanStart);
         // 対象や設定を変えたら、前の計画は使わない（計画と違う内容で実行しないように）
         _target.Changed += (_, _) => Ticket = null;
@@ -39,6 +39,9 @@ public sealed class DeploymentViewModel : ObservableObject
     }
 
     public AsyncCommand PlanCommand { get; }
+
+    /// <summary>計画の処理中の表示。</summary>
+    public BusyState Busy { get; } = new();
 
     public AsyncCommand StartCommand { get; }
 
@@ -88,8 +91,11 @@ public sealed class DeploymentViewModel : ObservableObject
     public string? Error
     {
         get => _error;
-        private set => SetProperty(ref _error, value);
+        private set => SetProperty(ref _error, value, new Dependent(nameof(HasError)));
     }
+
+    /// <summary>エラーを表示するか（画面の表示の切り替えに使う）。</summary>
+    public bool HasError => Error != null;
 
     private DeploymentPlanTicket? Ticket
     {
@@ -135,7 +141,7 @@ public sealed class DeploymentViewModel : ObservableObject
         }
         try
         {
-            Ticket = await _workflow.PlanAsync(_target.CreateSession(), input.Options);
+            Ticket = await _workflow.PlanAsync(_target.CreateSession(Busy), input.Options);
         }
         catch (Exception ex)
         {

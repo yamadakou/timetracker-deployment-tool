@@ -36,8 +36,11 @@ public sealed class SignInViewModel : ObservableObject
     public string? Error
     {
         get => _error;
-        private set => SetProperty(ref _error, value);
+        private set => SetProperty(ref _error, value, new Dependent(nameof(HasError)));
     }
+
+    /// <summary>エラーを表示するか（画面の表示の切り替えに使う）。</summary>
+    public bool HasError => Error != null;
 
     /// <summary>起動時に、前回のサインインを対話なしで復元する（できなければサインインしていない状態のまま）。</summary>
     public async Task RestoreAsync()

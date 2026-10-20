@@ -53,14 +53,19 @@ public sealed class DryRunViewModel : ObservableObject
     public string? ComposeContent
     {
         get => _composeContent;
-        private set => SetProperty(ref _composeContent, value);
+        private set => SetProperty(ref _composeContent, value, new Dependent(nameof(HasComposeContent)));
     }
+
+    public bool HasComposeContent => ComposeContent != null;
 
     public string? Error
     {
         get => _error;
-        private set => SetProperty(ref _error, value);
+        private set => SetProperty(ref _error, value, new Dependent(nameof(HasError)));
     }
+
+    /// <summary>エラーを表示するか（画面の表示の切り替えに使う）。</summary>
+    public bool HasError => Error != null;
 
     private async Task SaveAsync()
     {

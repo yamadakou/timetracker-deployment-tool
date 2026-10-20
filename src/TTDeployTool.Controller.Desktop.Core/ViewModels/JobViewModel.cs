@@ -50,6 +50,21 @@ public sealed class JobViewModel : ObservableObject
     /// <summary>デプロイが成功した場合の Timetracker の URL。</summary>
     public Uri? Endpoint => _snapshot.Result is DeploymentResult { TimetrackerUrl: { } url } ? new Uri(url) : null;
 
+    public bool HasEndpoint => Endpoint != null;
+
+    /// <summary>デプロイのジョブか（false なら削除）。</summary>
+    public bool IsDeployment => _job.Kind == JobKind.Deploy;
+
+    /// <summary>このジョブの対象か。</summary>
+    public bool IsFor(string subscription, string resourceGroup, string appName) =>
+        string.Equals(Key(_job.Target.Subscription, _job.Target.ResourceGroup, _job.Target.AppName), Key(subscription, resourceGroup, appName), StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>ほかのジョブと同じ対象か。</summary>
+    public bool IsSameTarget(JobViewModel other) => IsFor(other._job.Target.Subscription, other._job.Target.ResourceGroup, other._job.Target.AppName);
+
+    // Application のジョブの管理と同じく、大文字と小文字を区別しない
+    private static string Key(string subscription, string resourceGroup, string appName) => $"{subscription}/{resourceGroup}/{appName}";
+
     /// <summary>デプロイが成功し、DB のデータを永続化した場合の保存先。</summary>
     public string? PersistenceSummary => _snapshot.Result is DeploymentResult { StorageAccountName: { } account }
         ? $"DB のデータはストレージアカウント {account}（Azure Files）に保存しています。"
@@ -83,6 +98,7 @@ public sealed class JobViewModel : ObservableObject
         OnPropertyChanged(nameof(StepText));
         OnPropertyChanged(nameof(Error));
         OnPropertyChanged(nameof(Endpoint));
+        OnPropertyChanged(nameof(HasEndpoint));
         OnPropertyChanged(nameof(PersistenceSummary));
         OnPropertyChanged(nameof(DeletionSummary));
     }

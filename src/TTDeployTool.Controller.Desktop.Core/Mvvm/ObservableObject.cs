@@ -19,5 +19,17 @@ public abstract class ObservableObject : INotifyPropertyChanged
         return true;
     }
 
+    /// <summary>値が変わった場合だけ設定して通知し、値から決まるプロパティ（<paramref name="dependent"/>）も通知する。</summary>
+    protected bool SetProperty<T>(ref T field, T value, Dependent dependent, [CallerMemberName] string propertyName = "")
+    {
+        if (!SetProperty(ref field, value, propertyName))
+            return false;
+        OnPropertyChanged(dependent.PropertyName);
+        return true;
+    }
+
+    /// <summary>値から決まるプロパティの名前（<see cref="SetProperty{T}(ref T, T, Dependent, string)"/> で、通知するプロパティの名前と区別する）。</summary>
+    protected readonly record struct Dependent(string PropertyName);
+
     protected void OnPropertyChanged(string propertyName) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 }

@@ -24,7 +24,7 @@
                     <TextBlock Text="{x:Bind PersistenceSummary, Mode=OneWay}" TextWrapping="Wrap" />
                     <TextBlock Text="{x:Bind DeletionSummary, Mode=OneWay}" TextWrapping="Wrap" />
                     <HyperlinkButton Content="{x:Bind Endpoint, Mode=OneWay}" NavigateUri="{x:Bind Endpoint, Mode=OneWay}"
-                                     Visibility="{x:Bind local:Ui.IfNotNull(Endpoint), Mode=OneWay}" />
+                                     Visibility="{x:Bind HasEndpoint, Mode=OneWay}" />
                     <ItemsControl AutomationProperties.AutomationId="Job.Logs" ItemsSource="{x:Bind Logs}" FontFamily="Consolas" ItemTemplate="{StaticResource LineTemplate}" />
                 </StackPanel>
             </DataTemplate>
@@ -60,7 +60,7 @@
                             <Button AutomationProperties.AutomationId="SignIn.SignOut" Content="サインアウト" Command="{x:Bind ViewModel.SignIn.SignOutCommand}" />
                         </StackPanel>
                         <InfoBar AutomationProperties.AutomationId="SignIn.Error" AutomationProperties.Name="{x:Bind ViewModel.SignIn.Error, Mode=OneWay}" Severity="Error" IsOpen="True" IsClosable="False" Message="{x:Bind ViewModel.SignIn.Error, Mode=OneWay}"
-                                 Visibility="{x:Bind local:Ui.IfText(ViewModel.SignIn.Error), Mode=OneWay}" />
+                                 Visibility="{x:Bind ViewModel.SignIn.HasError, Mode=OneWay}" />
 
                         <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="対象" Margin="0,16,0,0" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
@@ -69,9 +69,10 @@
                                       DisplayMemberPath="Display" />
                             <Button AutomationProperties.AutomationId="Target.Reload" Content="読み直す" VerticalAlignment="Bottom" Command="{x:Bind ViewModel.Target.LoadCommand}" />
                         </StackPanel>
+                        <StackPanel AutomationProperties.AutomationId="Target.Busy" Orientation="Horizontal" Spacing="8" Visibility="{x:Bind ViewModel.Target.Busy.IsBusy, Mode=OneWay}"><ProgressRing IsActive="{x:Bind ViewModel.Target.Busy.IsBusy, Mode=OneWay}" Width="20" Height="20" /><TextBlock VerticalAlignment="Center" Text="{x:Bind ViewModel.Target.Busy.Text, Mode=OneWay}" /></StackPanel>
                         <ItemsControl AutomationProperties.AutomationId="Target.Notices" ItemsSource="{x:Bind ViewModel.Target.Notices}" ItemTemplate="{StaticResource LineTemplate}" />
                         <InfoBar AutomationProperties.AutomationId="Target.Error" AutomationProperties.Name="{x:Bind ViewModel.Target.Error, Mode=OneWay}" Severity="Error" IsOpen="True" IsClosable="False" Message="{x:Bind ViewModel.Target.Error, Mode=OneWay}"
-                                 Visibility="{x:Bind local:Ui.IfText(ViewModel.Target.Error), Mode=OneWay}" />
+                                 Visibility="{x:Bind ViewModel.Target.HasError, Mode=OneWay}" />
                         <TextBox AutomationProperties.AutomationId="Target.ResourceGroup" Header="リソースグループ名（無ければ作成します）" Text="{x:Bind ViewModel.Target.ResourceGroup, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxWidth="480" HorizontalAlignment="Left" Width="480" />
                         <TextBox AutomationProperties.AutomationId="Target.AppName" Header="アプリ名（リソース名の接頭辞）" Text="{x:Bind ViewModel.Target.AppName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="480" HorizontalAlignment="Left" />
                         <TextBox AutomationProperties.AutomationId="Target.Location" Header="リージョン" Text="{x:Bind ViewModel.Target.Location, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="480" HorizontalAlignment="Left" />
@@ -111,8 +112,9 @@
                         <TextBlock AutomationProperties.AutomationId="Panel.Deploy" Style="{StaticResource SubtitleTextBlockStyle}" Text="デプロイ" />
                         <TextBlock TextWrapping="Wrap" Text="「計画」は Azure を読むだけで、変更しません。内容を確かめてから「実行」を押してください。" />
                         <Button AutomationProperties.AutomationId="Deploy.Plan" Content="計画" Command="{x:Bind ViewModel.Deployment.PlanCommand}" />
+                        <StackPanel AutomationProperties.AutomationId="Deploy.Busy" Orientation="Horizontal" Spacing="8" Visibility="{x:Bind ViewModel.Deployment.Busy.IsBusy, Mode=OneWay}"><ProgressRing IsActive="{x:Bind ViewModel.Deployment.Busy.IsBusy, Mode=OneWay}" Width="20" Height="20" /><TextBlock VerticalAlignment="Center" Text="{x:Bind ViewModel.Deployment.Busy.Text, Mode=OneWay}" /></StackPanel>
                         <InfoBar AutomationProperties.AutomationId="Deploy.Error" AutomationProperties.Name="{x:Bind ViewModel.Deployment.Error, Mode=OneWay}" Severity="Error" IsOpen="True" IsClosable="False" Message="{x:Bind ViewModel.Deployment.Error, Mode=OneWay}"
-                                 Visibility="{x:Bind local:Ui.IfText(ViewModel.Deployment.Error), Mode=OneWay}" />
+                                 Visibility="{x:Bind ViewModel.Deployment.HasError, Mode=OneWay}" />
                         <StackPanel Spacing="8" Visibility="{x:Bind local:Ui.IfTrue(ViewModel.Deployment.HasPlan), Mode=OneWay}">
                             <ItemsControl AutomationProperties.AutomationId="Deploy.Operations" ItemsSource="{x:Bind ViewModel.Deployment.Operations}">
                                 <ItemsControl.ItemTemplate>
@@ -131,7 +133,7 @@
                                       Visibility="{x:Bind local:Ui.IfTrue(ViewModel.Deployment.RequiresDataLossAck), Mode=OneWay}" />
                             <Button AutomationProperties.AutomationId="Deploy.Start" Content="実行" Command="{x:Bind ViewModel.Deployment.StartCommand}" Style="{StaticResource AccentButtonStyle}" />
                         </StackPanel>
-                        <ContentControl Content="{x:Bind ViewModel.CurrentJob, Mode=OneWay}" ContentTemplate="{StaticResource JobTemplate}" />
+                        <ContentControl Content="{x:Bind ViewModel.CurrentDeployment, Mode=OneWay}" ContentTemplate="{StaticResource JobTemplate}" />
                         <Button AutomationProperties.AutomationId="Deploy.OpenEndpoint" Content="Timetracker を開く" Command="{x:Bind ViewModel.OpenEndpointCommand}" />
                     </StackPanel>
 
@@ -139,12 +141,14 @@
                     <StackPanel x:Name="StatusPanel" Spacing="12" MaxWidth="900" HorizontalAlignment="Left" Visibility="Collapsed">
                         <TextBlock AutomationProperties.AutomationId="Panel.Status" Style="{StaticResource SubtitleTextBlockStyle}" Text="状態の確認" />
                         <Button AutomationProperties.AutomationId="Status.Refresh" Content="読み込む" Command="{x:Bind ViewModel.Status.RefreshCommand}" />
+                        <StackPanel AutomationProperties.AutomationId="Status.Busy" Orientation="Horizontal" Spacing="8" Visibility="{x:Bind ViewModel.Status.Busy.IsBusy, Mode=OneWay}"><ProgressRing IsActive="{x:Bind ViewModel.Status.Busy.IsBusy, Mode=OneWay}" Width="20" Height="20" /><TextBlock VerticalAlignment="Center" Text="{x:Bind ViewModel.Status.Busy.Text, Mode=OneWay}" /></StackPanel>
                         <InfoBar AutomationProperties.AutomationId="Status.Error" AutomationProperties.Name="{x:Bind ViewModel.Status.Error, Mode=OneWay}" Severity="Error" IsOpen="True" IsClosable="False" Message="{x:Bind ViewModel.Status.Error, Mode=OneWay}"
-                                 Visibility="{x:Bind local:Ui.IfText(ViewModel.Status.Error), Mode=OneWay}" />
+                                 Visibility="{x:Bind ViewModel.Status.HasError, Mode=OneWay}" />
                         <TextBlock AutomationProperties.AutomationId="Status.Summary" Text="{x:Bind ViewModel.Status.Summary, Mode=OneWay}" />
+                        <TextBlock AutomationProperties.AutomationId="Status.Note" Text="{x:Bind ViewModel.Status.Note, Mode=OneWay}" TextWrapping="Wrap" Foreground="{ThemeResource SystemFillColorCautionBrush}" />
                         <TextBlock AutomationProperties.AutomationId="Status.Persistence" Text="{x:Bind ViewModel.Status.PersistenceText, Mode=OneWay}" TextWrapping="Wrap" />
                         <HyperlinkButton Content="{x:Bind ViewModel.Status.Endpoint, Mode=OneWay}" NavigateUri="{x:Bind ViewModel.Status.Endpoint, Mode=OneWay}"
-                                         Visibility="{x:Bind local:Ui.IfNotNull(ViewModel.Status.Endpoint), Mode=OneWay}" />
+                                         Visibility="{x:Bind ViewModel.Status.HasEndpoint, Mode=OneWay}" />
                         <ItemsControl ItemsSource="{x:Bind ViewModel.Status.Apps}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:AppStateRow">
@@ -164,8 +168,9 @@
                         <CheckBox AutomationProperties.AutomationId="Delete.IncludeUntagged" Content="管理タグの無いものも対象にする" IsChecked="{x:Bind ViewModel.Deletion.IncludeUntagged, Mode=TwoWay}" />
                         <CheckBox AutomationProperties.AutomationId="Delete.KeepDbData" Content="DB のデータを残す（ストレージアカウントを削除しない。料金がかかり続けます）" IsChecked="{x:Bind ViewModel.Deletion.KeepDbData, Mode=TwoWay}" />
                         <Button AutomationProperties.AutomationId="Delete.Plan" Content="計画" Command="{x:Bind ViewModel.Deletion.PlanCommand}" />
+                        <StackPanel AutomationProperties.AutomationId="Delete.Busy" Orientation="Horizontal" Spacing="8" Visibility="{x:Bind ViewModel.Deletion.Busy.IsBusy, Mode=OneWay}"><ProgressRing IsActive="{x:Bind ViewModel.Deletion.Busy.IsBusy, Mode=OneWay}" Width="20" Height="20" /><TextBlock VerticalAlignment="Center" Text="{x:Bind ViewModel.Deletion.Busy.Text, Mode=OneWay}" /></StackPanel>
                         <InfoBar AutomationProperties.AutomationId="Delete.Error" AutomationProperties.Name="{x:Bind ViewModel.Deletion.Error, Mode=OneWay}" Severity="Error" IsOpen="True" IsClosable="False" Message="{x:Bind ViewModel.Deletion.Error, Mode=OneWay}"
-                                 Visibility="{x:Bind local:Ui.IfText(ViewModel.Deletion.Error), Mode=OneWay}" />
+                                 Visibility="{x:Bind ViewModel.Deletion.HasError, Mode=OneWay}" />
                         <StackPanel Spacing="8" Visibility="{x:Bind local:Ui.IfTrue(ViewModel.Deletion.HasPlan), Mode=OneWay}">
                             <ItemsControl ItemsSource="{x:Bind ViewModel.Deletion.Targets}">
                                 <ItemsControl.ItemTemplate>
@@ -178,13 +183,13 @@
                             <TextBlock Text="{x:Bind ViewModel.Deletion.Note, Mode=OneWay}" />
                             <ItemsControl AutomationProperties.AutomationId="Delete.Blockers" ItemsSource="{x:Bind ViewModel.Deletion.Blockers}" Foreground="{ThemeResource SystemFillColorCriticalBrush}" ItemTemplate="{StaticResource LineTemplate}" />
                             <ItemsControl ItemsSource="{x:Bind ViewModel.Deletion.Warnings}" Foreground="{ThemeResource SystemFillColorCautionBrush}" ItemTemplate="{StaticResource LineTemplate}" />
-                            <StackPanel Spacing="8" Visibility="{x:Bind local:Ui.IfText(ViewModel.Deletion.AppNameToConfirm), Mode=OneWay}">
+                            <StackPanel Spacing="8" Visibility="{x:Bind ViewModel.Deletion.NeedsAppNameConfirmation, Mode=OneWay}">
                                 <StackPanel Orientation="Horizontal"><TextBlock Text="確認のため、アプリ名「" /><TextBlock Text="{x:Bind ViewModel.Deletion.AppNameToConfirm, Mode=OneWay}" /><TextBlock Text="」を入力してください。" /></StackPanel>
                                 <TextBox AutomationProperties.AutomationId="Delete.ConfirmAppName" Text="{x:Bind ViewModel.Deletion.ConfirmAppName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="320" HorizontalAlignment="Left" />
                                 <Button AutomationProperties.AutomationId="Delete.Start" Content="削除" Command="{x:Bind ViewModel.Deletion.StartCommand}" Style="{StaticResource AccentButtonStyle}" />
                             </StackPanel>
                         </StackPanel>
-                        <ContentControl Content="{x:Bind ViewModel.CurrentJob, Mode=OneWay}" ContentTemplate="{StaticResource JobTemplate}" />
+                        <ContentControl Content="{x:Bind ViewModel.CurrentDeletion, Mode=OneWay}" ContentTemplate="{StaticResource JobTemplate}" />
                     </StackPanel>
 
                     <!-- ローカル検証（Dry-run） -->
@@ -194,12 +199,12 @@
                         <InfoBar Severity="Warning" IsOpen="True" IsClosable="False" Message="{x:Bind ViewModel.DryRun.EnvWarning}" />
                         <Button AutomationProperties.AutomationId="DryRun.Save" Content="保存先を選んで保存" Command="{x:Bind ViewModel.DryRun.SaveCommand}" Style="{StaticResource AccentButtonStyle}" />
                         <InfoBar AutomationProperties.AutomationId="DryRun.Error" AutomationProperties.Name="{x:Bind ViewModel.DryRun.Error, Mode=OneWay}" Severity="Error" IsOpen="True" IsClosable="False" Message="{x:Bind ViewModel.DryRun.Error, Mode=OneWay}"
-                                 Visibility="{x:Bind local:Ui.IfText(ViewModel.DryRun.Error), Mode=OneWay}" />
+                                 Visibility="{x:Bind ViewModel.DryRun.HasError, Mode=OneWay}" />
                         <ItemsControl AutomationProperties.AutomationId="DryRun.Warnings" ItemsSource="{x:Bind ViewModel.DryRun.Warnings}" Foreground="{ThemeResource SystemFillColorCautionBrush}" ItemTemplate="{StaticResource LineTemplate}" />
                         <ItemsControl AutomationProperties.AutomationId="DryRun.NextSteps" ItemsSource="{x:Bind ViewModel.DryRun.NextSteps}" ItemTemplate="{StaticResource LineTemplate}" />
                         <Button AutomationProperties.AutomationId="DryRun.OpenFolder" Content="フォルダーを開く" Command="{x:Bind ViewModel.DryRun.OpenFolderCommand}" />
                         <TextBox AutomationProperties.AutomationId="DryRun.Compose" Header="docker-compose.yml" Text="{x:Bind ViewModel.DryRun.ComposeContent, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True"
-                                 FontFamily="Consolas" MinHeight="200" Visibility="{x:Bind local:Ui.IfText(ViewModel.DryRun.ComposeContent), Mode=OneWay}" />
+                                 FontFamily="Consolas" MinHeight="200" Visibility="{x:Bind ViewModel.DryRun.HasComposeContent, Mode=OneWay}" />
                     </StackPanel>
 
                     <!-- 実行の記録 -->
