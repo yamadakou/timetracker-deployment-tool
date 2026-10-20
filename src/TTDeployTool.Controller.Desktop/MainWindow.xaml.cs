@@ -115,7 +115,8 @@ public sealed partial class MainWindow : Window
         _tray = new TaskbarIcon
         {
             ToolTipText = TrayToolTip(),
-            IconSource = new BitmapImage(new Uri("ms-appx:///Assets/Square44x44Logo.png")),
+            // System.Drawing.Icon で読むため、ICO（BMP の形式。Assets/Square150x150Logo.png から作ったもの）にする
+            IconSource = new BitmapImage(new Uri("ms-appx:///Assets/TrayIcon.ico")),
             ContextMenuMode = ContextMenuMode.PopupMenu,
             ContextFlyout = menu,
             LeftClickCommand = open,

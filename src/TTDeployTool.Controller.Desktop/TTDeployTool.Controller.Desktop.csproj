@@ -46,6 +46,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Content Include="Assets\*.png" />
+    <Content Include="Assets\*.ico" />
     <Manifest Include="$(ApplicationManifest)" />
   </ItemGroup>
   <!-- Visual Studio で MSIX の作成と発行のメニューを出す（テンプレートと同じ） -->
