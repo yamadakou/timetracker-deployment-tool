@@ -122,7 +122,7 @@ public sealed class CliApplicationDeleteTests
         code.Should().Be(0);
         _deleted.Should().Equal("demo-tt", "demo-redis", "demo-db", "demo-env", "rg");
         var output = _out.ToString();
-        output.Should().Contain("削除計画\n").And.NotContain("リソースグループ rg は削除しません")
+        output.Should().Contain("[INFO] 削除計画" + Environment.NewLine).And.NotContain("リソースグループ rg は削除しません")
             .And.Contain("削除する     rg (リソースグループ)")
             .And.Contain("[WARN] リソースグループ rg も削除します。元に戻せません。")
             .And.Contain("削除中: リソースグループ rg")
