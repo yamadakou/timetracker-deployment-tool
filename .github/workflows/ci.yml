@@ -10,7 +10,7 @@ on:
 
 jobs:
   # 変更したファイルがドキュメント（docs/ の下と *.md）だけかを判定する（.github/scripts/detect-code-changes.ps1）。
-  # ドキュメントは、下の 6 つのチェックのどれにも使われていないため、ドキュメントだけなら各チェックを省く（Skipped は成功として扱われる）
+  # ドキュメントは、下の 7 つのチェックのどれにも使われていないため、ドキュメントだけなら各チェックを省く（Skipped は成功として扱われる）
   changes:
     runs-on: ubuntu-latest
     permissions:
@@ -215,3 +215,74 @@ jobs:
       with:
         name: ttdeploytool-desktop-msixupload
         path: AppPackages/**/*.msixupload
+
+  # デスクトップアプリの UI テスト（docs/design/desktop-ui-tests.md）。x64 の MSIX を一時的な自己署名の証明書で署名して導入し、
+  # UI Automation（FlaUI）で操作する。Azure は使わない。証明書はこのジョブの中だけで使い、保存しない
+  desktop-ui:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: 10.0.x
+
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2
+
+    # 発行者はマニフェストの Publisher（CN=TTDeployTool）と同じにし、コード署名の用途（1.3.6.1.5.5.7.3.3）を付ける。
+    # 導入できるよう、公開鍵の証明書だけを「信頼されたユーザー」に入れる
+    - name: Create a temporary signing certificate
+      id: cert
+      shell: pwsh
+      run: |
+        $cert = New-SelfSignedCertificate -Type Custom -Subject "CN=TTDeployTool" -KeyUsage DigitalSignature `
+          -FriendlyName "TTDeployTool UI test" -CertStoreLocation "Cert:\CurrentUser\My" `
+          -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.3", "2.5.29.19={text}")
+        $cer = Join-Path $env:RUNNER_TEMP "uitest.cer"
+        Export-Certificate -Cert $cert -FilePath $cer | Out-Null
+        Import-Certificate -FilePath $cer -CertStoreLocation "Cert:\LocalMachine\TrustedPeople" | Out-Null
+        "thumbprint=$($cert.Thumbprint)" >> $env:GITHUB_OUTPUT
+
+    - name: Build and sign MSIX (x64)
+      run: >
+        msbuild src/TTDeployTool.Controller.Desktop/TTDeployTool.Controller.Desktop.csproj /restore
+        /p:Configuration=Release /p:Platform=x64 /p:AppxBundle=Never /p:UapAppxPackageBuildMode=SideloadOnly
+        /p:GenerateAppxPackageOnBuild=true /p:AppxPackageSigningEnabled=true
+        /p:PackageCertificateThumbprint=${{ steps.cert.outputs.thumbprint }}
+        /p:AppxPackageDir=${{ github.workspace }}\UiPackages\
+
+    - name: Install MSIX
+      shell: pwsh
+      run: |
+        $all = Get-ChildItem UiPackages -Recurse -Filter *.msix
+        $package = $all | Where-Object { $_.FullName -notmatch '\\Dependencies\\' } | Select-Object -First 1
+        $dependencies = @($all | Where-Object { $_.FullName -match '\\Dependencies\\x64\\' } | ForEach-Object FullName)
+        Write-Host "Package: $($package.FullName)"
+        if ($dependencies.Count -gt 0) {
+          Add-AppxPackage -Path $package.FullName -DependencyPath $dependencies
+        } else {
+          Add-AppxPackage -Path $package.FullName
+        }
+        Get-AppxPackage -Name TTDeployTool | Format-List Name, PackageFamilyName, Version, SignatureKind
+
+    - name: UI test
+      env:
+        TT_UITEST_RESULTS_DIRECTORY: ${{ github.workspace }}\TestResults
+      run: >
+        dotnet test --project tests/TTDeployTool.Controller.Desktop.UITests --
+        --output detailed --report-xunit-trx --results-directory=${{ github.workspace }}\TestResults
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: desktop-ui-test-results
+        path: TestResults

@@ -19,5 +19,6 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/TTDeployTool.Controller.Desktop.Core.Tests/TTDeployTool.Controller.Desktop.Core.Tests.csproj" />
+    <Project Path="tests/TTDeployTool.Controller.Desktop.UITests/TTDeployTool.Controller.Desktop.UITests.csproj" />
   </Folder>
 </Solution>

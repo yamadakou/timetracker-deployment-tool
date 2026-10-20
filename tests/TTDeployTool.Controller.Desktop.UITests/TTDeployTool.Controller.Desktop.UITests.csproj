@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    デスクトップアプリの UI テスト（詳細設計 docs/design/desktop-ui-tests.md）。導入したアプリを起動し、UI Automation（FlaUI）で操作する。
+    Windows でしか動かないため TTDeployTool.sln には入れず、TTDeployTool.Desktop.slnx と CI の desktop-ui ジョブで実行する
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- 同時に起動したアプリが互いのウィンドウやダイアログを奪わないよう、テストは 1 つずつ実行する -->
+    <Content Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="FlaUI.UIA3" Version="5.0.0" />
+    <PackageReference Include="FluentAssertions" Version="8.11.0" />
+    <PackageReference Include="xunit.v3" Version="4.0.2" />
+  </ItemGroup>
+</Project>
