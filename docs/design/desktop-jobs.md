@@ -202,10 +202,18 @@
 - テスト: `Desktop.Core` のテスト 121 件成功・行と分岐の網羅率 100%。Application の停止のテスト 2 件。ソリューション全体 899 件（スキップ 5）成功。UI テスト（CI）に、ジョブの画面と帯（ジョブが無い状態）、同時に実行する数の保存（起動し直して確かめる）を加え、CI（run 39407879222）で 9 件成功（Azure のテスト 1 件はスキップ）。半自動の UI テスト（`AzureUiTests`）に、同じ対象の計画の拒否・予定の取り消し・別の対象との同時実行・停止を加えた。オーナーの確認の後、Desktop System Test（run 39413095628、約 15 分）で成功: 削除の実行中に同じ対象の計画を拒否し、別の対象（`ttuib`）の予定を帯から開いたジョブの画面で取り消し、今すぐ実行すると削除と同時に始まり（状況「実行中 2」）、停止で「リソースグループ（手順 1/3）の後で停止しました。」となり、作りかけのリソースが無いこと（削除の計画で「削除するリソースはありません」）を確かめた
 - 実行の記録（診断用のログ）で、登録したときの状態を順番に入れる前に書いていたため、すぐ始めたジョブも「待機中」と書かれていた。順番に入れた後の状態を書くように直した
 
+**実施結果（7c）**
+- Desktop.Core: `MainViewModel.RequestClose`（ジョブがあれば隠す。初めてだけ通知）・`ConfirmExitAsync`・`FindJob`、ジョブの終わりの通知（`JobQueue.Finished` → `INotificationService`。取り消しは通知しない）、`TimeLimitedCredential`（ジョブの接続 `TargetViewModel.CreateJobSession` で、トークンの取得を 10 分で打ち切る。`SignInTimeoutException`）
+- 画面の側: `Program.Main`（1 つだけ起動。Microsoft Learn の手順のとおり）、`AppNotificationService`（`AppNotificationManager`）と、マニフェストの通知からの起動、通知領域のアイコン（H.NotifyIcon.WinUI 2.4.1。メニューは「開く」「終了」、ツールチップにジョブの状況）、「ジョブ」の画面に常駐と制約の説明
+- 通知領域のアイコンは、最初 PNG を指定し、起動時に `System.Drawing.Icon` が読めずに例外になった（CI の UI テストが、診断用のログの `Critical` で見つけた）。BMP の形式の ICO（`Assets/TrayIcon.ico`）にして直した
+- テスト: `Desktop.Core` のテスト 132 件成功（3 回続けて実行して不安定さなし）・行と分岐の網羅率 100%。UI テスト（CI）に 1 つだけ起動することの確認を加え、CI（run 39439054110）で 10 件成功（Azure のテスト 1 件はスキップ）。半自動の UI テスト（`AzureUiTests`）に、予定のジョブがある状態で閉じるとウィンドウが隠れて終了しないこと、もう一度起動すると隠したウィンドウが出ることを加えた（本物の Azure では未実行）
+- オーナーの実機で確かめること: 通知領域のアイコンとメニュー、通知と、通知を押したときの動き、ウィンドウを隠している間の WAM のサインインの画面（`desktop-app-check.md` の 5.2）
+
 ## 11. 出典（2026-10-20 に確認）
 - x:Bind の関数の結び付け: https://learn.microsoft.com/windows/apps/develop/data-binding/function-bindings
 - アプリの通知（AppNotificationManager）: https://learn.microsoft.com/windows/apps/develop/notifications/app-notifications/app-notifications-quickstart
 - 通知領域のアイコン（Shell_NotifyIcon）: https://learn.microsoft.com/windows/win32/api/shellapi/nf-shellapi-shell_notifyiconw
+- 1 つだけ起動する WinUI のアプリ: https://learn.microsoft.com/windows/apps/windows-app-sdk/applifecycle/applifecycle-single-instance
 - H.NotifyIcon: https://github.com/HavenDV/H.NotifyIcon 、https://www.nuget.org/packages/H.NotifyIcon.WinUI
 - Azure Resource Graph の .NET SDK（`GetResourcesAsync`）: https://learn.microsoft.com/dotnet/api/azure.resourcemanager.resourcegraph.resourcegraphextensions.getresourcesasync
 - Container Apps の listSecrets（REST・.NET の `GetSecrets`）と、シークレットを読める権限の注意: https://learn.microsoft.com/rest/api/resource-manager/containerapps/container-apps/list-secrets 、https://learn.microsoft.com/dotnet/api/azure.resourcemanager.appcontainers.containerappresource.getsecrets 、https://learn.microsoft.com/azure/container-apps/security
