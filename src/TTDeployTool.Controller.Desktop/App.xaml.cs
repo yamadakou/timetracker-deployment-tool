@@ -32,8 +32,15 @@ public partial class App : Microsoft.UI.Xaml.Application
 
         _window = new MainWindow();
         var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(_window);
+#if UITEST_SIGNIN
+        // UI テストの System Test のビルドだけ、Azure CLI のサインインを使う（Store に出すパッケージには入らない）
+        appLogger.LogWarning("UI テスト用のビルドのため、Azure CLI のサインインを使います");
+        ISignInService signIn = new AzureCliSignInService();
+#else
+        ISignInService signIn = new WamSignInService(hwnd, DesktopSettings.ClientId, DesktopSettings.DataDirectory);
+#endif
         var viewModel = new MainViewModel(
-            new WamSignInService(hwnd, DesktopSettings.ClientId, DesktopSettings.DataDirectory),
+            signIn,
             new AzureClients(),
             new DialogService(_window, hwnd),
             new SystemLauncher(),

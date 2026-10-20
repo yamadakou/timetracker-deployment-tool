@@ -33,6 +33,13 @@
   <ItemGroup>
     <AssemblyMetadata Include="DesktopClientId" Value="$(DesktopClientId)" />
   </ItemGroup>
+  <!--
+    UI テストの System Test（.github/workflows/desktop-system-test.yml）のビルドだけ、/p:UiTestSignIn=true で Azure CLI のサインインを使う
+    （Services/AzureCliSignInService.cs。docs/design/desktop-ui-tests.md の 7）。CI の desktop ジョブとリリースでは指定しない
+  -->
+  <PropertyGroup Condition="'$(UiTestSignIn)' == 'true'">
+    <DefineConstants>$(DefineConstants);UITEST_SIGNIN</DefineConstants>
+  </PropertyGroup>
   <ItemGroup>
     <Content Include="Assets\*.png" />
     <Manifest Include="$(ApplicationManifest)" />

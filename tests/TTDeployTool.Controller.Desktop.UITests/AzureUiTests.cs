@@ -4,9 +4,10 @@ using Xunit;
 namespace TTDeployTool.Controller.Desktop.UITests;
 
 /// <summary>
-/// 本物のサインイン（WAM）と Azure を使う、ローカルの半自動の UI テスト（詳細設計 6）。サインインだけ人が行う。
-/// 料金が発生するため、TT_UITEST_SUBSCRIPTION_ID と TT_UITEST_RESOURCE_GROUP が無ければスキップする
-/// （scripts/run-desktop-ui-tests.ps1 が、実行の前に確認してから設定する）。
+/// 本物の Azure を使う UI テスト（詳細設計 6・7）。ローカルの半自動（WAM のサインインだけ人が行う。scripts/run-desktop-ui-tests.ps1）と、
+/// UI テストの System Test（Azure CLI のサインインを使うテスト用のビルド。.github/workflows/desktop-system-test.yml）で実行する。
+/// 実機の確認で見つかった問題（desktop-jobs.md の P1〜P4）も確かめる。
+/// 料金が発生するため、TT_UITEST_SUBSCRIPTION_ID と TT_UITEST_RESOURCE_GROUP が無ければスキップする。
 /// </summary>
 public class AzureUiTests
 {
@@ -65,17 +66,34 @@ public class AzureUiTests
                 "状態の確認の結果が表示されませんでした。", LoadTimeout);
             Log($"デプロイ前の状態: {(app.Exists("Status.Error") ? app.TextOf("Status.Error") : app.TextOf("Status.Summary"))}");
 
-            // デプロイ（計画 → 実行）
+            // P1: パスワードを入れずに計画するとエラーが出て、直して計画し直すとエラーの領域ごと消える
+            app.Show("Deploy");
+            app.Invoke("Deploy.Plan");
+            app.WaitForText("Deploy.Error", t => t.Contains("設定に誤りがあります"), "パスワードの無い計画でエラーが出る");
             app.Show("Settings");
             app.SetText("Settings.DbPassword", "Ui" + Guid.NewGuid().ToString("N")[..12] + "!");
             app.SetText("Settings.TrackerPassword", "Ui" + Guid.NewGuid().ToString("N")[..12] + "!");
+
+            // デプロイ（計画 → 実行）。P3: 計画の間、処理中の表示と、Azure の何を読んでいるかが出る
             app.Show("Deploy");
             app.Invoke("Deploy.Plan");
+            var planning = CollectBusy(app, "Deploy.Busy");
+            Log($"計画の処理中の表示: {string.Join(" → ", planning)}");
+            planning.Should().Contain(t => t.Contains("確認しています") || t.Contains("読んでいます"), "Azure を読む段階を知らせる");
             AppSession.WaitUntil(() => app.Exists("Deploy.Error") || app.Exists("Deploy.Start"), "デプロイの計画が表示されませんでした。", LoadTimeout);
-            app.Exists("Deploy.Error").Should().BeFalse(app.Exists("Deploy.Error") ? app.TextOf("Deploy.Error") : "");
+            app.Exists("Deploy.Error").Should().BeFalse(app.Exists("Deploy.Error") ? app.TextOf("Deploy.Error") : "P1: 計画し直すと、前のエラーの領域が消える");
             Log($"デプロイの計画: {app.TextOf("Deploy.Operations")}");
             app.Invoke("Deploy.Start");
             app.WaitForText("Job.Title", t => t.StartsWith("デプロイ"), "デプロイのジョブが表示される");
+
+            // P2: 実行中に状態を確認すると、まだ反映されていない場合がある旨が出て、環境が無ければ永続化の行は出ない
+            app.Show("Status");
+            app.Invoke("Status.Refresh");
+            app.WaitForText("Status.Note", t => t.Contains("実行中のため"), "実行中の注意が出る", LoadTimeout);
+            if (app.TextOf("Status.Summary").Contains("ありません"))
+                app.TextOf("Status.Persistence").Should().NotContain("永続化していません", "環境が無いときは永続化の行を出さない");
+            app.Show("Deploy");
+            app.WaitForText("Job.Title", t => t.StartsWith("デプロイ"), "デプロイの画面に戻ると、デプロイのジョブが表示される");
             var deployed = app.WaitForText("Job.Status", t => t.Contains("完了") || t.Contains("失敗"), "デプロイが終わる", JobTimeout);
             deployed.Should().Contain("完了", app.Exists("Job.Error") ? app.TextOf("Job.Error") : "");
             app.IsEnabled("Deploy.OpenEndpoint").Should().BeTrue("デプロイした Timetracker の URL がある");
@@ -94,6 +112,13 @@ public class AzureUiTests
             app.Invoke("Delete.Start");
             // 表示が削除のジョブに切り替わってから、終わるのを待つ（デプロイのジョブの「完了」を読まない）
             app.WaitForText("Job.Title", t => t.StartsWith("削除"), "削除のジョブが表示される");
+
+            // P4: 同じ対象を削除している間、デプロイの画面には削除のジョブもデプロイの結果も出ず、「Timetracker を開く」は押せない
+            app.Show("Deploy");
+            app.Exists("Job.Title").Should().BeFalse("デプロイの画面に削除のジョブを出さない");
+            app.IsEnabled("Deploy.OpenEndpoint").Should().BeFalse("削除した環境の URL は開けない");
+            app.Show("Delete");
+            app.WaitForText("Job.Title", t => t.StartsWith("削除"), "削除の画面には削除のジョブが表示される");
             var deleted = app.WaitForText("Job.Status", t => t.Contains("完了") || t.Contains("失敗"), "削除が終わる", JobTimeout);
             deleted.Should().Contain("完了", app.Exists("Job.Error") ? app.TextOf("Job.Error") : "");
 
@@ -101,6 +126,29 @@ public class AzureUiTests
             app.Invoke("Status.Refresh");
             app.WaitForText("Status.Summary", t => t.Contains("ありません"), "削除した後は環境が無い", LoadTimeout);
         });
+    }
+
+    // 処理中の表示の段階を、表示が消えるまで集める（短い間隔で読む）
+    private static List<string> CollectBusy(AppSession app, string automationId)
+    {
+        var texts = new List<string>();
+        var deadline = DateTime.UtcNow + LoadTimeout;
+        AppSession.WaitUntil(() => app.Exists(automationId), $"{automationId} が表示されませんでした。", TimeSpan.FromSeconds(10));
+        while (DateTime.UtcNow < deadline && app.Exists(automationId))
+        {
+            try
+            {
+                var text = app.TextOf(automationId);
+                if (text.Length > 0 && (texts.Count == 0 || texts[^1] != text))
+                    texts.Add(text);
+            }
+            catch (Exception)
+            {
+                // 読んでいる間に表示が消えた
+            }
+            Thread.Sleep(100);
+        }
+        return texts;
     }
 
     private static void Log(string message) => TestContext.Current.TestOutputHelper?.WriteLine(message);

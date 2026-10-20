@@ -21,7 +21,8 @@ UI テストでは、実際に起動したアプリを Windows の UI Automation
 | 画面の要素に AutomationId を付ける | ✔（6a） |
 | CI で、Azure を使わない操作の UI テスト | ✔（6a） |
 | ローカルの半自動の UI テスト（本物のサインインと Azure） | ✔（6b） |
-| 偽のサインインと Azure を差し込むテスト用のビルド | ✘（範囲の回答で選ばなかった。製品のコードにテスト用の入口を作らない） |
+| 偽のサインインと Azure を差し込むテスト用のビルド | ✘（範囲の回答で選ばなかった） |
+| 本物の Azure を Azure CLI のサインインで使うテスト用のビルドと、UI テストの System Test | ✔（6c。オーナー判断で追加。実機の確認の P1〜P4 を、人が操作せずに確かめるため） |
 | UI テストの網羅率の測定 | ✘（`Desktop` のプロジェクトは網羅率の対象外のまま。ViewModel の網羅率 100% は `Desktop.Core` のテストで保つ） |
 | 画面の見た目（スクリーンショットの比較） | ✘。失敗したときのスクリーンショットだけを成果物に残す |
 
@@ -77,11 +78,19 @@ CI のジョブ: `ci.yml` に `desktop-ui`（windows-latest）を加える。`de
 | デプロイと削除 | 計画 → 実行で、Timetracker の URL が表示されるまで。その後、状態の確認と、削除（アプリ名の入力）まで行う（Q3） |
 | 結果 | テストの結果（trx）、スクリーンショット、診断用のログの写しを、`TestResults` に置く。ログはオーナーが確かめてから、REVIEW_ISSUES に要約を書く |
 
+## 6.1 UI テストの System Test（6c）
+実機の確認で見つかった問題（`desktop-jobs.md` の P1〜P4）を、オーナーの PC での操作なしに、本物の Azure で確かめるため、6 のテスト（`AzureUiTests`）を GitHub Actions で実行する（オーナー判断。Azure に Windows の VM を作る案と比べ、VM の料金と自動ログオンの設定が要らないため）。
+- サインイン: WAM の対話サインインは人が要るため、テスト用のビルド（`/p:UiTestSignIn=true`。条件付きコンパイルの `UITEST_SIGNIN`）でだけ、`AzureCliSignInService`（Azure.Identity の `AzureCliCredential`）を使う。ワークフローの `azure/login`（OIDC。System Test と同じアプリ登録・環境 `systemtest`）でサインインした Azure CLI を、アプリがそのまま使う。秘密の情報をアプリに渡さず、保存もしない。CI の `desktop` ジョブとリリースはこの指定をしないため、Store に出すパッケージには入らない（「製品のコードにテスト用の入口を作らない」方針を、この範囲で変えた）
+- ワークフロー: `.github/workflows/desktop-system-test.yml`（手動実行・環境 `systemtest` の承認）。windows-latest で、MSIX を一時的な自己署名の証明書で署名して導入し、`AzureUiTests` を実行する。リソースグループは `rg-ttui-<実行の ID>` で、最後に（失敗しても）削除する。結果（trx・失敗したときのスクリーンショット・アプリの診断用のログ）を成果物に残す
+- 確かめること（6 の流れに加えて）: P1（パスワードの無い計画でエラーが出て、直して計画し直すとエラーの領域ごと消える）、P3（計画の間、処理中の表示と Azure を読む段階が出る）、P2（デプロイの実行中に状態を確認すると「実行中のため」の注意が出て、環境が無ければ永続化の行は出ない）、P4（同じ対象を削除している間、デプロイの画面に削除のジョブも結果も出ず、「Timetracker を開く」が押せない）
+- 制約: GitHub Actions の `workflow_dispatch` は、既定のブランチ（`main`）にあるワークフローしか手動で実行できない。作業ブランチで実行するには、このワークフローのファイルだけを先に `main` に入れる（実行するときに作業ブランチを選ぶと、作業ブランチのワークフローとテストを使う）
+
 ## 7. 実施の順序
 | フェーズ | 内容 | 完了条件 |
 |---|---|---|
 | 6a | AutomationId、テストのプロジェクト、CI のテスト（5）、`desktop-ui` ジョブ | CI で全件成功。テストを壊した版（例: 選択の変更イベントを外す）で失敗することを確かめる |
 | 6b | ローカルの半自動のテスト（6）とスクリプト、手順（`desktop-app-check.md` に追記） | オーナーの PC で成功（Azure での実行は、実行の前にオーナーの確認を取る） |
+| 6c | UI テストの System Test（6.1） | GitHub Actions で成功（実行はオーナーの承認の後） |
 
 **実施結果（6a）**
 - `MainWindow.xaml` の 66 の要素に AutomationId を付け、`tests/TTDeployTool.Controller.Desktop.UITests`（7 件）と CI の `desktop-ui` ジョブを追加した。GitHub のホストされた Windows ランナー（Windows Server 2025）で、UI Automation のパターンでの操作、フォルダーの選択のダイアログ（ID 1152・1）の操作、失敗したときのスクリーンショットができることを確かめた（テストは約 12 秒。MSIX のビルドと導入を含むジョブ全体は約 10 分）

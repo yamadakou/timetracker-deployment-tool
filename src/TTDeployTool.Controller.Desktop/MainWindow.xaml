@@ -69,7 +69,7 @@
                                       DisplayMemberPath="Display" />
                             <Button AutomationProperties.AutomationId="Target.Reload" Content="読み直す" VerticalAlignment="Bottom" Command="{x:Bind ViewModel.Target.LoadCommand}" />
                         </StackPanel>
-                        <StackPanel AutomationProperties.AutomationId="Target.Busy" Orientation="Horizontal" Spacing="8" Visibility="{x:Bind ViewModel.Target.Busy.IsBusy, Mode=OneWay}"><ProgressRing IsActive="{x:Bind ViewModel.Target.Busy.IsBusy, Mode=OneWay}" Width="20" Height="20" /><TextBlock VerticalAlignment="Center" Text="{x:Bind ViewModel.Target.Busy.Text, Mode=OneWay}" /></StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8" Visibility="{x:Bind ViewModel.Target.Busy.IsBusy, Mode=OneWay}"><ProgressRing IsActive="{x:Bind ViewModel.Target.Busy.IsBusy, Mode=OneWay}" Width="20" Height="20" /><TextBlock AutomationProperties.AutomationId="Target.Busy" VerticalAlignment="Center" Text="{x:Bind ViewModel.Target.Busy.Text, Mode=OneWay}" /></StackPanel>
                         <ItemsControl AutomationProperties.AutomationId="Target.Notices" ItemsSource="{x:Bind ViewModel.Target.Notices}" ItemTemplate="{StaticResource LineTemplate}" />
                         <InfoBar AutomationProperties.AutomationId="Target.Error" AutomationProperties.Name="{x:Bind ViewModel.Target.Error, Mode=OneWay}" Severity="Error" IsOpen="True" IsClosable="False" Message="{x:Bind ViewModel.Target.Error, Mode=OneWay}"
                                  Visibility="{x:Bind ViewModel.Target.HasError, Mode=OneWay}" />
@@ -112,7 +112,7 @@
                         <TextBlock AutomationProperties.AutomationId="Panel.Deploy" Style="{StaticResource SubtitleTextBlockStyle}" Text="デプロイ" />
                         <TextBlock TextWrapping="Wrap" Text="「計画」は Azure を読むだけで、変更しません。内容を確かめてから「実行」を押してください。" />
                         <Button AutomationProperties.AutomationId="Deploy.Plan" Content="計画" Command="{x:Bind ViewModel.Deployment.PlanCommand}" />
-                        <StackPanel AutomationProperties.AutomationId="Deploy.Busy" Orientation="Horizontal" Spacing="8" Visibility="{x:Bind ViewModel.Deployment.Busy.IsBusy, Mode=OneWay}"><ProgressRing IsActive="{x:Bind ViewModel.Deployment.Busy.IsBusy, Mode=OneWay}" Width="20" Height="20" /><TextBlock VerticalAlignment="Center" Text="{x:Bind ViewModel.Deployment.Busy.Text, Mode=OneWay}" /></StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8" Visibility="{x:Bind ViewModel.Deployment.Busy.IsBusy, Mode=OneWay}"><ProgressRing IsActive="{x:Bind ViewModel.Deployment.Busy.IsBusy, Mode=OneWay}" Width="20" Height="20" /><TextBlock AutomationProperties.AutomationId="Deploy.Busy" VerticalAlignment="Center" Text="{x:Bind ViewModel.Deployment.Busy.Text, Mode=OneWay}" /></StackPanel>
                         <InfoBar AutomationProperties.AutomationId="Deploy.Error" AutomationProperties.Name="{x:Bind ViewModel.Deployment.Error, Mode=OneWay}" Severity="Error" IsOpen="True" IsClosable="False" Message="{x:Bind ViewModel.Deployment.Error, Mode=OneWay}"
                                  Visibility="{x:Bind ViewModel.Deployment.HasError, Mode=OneWay}" />
                         <StackPanel Spacing="8" Visibility="{x:Bind local:Ui.IfTrue(ViewModel.Deployment.HasPlan), Mode=OneWay}">
@@ -141,7 +141,7 @@
                     <StackPanel x:Name="StatusPanel" Spacing="12" MaxWidth="900" HorizontalAlignment="Left" Visibility="Collapsed">
                         <TextBlock AutomationProperties.AutomationId="Panel.Status" Style="{StaticResource SubtitleTextBlockStyle}" Text="状態の確認" />
                         <Button AutomationProperties.AutomationId="Status.Refresh" Content="読み込む" Command="{x:Bind ViewModel.Status.RefreshCommand}" />
-                        <StackPanel AutomationProperties.AutomationId="Status.Busy" Orientation="Horizontal" Spacing="8" Visibility="{x:Bind ViewModel.Status.Busy.IsBusy, Mode=OneWay}"><ProgressRing IsActive="{x:Bind ViewModel.Status.Busy.IsBusy, Mode=OneWay}" Width="20" Height="20" /><TextBlock VerticalAlignment="Center" Text="{x:Bind ViewModel.Status.Busy.Text, Mode=OneWay}" /></StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8" Visibility="{x:Bind ViewModel.Status.Busy.IsBusy, Mode=OneWay}"><ProgressRing IsActive="{x:Bind ViewModel.Status.Busy.IsBusy, Mode=OneWay}" Width="20" Height="20" /><TextBlock AutomationProperties.AutomationId="Status.Busy" VerticalAlignment="Center" Text="{x:Bind ViewModel.Status.Busy.Text, Mode=OneWay}" /></StackPanel>
                         <InfoBar AutomationProperties.AutomationId="Status.Error" AutomationProperties.Name="{x:Bind ViewModel.Status.Error, Mode=OneWay}" Severity="Error" IsOpen="True" IsClosable="False" Message="{x:Bind ViewModel.Status.Error, Mode=OneWay}"
                                  Visibility="{x:Bind ViewModel.Status.HasError, Mode=OneWay}" />
                         <TextBlock AutomationProperties.AutomationId="Status.Summary" Text="{x:Bind ViewModel.Status.Summary, Mode=OneWay}" />
@@ -168,7 +168,7 @@
                         <CheckBox AutomationProperties.AutomationId="Delete.IncludeUntagged" Content="管理タグの無いものも対象にする" IsChecked="{x:Bind ViewModel.Deletion.IncludeUntagged, Mode=TwoWay}" />
                         <CheckBox AutomationProperties.AutomationId="Delete.KeepDbData" Content="DB のデータを残す（ストレージアカウントを削除しない。料金がかかり続けます）" IsChecked="{x:Bind ViewModel.Deletion.KeepDbData, Mode=TwoWay}" />
                         <Button AutomationProperties.AutomationId="Delete.Plan" Content="計画" Command="{x:Bind ViewModel.Deletion.PlanCommand}" />
-                        <StackPanel AutomationProperties.AutomationId="Delete.Busy" Orientation="Horizontal" Spacing="8" Visibility="{x:Bind ViewModel.Deletion.Busy.IsBusy, Mode=OneWay}"><ProgressRing IsActive="{x:Bind ViewModel.Deletion.Busy.IsBusy, Mode=OneWay}" Width="20" Height="20" /><TextBlock VerticalAlignment="Center" Text="{x:Bind ViewModel.Deletion.Busy.Text, Mode=OneWay}" /></StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8" Visibility="{x:Bind ViewModel.Deletion.Busy.IsBusy, Mode=OneWay}"><ProgressRing IsActive="{x:Bind ViewModel.Deletion.Busy.IsBusy, Mode=OneWay}" Width="20" Height="20" /><TextBlock AutomationProperties.AutomationId="Delete.Busy" VerticalAlignment="Center" Text="{x:Bind ViewModel.Deletion.Busy.Text, Mode=OneWay}" /></StackPanel>
                         <InfoBar AutomationProperties.AutomationId="Delete.Error" AutomationProperties.Name="{x:Bind ViewModel.Deletion.Error, Mode=OneWay}" Severity="Error" IsOpen="True" IsClosable="False" Message="{x:Bind ViewModel.Deletion.Error, Mode=OneWay}"
                                  Visibility="{x:Bind ViewModel.Deletion.HasError, Mode=OneWay}" />
                         <StackPanel Spacing="8" Visibility="{x:Bind local:Ui.IfTrue(ViewModel.Deletion.HasPlan), Mode=OneWay}">
