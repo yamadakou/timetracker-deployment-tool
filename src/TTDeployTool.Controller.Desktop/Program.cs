@@ -28,7 +28,7 @@ public static class Program
             return 0;
         }
         instance.Activated += (_, _) => Reactivated?.Invoke(null, EventArgs.Empty);
-        Microsoft.UI.Xaml.Application.Start(_ =>
+        Microsoft.UI.Xaml.Application.Start(p =>
         {
             SynchronizationContext.SetSynchronizationContext(new DispatcherQueueSynchronizationContext(DispatcherQueue.GetForCurrentThread()));
             _ = new App();
