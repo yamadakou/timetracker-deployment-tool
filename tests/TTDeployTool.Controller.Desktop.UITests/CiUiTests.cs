@@ -51,10 +51,10 @@ public class CiUiTests
         app.Show("Settings");
 
         app.SetText("Settings.TtCpu", "abc");
-        app.WaitForText("Settings.Errors", t => t.Contains("tt-cpu には数値を指定してください"), "数値でない CPU の誤りが表示される");
+        app.WaitForScreenText(t => t.Contains("tt-cpu には数値を指定してください"), "数値でない CPU の誤りが表示される");
 
         app.SetText("Settings.TtCpu", "1.5");
-        app.WaitForText("Settings.Errors", t => !t.Contains("tt-cpu"), "直すと誤りが消える");
+        app.WaitForScreenText(t => !t.Contains("tt-cpu"), "直すと誤りが消える");
     });
 
     [Fact]
@@ -89,8 +89,7 @@ public class CiUiTests
             app.WaitForText("DryRun.Compose", t => t.Contains("11.0.1-linux-mssql"), "SQL Server のイメージの docker-compose.yml が表示される");
             File.Exists(Path.Combine(folder, "docker-compose.yml")).Should().BeTrue();
             File.ReadAllText(Path.Combine(folder, ".env")).Should().Contain("UiTestDbPass1!");
-            app.TextOf("DryRun.Warnings").Should().Contain("persist-db は Azure 向けの設定のため");
-            app.TextOf("DryRun.NextSteps").Should().Contain("docker compose up -d");
+            app.ScreenText().Should().Contain("persist-db は Azure 向けの設定のため").And.Contain("docker compose up -d");
             app.IsEnabled("DryRun.OpenFolder").Should().BeTrue();
         }
         finally

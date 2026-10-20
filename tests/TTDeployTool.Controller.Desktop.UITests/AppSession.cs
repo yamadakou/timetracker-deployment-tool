@@ -150,6 +150,20 @@ public sealed class AppSession : IDisposable
         return last;
     }
 
+    /// <summary>
+    /// ウィンドウの中の文字列（TextBlock）をすべてつなげて返す。文字列の一覧（ItemsControl）は UI Automation の要素にならないため、
+    /// 一覧の内容はこれで確かめる（各行は MainWindow.xaml の LineTemplate の TextBlock）。
+    /// </summary>
+    public string ScreenText() =>
+        string.Join("\n", Window.FindAllDescendants(cf => cf.ByControlType(ControlType.Text)).Select(t => t.Name).Where(t => t.Length > 0));
+
+    /// <summary>ウィンドウの中の文字列が条件を満たすまで待つ。</summary>
+    public void WaitForScreenText(Func<string, bool> condition, string description, TimeSpan? timeout = null)
+    {
+        var last = "";
+        WaitUntil(() => condition(last = ScreenText()), $"{description}（最後の表示: {last}）", timeout);
+    }
+
     /// <summary>条件を満たすまで待つ（満たさなければ失敗にする）。</summary>
     public static void WaitUntil(Func<bool> condition, string description, TimeSpan? timeout = null)
     {
