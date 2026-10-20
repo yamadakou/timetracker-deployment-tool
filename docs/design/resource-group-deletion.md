@@ -103,4 +103,5 @@ Container Apps の環境は、本ツールのように既定のネットワー�
 - MCP: `plan_deletion` の `delete_resource_group`、結果の `targets`（`resource_group`）・`deletes_resource_group`・`kept`、ジョブの結果の `resource_group_deleted`（`kept_resource_group` は削除した場合 null）、instructions・Resources・Prompts
 - デスクトップアプリ: 「削除」の画面のチェックボックス、計画の一覧のリソースグループの行、警告、結果
 - テスト: 単体テストを追加（Domain・Infrastructure・Application・CLI・MCP・Desktop.Core）。ソリューション全体 925 件（スキップ 5）成功。追加・変更したコードの行と分岐はすべて網羅（残る未網羅は、既存の Program.cs と、既存の 2 か所の分岐）。半自動の UI テスト（`AzureUiTests`）の最後に、空になったリソースグループを「リソースグループも削除する」で消す確認を加えた
+- 本物の Azure での確認: オーナーの確認の後、Desktop System Test（run 39429755120、UI テスト約 17 分）で成功。本ツールのリソースを削除した後の空のリソースグループ（`rg-ttui-39429755120`）を「リソースグループも削除する」で計画すると、警告「…も削除します。元に戻せません。」が出て、実行するとリソースグループの削除だけを行い（約 18 秒）、結果に「リソースグループ … も削除しました。」が出た。ワークフローの後片付けの時点で、リソースグループは既に無かった（後片付けは削除をしなかった）
 
