@@ -178,6 +178,13 @@
 - テスト: `Desktop.Core` に 10 件（分岐網羅率 100%）、UI テスト（CI）に P1 の確認（Dry-run のエラーの後に保存すると、エラーの領域が消える）を加えた。CI（run 39389230295）で全件成功。修正前の画面で、この UI テストが失敗することは確かめていない
 - 本物の Azure での確認: オーナーの実機の代わりに、UI テストの System Test（`desktop-ui-tests.md` の 6.1。Azure CLI のサインインのテスト用のビルド）で、P1〜P4 を確かめた（run 39401149642 で成功）
 
+**実施結果（7b）**
+- Application: `Job.RequestStop()` と `JobStatus.Stopped`。`JobContext.ReportStep` が停止の要求を確かめ、次の手順に進まずに「停止」で終える（メッセージ: 「…（手順 n/m）の後で停止しました。」）。MCP は停止を要求しないため、MCP の状態の名前の対応は変えていない
+- Desktop.Core: `JobQueue`（同時実行の上限 1〜4・既定 2、同じ対象の登録を拒否、予定の時刻を 15 秒ごとに確かめる、予定より 1 分以上遅れたら注意を残す）、`ScheduleInput`（既定は今から 1 時間後）、`JobViewModel` の取り消し・一時停止・再開・予定の変更・停止。計画の有効期限を過ぎたジョブは、実行の直前に計画し直して比べ、違えば「実行しませんでした: …」で失敗にする。同時に実行する数は `FilePreferences`（アプリのデータの `preferences.json`）に保存する
+- 画面: 「ジョブ」の画面（4.4）、上部の帯（`Jobs.Banner`。「ジョブを見る」でジョブの画面に移る）、「デプロイ」「削除」の「今すぐ実行」「今すぐ削除」と「予定に追加」、「設定」の同時に実行する数
+- 4.5（予定の時刻のサインインの対話を 10 分で打ち切る）は、通知（7c）と合わせて 7c で行う
+- テスト: `Desktop.Core` のテスト 121 件成功・行と分岐の網羅率 100%。Application の停止のテスト 2 件。ソリューション全体 899 件（スキップ 5）成功。UI テスト（CI）に、ジョブの画面と帯（ジョブが無い状態）、同時に実行する数の保存（起動し直して確かめる）を加え、CI（run 39407879222）で 9 件成功（Azure のテスト 1 件はスキップ）。半自動の UI テスト（`AzureUiTests`）に、同じ対象の計画の拒否・予定の取り消し・別の対象との同時実行・停止を加えた（本物の Azure では未実行。Desktop System Test の実行の前にオーナーの確認を取る）
+
 ## 11. 出典（2026-10-20 に確認）
 - x:Bind の関数の結び付け: https://learn.microsoft.com/windows/apps/develop/data-binding/function-bindings
 - アプリの通知（AppNotificationManager）: https://learn.microsoft.com/windows/apps/develop/notifications/app-notifications/app-notifications-quickstart
