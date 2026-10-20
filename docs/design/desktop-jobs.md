@@ -174,7 +174,8 @@
 - P2: 環境が無ければ永続化の行を出さない。対象のジョブが実行中なら注意を添える（`StatusViewModel.Note`）
 - P3: `BusyState`（処理中と段階）を、計画（デプロイ・削除）・状態の確認・サブスクリプションの読み込みに加えた。段階は、Azure の窓口を包む `ReportingGateway`（`DispatchProxy`）が読み取りの前に知らせる（Application・CLI・MCP は変えていない）。経過時間は、`ProgressRing` が動き続けることで処理中と分かるため出さないことにした（画面の更新のための時計を ViewModel に持たない）
 - P4: `MainViewModel.CurrentDeployment` / `CurrentDeletion` を分け、同じ対象の削除を始めたらデプロイの結果を外す
-- テスト: `Desktop.Core` に 10 件（分岐網羅率 100%）、UI テスト（CI）に P1 の確認（Dry-run のエラーの後に保存すると、エラーの領域が消える）を加えた。CI（run 39389230295）で全件成功。修正前の画面で、この UI テストが失敗することは確かめていない。オーナーの実機での確認は未実施
+- テスト: `Desktop.Core` に 10 件（分岐網羅率 100%）、UI テスト（CI）に P1 の確認（Dry-run のエラーの後に保存すると、エラーの領域が消える）を加えた。CI（run 39389230295）で全件成功。修正前の画面で、この UI テストが失敗することは確かめていない
+- 本物の Azure での確認: オーナーの実機の代わりに、UI テストの System Test（`desktop-ui-tests.md` の 6.1。Azure CLI のサインインのテスト用のビルド）で、P1〜P4 を確かめた（run 39401149642 で成功）
 
 ## 11. 出典（2026-10-20 に確認）
 - x:Bind の関数の結び付け: https://learn.microsoft.com/windows/apps/develop/data-binding/function-bindings
