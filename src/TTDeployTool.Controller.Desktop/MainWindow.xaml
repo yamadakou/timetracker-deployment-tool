@@ -17,7 +17,7 @@
             <!-- デプロイ・削除のジョブの進み具合、ログ、結果 -->
             <DataTemplate x:Key="JobTemplate" x:DataType="vm:JobViewModel">
                 <StackPanel Spacing="4" Margin="0,8">
-                    <StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind Title}" /><TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text=": " /><TextBlock AutomationProperties.AutomationId="Job.Status" Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind StatusText, Mode=OneWay}" /></StackPanel>
+                    <StackPanel Orientation="Horizontal"><TextBlock AutomationProperties.AutomationId="Job.Title" Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind Title}" /><TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text=": " /><TextBlock AutomationProperties.AutomationId="Job.Status" Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind StatusText, Mode=OneWay}" /></StackPanel>
                     <ProgressBar IsIndeterminate="True" Visibility="{x:Bind local:Ui.IfTrue(IsRunning), Mode=OneWay}" />
                     <TextBlock AutomationProperties.AutomationId="Job.Step" Text="{x:Bind StepText, Mode=OneWay}" />
                     <TextBlock AutomationProperties.AutomationId="Job.Error" Text="{x:Bind Error, Mode=OneWay}" TextWrapping="Wrap" Foreground="{ThemeResource SystemFillColorCriticalBrush}" />

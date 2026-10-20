@@ -87,6 +87,7 @@ CI のジョブ: `ci.yml` に `desktop-ui`（windows-latest）を加える。`de
 - `MainWindow.xaml` の 66 の要素に AutomationId を付け、`tests/TTDeployTool.Controller.Desktop.UITests`（7 件）と CI の `desktop-ui` ジョブを追加した。GitHub のホストされた Windows ランナー（Windows Server 2025）で、UI Automation のパターンでの操作、フォルダーの選択のダイアログ（ID 1152・1）の操作、失敗したときのスクリーンショットができることを確かめた（テストは約 12 秒。MSIX のビルドと導入を含むジョブ全体は約 10 分）
 - CI で直したこと（アプリ）: 文字列の一覧（`ItemsControl`）の各行が UI Automation の要素にならなかったため、各行を `TextBlock` で表示するテンプレート（`LineTemplate`）にした。エラーの `InfoBar` のメッセージが読めなかったため、`AutomationProperties.Name` にもメッセージを出した（スクリーン リーダーでも読めるようになる）。テキストボックスの値は、入力のたびに ViewModel に戻すようにした（`UpdateSourceTrigger=PropertyChanged`。既定はフォーカスが外れたとき）
 - CI で直したこと（テスト）: 名前を持たない要素の `Name` を読むと例外になるため、空として読む。一覧の内容は、ウィンドウの中の文字列から確かめる
+- 6b の準備: `AzureUiTests`（`TT_UITEST_SUBSCRIPTION_ID` と `TT_UITEST_RESOURCE_GROUP` が無ければスキップ。CI ではスキップされる）と `scripts/run-desktop-ui-tests.ps1`（実行の前に確認し、終わったらリソースグループを削除するかを聞く）を追加した。手順は [`desktop-app-check.md`](desktop-app-check.md) の 5.1。オーナーの PC での実行は未実施（Azure での実行の前にオーナーの確認を取る）
 - テストを壊した版で失敗することの確認: DB 種別の選択を ViewModel に戻すイベントを外した版（一時的なブランチ）で、Dry-run の保存のテストだけが失敗した（7 件中 1 件。SQL Server のイメージの `docker-compose.yml` にならない）。CI の run 39349465420（成功）・39350045306（壊した版で失敗）
 
 ## 8. 決定事項

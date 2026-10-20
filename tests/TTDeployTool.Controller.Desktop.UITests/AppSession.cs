@@ -109,14 +109,31 @@ public sealed class AppSession : IDisposable
     public void SetText(string automationId, string value) => Find(automationId).Patterns.Value.Pattern.SetValue(value);
 
     /// <summary>コンボボックスで、表示の文字列が一致する項目を選ぶ。</summary>
-    public void Select(string automationId, string itemText)
+    public void Select(string automationId, string itemText) => SelectWhere(automationId, name => name == itemText, $"「{itemText}」");
+
+    /// <summary>コンボボックスの項目の名前（一覧を開いて読む）。</summary>
+    public IReadOnlyList<string> ItemsOf(string automationId)
+    {
+        var combo = Find(automationId).AsComboBox();
+        combo.Expand();
+        var names = combo.Items.Select(NameOf).ToList();
+        if (combo.ExpandCollapseState == ExpandCollapseState.Expanded)
+            combo.Collapse();
+        return names;
+    }
+
+    /// <summary>コンボボックスで選んでいる項目の名前（選んでいなければ空）。</summary>
+    public string SelectedOf(string automationId) => Find(automationId).AsComboBox().SelectedItem is { } item ? NameOf(item) : "";
+
+    /// <summary>コンボボックスで、名前が条件を満たす最初の項目を選ぶ。</summary>
+    public void SelectWhere(string automationId, Func<string, bool> condition, string description, TimeSpan? timeout = null)
     {
         var combo = Find(automationId).AsComboBox();
         combo.Expand();
         var item = Retry.WhileNull(
-            () => combo.Items.FirstOrDefault(i => NameOf(i) == itemText),
-            Timeout, Interval, throwOnTimeout: true, ignoreException: true,
-            timeoutMessage: $"{automationId} に「{itemText}」がありませんでした。").Result!;
+            () => combo.Items.FirstOrDefault(i => condition(NameOf(i))),
+            timeout ?? Timeout, Interval, throwOnTimeout: true, ignoreException: true,
+            timeoutMessage: $"{automationId} に{description}がありませんでした。").Result!;
         item.Patterns.SelectionItem.Pattern.Select();
         if (combo.ExpandCollapseState == ExpandCollapseState.Expanded)
             combo.Collapse();
