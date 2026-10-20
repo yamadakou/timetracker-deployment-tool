@@ -36,6 +36,15 @@ public interface IDialogService
     Task<bool> ConfirmAsync(string title, string message, string confirmText);
 }
 
+/// <summary>Windows の通知 1 件。<see cref="JobId"/> は、押したときに開くジョブ（無ければ、アプリを開くだけ）。</summary>
+public sealed record AppNotice(string Title, string Message, string? JobId = null);
+
+/// <summary>Windows の通知（OS の機能を使うため、画面の側で実装する。詳細設計 desktop-jobs.md の 5）。</summary>
+public interface INotificationService
+{
+    void Show(AppNotice notice);
+}
+
 /// <summary>フォルダーや URL を OS の既定のアプリで開く。</summary>
 public interface ISystemLauncher
 {

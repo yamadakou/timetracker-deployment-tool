@@ -602,7 +602,7 @@ public class JobRegistrationTests
         await h.Main.Deployment.ScheduleCommand.ExecuteAsync();
 
         notified.Should().Contain(nameof(MainViewModel.HasRunningJob));
-        (await h.Main.ConfirmCloseAsync()).Should().BeFalse();
+        (await h.Main.ConfirmExitAsync()).Should().BeFalse();
         h.Dialogs.Messages.Should().ContainSingle().Which.Should().Contain("ジョブ（予定 1）があります。");
         h.Main.Dispose();
     }

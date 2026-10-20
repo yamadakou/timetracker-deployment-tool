@@ -171,7 +171,7 @@ public class JobViewModelTests
         h.Main.HasRunningJob.Should().BeTrue();
         job.StatusText.Should().Be("実行中");
         // 実行中は、閉じる前に確認する
-        (await h.Main.ConfirmCloseAsync()).Should().BeFalse();
+        (await h.Main.ConfirmExitAsync()).Should().BeFalse();
         h.Dialogs.Confirmations.Should().Equal("終わっていないジョブがあります");
         // 画面の項目は、読み直しの間隔（5 ms）ごとに更新される
         for (var i = 0; i < 500 && job.StepText == null; i++)
@@ -184,7 +184,7 @@ public class JobViewModelTests
         job.StepText.Should().StartWith("3 / 3");
         job.Endpoint.Should().BeNull();
         h.Main.OpenEndpointCommand.CanExecute(null).Should().BeFalse();
-        (await h.Main.ConfirmCloseAsync()).Should().BeTrue();
+        (await h.Main.ConfirmExitAsync()).Should().BeTrue();
     }
 
     [Fact]

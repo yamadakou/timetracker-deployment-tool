@@ -37,6 +37,10 @@
     UI テストの System Test（.github/workflows/desktop-system-test.yml）のビルドだけ、/p:UiTestSignIn=true で Azure CLI のサインインを使う
     （Services/AzureCliSignInService.cs。docs/design/desktop-ui-tests.md の 7）。CI の desktop ジョブとリリースでは指定しない
   -->
+  <!-- 1 つだけ起動するため、XAML が生成する Main を使わず、Program.cs の Main で起動する（docs/design/desktop-jobs.md の 5.1） -->
+  <PropertyGroup>
+    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(UiTestSignIn)' == 'true'">
     <DefineConstants>$(DefineConstants);UITEST_SIGNIN</DefineConstants>
   </PropertyGroup>
@@ -53,6 +57,8 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Azure.Identity.Broker" Version="1.7.0" />
+    <!-- 通知領域のアイコン（WinUI 3 と Windows App SDK に API が無いため。D15） -->
+    <PackageReference Include="H.NotifyIcon.WinUI" Version="2.4.1" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2705" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.5.1" />
   </ItemGroup>

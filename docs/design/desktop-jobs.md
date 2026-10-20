@@ -98,6 +98,22 @@
 - 制約（画面と手順書に書く）: Windows のサインアウト・再起動・シャットダウンではアプリが終わり、残ったジョブは消える。PC がスリープしている間は実行しない（予定の時刻を過ぎていたら、動けるようになったときにすぐ実行する。D14）
 - 通知領域のアイコンは、WinUI 3 と Windows App SDK に API が無いため、Win32 の `Shell_NotifyIcon` を使う。OSS の H.NotifyIcon.WinUI（2.4.1）を使う（D15）
 
+### 5.1 7c の詳細（2026-10-20 に一次情報で確認）
+| 項目 | 内容 | 出典 |
+|---|---|---|
+| 1 つだけ起動する | 常駐中に、スタート メニューから 2 つ目を起動すると、ジョブを持たない別のアプリが動いてしまう。Windows App SDK の `AppInstance.FindOrRegisterForKey` で 1 つだけにし、2 つ目の起動は 1 つ目に渡す（`RedirectActivationToAsync`）。1 つ目は、渡された起動（`Activated`）で、隠したウィンドウを表示する。XAML が生成する `Main` を使わない（`DISABLE_XAML_GENERATED_MAIN` と、自前の `Program.Main`） | Microsoft Learn「How to create a single-instanced WinUI app with C#」 |
+| 通知 | `AppNotificationManager`（`Microsoft.Windows.AppNotifications`）。`NotificationInvoked` を登録してから `Register` を呼ぶ。通知の引数（`AppNotificationBuilder.AddArgument`）にジョブの ID を入れ、押されたらジョブの画面を開く。パッケージのマニフェストに、通知からの起動（`desktop:ToastNotificationActivation`）と COM サーバー（`com:ExeServer`、`Arguments="----AppNotificationActivated:"`）を加える。管理者として動かすと通知は出ない | Microsoft Learn「Quickstart: Send and Handle App Notifications」 |
+| 通知を押したとき、アプリが終わっていた | ジョブはアプリの中にしか無いため、そのジョブは開けない。アプリを普通に起動する（D13 で、ジョブが終わってもアプリは常駐を続けるため、通常は起きない） | 同上 |
+| 通知領域のアイコン | H.NotifyIcon.WinUI 2.4.1（`TaskbarIcon`。2026-10 時点の最新の安定版。依存は `Microsoft.WindowsAppSDK` 1.6 以上）。メニューは `MenuFlyout` から Win32 のポップアップ メニューを作る（`ContextMenuMode="PopupMenu"`）。アイコンを押すと「開く」と同じ。ウィンドウは `AppWindow.Hide` / `Show` で隠す・出す | https://github.com/HavenDV/H.NotifyIcon 、NuGet |
+| 予定の時刻のサインイン（4.5） | ジョブに渡す資格情報を包み、トークンの取得が 10 分を超えたら、サインインの時間切れとして失敗させる（`SignInTimeoutException`。Azure.Identity の `AuthenticationFailedException` の派生）。ジョブは「失敗」になり、通知する。ほかのジョブは続ける。ウィンドウを隠している間に WAM の画面が出るか（親のウィンドウが隠れている）は、オーナーの実機で確かめる | - |
+
+画面と ViewModel（`Desktop.Core`）の分担:
+- `MainViewModel.RequestClose()`: 終わっていないジョブがあれば「隠す」、無ければ「終了」を返す。初めて隠すときに「バックグラウンドで実行を続けています」を通知する
+- `MainViewModel.ConfirmExitAsync()`: 通知領域の「終了」。終わっていないジョブがあれば確認する（今の閉じるときの確認と同じ文）
+- ジョブが終わったら（完了・失敗・停止。取り消しは利用者の操作のため通知しない）通知する。題名はジョブの題名と状態、本文は結果（URL・削除したもの）か失敗の理由。予定より遅れて始めた場合は、その旨（D14）も本文に添える
+- `MainViewModel.FindJob(id)`: 通知から開くジョブ
+- 通知・通知領域・ウィンドウの表示は、画面の側（`TTDeployTool.Controller.Desktop`）で、`INotificationService` を実装して渡す
+
 ## 6. 利用可能期限とデプロイの一覧（7d）
 ### 6.1 利用可能期限日
 - 「設定」に「利用可能期限日」を加える。選べるのは「既定」（新しくデプロイする場合は今日から 32 日後、再デプロイは今の期限を引き継ぐ。D9・D11）、日付の指定、「期限なし」（D12）。画面には、既定で決まる日付も表示する。今日より前の日付は誤りにする

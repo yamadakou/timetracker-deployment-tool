@@ -183,7 +183,7 @@ public sealed class DeploymentViewModel : ObservableObject
         }
         var ticket = _ticket!;
         var acknowledged = DataLossAcknowledged;
-        var session = _target.CreateSession();
+        var session = _target.CreateJobSession();
         var options = ticket.Plan.Options;
         try
         {

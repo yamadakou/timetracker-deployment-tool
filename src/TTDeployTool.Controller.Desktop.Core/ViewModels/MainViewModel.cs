@@ -9,6 +9,16 @@ using TTDeployTool.Controller.Desktop.Core.Services;
 
 namespace TTDeployTool.Controller.Desktop.Core.ViewModels;
 
+/// <summary>ウィンドウを閉じるときの動き。</summary>
+public enum CloseAction
+{
+    /// <summary>アプリを終了する。</summary>
+    Exit,
+
+    /// <summary>ウィンドウを隠し、通知領域に残る。</summary>
+    Hide,
+}
+
 /// <summary>
 /// アプリの画面全体。CLI・MCP と同じアプリケーション層（計画ストア・ジョブ・ワークフロー）をプロセス内に持つ
 /// （利用者は 1 人なので呼び出し元は固定。計画とジョブはアプリを終了すると消える）。
@@ -19,17 +29,21 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public static readonly TimeSpan ScheduleCheckInterval = TimeSpan.FromSeconds(15);
 
     private readonly IDialogService _dialogs;
+    private readonly INotificationService? _notifications;
+    private bool _hiddenOnce;
     private JobViewModel? _currentJob;
     private JobViewModel? _currentDeployment;
     private JobViewModel? _currentDeletion;
 
     public MainViewModel(
         ISignInService signIn, IAzureClients clients, IDialogService dialogs, ISystemLauncher launcher, TimeProvider time, ILoggerFactory loggers,
-        TimeSpan? pollInterval = null, IAppPreferences? preferences = null)
+        TimeSpan? pollInterval = null, IAppPreferences? preferences = null, INotificationService? notifications = null)
     {
         _dialogs = dialogs;
+        _notifications = notifications;
         Queue = new JobQueue(time, pollInterval ?? JobViewModel.DefaultPollInterval, ScheduleCheckInterval,
             preferences ?? new InMemoryAppPreferences(), loggers.CreateLogger("TTDeployTool.Desktop.Jobs"));
+        Queue.Finished += NotifyFinished;
         Queue.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(JobQueue.HasActive))
@@ -40,7 +54,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         var jobs = new JobManager(new InMemoryJobStore(), time, loggers.CreateLogger<JobManager>());
         var caller = new LocalCallerContext();
 
-        Target = new TargetViewModel(signIn, clients, loggers.CreateLogger("TTDeployTool.Desktop.Target"));
+        Target = new TargetViewModel(signIn, clients, loggers.CreateLogger("TTDeployTool.Desktop.Target"), time);
         SignIn = new SignInViewModel(signIn, async signedIn =>
         {
             if (signedIn)
@@ -131,15 +145,46 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     /// <summary>起動時の処理（前回のサインインを復元し、サブスクリプションを読む）。</summary>
     public Task InitializeAsync() => SignIn.RestoreAsync();
 
-    /// <summary>ウィンドウを閉じてよいか。終わっていないジョブがあれば確認する（閉じると実行中のジョブは止まり、予定・待機中のジョブは消える）。</summary>
-    public async Task<bool> ConfirmCloseAsync() =>
+    /// <summary>
+    /// ウィンドウを閉じるとき。終わっていないジョブがあれば、アプリを終了せずにウィンドウを隠して通知領域に残る（D3）。
+    /// 初めて隠すときに、その旨を通知する。ジョブが無ければ終了する。
+    /// </summary>
+    public CloseAction RequestClose()
+    {
+        if (!HasRunningJob)
+            return CloseAction.Exit;
+        if (!_hiddenOnce)
+        {
+            _hiddenOnce = true;
+            _notifications?.Show(new AppNotice(
+                "バックグラウンドで実行を続けています",
+                $"ジョブ（{Queue.Summary}）があるため、通知領域に残ります。開くには通知領域のアイコンを押し、終了するにはそのメニューの「終了」を選んでください。"));
+        }
+        return CloseAction.Hide;
+    }
+
+    /// <summary>
+    /// アプリを終了してよいか（通知領域の「終了」）。終わっていないジョブがあれば確認する（終了すると実行中のジョブは止まり、予定・待機中のジョブは消える）。
+    /// </summary>
+    public async Task<bool> ConfirmExitAsync() =>
         !HasRunningJob || await _dialogs.ConfirmAsync(
             "終わっていないジョブがあります",
-            $"ジョブ（{Queue.Summary}）があります。閉じると実行中の処理が止まり、途中まで作成・削除したリソースが残ります" +
-            "（もう一度実行すると続きから処理します）。予定・待機中のジョブは消えます。閉じますか？",
-            "閉じる");
+            $"ジョブ（{Queue.Summary}）があります。終了すると実行中の処理が止まり、途中まで作成・削除したリソースが残ります" +
+            "（もう一度実行すると続きから処理します）。予定・待機中のジョブは消えます。終了しますか？",
+            "終了する");
+
+    /// <summary>通知から開くジョブ（一覧から消した場合などは null）。</summary>
+    public JobViewModel? FindJob(string id) => Jobs.FirstOrDefault(j => j.Id == id);
 
     public void Dispose() => Queue.Dispose();
+
+    // ジョブが終わったことを、ウィンドウを隠していても分かるように通知する（結果か失敗の理由と、予定より遅れた旨を添える）
+    private void NotifyFinished(JobViewModel job)
+    {
+        var details = new[] { job.Error, job.Endpoint?.ToString(), job.DeletionSummary, job.Note }.OfType<string>().ToList();
+        _notifications?.Show(new AppNotice(
+            $"{job.Title}: {job.StatusText}", details.Count == 0 ? "ジョブが終わりました。" : string.Join("\n", details), job.Id));
+    }
 
     // 登録したジョブを、デプロイ・削除の画面に表示する
     private void Show(JobViewModel job)

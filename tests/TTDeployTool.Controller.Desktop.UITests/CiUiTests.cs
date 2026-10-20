@@ -138,7 +138,21 @@ public class CiUiTests
     [Fact]
     public void Closing_Without_Jobs_Should_Not_Ask() => AppSession.Run(app =>
     {
-        app.CloseAndWait().Should().BeTrue("実行中のジョブが無ければ、確認なしで閉じる");
+        app.CloseAndWait().Should().BeTrue("終わっていないジョブが無ければ、確認なしで終了する（通知領域に残らない）");
+    });
+
+    [Fact]
+    public void A_Second_Launch_Should_Bring_The_Running_App_Forward() => AppSession.Run(app =>
+    {
+        app.Show("Jobs");
+        app.TextOf("Jobs.Resident").Should().Contain("通知領域に残って続けます");
+
+        // 2 つ目の起動は 1 つ目に渡されて終わり、アプリのプロセスは 1 つのまま
+        using var second = FlaUI.Core.Application.LaunchStoreApp(AppSession.AppUserModelId());
+        AppSession.TryWait(() => System.Diagnostics.Process.GetProcessesByName("ttdeploytool-desktop").Length == 1, TimeSpan.FromSeconds(30))
+            .Should().BeTrue("2 つ目は起動を渡して終わる");
+        app.App.HasExited.Should().BeFalse();
+        app.Exists("Panel.Jobs").Should().BeTrue("1 つ目のウィンドウはそのまま");
     });
 
     // アプリが書き込み中のログを読む

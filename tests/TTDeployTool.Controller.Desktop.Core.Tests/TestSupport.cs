@@ -61,6 +61,13 @@ internal sealed class FakeDialogs : IDialogService
     }
 }
 
+internal sealed class FakeNotifications : INotificationService
+{
+    public List<AppNotice> Shown { get; } = [];
+
+    public void Show(AppNotice notice) => Shown.Add(notice);
+}
+
 internal sealed class FakeLauncher : ISystemLauncher
 {
     public List<string> Opened { get; } = [];

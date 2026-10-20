@@ -254,7 +254,7 @@ public sealed class DeletionViewModel : ObservableObject
         }
         var ticket = _ticket!;
         var confirmed = ConfirmAppName;
-        var session = _target.CreateSession();
+        var session = _target.CreateJobSession();
         var plan = ticket.Plan;
         try
         {

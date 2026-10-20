@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
+using Microsoft.Windows.AppNotifications;
 using TTDeployTool.Controller.Desktop.Core.Diagnostics;
 using TTDeployTool.Controller.Desktop.Core.Services;
 using TTDeployTool.Controller.Desktop.Core.ViewModels;
@@ -8,7 +9,7 @@ using TTDeployTool.Controller.Desktop.Services;
 namespace TTDeployTool.Controller.Desktop;
 
 /// <summary>
-/// アプリの起動。画面の状態と操作（<see cref="MainViewModel"/>）に、OS の機能（WAM でのサインイン、ダイアログ、既定のアプリで開く）を渡す。
+/// アプリの起動。画面の状態と操作（<see cref="MainViewModel"/>）に、OS の機能（WAM でのサインイン、ダイアログ、既定のアプリで開く、通知）を渡す。
 /// </summary>
 public partial class App : Microsoft.UI.Xaml.Application
 {
@@ -30,6 +31,10 @@ public partial class App : Microsoft.UI.Xaml.Application
         UnhandledException += (_, e) => appLogger.LogCritical(e.Exception, "処理されなかった例外");
         appLogger.LogInformation("起動しました（版 {Version}）", typeof(App).Assembly.GetName().Version);
 
+        // 通知を押したときに、そのジョブを開く（Register の前に NotificationInvoked を登録する。docs/design/desktop-jobs.md の 5.1）
+        AppNotificationManager.Default.NotificationInvoked += OnNotificationInvoked;
+        AppNotificationManager.Default.Register();
+
         _window = new MainWindow();
         var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(_window);
 #if UITEST_SIGNIN
@@ -46,13 +51,24 @@ public partial class App : Microsoft.UI.Xaml.Application
             new SystemLauncher(),
             TimeProvider.System,
             log,
-            preferences: new FilePreferences(Path.Combine(DesktopSettings.DataDirectory, "preferences.json")));
+            preferences: new FilePreferences(Path.Combine(DesktopSettings.DataDirectory, "preferences.json")),
+            notifications: new AppNotificationService());
+        // 常駐中に 2 つ目を起動したら、隠したウィンドウを出す（Program.cs）
+        Program.Reactivated += (_, _) => _window.DispatcherQueue.TryEnqueue(_window.ShowFromTray);
         _window.Closed += (_, _) =>
         {
             viewModel.Dispose();
+            AppNotificationManager.Default.Unregister();
             _azureEvents?.Dispose();
         };
         _window.Initialize(viewModel, hwnd);
         _window.Activate();
+    }
+
+    // 通知を押した（アプリが動いている間。終わった後に押された場合は、ジョブが残っていないため普通に起動する）
+    private void OnNotificationInvoked(AppNotificationManager sender, AppNotificationActivatedEventArgs args)
+    {
+        var jobId = args.Arguments.TryGetValue(AppNotificationService.JobArgument, out var id) ? id : null;
+        _window?.DispatcherQueue.TryEnqueue(() => _window.ShowJob(jobId));
     }
 }

@@ -43,6 +43,9 @@ public sealed class JobQueue : ObservableObject, IDisposable
         _timer = time.CreateTimer(_ => Post(Pump), null, scheduleCheckInterval, scheduleCheckInterval);
     }
 
+    /// <summary>ジョブが終わったとき（完了・失敗・停止。取り消しは含めない）。画面のスレッドで呼ぶ。</summary>
+    public event Action<JobViewModel>? Finished;
+
     /// <summary>登録したジョブ（新しい順）。</summary>
     public ObservableCollection<JobViewModel> Jobs { get; } = [];
 
@@ -185,12 +188,14 @@ public sealed class JobQueue : ObservableObject, IDisposable
         {
             _logger.LogWarning(ex, "ジョブを始められませんでした: {Title}", job.Title);
             job.FailToStart(DesktopMessages.ForAzure(ex));
+            Finished?.Invoke(job);
             Pump();
             return;
         }
         job.Attach(started);
         await job.WatchAsync(_time, _pollInterval);
         _logger.LogInformation("ジョブが終わりました: {Title}（{State}）", job.Title, job.StatusText);
+        Finished?.Invoke(job);
         Pump();
     }
 

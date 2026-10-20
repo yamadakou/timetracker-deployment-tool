@@ -73,6 +73,12 @@ public sealed class AppSession : IDisposable
         return $"{package.Id.FamilyName}!App";
     }
 
+    /// <summary>ウィンドウが表示されているか（閉じて通知領域に残ると、隠れる）。</summary>
+    public bool IsWindowShown => IsWindowVisible(Window.Properties.NativeWindowHandle.Value);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool IsWindowVisible(IntPtr window);
+
     /// <summary>AutomationId の要素が出るまで待って返す。</summary>
     public AutomationElement Find(string automationId, TimeSpan? timeout = null) =>
         Retry.WhileNull(

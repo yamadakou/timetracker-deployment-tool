@@ -1,6 +1,7 @@
 using Azure;
 using Azure.Identity;
 using TTDeployTool.Application.Workflows;
+using TTDeployTool.Controller.Desktop.Core.Services;
 
 namespace TTDeployTool.Controller.Desktop.Core;
 
@@ -48,6 +49,7 @@ public static class DesktopMessages
         WorkflowException workflow => For(workflow),
         AuthenticationRequiredException => $"サインインが必要です。{SignInAgain}",
         CredentialUnavailableException unavailable => $"サインインできませんでした。{SignInAgain}（{unavailable.Message}）",
+        SignInTimeoutException timeout => $"{timeout.Message}{SignInAgain}",
         AuthenticationFailedException auth when auth.Message.Contains(MfaRegistrationRequiredError) => MfaRegistrationRequired,
         AuthenticationFailedException auth when auth.Message.Contains(MfaRequiredError) => MfaRequired,
         AuthenticationFailedException auth => $"Azure の認証に失敗しました。{SignInAgain}（{auth.Message}）",

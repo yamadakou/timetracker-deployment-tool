@@ -88,6 +88,9 @@ public sealed class JobViewModel : ObservableObject
     /// <summary>登録した順（同じ状態なら、先に登録したものから始める）。</summary>
     internal long Order { get; init; }
 
+    /// <summary>このアプリの中でジョブを指す ID（通知から開くときに使う）。</summary>
+    public string Id => $"job-{Order}";
+
     /// <summary>終わったとき（完了・失敗・取り消し・停止）に完了する。</summary>
     internal Task Finished => _finished.Task;
 

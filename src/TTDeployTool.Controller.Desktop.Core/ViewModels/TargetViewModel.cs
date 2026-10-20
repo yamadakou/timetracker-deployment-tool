@@ -21,17 +21,20 @@ public sealed class TargetViewModel : ObservableObject
     private readonly ISignInService _signIn;
     private readonly IAzureClients _clients;
     private readonly ILogger _logger;
+    private readonly TimeProvider _time;
     private SubscriptionChoice? _selected;
     private string _resourceGroup = "";
     private string _appName = Defaults.DefaultAppName;
     private string _location = Defaults.DefaultLocation;
     private string? _error;
 
-    public TargetViewModel(ISignInService signIn, IAzureClients clients, ILogger logger)
+    /// <param name="time">ジョブでトークンの取得を待つ上限を測る時刻（省略時はシステムの時刻）</param>
+    public TargetViewModel(ISignInService signIn, IAzureClients clients, ILogger logger, TimeProvider? time = null)
     {
         _signIn = signIn;
         _clients = clients;
         _logger = logger;
+        _time = time ?? TimeProvider.System;
         LoadCommand = new AsyncCommand(LoadAsync);
     }
 
@@ -145,11 +148,20 @@ public sealed class TargetViewModel : ObservableObject
     /// 選んだサブスクリプションのテナントで、サインインしたアカウントの権限で Azure を操作する接続。
     /// <paramref name="progress"/> を渡すと、Azure を読む前に段階を知らせる（計画・状態の確認の画面で使う。ジョブの中では渡さない）。
     /// </summary>
-    public IAzureSession CreateSession(IProgress<string>? progress = null)
+    public IAzureSession CreateSession(IProgress<string>? progress = null) => CreateSession(Credential(), progress);
+
+    /// <summary>
+    /// ジョブで使う接続。サインインの画面での対話が要ったまま、<see cref="TimeLimitedCredential.DefaultTimeout"/> を過ぎたら失敗させる
+    /// （予定の時刻に誰もいない場合に、ジョブが止まったままにならないよう。詳細設計 desktop-jobs.md の 4.5）。
+    /// </summary>
+    public IAzureSession CreateJobSession() => CreateSession(new TimeLimitedCredential(Credential(), _time));
+
+    private TokenCredential Credential() => SelectedSubscription?.TenantId is { } tenantId
+        ? new TenantScopedCredential(_signIn.Credential, tenantId)
+        : _signIn.Credential;
+
+    private IAzureSession CreateSession(TokenCredential credential, IProgress<string>? progress = null)
     {
-        TokenCredential credential = SelectedSubscription?.TenantId is { } tenantId
-            ? new TenantScopedCredential(_signIn.Credential, tenantId)
-            : _signIn.Credential;
         return new UnrestrictedAzureSession(logger => progress == null
             ? _clients.Gateway(logger, credential)
             : ReportingGateway.Wrap(_clients.Gateway(logger, credential), progress));

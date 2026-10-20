@@ -136,6 +136,13 @@ public class AzureUiTests
             AppSession.WaitUntil(() => app.Exists("Deploy.Schedule") && app.IsEnabled("Deploy.Schedule"), "2 つ目の対象の計画が表示されませんでした。", LoadTimeout);
             app.Invoke("Deploy.Schedule");
             app.WaitForText("Jobs.Banner", t => t.Contains("予定 1"), "上部の帯に予定が出る");
+
+            // 7c: 終わっていないジョブがあれば、閉じても終了せずに通知領域に残り、もう一度起動するとウィンドウが出る
+            app.Window.Close();
+            AppSession.WaitUntil(() => !app.IsWindowShown, "閉じるとウィンドウが隠れる", TimeSpan.FromSeconds(15));
+            app.App.HasExited.Should().BeFalse("ジョブがあるため終了しない");
+            using (FlaUI.Core.Application.LaunchStoreApp(AppSession.AppUserModelId()))
+                AppSession.WaitUntil(() => app.IsWindowShown && app.Exists("Jobs.Banner"), "もう一度起動すると、隠したウィンドウが出る", TimeSpan.FromSeconds(30));
             app.Invoke("Jobs.BannerShow");
             app.Find("Panel.Jobs");
             // 一覧は新しい順なので、先頭（最初に見つかる要素）が今登録したジョブ
