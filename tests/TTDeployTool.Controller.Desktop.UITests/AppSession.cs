@@ -146,7 +146,8 @@ public sealed class AppSession : IDisposable
     public string WaitForText(string automationId, Func<string, bool> condition, string description, TimeSpan? timeout = null)
     {
         var last = "";
-        WaitUntil(() => condition(last = TextOf(automationId)), $"{automationId}: {description}（最後の表示: {last}）", timeout);
+        if (!TryWait(() => condition(last = TextOf(automationId)), timeout))
+            throw new TimeoutException($"{automationId}: {description}（最後の表示: {last}）");
         return last;
     }
 
@@ -164,16 +165,20 @@ public sealed class AppSession : IDisposable
     public void WaitForScreenText(Func<string, bool> condition, string description, TimeSpan? timeout = null)
     {
         var last = "";
-        WaitUntil(() => condition(last = ScreenText()), $"{description}（最後の表示: {last}）", timeout);
+        if (!TryWait(() => condition(last = ScreenText()), timeout))
+            throw new TimeoutException($"{description}（最後の表示: {last}）");
     }
 
     /// <summary>条件を満たすまで待つ（満たさなければ失敗にする）。</summary>
     public static void WaitUntil(Func<bool> condition, string description, TimeSpan? timeout = null)
     {
-        var result = Retry.WhileFalse(condition, timeout ?? Timeout, Interval, throwOnTimeout: false, ignoreException: true);
-        if (!result.Success)
+        if (!TryWait(condition, timeout))
             throw new TimeoutException(description);
     }
+
+    // 条件を満たすまで待つ（満たしたか）。待っている間の例外（要素の作り直しなど）は、満たしていないとして続ける
+    private static bool TryWait(Func<bool> condition, TimeSpan? timeout) =>
+        Retry.WhileFalse(condition, timeout ?? Timeout, Interval, throwOnTimeout: false, ignoreException: true).Success;
 
     /// <summary>
     /// OS のフォルダーの選択のダイアログで、フォルダーを選ぶ。ダイアログの要素は Windows の共通のダイアログの ID

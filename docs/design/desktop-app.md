@@ -225,6 +225,7 @@ Store を使えない利用者（社内の PC で Store が無効など）向け
 | `build`（既存） | `TTDeployTool.sln` のビルドとテスト。`Desktop.Core` とそのテストを含む |
 | `desktop`（新規・windows-latest） | `microsoft/setup-msbuild` で `TTDeployTool.Desktop.slnx` をビルドし、署名なしの MSIX を作る（`/p:GenerateAppxPackageOnBuild=true /p:AppxPackageSigningEnabled=false /p:UapAppxPackageBuildMode=StoreUpload /p:AppxBundle=Always /p:AppxBundlePlatforms="x64|arm64"`）。できた `.msixupload` をワークフローの成果物として保存する。Microsoft Learn の WinUI 3 の CI の例に合わせ、`dotnet publish` ではなく `msbuild` を使う |
 | 確認 | 生成した MSIX の `AppxManifest.xml` の版・機能・対象 OS を PowerShell で確かめる（パッケージの設定の誤りを、Store への提出の前に見つける） |
+| `desktop-ui`（Phase 6a・windows-latest） | x64 の MSIX を一時的な自己署名の証明書で署名して導入し、UI テスト（FlaUI）を実行する。詳細は [`desktop-ui-tests.md`](desktop-ui-tests.md) |
 
 ### 9.2 リリース（`release.yml`）
 - タグ `vX.Y.Z` で、`desktop` と同じビルドに版 `X.Y.Z.0` を渡し、`ttdeploytool-desktop-vX.Y.Z.msixupload` を GitHub Release に CLI・MCP の zip と並べて載せる
@@ -271,7 +272,7 @@ Store を使えない利用者（社内の PC で Store が無効など）向け
 - Application: ワークフローの各分岐（計画の保存・ブロッカーで発行しない・期限切れ・使用済み・別の呼び出し元・同意なし（計画を使用済みにしない）・アプリ名の不一致（同）・直前の再確認での変化とブロッカー・同じ対象の実行中・追加の確認（`IPlanGuard`））
 - MCP: 既存のテストをそのまま通す（ワークフローへの置き換えで結果・メッセージが変わらないこと）
 - `Desktop.Core`: サービスのインターフェース（サインイン、ファイルの選択、保管庫、UI のスレッドへの切り替え）をモックし、画面の状態の移り変わり（ボタンの有効・無効、同意のチェック、アプリ名の一致、計画の期限切れ、ジョブの進み具合とログの差分、失敗時の表示、再サインインの案内）を確かめる。パスワードが画面のログ・エラーに出ないこと
-- `Desktop`（WinUI 3）: 画面は ViewModel への結び付けだけにし、自動テストの対象にしない。サインイン（WAM）・ファイルの選択・Store の更新の確認は、Windows の実機で手動で確認し、結果を記録する
+- `Desktop`（WinUI 3）: 画面は ViewModel への結び付けだけにする。結び付けは、Phase 6 の UI テスト（[`desktop-ui-tests.md`](desktop-ui-tests.md)。CI と、本物のサインインと Azure を使うローカルの半自動）で確かめる。Store の更新の確認は、Windows の実機で手動で確認し、結果を記録する
 
 ## 14. 出典（2026-10-17 に確認）
 - Windows App SDK のダウンロードと版: https://learn.microsoft.com/windows/apps/windows-app-sdk/downloads

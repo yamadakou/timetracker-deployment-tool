@@ -702,7 +702,7 @@ dotnet publish .\src\TTDeployTool.Controller.Cli\TTDeployTool.Controller.Cli.csp
 - 単体テスト: `dotnet test TTDeployTool.sln`（Azure には接続しません）
 - システムテスト（本物の Azure に対するテスト。料金がかかります）: 準備と実行の方法は [docs/SYSTEM_TESTS.md](docs/SYSTEM_TESTS.md) を参照してください。ローカルでは `scripts/run-system-tests.ps1`（または `.sh`）、CI では GitHub Actions の **System Test** ワークフローを手動で実行します
 - セットアップウィザードとログインの確認（ブラウザーを使う E2E テスト。Playwright）: Timetracker のライセンスキーとサンプルデータベースのユーザー（`TT_E2E_LICENSE_KEY` / `TT_E2E_SAMPLE_LOGIN` / `TT_E2E_SAMPLE_PASSWORD`）がある場合に、サンプルデータベースの作成と、そのユーザーでのログインまでを確かめます。ローカルの docker compose（PostgreSQL / SQL Server）では PR の CI（ubuntu）で毎回、Azure ではシステムテストの中で実行します（[docs/SYSTEM_TESTS.md](docs/SYSTEM_TESTS.md)）
-- CI（`.github/workflows/ci.yml`）: PR と `main` への push のたびに、ビルドと単体テスト・スクリプトのテスト・上の E2E テスト・MCP サーバーのイメージの確認・デスクトップアプリの Store 用のパッケージの作成と確認を実行します。変更がドキュメント（`docs/` の下と `*.md`）だけのときは省きます（Actions の **CI** → Run workflow で手動実行すると、変更にかかわらずすべて実行します）
+- CI（`.github/workflows/ci.yml`）: PR と `main` への push のたびに、ビルドと単体テスト・スクリプトのテスト・上の E2E テスト・MCP サーバーのイメージの確認・デスクトップアプリの Store 用のパッケージの作成と確認・デスクトップアプリの UI テスト（署名した MSIX を導入して画面を操作する）を実行します。変更がドキュメント（`docs/` の下と `*.md`）だけのときは省きます（Actions の **CI** → Run workflow で手動実行すると、変更にかかわらずすべて実行します）
 - リンク切れのチェック（[lychee](https://github.com/lycheeverse/lychee)。設定は `lychee.toml`）: Markdown の中のファイルと見出し（`#...`）へのリンクは、CI の `links` ジョブで PR と `main` への push のたびに確かめます（ドキュメントだけの変更でも省きません）。外部のサイトへのリンクは、相手の都合で一時的に失敗することがあるため、**Links** ワークフロー（`.github/workflows/links.yml`）で月 1 回確かめ、切れていればラベル `link-check` の Issue で知らせます（Actions の **Links** → Run workflow で手動でも実行できます）
 
 ### 設計概要
