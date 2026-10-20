@@ -43,8 +43,8 @@ public class AzureUiTests
             app.SelectWhere("Target.Subscription", name => name.Contains(subscription!), $"サブスクリプション {subscription}", LoadTimeout);
             app.Exists("Target.Error").Should().BeFalse();
             Log($"サブスクリプションの一覧: {string.Join(" / ", app.ItemsOf("Target.Subscription"))}");
-            if (app.Exists("Target.Notices"))
-                Log($"一覧の注意: {app.TextOf("Target.Notices")}");
+            if (app.ScreenText().Split('\n').FirstOrDefault(l => l.StartsWith("テナント ") && l.Contains("読めませんでした")) is { } notice)
+                Log($"一覧の注意: {notice}");
 
             // 「読み直す」を続けて押しても、一覧が重複せず、選んだサブスクリプションが残る
             app.Invoke("Target.Reload");
@@ -82,7 +82,11 @@ public class AzureUiTests
             planning.Should().Contain(t => t.Contains("確認しています") || t.Contains("読んでいます"), "Azure を読む段階を知らせる");
             AppSession.WaitUntil(() => app.Exists("Deploy.Error") || app.Exists("Deploy.Start"), "デプロイの計画が表示されませんでした。", LoadTimeout);
             app.Exists("Deploy.Error").Should().BeFalse(app.Exists("Deploy.Error") ? app.TextOf("Deploy.Error") : "P1: 計画し直すと、前のエラーの領域が消える");
-            Log($"デプロイの計画: {app.TextOf("Deploy.Operations")}");
+            // 計画の一覧（ItemsControl）は UI Automation の要素にならないため、ウィンドウの中の文字列から読む
+            var screen = app.ScreenText();
+            screen.Should().Contain("作成する").And.Contain($"{appName}-env", "作るリソースが計画に出る");
+            // 計画の各行は、操作・名前・種類を横に並べた TextBlock なので、操作の数を書き出す
+            Log($"デプロイの計画: 作成する {screen.Split('\n').Count(l => l == "作成する")} 件");
             app.Invoke("Deploy.Start");
             app.WaitForText("Job.Title", t => t.StartsWith("デプロイ"), "デプロイのジョブが表示される");
 
