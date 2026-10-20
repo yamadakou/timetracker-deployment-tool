@@ -103,9 +103,10 @@ public sealed class JobQueue : ObservableObject, IDisposable
             };
             Jobs.Insert(0, job);
         }
-        _logger.LogInformation("ジョブを登録しました: {Title}（{State}）", job.Title, job.StatusText);
         Changed();
         Pump();
+        // 始めたかどうかが分かるよう、順番に入れた後の状態を書く
+        _logger.LogInformation("ジョブを登録しました: {Title}（{State}）", job.Title, job.StatusText);
         return job;
     }
 
