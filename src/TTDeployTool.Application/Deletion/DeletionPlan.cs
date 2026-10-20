@@ -24,6 +24,10 @@ public sealed record DeletionPlan(
 {
     public bool HasDeletions => Targets.Any(t => t.WillDelete);
 
+    /// <summary>対象ごとの「削除するか」がほかの計画と同じか（削除しない理由の文言の違いは問わない。実行の直前の確認に使う）。</summary>
+    public bool HasSameDeletions(DeletionPlan other) =>
+        Targets.Select(t => (t.Name, t.WillDelete)).SequenceEqual(other.Targets.Select(t => (t.Name, t.WillDelete)));
+
     /// <summary>DB アプリを削除するか。</summary>
     public bool DeletesDb => Targets.Any(t => t.WillDelete && t.Name == ResourceNaming.DbApp(AppName));
 

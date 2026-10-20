@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using TTDeployTool.Application.Jobs;
 using TTDeployTool.Application.Workflows;
 using TTDeployTool.Controller.Desktop.Core.Diagnostics;
+using TTDeployTool.Controller.Desktop.Core.Jobs;
 using TTDeployTool.Controller.Desktop.Core.Mvvm;
 using TTDeployTool.Controller.Desktop.Core.Services;
 
@@ -12,22 +13,28 @@ namespace TTDeployTool.Controller.Desktop.Core.ViewModels;
 /// アプリの画面全体。CLI・MCP と同じアプリケーション層（計画ストア・ジョブ・ワークフロー）をプロセス内に持つ
 /// （利用者は 1 人なので呼び出し元は固定。計画とジョブはアプリを終了すると消える）。
 /// </summary>
-public sealed class MainViewModel : ObservableObject
+public sealed class MainViewModel : ObservableObject, IDisposable
 {
+    /// <summary>予定の時刻を確かめる間隔。</summary>
+    public static readonly TimeSpan ScheduleCheckInterval = TimeSpan.FromSeconds(15);
+
     private readonly IDialogService _dialogs;
-    private readonly TimeProvider _time;
-    private readonly TimeSpan _pollInterval;
     private JobViewModel? _currentJob;
     private JobViewModel? _currentDeployment;
     private JobViewModel? _currentDeletion;
 
     public MainViewModel(
         ISignInService signIn, IAzureClients clients, IDialogService dialogs, ISystemLauncher launcher, TimeProvider time, ILoggerFactory loggers,
-        TimeSpan? pollInterval = null)
+        TimeSpan? pollInterval = null, IAppPreferences? preferences = null)
     {
         _dialogs = dialogs;
-        _time = time;
-        _pollInterval = pollInterval ?? JobViewModel.DefaultPollInterval;
+        Queue = new JobQueue(time, pollInterval ?? JobViewModel.DefaultPollInterval, ScheduleCheckInterval,
+            preferences ?? new InMemoryAppPreferences(), loggers.CreateLogger("TTDeployTool.Desktop.Jobs"));
+        Queue.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(JobQueue.HasActive))
+                OnPropertyChanged(nameof(HasRunningJob));
+        };
         var logger = new DesktopDeploymentLogger(loggers.CreateLogger("TTDeployTool.Desktop"));
         var plans = new InMemoryPlanStore(time);
         var jobs = new JobManager(new InMemoryJobStore(), time, loggers.CreateLogger<JobManager>());
@@ -42,10 +49,10 @@ public sealed class MainViewModel : ObservableObject
                 Target.Clear();
         }, loggers.CreateLogger("TTDeployTool.Desktop.SignIn"));
         Settings = new SettingsViewModel(Target);
-        Deployment = new DeploymentViewModel(new DeploymentWorkflow(plans, jobs, caller, logger), Target, Settings, WatchAsync);
-        Deletion = new DeletionViewModel(new DeletionWorkflow(plans, jobs, caller, logger), Target, WatchAsync);
+        Deployment = new DeploymentViewModel(new DeploymentWorkflow(plans, jobs, caller, logger), Target, Settings, Queue, Show, time);
+        Deletion = new DeletionViewModel(new DeletionWorkflow(plans, jobs, caller, logger), Target, Queue, Show, time);
         Status = new StatusViewModel(Target, logger,
-            () => Jobs.Any(j => j.IsRunning && j.IsFor(Target.Subscription, Target.ResourceGroup, Target.AppName.ToLowerInvariant())));
+            () => Queue.ActiveFor(Target.Subscription, Target.ResourceGroup, Target.AppName.ToLowerInvariant())?.IsRunning == true);
         DryRun = new DryRunViewModel(Settings, dialogs, launcher);
         LogDirectory = (loggers as DiagnosticLog)?.Directory;
         OpenLogFolderCommand = new AsyncCommand(() =>
@@ -83,8 +90,11 @@ public sealed class MainViewModel : ObservableObject
     /// <summary>デプロイが成功した後に、Timetracker を既定のブラウザーで開く。</summary>
     public AsyncCommand OpenEndpointCommand { get; }
 
-    /// <summary>このアプリで実行したジョブ（新しい順）。</summary>
-    public ObservableCollection<JobViewModel> Jobs { get; } = [];
+    /// <summary>ジョブの順番待ち・予定・同時実行の上限。</summary>
+    public JobQueue Queue { get; }
+
+    /// <summary>このアプリで登録したジョブ（新しい順）。</summary>
+    public ObservableCollection<JobViewModel> Jobs => Queue.Jobs;
 
     /// <summary>最後に始めたジョブ。</summary>
     public JobViewModel? CurrentJob
@@ -107,20 +117,24 @@ public sealed class MainViewModel : ObservableObject
         private set => SetProperty(ref _currentDeletion, value);
     }
 
-    public bool HasRunningJob => Jobs.Any(j => j.IsRunning);
+    /// <summary>終わっていないジョブ（予定・待機中・一時停止を含む）があるか。</summary>
+    public bool HasRunningJob => Queue.HasActive;
 
     /// <summary>起動時の処理（前回のサインインを復元し、サブスクリプションを読む）。</summary>
     public Task InitializeAsync() => SignIn.RestoreAsync();
 
-    /// <summary>ウィンドウを閉じてよいか。実行中のジョブがあれば確認する（閉じるとジョブは止まる）。</summary>
+    /// <summary>ウィンドウを閉じてよいか。終わっていないジョブがあれば確認する（閉じると実行中のジョブは止まり、予定・待機中のジョブは消える）。</summary>
     public async Task<bool> ConfirmCloseAsync() =>
         !HasRunningJob || await _dialogs.ConfirmAsync(
-            "実行中の処理があります",
-            "デプロイまたは削除を実行中です。閉じると処理が止まり、途中まで作成・削除したリソースが残ります" +
-            "（もう一度実行すると続きから処理します）。閉じますか？",
+            "終わっていないジョブがあります",
+            $"ジョブ（{Queue.Summary}）があります。閉じると実行中の処理が止まり、途中まで作成・削除したリソースが残ります" +
+            "（もう一度実行すると続きから処理します）。予定・待機中のジョブは消えます。閉じますか？",
             "閉じる");
 
-    private async Task WatchAsync(JobViewModel job)
+    public void Dispose() => Queue.Dispose();
+
+    // 登録したジョブを、デプロイ・削除の画面に表示する
+    private void Show(JobViewModel job)
     {
         CurrentJob = job;
         if (job.IsDeployment)
@@ -134,11 +148,12 @@ public sealed class MainViewModel : ObservableObject
             if (CurrentDeployment?.IsSameTarget(job) == true)
                 CurrentDeployment = null;
         }
-        OpenEndpointCommand.RaiseCanExecuteChanged();
-        Jobs.Insert(0, job);
-        OnPropertyChanged(nameof(HasRunningJob));
-        await job.WatchAsync(_time, _pollInterval);
-        OnPropertyChanged(nameof(HasRunningJob));
+        // デプロイが終わって URL が分かったら、「Timetracker を開く」を押せるようにする
+        job.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(JobViewModel.Endpoint))
+                OpenEndpointCommand.RaiseCanExecuteChanged();
+        };
         OpenEndpointCommand.RaiseCanExecuteChanged();
     }
 }

@@ -83,7 +83,7 @@ public sealed class DeletionWorkflow
         var blockers = Blockers(current);
         if (blockers.Count > 0)
             throw new WorkflowException(WorkflowFailure.Blocked, blockers);
-        if (!HasSameDeletions(plan, current))
+        if (!plan.HasSameDeletions(current))
             throw new WorkflowException(WorkflowFailure.Changed);
 
         var total = plan.Targets.Count(t => t.WillDelete);
@@ -114,8 +114,4 @@ public sealed class DeletionWorkflow
         plan.HasDeletions && plan.PermissionCheck.Status == PermissionCheckStatus.Missing
             ? [string.Format(PermissionBlocker, string.Join(", ", plan.PermissionCheck.MissingActions))]
             : [];
-
-    // 対象ごとの「削除するか」が計画と同じか（削除しない理由の文言の違いは問わない）
-    private static bool HasSameDeletions(DeletionPlan plan, DeletionPlan current) =>
-        plan.Targets.Select(t => (t.Name, t.WillDelete)).SequenceEqual(current.Targets.Select(t => (t.Name, t.WillDelete)));
 }

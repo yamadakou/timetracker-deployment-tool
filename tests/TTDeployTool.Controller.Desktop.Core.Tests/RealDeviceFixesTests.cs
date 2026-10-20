@@ -121,6 +121,7 @@ public class RealDeviceFixesTests
 
         release.SetResult();
         await start;
+        await h.Main.Queue.WhenIdleAsync();
         h.Main.Target.AppName = "demo";
         h.Azure.Deployed();
         h.Azure.AppDetails.Add(new ContainerAppDetails("demo-tt", "Succeeded", "Running", "tt", 1.5, "3Gi", "demo-tt--r1", "demo-tt.example.io", FakeAzure.Managed));
@@ -137,6 +138,7 @@ public class RealDeviceFixesTests
         h.Main.OpenEndpointCommand.CanExecute(null).Should().BeFalse();
         await h.Main.Deployment.PlanCommand.ExecuteAsync();
         await h.Main.Deployment.StartCommand.ExecuteAsync();
+        await h.Main.Queue.WhenIdleAsync();
         var deployment = h.Main.CurrentDeployment!;
         deployment.IsDeployment.Should().BeTrue();
         deployment.HasEndpoint.Should().BeTrue();
@@ -149,6 +151,7 @@ public class RealDeviceFixesTests
         await h.Main.Deletion.PlanCommand.ExecuteAsync();
         h.Main.Deletion.ConfirmAppName = "other";
         await h.Main.Deletion.StartCommand.ExecuteAsync();
+        await h.Main.Queue.WhenIdleAsync();
         h.Main.CurrentDeletion!.IsDeployment.Should().BeFalse();
         h.Main.CurrentDeletion.HasEndpoint.Should().BeFalse();
         h.Main.CurrentDeployment.Should().BeSameAs(deployment);
@@ -161,6 +164,7 @@ public class RealDeviceFixesTests
         await h.Main.Deletion.PlanCommand.ExecuteAsync();
         h.Main.Deletion.ConfirmAppName = "demo";
         await h.Main.Deletion.StartCommand.ExecuteAsync();
+        await h.Main.Queue.WhenIdleAsync();
         h.Main.CurrentDeployment.Should().BeNull();
         h.Main.OpenEndpointCommand.CanExecute(null).Should().BeFalse();
         h.Main.CurrentJob.Should().BeSameAs(h.Main.CurrentDeletion);

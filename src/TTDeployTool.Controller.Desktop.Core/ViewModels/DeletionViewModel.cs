@@ -1,7 +1,9 @@
 using System.Collections.ObjectModel;
 using TTDeployTool.Application.Deletion;
+using TTDeployTool.Application.Jobs;
 using TTDeployTool.Application.Permissions;
 using TTDeployTool.Application.Workflows;
+using TTDeployTool.Controller.Desktop.Core.Jobs;
 using TTDeployTool.Controller.Desktop.Core.Mvvm;
 
 namespace TTDeployTool.Controller.Desktop.Core.ViewModels;
@@ -24,7 +26,8 @@ public sealed class DeletionViewModel : ObservableObject
 
     private readonly DeletionWorkflow _workflow;
     private readonly TargetViewModel _target;
-    private readonly Func<JobViewModel, Task> _watch;
+    private readonly JobQueue _queue;
+    private readonly Action<JobViewModel> _registered;
     private DeletionPlanTicket? _ticket;
     private bool _includeUntagged;
     private bool _keepDbData;
@@ -32,14 +35,18 @@ public sealed class DeletionViewModel : ObservableObject
     private string? _error;
     private string? _note;
 
-    /// <param name="watch">始めたジョブを画面に表示し、終わるまで状態を読み直す</param>
-    public DeletionViewModel(DeletionWorkflow workflow, TargetViewModel target, Func<JobViewModel, Task> watch)
+    /// <param name="queue">ジョブの順番待ち（同じ対象のジョブがあれば、計画・登録しない）</param>
+    /// <param name="registered">登録したジョブを画面に表示する</param>
+    public DeletionViewModel(DeletionWorkflow workflow, TargetViewModel target, JobQueue queue, Action<JobViewModel> registered, TimeProvider time)
     {
         _workflow = workflow;
         _target = target;
-        _watch = watch;
+        _queue = queue;
+        _registered = registered;
+        Schedule = new ScheduleInput(time);
         PlanCommand = new AsyncCommand(() => Busy.RunAsync("計画を作っています", PlanAsync));
-        StartCommand = new AsyncCommand(StartAsync, () => CanStart);
+        StartCommand = new AsyncCommand(() => RegisterAsync(null), () => CanStart);
+        ScheduleCommand = new AsyncCommand(() => RegisterAsync(Schedule), () => CanStart);
         _target.Changed += (_, _) => Ticket = null;
     }
 
@@ -48,7 +55,14 @@ public sealed class DeletionViewModel : ObservableObject
     /// <summary>計画の処理中の表示。</summary>
     public BusyState Busy { get; } = new();
 
+    /// <summary>今すぐ削除する（同時に実行できる数に達していれば、待機中になる）。</summary>
     public AsyncCommand StartCommand { get; }
+
+    /// <summary>予定に追加する（<see cref="Schedule"/> の日時に削除する）。</summary>
+    public AsyncCommand ScheduleCommand { get; }
+
+    /// <summary>「予定に追加」の日時。</summary>
+    public ScheduleInput Schedule { get; }
 
     public ObservableCollection<DeletionRow> Targets { get; } = [];
 
@@ -171,11 +185,15 @@ public sealed class DeletionViewModel : ObservableObject
             OnPropertyChanged(nameof(KeptText));
             OnPropertyChanged(nameof(CanStart));
             StartCommand.RaiseCanExecuteChanged();
+            ScheduleCommand.RaiseCanExecuteChanged();
         }
     }
 
     private static string KeptResourceGroup(DeletionPlan plan) =>
         $"リソースグループ {plan.ResourceGroup} は削除しません（不要であれば Azure ポータルや az group delete で削除してください）。";
+
+    // 完了のログに添える案内（メソッドのグループを何度も渡すと、そのたびに委譲の作成の確かめが入るため、1 つにする）
+    private static readonly Func<DeletionPlan, string> KeptNotice = KeptDbDataNotice;
 
     private static string KeptDbDataNotice(DeletionPlan plan) =>
         $"ストレージアカウント {plan.StorageAccountName}（DB のデータ）は残します。料金がかかり続けます。同じアプリ名で「Azure Files に永続化する」を選んで" +
@@ -191,6 +209,11 @@ public sealed class DeletionViewModel : ObservableObject
             Error = targetError;
             return;
         }
+        if (_queue.ActiveFor(_target.Subscription, _target.ResourceGroup, _target.AppName.ToLowerInvariant()) is { } active)
+        {
+            Error = JobQueue.ActiveMessage(active);
+            return;
+        }
         try
         {
             Ticket = await _workflow.PlanAsync(
@@ -202,24 +225,52 @@ public sealed class DeletionViewModel : ObservableObject
         }
     }
 
-    private async Task StartAsync()
+    // アプリ名を確かめた計画を登録する。始めるのは JobQueue（今すぐ、または予定の時刻）
+    private Task RegisterAsync(ScheduleInput? schedule)
     {
         Error = null;
-        JobViewModel job;
+        if (schedule?.Error is { } scheduleError)
+        {
+            Error = scheduleError;
+            return Task.CompletedTask;
+        }
+        var ticket = _ticket!;
+        var confirmed = ConfirmAppName;
+        var session = _target.CreateSession();
+        var plan = ticket.Plan;
         try
         {
-            job = new JobViewModel(await _workflow.StartAsync(_ticket!.Saved!.PlanId, ConfirmAppName, _ => _target.CreateSession(), KeptDbDataNotice));
-        }
-        catch (Exception ex)
-        {
-            Error = DesktopMessages.ForAzure(ex);
-            return;
-        }
-        finally
-        {
-            // 実行しなかった場合も計画は使用済みになるため、計画からやり直してもらう（アプリ名の不一致は、一致するまで押せないので起きない）
+            _registered(_queue.Register(JobKind.Delete, new JobTarget(plan.Subscription, plan.ResourceGroup, plan.AppName), schedule?.At,
+                () => StartPlannedAsync(ticket, confirmed, session)));
+            // 登録した計画は使ったものとして、画面から外す（次は計画からやり直す）
             Ticket = null;
         }
-        await _watch(job);
+        catch (InvalidOperationException ex)
+        {
+            Error = ex.Message;
+        }
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// 確かめた計画で削除のジョブを始める。計画の有効期限（15 分）が切れていれば計画し直し、対象ごとの「削除するか」が確かめた計画と
+    /// 同じ場合だけ始める（予定・待機中のジョブのため。詳細設計 desktop-jobs.md の 4.2）。
+    /// </summary>
+    internal async Task<Job> StartPlannedAsync(DeletionPlanTicket ticket, string confirmedAppName, IAzureSession session)
+    {
+        try
+        {
+            return await _workflow.StartAsync(ticket.Saved!.PlanId, confirmedAppName, _ => session, KeptNotice);
+        }
+        catch (WorkflowException ex) when (ex.Failure == WorkflowFailure.PlanExpired)
+        {
+            var plan = ticket.Plan;
+            var fresh = await _workflow.PlanAsync(session, plan.Subscription, plan.ResourceGroup, plan.AppName, plan.IncludeUntagged, plan.KeepDbData);
+            if (!fresh.CanRun)
+                throw new WorkflowException(WorkflowFailure.Blocked, fresh.Blockers);
+            if (!plan.HasSameDeletions(fresh.Plan))
+                throw new WorkflowException(WorkflowFailure.Changed);
+            return await _workflow.StartAsync(fresh.Saved!.PlanId, confirmedAppName, _ => session, KeptNotice);
+        }
     }
 }

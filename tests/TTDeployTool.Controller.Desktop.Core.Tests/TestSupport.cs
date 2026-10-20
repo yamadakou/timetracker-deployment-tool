@@ -49,11 +49,14 @@ internal sealed class FakeDialogs : IDialogService
 
     public List<string> Confirmations { get; } = [];
 
+    public List<string> Messages { get; } = [];
+
     public Task<string?> PickFolderAsync() => Task.FromResult(Folder);
 
     public Task<bool> ConfirmAsync(string title, string message, string confirmText)
     {
         Confirmations.Add(title);
+        Messages.Add(message);
         return Task.FromResult(Confirm);
     }
 }

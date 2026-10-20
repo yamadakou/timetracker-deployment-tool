@@ -147,6 +147,56 @@ public class JobManagerTests
     }
 
     [Fact]
+    public async Task A_Stop_Request_Should_Stop_The_Job_Before_The_Next_Step()
+    {
+        var firstStep = new TaskCompletionSource();
+        var release = new TaskCompletionSource();
+        var job = _jobs.TryStart(JobKind.Deploy, Target, "local", async ctx =>
+        {
+            ctx.ReportStep(1, 3, "リソースグループ rg");
+            firstStep.SetResult();
+            await release.Task;
+            ctx.ReportStep(2, 3, "Container Apps Environment demo-env");
+            return "done";
+        }).Job!;
+        await firstStep.Task;
+
+        job.RequestStop().Should().BeTrue();
+        job.StopRequested.Should().BeTrue();
+        job.Snapshot().StopRequested.Should().BeTrue();
+        job.Snapshot().Status.Should().Be(JobStatus.Running, "今の手順は止めない");
+        release.SetResult();
+        await job.Completion;
+
+        var snapshot = job.Snapshot();
+        snapshot.Status.Should().Be(JobStatus.Stopped);
+        snapshot.CurrentStep.Should().Be(new JobStep(1, 3, "リソースグループ rg"));
+        snapshot.Error.Should().Be("リソースグループ rg（手順 1/3）の後で停止しました。");
+        snapshot.Result.Should().BeNull();
+        snapshot.CompletedAt.Should().Be(_time.Now);
+        // 終わったジョブは停止を受け付けない
+        job.RequestStop().Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task A_Stop_Before_The_First_Step_Should_Say_So()
+    {
+        var release = new TaskCompletionSource();
+        var job = _jobs.TryStart(JobKind.Delete, Target, "local", async ctx =>
+        {
+            await release.Task;
+            ctx.ReportStep(1, 2, "demo-tt の削除");
+            return null;
+        }).Job!;
+
+        job.RequestStop();
+        release.SetResult();
+        await job.Completion;
+
+        job.Snapshot().Should().Match<JobSnapshot>(s => s.Status == JobStatus.Stopped && s.Error == "最初の手順の前に停止しました。" && s.CurrentStep == null);
+    }
+
+    [Fact]
     public async Task Jobs_Should_Be_Visible_Only_To_Their_Caller_Newest_First()
     {
         var first = _jobs.TryStart(JobKind.Deploy, new JobTarget("sub", "rg", "a"), "alice", _ => Task.FromResult<object?>(null)).Job!;

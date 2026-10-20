@@ -16,11 +16,13 @@ internal sealed class Harness
     public FakeAzure Azure { get; } = new();
     public FakeDialogs Dialogs { get; } = new();
     public FakeLauncher Launcher { get; } = new();
+    public TTDeployTool.Controller.Desktop.Core.Services.InMemoryAppPreferences Preferences { get; } = new();
     public MainViewModel Main { get; }
 
-    public Harness(Microsoft.Extensions.Logging.ILoggerFactory? loggers = null)
+    public Harness(Microsoft.Extensions.Logging.ILoggerFactory? loggers = null, TimeProvider? time = null)
     {
-        Main = new MainViewModel(SignIn, Azure, Dialogs, Launcher, TimeProvider.System, loggers ?? NullLoggerFactory.Instance, TimeSpan.FromMilliseconds(5));
+        Main = new MainViewModel(SignIn, Azure, Dialogs, Launcher, time ?? TimeProvider.System, loggers ?? NullLoggerFactory.Instance, TimeSpan.FromMilliseconds(5),
+            Preferences);
     }
 
     /// <summary>サインインして、対象（sub / rg / demo）と正しい設定を入れる。</summary>

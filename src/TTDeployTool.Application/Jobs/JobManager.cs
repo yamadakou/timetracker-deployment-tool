@@ -37,15 +37,25 @@ public sealed class JobContext
 
     public IDeploymentLogger Logger { get; }
 
-    public void ReportStep(int index, int total, string name) => _job.SetStep(new JobStep(index, total, name));
+    /// <summary>次の手順を始める。停止を要求されていれば、始めずに止める（<see cref="JobStoppedException"/>）。</summary>
+    public void ReportStep(int index, int total, string name)
+    {
+        if (_job.StopRequested)
+            throw new JobStoppedException();
+        _job.SetStep(new JobStep(index, total, name));
+    }
 }
+
+/// <summary>停止の要求により、手順の境目で止めた（ジョブは「停止」になる）。</summary>
+public sealed class JobStoppedException() : Exception("停止を要求されたため、次の手順に進みませんでした。");
 
 /// <summary>ジョブを始めた結果。同じ対象のジョブが実行中なら <see cref="Job"/> は null で、<see cref="ConflictingJobId"/> にそのジョブの ID が入る。</summary>
 public sealed record JobStartResult(Job? Job, string? ConflictingJobId);
 
 /// <summary>
 /// デプロイ・削除をバックグラウンドで実行し、状態を問い合わせられるようにする（MCP の start_* と get_job_status）。
-/// 実行中のジョブはキャンセルしない（Azure の操作を途中で止めると中途半端な状態が残るため）。
+/// 実行中のジョブはキャンセルしない（Azure の操作を途中で止めると中途半端な状態が残るため）。停止の要求（<see cref="Job.RequestStop"/>）は、
+/// 手順の境目でだけ受け付ける。
 /// </summary>
 public sealed class JobManager
 {
@@ -81,6 +91,11 @@ public sealed class JobManager
             try
             {
                 job.Succeed(await work(context), _time.GetUtcNow());
+            }
+            catch (JobStoppedException)
+            {
+                _logger.LogInformation("ジョブ {JobId} を停止しました", job.Id);
+                job.Stop(_time.GetUtcNow());
             }
             catch (Exception ex)
             {

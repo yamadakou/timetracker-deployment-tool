@@ -49,6 +49,7 @@ public class DeploymentViewModelTests
         vm.CanStart.Should().BeTrue();
 
         await vm.StartCommand.ExecuteAsync();
+        await h.Main.Queue.WhenIdleAsync();
 
         vm.HasPlan.Should().BeFalse();
         var job = h.Main.CurrentJob!;
@@ -85,6 +86,7 @@ public class DeploymentViewModelTests
         vm.DataLossAcknowledged = true;
         vm.StartCommand.CanExecute(null).Should().BeTrue();
         await vm.StartCommand.ExecuteAsync();
+        await h.Main.Queue.WhenIdleAsync();
 
         h.Main.CurrentJob!.StatusText.Should().Be("完了");
         vm.DataLossAcknowledged.Should().BeFalse();
@@ -125,10 +127,13 @@ public class DeploymentViewModelTests
         h.Azure.Apps.Add(new ContainerAppInfo("demo-redis", FakeAzure.EnvId, FakeAzure.Managed));
 
         await vm.StartCommand.ExecuteAsync();
+        await h.Main.Queue.WhenIdleAsync();
 
-        vm.Error.Should().Be(DesktopMessages.Changed);
+        // 実行の直前の確認で変化が分かり、ジョブは始めずに失敗にする（計画は使ったものとして外す）
         vm.HasPlan.Should().BeFalse();
-        h.Main.CurrentJob.Should().BeNull();
+        var job = h.Main.CurrentJob!;
+        job.State.Should().Be(DesktopJobState.Failed);
+        job.Error.Should().Be("実行しませんでした: " + DesktopMessages.Changed);
     }
 
     [Fact]
@@ -167,13 +172,14 @@ public class JobViewModelTests
         job.StatusText.Should().Be("実行中");
         // 実行中は、閉じる前に確認する
         (await h.Main.ConfirmCloseAsync()).Should().BeFalse();
-        h.Dialogs.Confirmations.Should().Equal("実行中の処理があります");
+        h.Dialogs.Confirmations.Should().Equal("終わっていないジョブがあります");
         // 画面の項目は、読み直しの間隔（5 ms）ごとに更新される
         for (var i = 0; i < 500 && job.StepText == null; i++)
             await Task.Delay(10, TestContext.Current.CancellationToken);
         job.StepText.Should().Be("1 / 3: リソースグループ rg");
         release.SetResult();
         await start;
+        await h.Main.Queue.WhenIdleAsync();
 
         job.StepText.Should().StartWith("3 / 3");
         job.Endpoint.Should().BeNull();
@@ -190,6 +196,7 @@ public class JobViewModelTests
         await h.Main.Deployment.PlanCommand.ExecuteAsync();
 
         await h.Main.Deployment.StartCommand.ExecuteAsync();
+        await h.Main.Queue.WhenIdleAsync();
 
         var job = h.Main.CurrentJob!;
         job.StatusText.Should().Be("失敗");

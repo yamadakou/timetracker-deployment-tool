@@ -1,7 +1,9 @@
 using System.Collections.ObjectModel;
 using TTDeployTool.Application.Deployment;
+using TTDeployTool.Application.Jobs;
 using TTDeployTool.Application.Permissions;
 using TTDeployTool.Application.Workflows;
+using TTDeployTool.Controller.Desktop.Core.Jobs;
 using TTDeployTool.Controller.Desktop.Core.Mvvm;
 using TTDeployTool.Domain.Deployment;
 
@@ -19,20 +21,26 @@ public sealed class DeploymentViewModel : ObservableObject
     private readonly DeploymentWorkflow _workflow;
     private readonly TargetViewModel _target;
     private readonly SettingsViewModel _settings;
-    private readonly Func<JobViewModel, Task> _watch;
+    private readonly JobQueue _queue;
+    private readonly Action<JobViewModel> _registered;
     private DeploymentPlanTicket? _ticket;
     private bool _dataLossAcknowledged;
     private string? _error;
 
-    /// <param name="watch">始めたジョブを画面に表示し、終わるまで状態を読み直す</param>
-    public DeploymentViewModel(DeploymentWorkflow workflow, TargetViewModel target, SettingsViewModel settings, Func<JobViewModel, Task> watch)
+    /// <param name="queue">ジョブの順番待ち（同じ対象のジョブがあれば、計画・登録しない）</param>
+    /// <param name="registered">登録したジョブを画面に表示する</param>
+    public DeploymentViewModel(
+        DeploymentWorkflow workflow, TargetViewModel target, SettingsViewModel settings, JobQueue queue, Action<JobViewModel> registered, TimeProvider time)
     {
         _workflow = workflow;
         _target = target;
         _settings = settings;
-        _watch = watch;
+        _queue = queue;
+        _registered = registered;
+        Schedule = new ScheduleInput(time);
         PlanCommand = new AsyncCommand(() => Busy.RunAsync("計画を作っています", PlanAsync));
-        StartCommand = new AsyncCommand(StartAsync, () => CanStart);
+        StartCommand = new AsyncCommand(() => RegisterAsync(null), () => CanStart);
+        ScheduleCommand = new AsyncCommand(() => RegisterAsync(Schedule), () => CanStart);
         // 対象や設定を変えたら、前の計画は使わない（計画と違う内容で実行しないように）
         _target.Changed += (_, _) => Ticket = null;
         _settings.PropertyChanged += (_, _) => Ticket = null;
@@ -43,7 +51,14 @@ public sealed class DeploymentViewModel : ObservableObject
     /// <summary>計画の処理中の表示。</summary>
     public BusyState Busy { get; } = new();
 
+    /// <summary>今すぐ実行する（同時に実行できる数に達していれば、待機中になる）。</summary>
     public AsyncCommand StartCommand { get; }
+
+    /// <summary>予定に追加する（<see cref="Schedule"/> の日時に実行する）。</summary>
+    public AsyncCommand ScheduleCommand { get; }
+
+    /// <summary>「予定に追加」の日時。</summary>
+    public ScheduleInput Schedule { get; }
 
     public ObservableCollection<OperationRow> Operations { get; } = [];
 
@@ -81,8 +96,10 @@ public sealed class DeploymentViewModel : ObservableObject
         get => _dataLossAcknowledged;
         set
         {
-            if (SetProperty(ref _dataLossAcknowledged, value))
-                StartCommand.RaiseCanExecuteChanged();
+            if (!SetProperty(ref _dataLossAcknowledged, value))
+                return;
+            StartCommand.RaiseCanExecuteChanged();
+            ScheduleCommand.RaiseCanExecuteChanged();
         }
     }
 
@@ -125,6 +142,7 @@ public sealed class DeploymentViewModel : ObservableObject
             OnPropertyChanged(nameof(RequiresDataLossAck));
             OnPropertyChanged(nameof(CanStart));
             StartCommand.RaiseCanExecuteChanged();
+            ScheduleCommand.RaiseCanExecuteChanged();
         }
     }
 
@@ -139,6 +157,11 @@ public sealed class DeploymentViewModel : ObservableObject
             Error = "設定に誤りがあります:\n- " + string.Join("\n- ", input.Errors);
             return;
         }
+        if (_queue.ActiveFor(input.Options.Subscription, input.Options.ResourceGroup, input.Options.AppName) is { } active)
+        {
+            Error = JobQueue.ActiveMessage(active);
+            return;
+        }
         try
         {
             Ticket = await _workflow.PlanAsync(_target.CreateSession(Busy), input.Options);
@@ -149,26 +172,52 @@ public sealed class DeploymentViewModel : ObservableObject
         }
     }
 
-    private async Task StartAsync()
+    // 計画を確かめたジョブを登録する。始めるのは JobQueue（今すぐ、または予定の時刻）
+    private Task RegisterAsync(ScheduleInput? schedule)
     {
         Error = null;
-        var planId = _ticket!.Saved!.PlanId;
-        JobViewModel job;
+        if (schedule?.Error is { } scheduleError)
+        {
+            Error = scheduleError;
+            return Task.CompletedTask;
+        }
+        var ticket = _ticket!;
+        var acknowledged = DataLossAcknowledged;
+        var session = _target.CreateSession();
+        var options = ticket.Plan.Options;
         try
         {
-            job = new JobViewModel(await _workflow.StartAsync(planId, DataLossAcknowledged, _ => _target.CreateSession()));
-        }
-        catch (Exception ex)
-        {
-            Error = DesktopMessages.ForAzure(ex);
-            return;
-        }
-        finally
-        {
-            // 実行しなかった場合も計画は使用済みになるため、計画からやり直してもらう（同意の不足は、チェックが無いと押せないので起きない）
+            _registered(_queue.Register(JobKind.Deploy, new JobTarget(options.Subscription, options.ResourceGroup, options.AppName), schedule?.At,
+                () => StartPlannedAsync(ticket, acknowledged, session)));
+            // 登録した計画は使ったものとして、画面から外す（次は計画からやり直す）
             Ticket = null;
         }
-        await _watch(job);
+        catch (InvalidOperationException ex)
+        {
+            Error = ex.Message;
+        }
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// 確かめた計画でジョブを始める。計画の有効期限（15 分）が切れていれば計画し直し、確かめた計画と同じ操作で、データ消失の同意が
+    /// 新たに要らない場合だけ始める（予定・待機中のジョブのため。詳細設計 desktop-jobs.md の 4.2）。
+    /// </summary>
+    internal async Task<Job> StartPlannedAsync(DeploymentPlanTicket ticket, bool acknowledged, IAzureSession session)
+    {
+        try
+        {
+            return await _workflow.StartAsync(ticket.Saved!.PlanId, acknowledged, _ => session);
+        }
+        catch (WorkflowException ex) when (ex.Failure == WorkflowFailure.PlanExpired)
+        {
+            var fresh = await _workflow.PlanAsync(session, ticket.Plan.Options);
+            if (!fresh.Plan.CanRun)
+                throw new WorkflowException(WorkflowFailure.Blocked, fresh.Plan.Blockers);
+            if (!ticket.Plan.HasSameOperations(fresh.Plan) || (fresh.Plan.RequiresDataLossAck && !acknowledged))
+                throw new WorkflowException(WorkflowFailure.Changed);
+            return await _workflow.StartAsync(fresh.Saved!.PlanId, acknowledged, _ => session);
+        }
     }
 
     internal static OperationRow ToRow(PlannedOperation op) => new(

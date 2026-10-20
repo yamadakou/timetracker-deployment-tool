@@ -48,6 +48,7 @@ public class DeletionViewModelTests
         vm.ConfirmAppName = "demo";
         vm.StartCommand.CanExecute(null).Should().BeTrue();
         await vm.StartCommand.ExecuteAsync();
+        await h.Main.Queue.WhenIdleAsync();
 
         var job = h.Main.CurrentJob!;
         job.Title.Should().Be("削除（rg / demo）");
@@ -80,6 +81,7 @@ public class DeletionViewModelTests
         vm.Targets[0].WillDelete.Should().BeTrue();
         vm.ConfirmAppName = "demo";
         await vm.StartCommand.ExecuteAsync();
+        await h.Main.Queue.WhenIdleAsync();
 
         h.Main.CurrentJob!.DeletionSummary.Should().StartWith("削除したもの: なし。既に無かったもの: demo-tt。");
     }
@@ -113,9 +115,10 @@ public class DeletionViewModelTests
 
         vm.ConfirmAppName = "demo";
         await vm.StartCommand.ExecuteAsync();
+        await h.Main.Queue.WhenIdleAsync();
 
-        vm.Error.Should().Be(DesktopMessages.Changed);
         vm.HasPlan.Should().BeFalse();
+        h.Main.CurrentDeletion!.Error.Should().Be("実行しませんでした: " + DesktopMessages.Changed);
 
         h.Azure.GatewayMock.Setup(g => g.ListContainerAppsAsync("sub", "rg", It.IsAny<CancellationToken>())).ThrowsAsync(new RequestFailedException(500, "障害"));
         await vm.PlanCommand.ExecuteAsync();

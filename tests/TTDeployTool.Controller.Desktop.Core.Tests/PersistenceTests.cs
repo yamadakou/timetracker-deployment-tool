@@ -40,6 +40,7 @@ public class PersistenceTests
         vm.Warnings.Should().Contain(DbPersistence.StorageNotice(FakeAzure.StorageAccountName));
 
         await vm.StartCommand.ExecuteAsync();
+        await h.Main.Queue.WhenIdleAsync();
 
         h.Main.CurrentJob!.StatusText.Should().Be("完了");
         h.Main.CurrentJob.PersistenceSummary.Should().Be($"DB のデータはストレージアカウント {FakeAzure.StorageAccountName}（Azure Files）に保存しています。");
@@ -67,6 +68,7 @@ public class PersistenceTests
 
         await h.Main.Deployment.PlanCommand.ExecuteAsync();
         await h.Main.Deployment.StartCommand.ExecuteAsync();
+        await h.Main.Queue.WhenIdleAsync();
 
         h.Main.Deployment.PersistDbText.Should().BeNull();
         h.Main.CurrentJob!.PersistenceSummary.Should().BeNull();
@@ -98,6 +100,7 @@ public class PersistenceTests
         vm.KeptText.Should().EndWith("不要になったら「DB のデータを残す」のチェックを外して削除してください。");
         vm.ConfirmAppName = "demo";
         await vm.StartCommand.ExecuteAsync();
+        await h.Main.Queue.WhenIdleAsync();
 
         var job = h.Main.CurrentJob!;
         job.StatusText.Should().Be("完了");
