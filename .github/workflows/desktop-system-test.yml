@@ -28,7 +28,10 @@ jobs:
       TT_UITEST_RESULTS_DIRECTORY: ${{ github.workspace }}\TestResults
 
     steps:
+    # 後の手順で git の資格情報を使わないため、保存しない
     - uses: actions/checkout@v6
+      with:
+        persist-credentials: false
 
     - name: Setup .NET
       uses: actions/setup-dotnet@v5
@@ -71,6 +74,7 @@ jobs:
       run: |
         $all = Get-ChildItem UiPackages -Recurse -Filter *.msix
         $package = $all | Where-Object { $_.FullName -notmatch '\\Dependencies\\' } | Select-Object -First 1
+        if (-not $package) { throw "UiPackages に MSIX がありません（ビルドの出力を確かめてください）。" }
         $dependencies = @($all | Where-Object { $_.FullName -match '\\Dependencies\\x64\\' } | ForEach-Object FullName)
         if ($dependencies.Count -gt 0) {
           Add-AppxPackage -Path $package.FullName -DependencyPath $dependencies
@@ -106,12 +110,25 @@ jobs:
         name: desktop-system-test-results
         path: TestResults
 
-    # テストが途中で失敗しても、作ったリソースを残さない（本ツールは既存のリソースグループを消さないため、この専用のものを消す）
+    # 片付けの前にサインインし直す（OIDC のサインインはトークンを更新できず、長い実行の後では期限が切れていることがあるため）
+    - name: Azure login for cleanup (OIDC)
+      if: always()
+      uses: azure/login@v3
+      with:
+        client-id: ${{ vars.AZURE_CLIENT_ID }}
+        tenant-id: ${{ vars.AZURE_TENANT_ID }}
+        subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+    # テストが途中で失敗しても、作ったリソースを残さない（本ツールは既存のリソースグループを消さないため、この専用のものを消す）。
+    # az が失敗したら、消さずに黙って終わらないよう、この手順を失敗にする（料金のかかるリソースが残っていることに気づけるように）
     - name: Delete the resource group
       if: always()
       shell: pwsh
       run: |
-        if ((az group exists --name $env:TT_UITEST_RESOURCE_GROUP) -eq "true") {
+        $exists = az group exists --name $env:TT_UITEST_RESOURCE_GROUP
+        if ($LASTEXITCODE -ne 0) { throw "リソースグループ $($env:TT_UITEST_RESOURCE_GROUP) があるかを確かめられませんでした。Azure ポータルで確かめて削除してください。" }
+        if ($exists -eq "true") {
           az group delete --name $env:TT_UITEST_RESOURCE_GROUP --yes --no-wait
+          if ($LASTEXITCODE -ne 0) { throw "リソースグループ $($env:TT_UITEST_RESOURCE_GROUP) の削除を始められませんでした。Azure ポータルで削除してください。" }
           Write-Host "リソースグループ $($env:TT_UITEST_RESOURCE_GROUP) の削除を始めました。"
         }
