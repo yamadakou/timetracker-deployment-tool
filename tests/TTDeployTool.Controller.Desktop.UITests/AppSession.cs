@@ -114,7 +114,7 @@ public sealed class AppSession : IDisposable
         var combo = Find(automationId).AsComboBox();
         combo.Expand();
         var item = Retry.WhileNull(
-            () => combo.Items.FirstOrDefault(i => i.Name == itemText),
+            () => combo.Items.FirstOrDefault(i => NameOf(i) == itemText),
             Timeout, Interval, throwOnTimeout: true, ignoreException: true,
             timeoutMessage: $"{automationId} に「{itemText}」がありませんでした。").Result!;
         item.Patterns.SelectionItem.Pattern.Select();
@@ -137,8 +137,8 @@ public sealed class AppSession : IDisposable
         var texts = new List<string>();
         if (element.Patterns.Value.TryGetPattern(out var value))
             texts.Add(value.Value.Value ?? "");
-        texts.Add(element.Name);
-        texts.AddRange(element.FindAllDescendants(cf => cf.ByControlType(ControlType.Text)).Select(t => t.Name));
+        texts.Add(NameOf(element));
+        texts.AddRange(element.FindAllDescendants(cf => cf.ByControlType(ControlType.Text)).Select(NameOf));
         return string.Join("\n", texts.Where(t => t.Length > 0).Distinct());
     }
 
@@ -155,7 +155,10 @@ public sealed class AppSession : IDisposable
     /// 一覧の内容はこれで確かめる（各行は MainWindow.xaml の LineTemplate の TextBlock）。
     /// </summary>
     public string ScreenText() =>
-        string.Join("\n", Window.FindAllDescendants(cf => cf.ByControlType(ControlType.Text)).Select(t => t.Name).Where(t => t.Length > 0));
+        string.Join("\n", Window.FindAllDescendants(cf => cf.ByControlType(ControlType.Text)).Select(NameOf).Where(t => t.Length > 0));
+
+    // 名前を持たない要素（表示の更新の途中など）は空として読む
+    private static string NameOf(AutomationElement element) => element.Properties.Name.ValueOrDefault ?? "";
 
     /// <summary>ウィンドウの中の文字列が条件を満たすまで待つ。</summary>
     public void WaitForScreenText(Func<string, bool> condition, string description, TimeSpan? timeout = null)
