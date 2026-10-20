@@ -181,7 +181,7 @@ Windows の実機で、サインインの後にサブスクリプションを読
 
 | 項目 | 内容 |
 |---|---|
-| 置き場所 | アプリのデータのフォルダー（MSIX ではパッケージごとの `LocalState`、パッケージにしない場合は `%LOCALAPPDATA%\TTDeployTool`）の `logs`。日ごとのファイル `ttdeploytool-desktop-yyyyMMdd.log`。起動時に 7 日より古いファイルを消す。「実行の記録」の画面にフォルダーを示し、「ログのフォルダーを開く」で開ける |
+| 置き場所 | アプリのデータのフォルダー（MSIX ではパッケージごとの `LocalState`、パッケージにしない場合は `%LOCALAPPDATA%\TTDeployTool`）の `logs`。日ごとのファイル `ttdeploytool-desktop-yyyyMMdd.log`。起動時に 7 日より古いファイルを消す。「ジョブ」の画面にフォルダーを示し、「ログのフォルダーを開く」で開ける |
 | 書くこと | 起動（版）、サインインの状態（サインイン・サインアウトとホームのテナント。アカウント名は書かない）、復元・サインイン・サインアウトの失敗、テナントの件数とテナントごとのサブスクリプションの件数、読めなかったテナントと例外、計画・状態の確認での Azure の読み込み（`DesktopDeploymentLogger`）、ジョブの進み具合、処理されなかった例外。情報（Information）以上 |
 | Azure SDK のイベント | `AzureEventSourceListener` で、`Azure-Identity`（サインインとトークンの取得。MSAL・WAM のログを含む）は情報以上、それ以外（`Azure-Core` の HTTP など）は警告とエラーだけを書く。Azure SDK は既定で、ヘッダーとクエリの値から個人のデータを除き、要求と応答の本文を書かず、Azure.Identity は PII のログ（`IsUnsafeSupportLoggingEnabled`）を無効のままにする。レベルの対応は Microsoft Learn の表（`AzureEventSourceLogForwarder`）と同じ |
 | 書かないこと | パスワード、トークン、アカウント名。ファイルはこの PC にだけ置き、送信しない |

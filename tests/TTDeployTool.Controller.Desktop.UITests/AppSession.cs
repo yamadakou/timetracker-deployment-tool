@@ -194,7 +194,7 @@ public sealed class AppSession : IDisposable
     }
 
     // 条件を満たすまで待つ（満たしたか）。待っている間の例外（要素の作り直しなど）は、満たしていないとして続ける
-    private static bool TryWait(Func<bool> condition, TimeSpan? timeout) =>
+    internal static bool TryWait(Func<bool> condition, TimeSpan? timeout) =>
         Retry.WhileFalse(condition, timeout ?? Timeout, Interval, throwOnTimeout: false, ignoreException: true).Success;
 
     /// <summary>

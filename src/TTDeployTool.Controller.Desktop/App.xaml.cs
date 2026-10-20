@@ -45,8 +45,13 @@ public partial class App : Microsoft.UI.Xaml.Application
             new DialogService(_window, hwnd),
             new SystemLauncher(),
             TimeProvider.System,
-            log);
-        _window.Closed += (_, _) => _azureEvents?.Dispose();
+            log,
+            preferences: new FilePreferences(Path.Combine(DesktopSettings.DataDirectory, "preferences.json")));
+        _window.Closed += (_, _) =>
+        {
+            viewModel.Dispose();
+            _azureEvents?.Dispose();
+        };
         _window.Initialize(viewModel, hwnd);
         _window.Activate();
     }

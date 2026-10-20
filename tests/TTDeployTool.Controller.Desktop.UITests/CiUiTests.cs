@@ -37,6 +37,36 @@ public class CiUiTests
     });
 
     [Fact]
+    public void Jobs_Page_Should_Show_No_Jobs_And_No_Banner() => AppSession.Run(app =>
+    {
+        app.Show("Jobs");
+        app.TextOf("Panel.Jobs").Should().StartWith("ジョブ");
+        app.TextOf("Jobs.Summary").Should().BeEmpty("終わっていないジョブが無い");
+        app.Exists("Jobs.Banner").Should().BeFalse("ジョブが無ければ上部の帯を出さない");
+        app.IsEnabled("Jobs.ClearFinished").Should().BeTrue();
+        app.Exists("Job.Title").Should().BeFalse();
+    });
+
+    [Fact]
+    public void Concurrency_Should_Be_Saved_Across_Restarts()
+    {
+        AppSession.Run(app =>
+        {
+            app.Show("Settings");
+            app.ItemsOf("Settings.Concurrency").Should().Equal("1", "2", "3", "4");
+            app.SelectedOf("Settings.Concurrency").Should().Be("2", "既定は 2");
+            app.Select("Settings.Concurrency", "3");
+        }, "Concurrency_Should_Be_Saved_Across_Restarts_1");
+        AppSession.Run(app =>
+        {
+            app.Show("Settings");
+            app.SelectedOf("Settings.Concurrency").Should().Be("3", "アプリのデータに保存する");
+            // ほかのテストのために既定に戻す
+            app.Select("Settings.Concurrency", "2");
+        }, "Concurrency_Should_Be_Saved_Across_Restarts_2");
+    }
+
+    [Fact]
     public void Signed_Out_State_Should_Allow_Only_Sign_In() => AppSession.Run(app =>
     {
         app.TextOf("SignIn.Account").Should().StartWith("サインインしていません");

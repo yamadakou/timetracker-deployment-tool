@@ -47,6 +47,15 @@ public sealed partial class MainWindow : Window
             ViewModel.Settings.PersistDb = option;
     }
 
+    private void OnConcurrencyChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (((ComboBox)sender).SelectedItem is int concurrency)
+            ViewModel.Queue.MaxConcurrency = concurrency;
+    }
+
+    // 上部の帯の「ジョブを見る」
+    private void OnShowJobs(object sender, RoutedEventArgs e) => Nav.SelectedItem = JobsNavItem;
+
     private void OnNavigationChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
     {
         var tag = (args.SelectedItem as NavigationViewItem)?.Tag as string;

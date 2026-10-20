@@ -65,6 +65,11 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             launcher.OpenUri(CurrentDeployment!.Endpoint!);
             return Task.CompletedTask;
         }, () => CurrentDeployment?.Endpoint != null);
+        ClearFinishedCommand = new AsyncCommand(() =>
+        {
+            Queue.ClearFinished();
+            return Task.CompletedTask;
+        });
     }
 
     public SignInViewModel SignIn { get; }
@@ -89,6 +94,9 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
     /// <summary>デプロイが成功した後に、Timetracker を既定のブラウザーで開く。</summary>
     public AsyncCommand OpenEndpointCommand { get; }
+
+    /// <summary>終わったジョブを一覧から消す。</summary>
+    public AsyncCommand ClearFinishedCommand { get; }
 
     /// <summary>ジョブの順番待ち・予定・同時実行の上限。</summary>
     public JobQueue Queue { get; }

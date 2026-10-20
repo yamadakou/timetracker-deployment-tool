@@ -121,14 +121,69 @@ public class AzureUiTests
             app.Show("Deploy");
             app.Exists("Job.Title").Should().BeFalse("デプロイの画面に削除のジョブを出さない");
             app.IsEnabled("Deploy.OpenEndpoint").Should().BeFalse("削除した環境の URL は開けない");
+
+            // 7b: ジョブのある対象は計画できない
+            app.Invoke("Deploy.Plan");
+            app.WaitForText("Deploy.Error", t => t.Contains("この対象のジョブ"), "同じ対象のジョブがあれば計画できない", LoadTimeout);
+
+            // 7b: 別の対象を予定に追加し、上部の帯からジョブの画面に移って取り消す
+            var second = appName + "b";
+            app.Show("Target");
+            app.SetText("Target.AppName", second);
+            app.WaitForText("Target.TargetError", t => t.Length == 0, "対象の誤りが無い");
+            app.Show("Deploy");
+            app.Invoke("Deploy.Plan");
+            AppSession.WaitUntil(() => app.Exists("Deploy.Schedule") && app.IsEnabled("Deploy.Schedule"), "2 つ目の対象の計画が表示されませんでした。", LoadTimeout);
+            app.Invoke("Deploy.Schedule");
+            app.WaitForText("Jobs.Banner", t => t.Contains("予定 1"), "上部の帯に予定が出る");
+            app.Invoke("Jobs.BannerShow");
+            app.Find("Panel.Jobs");
+            // 一覧は新しい順なので、先頭（最初に見つかる要素）が今登録したジョブ
+            app.WaitForText("Job.Status", t => t.StartsWith("予定"), "予定のジョブが一覧の先頭に出る");
+            app.Invoke("Job.Cancel");
+            app.WaitForText("Job.Status", t => t == "取り消し", "予定を取り消せる");
+
+            // 7b: 削除の実行中に、別の対象のデプロイを同時に実行し（既定の上限は 2）、今の手順の後で止める
+            app.Show("Deploy");
+            app.Invoke("Deploy.Plan");
+            AppSession.WaitUntil(() => app.Exists("Deploy.Start") && app.IsEnabled("Deploy.Start"), "2 つ目の対象の計画が表示されませんでした。", LoadTimeout);
+            app.Invoke("Deploy.Start");
+            app.Show("Jobs");
+            var concurrent = app.WaitForText("Job.Status", t => t is "実行中" or "待機中（同時に実行できる数に達しています）" or "完了" or "失敗", "2 つ目のデプロイが始まる", LoadTimeout);
+            Log($"2 つ目のデプロイを始めたときのジョブ: {app.TextOf("Jobs.Summary")}");
+            concurrent.Should().Be("実行中", "対象が違えば、削除の実行中でも待たずに始める");
+            app.Invoke("Job.Stop");
+            var stopped = app.WaitForText("Job.Status", t => t is "停止" or "完了" or "失敗", "2 つ目のデプロイが止まる", JobTimeout);
+            Log($"停止: {(app.Exists("Job.Error") ? app.TextOf("Job.Error") : stopped)}");
+            stopped.Should().Be("停止");
+
             app.Show("Delete");
-            app.WaitForText("Job.Title", t => t.StartsWith("削除"), "削除の画面には削除のジョブが表示される");
+            app.WaitForText("Job.Title", t => t.StartsWith($"削除（{resourceGroup} / {appName}）"), "削除の画面には、1 つ目の対象の削除のジョブが表示されたまま");
             var deleted = app.WaitForText("Job.Status", t => t.Contains("完了") || t.Contains("失敗"), "削除が終わる", JobTimeout);
             deleted.Should().Contain("完了", app.Exists("Job.Error") ? app.TextOf("Job.Error") : "");
 
-            app.Show("Status");
-            app.Invoke("Status.Refresh");
-            app.WaitForText("Status.Summary", t => t.Contains("ありません"), "削除した後は環境が無い", LoadTimeout);
+            // 止めたデプロイの作りかけのリソースを消す（最初の手順の前に止まっていれば、消すものは無い）
+            app.Invoke("Delete.Plan");
+            if (AppSession.TryWait(() => app.Exists("Delete.ConfirmAppName"), LoadTimeout))
+            {
+                app.SetText("Delete.ConfirmAppName", second);
+                app.Invoke("Delete.Start");
+                app.WaitForText("Job.Title", t => t.StartsWith($"削除（{resourceGroup} / {second}）"), "2 つ目の対象の削除のジョブが表示される");
+                app.WaitForText("Job.Status", t => t.Contains("完了") || t.Contains("失敗"), "2 つ目の対象の削除が終わる", JobTimeout).Should().Contain("完了");
+            }
+            else
+            {
+                Log($"2 つ目の対象は、消すものがありませんでした: {app.ScreenText().Replace('\n', ' ')}");
+            }
+
+            foreach (var name in new[] { second, appName })
+            {
+                app.Show("Target");
+                app.SetText("Target.AppName", name);
+                app.Show("Status");
+                app.Invoke("Status.Refresh");
+                app.WaitForText("Status.Summary", t => t.Contains("ありません"), $"削除した後は {name} の環境が無い", LoadTimeout);
+            }
         });
     }
 

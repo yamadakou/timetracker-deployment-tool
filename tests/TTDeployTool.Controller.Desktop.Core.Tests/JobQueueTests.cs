@@ -607,3 +607,65 @@ public class JobRegistrationTests
         h.Main.Dispose();
     }
 }
+
+public sealed class JobListAndPreferencesTests : IDisposable
+{
+    private readonly string _dir = Path.Combine(Path.GetTempPath(), "ttdeploy-pref-" + Guid.NewGuid().ToString("N"));
+
+    public void Dispose()
+    {
+        if (Directory.Exists(_dir))
+            Directory.Delete(_dir, true);
+    }
+
+    [Fact]
+    public async Task Clear_Finished_Should_Remove_Only_Finished_Jobs()
+    {
+        var h = await new Harness().ReadyAsync();
+        await h.Main.Deployment.PlanCommand.ExecuteAsync();
+        await h.Main.Deployment.StartCommand.ExecuteAsync();
+        await h.Main.Queue.WhenIdleAsync();
+        var waiting = h.Main.Queue.Register(JobKind.Delete, new JobTarget("sub", "rg", "other"), DateTimeOffset.UtcNow.AddHours(1),
+            () => new TaskCompletionSource<Job>().Task);
+
+        await h.Main.ClearFinishedCommand.ExecuteAsync();
+
+        h.Main.Jobs.Should().Equal(waiting);
+    }
+
+    [Fact]
+    public void File_Preferences_Should_Save_And_Read_Back_The_Concurrency()
+    {
+        var path = Path.Combine(_dir, "data", "preferences.json");
+        new FilePreferences(path).MaxConcurrentJobs.Should().BeNull("ファイルが無ければ未設定");
+
+        new FilePreferences(path) { MaxConcurrentJobs = 3 };
+
+        new FilePreferences(path).MaxConcurrentJobs.Should().Be(3);
+    }
+
+    [Theory]
+    [InlineData("{ not json")]
+    [InlineData("null")]
+    public void File_Preferences_Should_Use_Defaults_When_The_File_Is_Unreadable(string content)
+    {
+        Directory.CreateDirectory(_dir);
+        var path = Path.Combine(_dir, "preferences.json");
+        File.WriteAllText(path, content);
+
+        new FilePreferences(path).MaxConcurrentJobs.Should().BeNull();
+    }
+
+    [Fact]
+    public void File_Preferences_Should_Keep_The_Value_When_It_Cannot_Save()
+    {
+        // 保存先のフォルダーの名前で、ファイルがある（フォルダーを作れない）
+        Directory.CreateDirectory(_dir);
+        File.WriteAllText(Path.Combine(_dir, "blocked"), "");
+        var preferences = new FilePreferences(Path.Combine(_dir, "blocked", "preferences.json"));
+
+        preferences.MaxConcurrentJobs = 4;
+
+        preferences.MaxConcurrentJobs.Should().Be(4);
+    }
+}
