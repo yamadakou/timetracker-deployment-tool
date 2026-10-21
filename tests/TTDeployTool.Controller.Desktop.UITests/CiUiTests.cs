@@ -48,6 +48,18 @@ public class CiUiTests
     });
 
     [Fact]
+    public void Deploy_And_Delete_Pages_Should_Not_Show_A_Job_Before_Any_Job() => AppSession.Run(app =>
+    {
+        // ジョブが無いのに、ジョブの表示の型（「: 」と進み具合のバー）が出ていた（実機の確認、2026-10-21）
+        foreach (var page in new[] { "Deploy", "Delete" })
+        {
+            app.Show(page);
+            app.Exists("Job.Title").Should().BeFalse($"{page} の画面にジョブの題名を出さない");
+            app.Exists("Job.Progress").Should().BeFalse($"{page} の画面に進み具合のバーを出さない");
+        }
+    });
+
+    [Fact]
     public void Concurrency_Should_Be_Saved_Across_Restarts()
     {
         AppSession.Run(app =>

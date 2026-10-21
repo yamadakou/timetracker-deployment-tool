@@ -19,7 +19,7 @@
             <DataTemplate x:Key="JobTemplate" x:DataType="vm:JobViewModel">
                 <StackPanel Spacing="4" Margin="0,8">
                     <StackPanel Orientation="Horizontal"><TextBlock AutomationProperties.AutomationId="Job.Title" Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind Title}" /><TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text=": " /><TextBlock AutomationProperties.AutomationId="Job.Status" Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind StatusText, Mode=OneWay}" /></StackPanel>
-                    <ProgressBar IsIndeterminate="True" Visibility="{x:Bind local:Ui.IfTrue(IsRunning), Mode=OneWay}" />
+                    <ProgressBar AutomationProperties.AutomationId="Job.Progress" IsIndeterminate="True" Visibility="{x:Bind IsRunning, Mode=OneWay}" />
                     <TextBlock AutomationProperties.AutomationId="Job.Step" Text="{x:Bind StepText, Mode=OneWay}" />
                     <TextBlock AutomationProperties.AutomationId="Job.Note" Text="{x:Bind Note, Mode=OneWay}" TextWrapping="Wrap" Foreground="{ThemeResource SystemFillColorCautionBrush}" />
                     <TextBlock AutomationProperties.AutomationId="Job.Error" Text="{x:Bind Error, Mode=OneWay}" TextWrapping="Wrap" Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
@@ -171,7 +171,8 @@
                                 <Button AutomationProperties.AutomationId="Deploy.Schedule" Content="予定に追加" VerticalAlignment="Bottom" Command="{x:Bind ViewModel.Deployment.ScheduleCommand}" />
                             </StackPanel>
                         </StackPanel>
-                        <ContentControl Content="{x:Bind ViewModel.CurrentDeployment, Mode=OneWay}" ContentTemplate="{StaticResource JobTemplate}" />
+                        <ContentControl Content="{x:Bind ViewModel.CurrentDeployment, Mode=OneWay}" ContentTemplate="{StaticResource JobTemplate}"
+                                        Visibility="{x:Bind ViewModel.HasCurrentDeployment, Mode=OneWay}" />
                         <Button AutomationProperties.AutomationId="Deploy.OpenEndpoint" Content="Timetracker を開く" Command="{x:Bind ViewModel.OpenEndpointCommand}" />
                     </StackPanel>
 
@@ -233,7 +234,8 @@
                                 </StackPanel>
                             </StackPanel>
                         </StackPanel>
-                        <ContentControl Content="{x:Bind ViewModel.CurrentDeletion, Mode=OneWay}" ContentTemplate="{StaticResource JobTemplate}" />
+                        <ContentControl Content="{x:Bind ViewModel.CurrentDeletion, Mode=OneWay}" ContentTemplate="{StaticResource JobTemplate}"
+                                        Visibility="{x:Bind ViewModel.HasCurrentDeletion, Mode=OneWay}" />
                     </StackPanel>
 
                     <!-- ローカル検証（Dry-run） -->

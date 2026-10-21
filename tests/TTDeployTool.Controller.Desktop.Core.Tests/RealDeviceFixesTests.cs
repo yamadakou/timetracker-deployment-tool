@@ -136,6 +136,10 @@ public class RealDeviceFixesTests
         // P4: デプロイの画面にはデプロイのジョブを、削除の画面には削除のジョブを出す
         var h = await new Harness().ReadyAsync();
         h.Main.OpenEndpointCommand.CanExecute(null).Should().BeFalse();
+        // ジョブが無ければ、デプロイ・削除の画面のジョブの欄を出さない
+        h.Main.HasCurrentDeployment.Should().BeFalse();
+        h.Main.HasCurrentDeletion.Should().BeFalse();
+        var changes = new ChangeRecorder(h.Main);
         await h.Main.Deployment.PlanCommand.ExecuteAsync();
         await h.Main.Deployment.StartCommand.ExecuteAsync();
         await h.Main.Queue.WhenIdleAsync();
@@ -143,6 +147,9 @@ public class RealDeviceFixesTests
         deployment.IsDeployment.Should().BeTrue();
         deployment.HasEndpoint.Should().BeTrue();
         h.Main.CurrentDeletion.Should().BeNull();
+        h.Main.HasCurrentDeployment.Should().BeTrue();
+        h.Main.HasCurrentDeletion.Should().BeFalse();
+        changes.Names.Should().Contain(nameof(MainViewModel.HasCurrentDeployment));
         h.Main.OpenEndpointCommand.CanExecute(null).Should().BeTrue();
 
         // 別の対象の削除では、デプロイの結果を残す
@@ -152,6 +159,8 @@ public class RealDeviceFixesTests
         h.Main.Deletion.ConfirmAppName = "other";
         await h.Main.Deletion.StartCommand.ExecuteAsync();
         await h.Main.Queue.WhenIdleAsync();
+        h.Main.HasCurrentDeletion.Should().BeTrue();
+        changes.Names.Should().Contain(nameof(MainViewModel.HasCurrentDeletion));
         h.Main.CurrentDeletion!.IsDeployment.Should().BeFalse();
         h.Main.CurrentDeletion.HasEndpoint.Should().BeFalse();
         h.Main.CurrentDeployment.Should().BeSameAs(deployment);
@@ -166,6 +175,7 @@ public class RealDeviceFixesTests
         await h.Main.Deletion.StartCommand.ExecuteAsync();
         await h.Main.Queue.WhenIdleAsync();
         h.Main.CurrentDeployment.Should().BeNull();
+        h.Main.HasCurrentDeployment.Should().BeFalse();
         h.Main.OpenEndpointCommand.CanExecute(null).Should().BeFalse();
         h.Main.CurrentJob.Should().BeSameAs(h.Main.CurrentDeletion);
     }

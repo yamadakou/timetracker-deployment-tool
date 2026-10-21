@@ -129,15 +129,24 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public JobViewModel? CurrentDeployment
     {
         get => _currentDeployment;
-        private set => SetProperty(ref _currentDeployment, value);
+        private set => SetProperty(ref _currentDeployment, value, new Dependent(nameof(HasCurrentDeployment)));
     }
+
+    /// <summary>
+    /// デプロイの画面にジョブを表示するか。ジョブが無いのにジョブの表示の型だけが描かれ、「: 」と進み具合のバーが出ていたため
+    /// （実機の確認、2026-10-21）、無ければ欄ごと隠す。
+    /// </summary>
+    public bool HasCurrentDeployment => CurrentDeployment != null;
 
     /// <summary>最後に始めた削除のジョブ（削除の画面に表示する）。</summary>
     public JobViewModel? CurrentDeletion
     {
         get => _currentDeletion;
-        private set => SetProperty(ref _currentDeletion, value);
+        private set => SetProperty(ref _currentDeletion, value, new Dependent(nameof(HasCurrentDeletion)));
     }
+
+    /// <summary>削除の画面にジョブを表示するか（<see cref="HasCurrentDeployment"/> と同じ）。</summary>
+    public bool HasCurrentDeletion => CurrentDeletion != null;
 
     /// <summary>終わっていないジョブ（予定・待機中・一時停止を含む）があるか。</summary>
     public bool HasRunningJob => Queue.HasActive;
