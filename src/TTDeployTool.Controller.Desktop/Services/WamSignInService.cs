@@ -2,6 +2,7 @@ using Azure.Core;
 using Azure.Identity;
 using Azure.Identity.Broker;
 using TTDeployTool.Controller.Desktop.Core.Services;
+using TTDeployTool.Infrastructure.Azure;
 
 namespace TTDeployTool.Controller.Desktop.Services;
 
