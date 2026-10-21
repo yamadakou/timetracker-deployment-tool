@@ -1,15 +1,18 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Runtime.ExceptionServices;
+using Azure.Core;
 using Azure.Core.Pipeline;
+using Azure.ResourceManager;
 
-namespace TTDeployTool.Controller.Desktop.Core.Services;
+namespace TTDeployTool.Infrastructure.Azure;
 
 /// <summary>
 /// IPv6 と IPv4 のアドレスを、少しずつずらして並行して試し、先につながったものを使う（Happy Eyeballs。RFC 8305 の考え方）。
 /// .NET の HttpClient は DNS が返したアドレスを 1 つずつ試すため、IPv6 の通信が応答なく捨てられる環境では、アドレスごとに
 /// TCP の接続の時間切れ（Windows では約 21 秒）まで待つ。実機の確認で、Azure の管理 API に 21 秒、サインインの設定情報の取得に
 /// 100 秒以上かかっていた（docs/REVIEW_ISSUES.md の No.54）。ブラウザーと WAM はこの方式でつなぐため、速い。
+/// CLI・MCP サーバー・デスクトップアプリの Azure SDK（管理 API と Azure.Identity）の通信で使う。
 /// </summary>
 public static class HappyEyeballs
 {
@@ -109,6 +112,9 @@ public static class HappyEyeballs
 
     /// <summary>Azure SDK（管理 API と Azure.Identity）に渡す通信（アプリの中で 1 つを使い回す）。</summary>
     public static HttpClientTransport Transport { get; } = new(Handler);
+
+    /// <summary>この通信を使う、Azure の管理 API の接続。</summary>
+    public static ArmClient Arm(TokenCredential credential) => new(credential, default, new ArmClientOptions { Transport = Transport });
 
     private static async Task CloseWhenConnected<T>(Task<T> attempt) where T : IDisposable
     {

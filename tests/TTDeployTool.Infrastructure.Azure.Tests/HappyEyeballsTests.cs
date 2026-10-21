@@ -3,10 +3,9 @@ using System.Net.Sockets;
 using System.Text;
 using FluentAssertions;
 using Microsoft.Extensions.Time.Testing;
-using TTDeployTool.Controller.Desktop.Core.Services;
 using Xunit;
 
-namespace TTDeployTool.Controller.Desktop.Core.Tests;
+namespace TTDeployTool.Infrastructure.Azure.Tests;
 
 /// <summary>IPv6 と IPv4 を並行して試す接続（docs/REVIEW_ISSUES.md の No.54）。</summary>
 public class HappyEyeballsTests

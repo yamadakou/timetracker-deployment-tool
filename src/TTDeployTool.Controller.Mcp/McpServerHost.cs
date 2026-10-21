@@ -3,7 +3,6 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 using Azure.Core;
-using Azure.ResourceManager;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
@@ -178,7 +177,7 @@ public static class McpServerHost
     {
         services.AddSingleton(settings);
         // 資格情報は、ツールが方式（IAzureAccessPolicy）に応じて作って渡す
-        services.AddSingleton<Func<TokenCredential, ISubscriptionDirectory>>(_ => credential => new AzureSubscriptionDirectory(new ArmClient(credential)));
+        services.AddSingleton<Func<TokenCredential, ISubscriptionDirectory>>(_ => credential => new AzureSubscriptionDirectory(HappyEyeballs.Arm(credential)));
 
         // 計画とジョブはプロセス内のメモリに置く（サーバーの終了で消える。HTTP ではレプリカを 1 に固定する）
         services.AddSingleton(TimeProvider.System);

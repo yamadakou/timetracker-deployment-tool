@@ -6,6 +6,8 @@ namespace TTDeployTool.Infrastructure.Azure;
 
 /// <summary>
 /// Factory class that creates Azure TokenCredential based on the specified AuthMode.
+/// Azure.Identity の通信（トークンの取得）は、IPv6 と IPv4 を並行して試す（<see cref="HappyEyeballs"/>。No.54）。
+/// Azure CLI の資格情報は az を起動するため、通信の設定は無い。
 /// </summary>
 public static class CredentialFactory
 {
@@ -36,7 +38,7 @@ public static class CredentialFactory
     private static TokenCredential CreateDefaultCredential(IDeploymentLogger logger)
     {
         logger.Verbose("DefaultAzureCredential を使用します");
-        return new DefaultAzureCredential();
+        return new DefaultAzureCredential(new DefaultAzureCredentialOptions { Transport = HappyEyeballs.Transport });
     }
 
     private static TokenCredential CreateAzureCliCredential(IDeploymentLogger logger)
@@ -62,7 +64,7 @@ public static class CredentialFactory
         }
 
         logger.Verbose("ClientSecretCredential を使用します（Service Principal 環境変数より）");
-        return new ClientSecretCredential(tenantId, clientId, clientSecret);
+        return new ClientSecretCredential(tenantId, clientId, clientSecret, new ClientSecretCredentialOptions { Transport = HappyEyeballs.Transport });
     }
 
     private static TokenCredential CreateDeviceCodeCredential(IDeploymentLogger logger)
@@ -70,7 +72,8 @@ public static class CredentialFactory
         logger.Verbose("DeviceCodeCredential を使用します（デバイスコード認証）");
         return new DeviceCodeCredential(new DeviceCodeCredentialOptions
         {
-            DeviceCodeCallback = DeviceCodeCallback(logger)
+            DeviceCodeCallback = DeviceCodeCallback(logger),
+            Transport = HappyEyeballs.Transport,
         });
     }
 
@@ -94,10 +97,11 @@ public static class CredentialFactory
         if (string.IsNullOrWhiteSpace(clientId))
         {
             logger.Verbose("ManagedIdentityCredential を使用します（システム割り当て）");
-            return new ManagedIdentityCredential(ManagedIdentityId.SystemAssigned);
+            return new ManagedIdentityCredential(new ManagedIdentityCredentialOptions(ManagedIdentityId.SystemAssigned) { Transport = HappyEyeballs.Transport });
         }
         logger.Verbose($"ManagedIdentityCredential を使用します（ユーザー割り当て: {clientId}）");
-        return new ManagedIdentityCredential(ManagedIdentityId.FromUserAssignedClientId(clientId));
+        return new ManagedIdentityCredential(
+            new ManagedIdentityCredentialOptions(ManagedIdentityId.FromUserAssignedClientId(clientId)) { Transport = HappyEyeballs.Transport });
     }
 
     /// <summary>フェデレーション資格情報（マネージド ID のトークンをクライアントアサーションにする）で要求するスコープ。</summary>
@@ -114,11 +118,12 @@ public static class CredentialFactory
         if (clientSecret != null)
         {
             logger.Verbose("OnBehalfOfCredential を使用します（クライアントシークレット）");
-            return new OnBehalfOfCredential(tenantId, clientId, clientSecret, userAssertion);
+            return new OnBehalfOfCredential(tenantId, clientId, clientSecret, userAssertion, new OnBehalfOfCredentialOptions { Transport = HappyEyeballs.Transport });
         }
         logger.Verbose("OnBehalfOfCredential を使用します（マネージド ID のフェデレーション資格情報）");
         return new OnBehalfOfCredential(
-            tenantId, clientId, ClientAssertion(CreateManagedIdentityCredential(logger)), userAssertion, new OnBehalfOfCredentialOptions());
+            tenantId, clientId, ClientAssertion(CreateManagedIdentityCredential(logger)), userAssertion,
+            new OnBehalfOfCredentialOptions { Transport = HappyEyeballs.Transport });
     }
 
     /// <summary>マネージド ID のトークン（対象 api://AzureADTokenExchange）を、アプリ登録のクライアントアサーションとして返す。</summary>

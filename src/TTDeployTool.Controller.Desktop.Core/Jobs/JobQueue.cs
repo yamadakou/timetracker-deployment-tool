@@ -99,10 +99,18 @@ public sealed class JobQueue : ObservableObject, IDisposable
             if (ActiveFor(target.Subscription, target.ResourceGroup, target.AppName) is { } active)
                 throw new InvalidOperationException(ActiveMessage(active));
             job = new JobViewModel(kind, target, scheduledAt, this, starter) { Order = ++_order };
+            // 終わったことを、ジョブの Finished が完了する前に知らせる（状態の変更の通知は、Finished の完了より先に呼ばれる）
+            var notified = false;
             job.PropertyChanged += (_, e) =>
             {
-                if (e.PropertyName == nameof(JobViewModel.State))
-                    Changed();
+                if (e.PropertyName != nameof(JobViewModel.State))
+                    return;
+                Changed();
+                if (!notified && !job.IsActive && job.State != DesktopJobState.Canceled)
+                {
+                    notified = true;
+                    Finished?.Invoke(job);
+                }
             };
             Jobs.Insert(0, job);
         }
@@ -188,14 +196,12 @@ public sealed class JobQueue : ObservableObject, IDisposable
         {
             _logger.LogWarning(ex, "ジョブを始められませんでした: {Title}", job.Title);
             job.FailToStart(DesktopMessages.ForAzure(ex));
-            Finished?.Invoke(job);
             Pump();
             return;
         }
         job.Attach(started);
         await job.WatchAsync(_time, _pollInterval);
         _logger.LogInformation("ジョブが終わりました: {Title}（{State}）", job.Title, job.StatusText);
-        Finished?.Invoke(job);
         Pump();
     }
 

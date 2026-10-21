@@ -19,7 +19,7 @@ public class AzureSdkExecutor : IAzureDeploymentGateway
     private readonly ArmClient _arm;
 
     public AzureSdkExecutor(IDeploymentLogger logger, TokenCredential credential)
-        : this(logger, new ArmClient(credential))
+        : this(logger, HappyEyeballs.Arm(credential))
     {
     }
 
