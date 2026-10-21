@@ -63,11 +63,15 @@ public interface IAzureClients
     IAzureDeploymentGateway Gateway(IDeploymentLogger logger, TokenCredential credential);
 }
 
+/// <summary>Azure の管理 API を、IPv6 と IPv4 を並行して試す通信（<see cref="HappyEyeballs"/>）で使う。</summary>
 public sealed class AzureClients : IAzureClients
 {
-    public ITenantDirectory Tenants(TokenCredential credential) => new AzureTenantDirectory(new ArmClient(credential));
+    public ITenantDirectory Tenants(TokenCredential credential) => new AzureTenantDirectory(Arm(credential));
 
-    public ISubscriptionDirectory Subscriptions(TokenCredential credential) => new AzureSubscriptionDirectory(new ArmClient(credential));
+    public ISubscriptionDirectory Subscriptions(TokenCredential credential) => new AzureSubscriptionDirectory(Arm(credential));
 
-    public IAzureDeploymentGateway Gateway(IDeploymentLogger logger, TokenCredential credential) => new AzureSdkExecutor(logger, credential);
+    public IAzureDeploymentGateway Gateway(IDeploymentLogger logger, TokenCredential credential) => new AzureSdkExecutor(logger, Arm(credential));
+
+    internal static ArmClient Arm(TokenCredential credential) =>
+        new(credential, default, new ArmClientOptions { Transport = HappyEyeballs.Transport });
 }

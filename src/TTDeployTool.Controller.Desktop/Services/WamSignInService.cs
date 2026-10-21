@@ -80,6 +80,8 @@ internal sealed class WamSignInService : ISignInService
             // 公開の Azure（login.microsoftonline.com）だけを使うため、認証局のメタデータの取得（インスタンスの検出）をしない。
             // 実機の確認で、この取得がネットワークで応答せず、トークンを取るたびに 100 秒（HttpClient の既定の時間切れ）待っていた
             DisableInstanceDiscovery = true,
+            // IPv6 の通信が応答なく捨てられる環境でも待たないよう、IPv6 と IPv4 を並行して試す（No.54）
+            Transport = HappyEyeballs.Transport,
         };
         // テナントごとにサブスクリプションを読むため、アカウントが入れるすべてのテナントのトークンを取れるようにする
         options.AdditionallyAllowedTenants.Add("*");
