@@ -19,9 +19,21 @@ public sealed class SignInViewModel : ObservableObject
         _signIn = signIn;
         _accountChanged = accountChanged;
         _logger = logger;
-        SignInCommand = new AsyncCommand(SignInAsync, () => !IsSignedIn);
-        SignOutCommand = new AsyncCommand(SignOutAsync, () => IsSignedIn);
+        SignInCommand = new AsyncCommand(SignInAsync, () => !IsSignedIn && !Busy.IsBusy);
+        SignOutCommand = new AsyncCommand(SignOutAsync, () => IsSignedIn && !Busy.IsBusy);
+        // 前回のサインインを確かめている間に「サインイン」を押して、2 つのサインインが同時に進まないようにする
+        Busy.PropertyChanged += (_, _) =>
+        {
+            SignInCommand.RaiseCanExecuteChanged();
+            SignOutCommand.RaiseCanExecuteChanged();
+        };
     }
+
+    /// <summary>
+    /// サインインの処理中の表示。ネットワークによっては、サインインの画面が出るまで・前回のサインインを確かめるまでに時間がかかるため、
+    /// 処理中と分かるようにする（実機の確認で、固まったように見えた）。
+    /// </summary>
+    public BusyState Busy { get; } = new();
 
     public AsyncCommand SignInCommand { get; }
 
@@ -47,7 +59,9 @@ public sealed class SignInViewModel : ObservableObject
     {
         try
         {
-            await SetAccountAsync(await _signIn.RestoreAsync());
+            SignedInAccount? account = null;
+            await Busy.RunAsync("前回のサインインを確かめています", async () => account = await _signIn.RestoreAsync());
+            await SetAccountAsync(account);
         }
         catch (Exception ex)
         {
@@ -61,7 +75,10 @@ public sealed class SignInViewModel : ObservableObject
         Error = null;
         try
         {
-            await SetAccountAsync(await _signIn.SignInAsync());
+            _logger.LogInformation("サインインを始めます");
+            SignedInAccount? account = null;
+            await Busy.RunAsync("サインインの画面を開いています（表示まで時間がかかることがあります）", async () => account = await _signIn.SignInAsync());
+            await SetAccountAsync(account);
         }
         catch (OperationCanceledException)
         {

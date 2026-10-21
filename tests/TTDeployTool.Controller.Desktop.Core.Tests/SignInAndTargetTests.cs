@@ -41,6 +41,36 @@ internal sealed class Harness
 public class SignInViewModelTests
 {
     [Fact]
+    public async Task Restoring_And_Signing_In_Should_Show_That_They_Are_In_Progress()
+    {
+        var h = new Harness();
+        var vm = h.Main.SignIn;
+        var gate = new TaskCompletionSource();
+        h.SignIn.Gate = gate.Task;
+
+        var restoring = h.Main.InitializeAsync();
+        vm.Busy.IsBusy.Should().BeTrue();
+        vm.Busy.Text.Should().Be("前回のサインインを確かめています…");
+        vm.SignInCommand.CanExecute(null).Should().BeFalse("確かめている間は、もう 1 つのサインインを始めない");
+        gate.SetResult();
+        await restoring;
+        vm.Busy.IsBusy.Should().BeFalse();
+        vm.SignInCommand.CanExecute(null).Should().BeTrue();
+
+        gate = new TaskCompletionSource();
+        h.SignIn.Gate = gate.Task;
+        var signingIn = vm.SignInCommand.ExecuteAsync();
+        vm.Busy.Text.Should().StartWith("サインインの画面を開いています");
+        vm.SignOutCommand.CanExecute(null).Should().BeFalse();
+        gate.SetResult();
+        await signingIn;
+
+        vm.Busy.IsBusy.Should().BeFalse();
+        vm.IsSignedIn.Should().BeTrue();
+        vm.SignOutCommand.CanExecute(null).Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Restore_Should_Sign_In_Silently_And_Load_Subscriptions()
     {
         var h = new Harness();

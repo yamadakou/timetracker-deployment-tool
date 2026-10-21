@@ -26,11 +26,20 @@ internal sealed class FakeSignIn : ISignInService
 
     public int SignOuts { get; private set; }
 
-    public Task<SignedInAccount?> RestoreAsync(CancellationToken cancellationToken = default) =>
-        RestoreError != null ? Task.FromException<SignedInAccount?>(RestoreError) : Task.FromResult(Restored);
+    /// <summary>復元・サインインを、これが終わるまで待たせる（処理中の表示を確かめる）。</summary>
+    public Task Gate { get; set; } = Task.CompletedTask;
 
-    public Task<SignedInAccount> SignInAsync(CancellationToken cancellationToken = default) =>
-        SignInError != null ? Task.FromException<SignedInAccount>(SignInError) : Task.FromResult(Alice);
+    public async Task<SignedInAccount?> RestoreAsync(CancellationToken cancellationToken = default)
+    {
+        await Gate;
+        return RestoreError != null ? throw RestoreError : Restored;
+    }
+
+    public async Task<SignedInAccount> SignInAsync(CancellationToken cancellationToken = default)
+    {
+        await Gate;
+        return SignInError != null ? throw SignInError : Alice;
+    }
 
     public Task SignOutAsync(CancellationToken cancellationToken = default)
     {

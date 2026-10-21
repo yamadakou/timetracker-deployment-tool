@@ -77,6 +77,9 @@ internal sealed class WamSignInService : ISignInService
             TokenCachePersistenceOptions = new TokenCachePersistenceOptions { Name = CacheName },
             AuthenticationRecord = record,
             DisableAutomaticAuthentication = disableAutomaticAuthentication,
+            // 公開の Azure（login.microsoftonline.com）だけを使うため、認証局のメタデータの取得（インスタンスの検出）をしない。
+            // 実機の確認で、この取得がネットワークで応答せず、トークンを取るたびに 100 秒（HttpClient の既定の時間切れ）待っていた
+            DisableInstanceDiscovery = true,
         };
         // テナントごとにサブスクリプションを読むため、アカウントが入れるすべてのテナントのトークンを取れるようにする
         options.AdditionallyAllowedTenants.Add("*");
