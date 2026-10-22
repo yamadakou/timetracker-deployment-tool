@@ -216,7 +216,7 @@
 - Infrastructure: `ContainerAppSpecBuilder.WithManagedTags` が、期限のタグを、今のタグ（利用者が付けたものを含む）に上書きする
 - CLI: `--expires-on <yyyy-MM-dd|none>` とヘルプ。デプロイの後に期限と、期限での自動の削除（デスクトップアプリ）を表示する。MCP: `validate_deployment`・`plan_deployment` の `expires_on`、計画とジョブの結果の `expires_on`（UTC の時刻・表示・決まり方・注意）、instructions・`get_deployment_options` の制約・Resources の制約に期限と自動の削除を書いた
 - デスクトップアプリ: 「設定」に「利用可能期限日」（既定・日付を指定する・期限なし）、日付の入力（日付を指定するときだけ表示）、既定で決まる日付と期限での削除の説明。今日より前の日付は誤りに出す。「デプロイ」の計画と、ジョブの結果に期限を出す
-- テスト: Domain・Application・Infrastructure・CLI・MCP・Desktop.Core に期限のテストを加え、ソリューション全体 990 件（スキップ 5）成功。新しいコードの行と分岐の網羅率 100%（以前からの対象外: 各 `Program`、正規表現の生成コード、`AzureSdkExecutor` の再スローの後の閉じかっこ）。UI テスト（CI）に、「設定」の期限日の選択で日付の入力が出る・消えることを加えた。CI（run 39704976174）で全ジョブ成功
+- テスト: Domain・Application・Infrastructure・CLI・MCP・Desktop.Core に期限のテストを加え、ソリューション全体 990 件（スキップ 5）成功。新しいコードの行と分岐の網羅率 100%（以前からの対象外: 各 `Program`、正規表現の生成コード、`AzureSdkExecutor` の再スローの後の閉じかっこ）。UI テスト（CI）に、「設定」の期限日の選択で日付の入力が出る・消えることを加えた。CI（run 39704976174）で全ジョブ成功。オーナーの確認の後、Desktop System Test（run 39711635858）で、期限のタグを書くデプロイを含むこれまでの流れが成功（期限のタグの値は、この UI テストでは確かめていない）
 - 期限での自動の削除は、7d-3 で行う（7d-1 では、期限を記録して表示するだけ）
 
 ## 11. 出典（2026-10-20 に確認）
