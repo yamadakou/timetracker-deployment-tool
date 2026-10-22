@@ -42,7 +42,12 @@
 - `FilePreferences`: テンプレートの保存と読み直し
 - UI テスト（CI）: 対象の入力が「設定」にあること、初期値に戻す、テンプレートの保存と適用（起動し直して確かめる）
 
-## 4. 決定事項（オーナーの回答、2026-10-22）
+## 4. 実施結果
+- Desktop.Core: `SettingsViewModel`（テンプレート・初期値に戻す・Markdown）、`StatusViewModel`・`DeletionViewModel`・`JobViewModel` のコピー、`MarkdownText`、`IAppPreferences.Templates`（`FilePreferences` に保存）、`TargetViewModel.SubscriptionDisplay`
+- 画面: 対象の入力を「設定」に移し、各画面にコピーのボタン、「設定」にテンプレート・初期値に戻す
+- テスト: `Desktop.Core` 187 件成功・行と分岐の網羅率 100%。ソリューション全体 1,054 件（スキップ 5）成功。CI（run 39717223401）で UI テスト 14 件（Azure の 1 件はスキップ）を含む全ジョブ成功。半自動の UI テスト（Azure）は、対象の入力を「設定」で行うように直した
+
+## 5. 決定事項（オーナーの回答、2026-10-22）
 | # | 論点 | 決定 |
 |---|---|---|
 | Q1 | 対象の入力の場所 | **設定へ移す**（リソースグループ・アプリ名・リージョン） |
@@ -50,5 +55,5 @@
 | Q3 | Markdown のコピーのパスワード | **含めるか選べるようにする**（既定は伏せ字） |
 | Q4 | 初期値に戻す範囲 | **すべて戻す**（サブスクリプションの選択と同時に実行する数を除く） |
 
-## 5. 出典（2026-10-22 に確認）
+## 6. 出典（2026-10-22 に確認）
 - ClipboardContentOptions Class: https://learn.microsoft.com/en-us/uwp/api/windows.applicationmodel.datatransfer.clipboardcontentoptions
