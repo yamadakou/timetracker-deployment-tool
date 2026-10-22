@@ -239,7 +239,7 @@
 - Application: `DeploymentCatalog`（サブスクリプション・リソースグループ・`tt-app-name` ごとにまとめる。作りかけ・消しかけ・ストレージアカウントだけ残ったものも 1 行にする）、`DeploymentMaintenance`（管理タグの一致する Container App だけの期限の変更と、Timetracker アプリのシークレットの読み取り）
 - Desktop.Core: `DeploymentListViewModel`（テナントごとの読み込み、フィルタ・並べ替え・ページング、このアプリで 15 分以内に終えたデプロイ・削除と変えた期限を重ねる）、`DeploymentRowViewModel`（表示、期限の色、パスワードの表示・伏せ字・コピー、期限の変更、対象に入れる・状態を確認・削除の画面へ）。`TargetViewModel.CreateSessionFor`（行のサブスクリプションのテナントで操作する）
 - 画面: 「デプロイの一覧」の項目。クリップボードは `ClipboardContentOptions` で履歴と同期に残さない
-- テスト: Infrastructure・Application・Desktop.Core に一覧のテストを加え、ソリューション全体 1,035 件（スキップ 5）成功。新しいコードの行と分岐の網羅率 100%。UI テスト（CI）に一覧の画面（サインインの前の読み込み、期限日の範囲の入力の表示）を、半自動の UI テスト（Azure）に、デプロイした環境が一覧に出ること・パスワードの表示・期限の変更を加えた
+- テスト: Infrastructure・Application・Desktop.Core に一覧のテストを加え、ソリューション全体 1,035 件（スキップ 5）成功。新しいコードの行と分岐の網羅率 100%。UI テスト（CI）に一覧の画面（サインインの前の読み込み、期限日の範囲の入力の表示）を、半自動の UI テスト（Azure）に、デプロイした環境が一覧に出ること・パスワードの表示・期限の変更を加えた。CI（run 39715667398）で全ジョブ成功
 
 ## 11. 出典（2026-10-20 に確認）
 - x:Bind の関数の結び付け: https://learn.microsoft.com/windows/apps/develop/data-binding/function-bindings
