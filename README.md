@@ -13,6 +13,7 @@ TimeTracker のコンテナイメージの詳細（クイックスタート、�
 - ローカルでの検証（Dry-run）: Azure を使わずに、Docker Compose で起動するための `docker-compose.yml` と `.env` を作ります（[Docker Hub の TimeTracker のページ](https://hub.docker.com/r/densocreate/timetracker)の「クイックスタート」に沿った構成）
 - 設定の指定: Timetracker のイメージのバージョン（タグ）と、コンテナごとの CPU・メモリを指定できます。台数は 1 台に固定です
 - DB のデータの永続化（`--persist-db`）: 既定では、DB のデータは DB コンテナの再起動で消えます。指定すると、Azure Files に置いて残します（[DB のデータの扱い](#db-のデータの扱いと永続化--persist-db)）
+- 利用可能期限（`--expires-on`）: デプロイに期限日を記録します（省略すると今日から 32 日後。再デプロイは今の期限を引き継ぎます）。期限を過ぎると、デスクトップアプリが自動で削除します（CLI と MCP サーバーは削除しません）
 - AI アシスタントからの操作: MCP サーバー（`ttdeploytool-mcp`）で、同じ操作を AI アシスタントとの対話で行えます（[MCP サーバーの利用者向けマニュアル](docs/MCP_SERVER.md)）
 - 画面での操作（開発中）: Windows のデスクトップアプリで、同じ操作を画面から行えるようにします（[デスクトップアプリ（開発中）](#デスクトップアプリ開発中)）
 
@@ -89,9 +90,12 @@ TimeTracker のコンテナイメージの詳細（クイックスタート、�
 |---|---|
 | `managed-by` | `ttdeploytool` |
 | `tt-app-name` | アプリ名（`--app-name`） |
+| `tt-expires-at` | 利用可能期限（UTC。例: `2026-11-23T14:59:59Z`）。期限なしは `none`（`--expires-on`。3 つの Container App だけ） |
+| `tt-deployed-at` | 最後にデプロイした時刻（UTC。3 つの Container App だけ） |
 
 - 3 つの Container App には、作成するときと更新するときに付けます。更新するときは、利用者が付けたほかのタグを残したまま、管理タグを加えます
 - Container Apps 環境とストレージアカウントには、新しく作成するときだけ付けます（既存のものは変更しないため）
+- `tt-expires-at` と `tt-deployed-at` は、デプロイのたびに 3 つの Container App へ書きます（期限を省略した再デプロイでは、`tt-expires-at` は今の値のまま）。Container Apps 環境・ストレージアカウントには付けません（既存のものを変更しないため）
 - リソースグループは、本ツールが新しく作成したときだけ `managed-by` を付けます（`tt-app-name` は付けません。同じリソースグループに複数のアプリ名でデプロイできるため）。既存のリソースグループは変更しません
 - 以前の名前（timetracker-deployment-tool）の版（v0.8.1 まで）は `managed-by` に `timetracker-deployment-tool` を付けていました。この値のリソースも本ツールのものとして扱い、削除の対象にします。更新すると `ttdeploytool` に置き換わります
 - タグは誤って削除しないための目印で、セキュリティの制限ではありません（削除できるかどうかは、Azure の RBAC で決まります）
@@ -585,6 +589,7 @@ CLI や AI アシスタントを使わずに、Windows の画面の操作で同�
 - `--tracker-password`（必須）: Timetracker のパスワード（[Docker Hub の TimeTracker のページ](https://hub.docker.com/r/densocreate/timetracker)の説明にある `<your password>` に当たるもの）
 - `--tt-tag`（任意）: Timetracker のイメージのタグ（版）。省略時は、DB の種類に合わせて `11.0.1-linux-postgres`（postgresql）または `11.0.1-linux-mssql`（sqlserver）。使えるタグは [Docker Hub](https://hub.docker.com/r/densocreate/timetracker/tags) を参照してください。**DB の種類に合ったタグ**（PostgreSQL 用は `-linux-postgres`、SQL Server 用は `-linux-mssql`）を指定してください
 - `--persist-db`（任意）: DB のデータを Azure Files に置き、DB コンテナの再起動の後も残す（[DB のデータの扱いと永続化](#db-のデータの扱いと永続化--persist-db)）。省略時は、既存の DB アプリの今の状態を引き継ぎます（新しく作る場合は永続化しない）。永続化をやめるには `--persist-db false`。Dry-run では使いません（警告を表示します）
+- `--expires-on`（任意）: 利用可能期限日（`yyyy-MM-dd`）。期限は期限日の終わり（実行する PC の時刻帯の 23:59:59）です。`none` で期限なし。今日より前の日付は誤りになります。省略時は、既存のデプロイの今の期限を引き継ぎ、無ければ（新しくデプロイする場合、この機能より前にデプロイした環境の場合）**今日から 32 日後**にします。期限は Container App のタグ（`tt-expires-at`）に記録します。**期限を過ぎると、TTDeployTool のデスクトップアプリが自動で削除します**（DB のデータも消えます。CLI と MCP サーバーは期限での削除をしません）。残したい環境は、期限日を指定し直すか `none` を指定して再デプロイしてください。Dry-run では使いません
 
 **コンテナの CPU とメモリ**（任意。[組み合わせの一覧](https://learn.microsoft.com/ja-jp/azure/container-apps/containers#allocations)にある値を指定してください）:
 

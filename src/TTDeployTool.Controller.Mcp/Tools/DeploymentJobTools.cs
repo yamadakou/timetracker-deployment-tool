@@ -34,12 +34,16 @@ public sealed class DeploymentJobTools
     private readonly JobManager _jobs;
     private readonly Func<IDeploymentLogger, TokenCredential, IAzureDeploymentGateway> _gatewayFactory;
     private readonly ILogger<DeploymentJobTools> _logger;
+    private readonly TimeProvider _time;
 
     /// <param name="gatewayFactory">渡したロガーにログを書き、渡した資格情報で操作する Azure の操作を作る（ジョブではジョブのログに書く）</param>
+    /// <param name="time">利用可能期限を決める時刻と時刻帯（省略時はシステムの時刻）</param>
     public DeploymentJobTools(
         McpServerSettings settings, ICallerContext caller, IAzureAccessPolicy policy, IPlanStore plans, JobManager jobs,
-        Func<IDeploymentLogger, TokenCredential, IAzureDeploymentGateway> gatewayFactory, ILogger<DeploymentJobTools> logger)
+        Func<IDeploymentLogger, TokenCredential, IAzureDeploymentGateway> gatewayFactory, ILogger<DeploymentJobTools> logger,
+        TimeProvider? time = null)
     {
+        _time = time ?? TimeProvider.System;
         _settings = settings;
         _caller = caller;
         _policy = policy;
@@ -71,6 +75,7 @@ public sealed class DeploymentJobTools
         [Description("Redis の CPU（vCPU、既定 0.5）")] double? redis_cpu = null,
         [Description("Redis のメモリ（Gi、既定 1.0）")] double? redis_memory_gi = null,
         [Description(DeploymentTools.PersistDbDescription)] bool? persist_db = null,
+        [Description(DeploymentTools.ExpiresOnDescription)] string? expires_on = null,
         [Description(DeploymentTools.AzureIdentityDescription)] string? azure_identity = null,
         CancellationToken cancellationToken = default)
     {
@@ -80,7 +85,7 @@ public sealed class DeploymentJobTools
             Subscription = subscription, ResourceGroup = resource_group, Location = location, AppName = app_name, DbType = db_type,
             DbName = db_name, TtTag = tt_tag, DbPassword = db_password, TrackerPassword = tracker_password,
             TtCpu = tt_cpu, TtMemoryGi = tt_memory_gi, DbCpu = db_cpu, DbMemoryGi = db_memory_gi, RedisCpu = redis_cpu, RedisMemoryGi = redis_memory_gi,
-            PersistDb = persist_db,
+            PersistDb = persist_db, ExpiresOn = expires_on,
         }.Resolve(_settings);
         var o = resolved.Options;
         var advice = DeploymentAdvisor.GetWarnings(o, ValidationTarget.Azure);
@@ -110,7 +115,8 @@ public sealed class DeploymentJobTools
             Resolved: ToolSupport.ToResolvedSettings(resolved),
             ResourceNames: ToolSupport.ToResourceNames(o.AppName),
             PersistDb: plan.PersistDb,
-            StorageAccount: plan.PersistDb ? ResourceNaming.StorageAccount(o.Subscription, o.ResourceGroup, o.AppName) : null);
+            StorageAccount: plan.PersistDb ? ResourceNaming.StorageAccount(o.Subscription, o.ResourceGroup, o.AppName) : null,
+            ExpiresOn: plan.Expiry is { } expiry ? ToExpiryInfo(expiry) : null);
     }
 
     [McpServerTool(Name = "start_deployment", Title = "Azure へのデプロイの開始",
@@ -162,7 +168,8 @@ public sealed class DeploymentJobTools
             s.NextLogOffset,
             s.Result is DeploymentResult r
                 ? new DeploymentJobResult(
-                    r.ResourceGroup, r.EnvironmentName, r.TimetrackerAppName, r.DbAppName, r.RedisAppName, r.TimetrackerUrl, r.StorageAccountName)
+                    r.ResourceGroup, r.EnvironmentName, r.TimetrackerAppName, r.DbAppName, r.RedisAppName, r.TimetrackerUrl, r.StorageAccountName,
+                    r.Expiry is { } expiry ? ToExpiryInfo(expiry) : null)
                 : null,
             s.Result is DeletionOutcome d
                 ? new DeletionJobResult(d.ResourceGroup, d.Deleted, d.AlreadyDeleted, d.ResourceGroupDeleted ? null : d.ResourceGroup, d.ResourceGroupDeleted)
@@ -219,7 +226,12 @@ public sealed class DeploymentJobTools
     }
 
     // 計画 → 確認 → 実行の安全策（計画で Azure を読むときは、ツールのログに書く）
-    private DeploymentWorkflow Workflow() => new(_plans, _jobs, _caller, new McpDeploymentLogger(_logger));
+    private DeploymentWorkflow Workflow() => new(_plans, _jobs, _caller, new McpDeploymentLogger(_logger), _time);
+
+    // 利用可能期限（サーバーの時刻帯の期限日と、UTC の時刻）
+    private ExpiryInfo ToExpiryInfo(ExpiryDecision expiry) => new(
+        expiry.ExpiresAt?.UtcDateTime.ToString("o"), expiry.Describe(_time.LocalTimeZone), expiry.Source.ToString().ToLowerInvariant(),
+        expiry.ExpiresAt == null ? null : DeploymentTools.ExpiryNote);
 
     // ツールのログに書き、方式の資格情報で操作する Azure の操作
     private IAzureDeploymentGateway CreateGateway(AzureAccess access)

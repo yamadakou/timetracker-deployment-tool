@@ -32,6 +32,9 @@ public static class DeploymentValidator
         // CLI は引数の解析時に確認済みだが、他のフロントエンドから呼ばれた場合も Azure に送る前に止める
         if (AppNameValidator.GetError(o.AppName) is { } appNameError)
             errors.Add(appNameError);
+        // 利用可能期限は Azure のタグに記録するため、Azure へのデプロイだけで確かめる（今日より前かは、実行する時刻で確かめる）
+        if (target == ValidationTarget.Azure && DeploymentExpiry.FormatError(o.ExpiresOn) is { } expiryError)
+            errors.Add(expiryError);
         AddIfNotPositive(errors, o.TimetrackerCpu, "tt-cpu");
         AddIfNotPositive(errors, o.TimetrackerMemoryGi, "tt-memory");
         AddIfNotPositive(errors, o.DbCpu, "db-cpu");

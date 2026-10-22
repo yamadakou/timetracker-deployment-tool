@@ -26,10 +26,13 @@ public sealed class DeploymentWorkflow
     private readonly JobManager _jobs;
     private readonly ICallerContext _caller;
     private readonly IDeploymentLogger _logger;
+    private readonly TimeProvider _time;
 
     /// <param name="logger">計画で Azure を読むときのログの出力先（ジョブではジョブのログに書く）</param>
-    public DeploymentWorkflow(IPlanStore plans, JobManager jobs, ICallerContext caller, IDeploymentLogger logger)
+    /// <param name="time">利用可能期限を決める時刻と時刻帯（省略時はシステムの時刻）</param>
+    public DeploymentWorkflow(IPlanStore plans, JobManager jobs, ICallerContext caller, IDeploymentLogger logger, TimeProvider? time = null)
     {
+        _time = time ?? TimeProvider.System;
         _plans = plans;
         _jobs = jobs;
         _caller = caller;
@@ -78,7 +81,7 @@ public sealed class DeploymentWorkflow
         var started = _jobs.TryStart(JobKind.Deploy, target, _caller.CallerId, async context =>
         {
             var progress = new ActionProgress<DeploymentProgress>(p => context.ReportStep(p.Index, p.Total, p.Description));
-            return await new DeploymentRunner(session.CreateGateway(context.Logger)).RunAsync(o, progress);
+            return await new DeploymentRunner(session.CreateGateway(context.Logger), _time).RunAsync(o, progress);
         });
         return started.Job ?? throw new WorkflowException(WorkflowFailure.Conflict, target: target, conflictingJobId: started.ConflictingJobId);
     }
@@ -90,7 +93,7 @@ public sealed class DeploymentWorkflow
         if (session.ScopeBlocker(options.Subscription, options.ResourceGroup) is { } blocker)
             return new DeploymentPlan(options, [], [blocker], [], PermissionCheckResult.NotChecked("操作できる範囲に無いため確認していません。"));
 
-        var plan = await new DeploymentPlanner(session.CreateGateway(_logger)).PlanAsync(options, cancellationToken);
+        var plan = await new DeploymentPlanner(session.CreateGateway(_logger), _time).PlanAsync(options, cancellationToken);
         return plan.Operations.Any(op => op.Kind == PlannedResourceKind.ResourceGroup && op.Action == PlannedAction.Create)
                && session.ResourceGroupCreationBlocker(options.ResourceGroup) is { } cannotCreate
             ? plan with { Blockers = [.. plan.Blockers, cannotCreate] }

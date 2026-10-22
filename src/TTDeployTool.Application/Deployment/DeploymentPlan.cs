@@ -26,14 +26,16 @@ public sealed record PlannedOperation(PlannedResourceKind Kind, string Name, Pla
 /// <summary>
 /// デプロイの計画（読み取りだけで作る）。<see cref="Blockers"/> があれば実行できない。
 /// <see cref="Options"/> はパスワードを含むため、結果やログに出さない。<see cref="Options"/> の PersistDb は、
-/// 既存の DB アプリの状態から決めた実際の値（true / false）にしてある。
+/// 既存の DB アプリの状態から決めた実際の値（true / false）にしてある。<see cref="Expiry"/> は、記録する予定の利用可能期限
+/// （実行するときに、その時刻と Azure の状態で決め直す）。
 /// </summary>
 public sealed record DeploymentPlan(
     DeployOptions Options,
     IReadOnlyList<PlannedOperation> Operations,
     IReadOnlyList<string> Blockers,
     IReadOnlyList<string> Warnings,
-    PermissionCheckResult PermissionCheck)
+    PermissionCheckResult PermissionCheck,
+    ExpiryDecision? Expiry = null)
 {
     public bool CanRun => Blockers.Count == 0;
 

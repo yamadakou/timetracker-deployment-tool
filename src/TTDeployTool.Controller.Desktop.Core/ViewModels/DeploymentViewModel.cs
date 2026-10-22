@@ -18,6 +18,7 @@ public sealed record OperationRow(string Resource, string Name, string Action, b
 /// </summary>
 public sealed class DeploymentViewModel : ObservableObject
 {
+    private readonly TimeProvider _time;
     private readonly DeploymentWorkflow _workflow;
     private readonly TargetViewModel _target;
     private readonly SettingsViewModel _settings;
@@ -32,6 +33,7 @@ public sealed class DeploymentViewModel : ObservableObject
     public DeploymentViewModel(
         DeploymentWorkflow workflow, TargetViewModel target, SettingsViewModel settings, JobQueue queue, Action<JobViewModel> registered, TimeProvider time)
     {
+        _time = time;
         _workflow = workflow;
         _target = target;
         _settings = settings;
@@ -88,6 +90,14 @@ public sealed class DeploymentViewModel : ObservableObject
 
     public DateTimeOffset? ExpiresAt => _ticket?.Saved?.ExpiresAt;
 
+    /// <summary>記録する利用可能期限（期限を過ぎると自動で削除する旨を添える）。</summary>
+    public string? ExpiryText => _ticket?.Plan.Expiry switch
+    {
+        null => null,
+        { ExpiresAt: null } e => $"利用可能期限: {e.Describe(_time.LocalTimeZone)}",
+        { } e => $"利用可能期限: {e.Describe(_time.LocalTimeZone)}。期限の後に自動で削除します（DB のデータも消えます）。",
+    };
+
     public bool RequiresDataLossAck => _ticket?.Plan.RequiresDataLossAck == true;
 
     /// <summary>「DB のデータが失われることを理解しました」のチェック。</summary>
@@ -139,6 +149,7 @@ public sealed class DeploymentViewModel : ObservableObject
             OnPropertyChanged(nameof(EstimatedDuration));
             OnPropertyChanged(nameof(PersistDbText));
             OnPropertyChanged(nameof(ExpiresAt));
+            OnPropertyChanged(nameof(ExpiryText));
             OnPropertyChanged(nameof(RequiresDataLossAck));
             OnPropertyChanged(nameof(CanStart));
             StartCommand.RaiseCanExecuteChanged();

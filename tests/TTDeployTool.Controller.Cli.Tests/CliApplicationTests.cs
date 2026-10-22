@@ -196,6 +196,86 @@ public sealed class CliApplicationTests : IDisposable
         received!.PersistDb.Should().Be(expected);
     }
 
+    // 利用可能期限日の判定に使う時刻（UTC の時刻帯で 2026-10-15）
+    private sealed class FixedTime : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => new(2026, 10, 15, 12, 0, 0, TimeSpan.Zero);
+
+        public override TimeZoneInfo LocalTimeZone => TimeZoneInfo.Utc;
+    }
+
+    private Task<int> RunAt(string[] args, CliApplication.GatewayFactory gatewayFactory) =>
+        CliApplication.RunAsync(args, _out, _err, _dir, gatewayFactory, time: new FixedTime());
+
+    private static (Mock<IAzureDeploymentGateway> Gateway, List<DeployOptions> Deployed) SucceedingGateway()
+    {
+        var gateway = new Mock<IAzureDeploymentGateway>();
+        var env = new Mock<ContainerAppManagedEnvironmentResource>().Object;
+        var deployed = new List<DeployOptions>();
+        gateway.Setup(g => g.EnsureContainerAppEnvAsync("sub", "rg", "timetracker", "japaneast", It.IsAny<CancellationToken>())).ReturnsAsync(env);
+        gateway.Setup(g => g.CreateOrUpdateContainerAppAsync("sub", "rg", "timetracker", "japaneast", Capture.In(deployed), env, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ContainerAppsDeployment("timetracker-tt", "timetracker-db", "timetracker-redis", null));
+        return (gateway, deployed);
+    }
+
+    [Fact]
+    public async Task Deploy_Should_Record_The_Specified_Expiry_And_Show_It()
+    {
+        var (gateway, deployed) = SucceedingGateway();
+
+        var code = await RunAt(With("--expires-on", "2026-12-01"), (_, _) => gateway.Object);
+
+        code.Should().Be(0);
+        deployed.Single().LifecycleTags.Should().Contain(DeploymentExpiry.ExpiresAtKey, "2026-12-01T23:59:59Z")
+            .And.Contain(DeploymentExpiry.DeployedAtKey, "2026-10-15T12:00:00Z");
+        _out.ToString().Should().Contain("利用可能期限: 2026-12-01。期限を過ぎると、TTDeployTool のデスクトップアプリが自動で削除します")
+            .And.Contain("--expires-on <yyyy-MM-dd|none>");
+    }
+
+    [Fact]
+    public async Task Deploy_Should_Default_To_32_Days_Later()
+    {
+        var (gateway, deployed) = SucceedingGateway();
+
+        await RunAt(Required, (_, _) => gateway.Object);
+
+        deployed.Single().LifecycleTags.Should().Contain(DeploymentExpiry.ExpiresAtKey, "2026-11-16T23:59:59Z");
+        _out.ToString().Should().Contain("利用可能期限: 2026-11-16（既定: 今日から 32 日後）。");
+    }
+
+    [Fact]
+    public async Task Deploy_Should_Record_No_Expiry_Without_The_Auto_Delete_Notice()
+    {
+        var (gateway, deployed) = SucceedingGateway();
+
+        await RunAt(With("--expires-on", "NONE"), (_, _) => gateway.Object);
+
+        deployed.Single().LifecycleTags.Should().Contain(DeploymentExpiry.ExpiresAtKey, DeploymentExpiry.None);
+        _out.ToString().Should().Contain("利用可能期限: 期限なし").And.NotContain("期限を過ぎると");
+    }
+
+    [Fact]
+    public async Task Deploy_Should_Reject_A_Malformed_Expiry_Without_Calling_Azure()
+    {
+        var code = await RunAt(With("--expires-on", "12/01"), NotCalled);
+
+        code.Should().Be(1);
+        (_out.ToString() + _err.ToString()).Should().Contain("expires-on には yyyy-MM-dd の日付か none を指定してください: 12/01");
+    }
+
+    [Fact]
+    public async Task Deploy_Should_Reject_A_Past_Expiry_Before_Changing_Azure()
+    {
+        var (gateway, deployed) = SucceedingGateway();
+
+        var code = await RunAt(With("--expires-on", "2026-10-14"), (_, _) => gateway.Object);
+
+        code.Should().Be(1);
+        (_out.ToString() + _err.ToString()).Should().Contain("今日以降の日付を指定してください");
+        gateway.Verify(g => g.EnsureResourceGroupAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        deployed.Should().BeEmpty();
+    }
+
     [Fact]
     public async Task Deploy_Should_Show_The_Storage_Notice_When_Persisting()
     {

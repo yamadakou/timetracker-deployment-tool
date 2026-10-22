@@ -53,6 +53,12 @@ public sealed partial class MainWindow : Window
             ViewModel.Settings.PersistDb = option;
     }
 
+    private void OnExpiryChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (((ComboBox)sender).SelectedItem is ExpiryOption option)
+            ViewModel.Settings.Expiry = option;
+    }
+
     private void OnConcurrencyChanged(object sender, SelectionChangedEventArgs e)
     {
         if (((ComboBox)sender).SelectedItem is int concurrency)

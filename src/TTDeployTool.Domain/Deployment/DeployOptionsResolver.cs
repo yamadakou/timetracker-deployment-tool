@@ -36,6 +36,7 @@ public static class DeployOptionsResolver
             RedisMemoryGi       = input.RedisMemoryGi ?? Defaults.RedisMemoryGi,
             Verbose             = input.Verbose,
             PersistDb           = input.PersistDb,
+            ExpiresOn           = string.IsNullOrWhiteSpace(input.ExpiresOn) ? null : input.ExpiresOn.Trim(),
             AuthMode            = OrDefault(input.AuthMode, DefaultAuthMode),
         };
     }

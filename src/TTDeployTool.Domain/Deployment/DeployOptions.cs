@@ -16,6 +16,12 @@ public class DeployOptions
     // DB のデータを Azure Files に置くか。null は既存の DB アプリの今の状態を引き継ぐ（新規は永続化しない）
     public bool? PersistDb { get; set; }
 
+    // 利用可能期限日（yyyy-MM-dd | none）。null は既定（今の期限を引き継ぎ、無ければ今日から 32 日後。DeploymentExpiry）
+    public string? ExpiresOn { get; set; }
+
+    // デプロイで Container App に付けるタグ（利用可能期限・デプロイした時刻）。実行するときに決める（DeploymentRunner）
+    public IReadOnlyDictionary<string, string>? LifecycleTags { get; set; }
+
     // 認証モード（default | azure-cli | sp-env | device-code | managed-identity）
     public string AuthMode { get; set; } = "default";
 
@@ -32,6 +38,14 @@ public class DeployOptions
 
     // Dry-run 用ファイル出力
     public string OutputCompose { get; set; } = "./docker-compose.yml";
+
+    /// <summary>デプロイで付けるタグを決めた設定の複製を返す（元の設定は変えない）。</summary>
+    public DeployOptions WithLifecycleTags(IReadOnlyDictionary<string, string> tags)
+    {
+        var copy = (DeployOptions)MemberwiseClone();
+        copy.LifecycleTags = tags;
+        return copy;
+    }
 
     /// <summary>実際に永続化するかを決めた設定の複製を返す（元の設定は変えない）。</summary>
     public DeployOptions WithPersistDb(bool persistDb)

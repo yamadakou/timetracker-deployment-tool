@@ -103,6 +103,7 @@ public static class CliApplication
                 DryRun              = cli.GetBool("--dry-run"),
                 Verbose             = cli.GetBool("--verbose"),
                 PersistDb           = cli.GetBoolOrNull("--persist-db"),
+                ExpiresOn           = cli.Get("--expires-on"),
             };
         }
         catch (ArgumentException ex)
@@ -142,9 +143,10 @@ public static class CliApplication
             if (!ReportPermissions(permissions, log))
                 return 1;
 
-            var result = await new DeploymentRunner(gateway).RunAsync(opts);
+            var result = await new DeploymentRunner(gateway, ctx.Time).RunAsync(opts);
             if (result.StorageAccountName != null)
                 log.Info(DbPersistence.StorageNotice(result.StorageAccountName));
+            log.Info(ExpiryNotice(result.Expiry!, ctx.Time));
             log.Success("Container Apps デプロイ完了");
             return 0;
         }
@@ -311,6 +313,12 @@ public static class CliApplication
         if (plan.PermissionCheck.Status == PermissionCheckStatus.NotChecked)
             log.Warn($"権限を事前に確認できませんでした: {plan.PermissionCheck.Note}");
     }
+
+    /// <summary>記録した利用可能期限の案内。</summary>
+    internal static string ExpiryNotice(ExpiryDecision expiry, TimeProvider time) => expiry.ExpiresAt == null
+        ? $"利用可能期限: {expiry.Describe(time.LocalTimeZone)}"
+        : $"利用可能期限: {expiry.Describe(time.LocalTimeZone)}。期限を過ぎると、TTDeployTool のデスクトップアプリが自動で削除します" +
+          "（DB のデータも消えます。CLI は期限での削除をしません）。変えるには --expires-on <yyyy-MM-dd|none> を付けてデプロイしてください。";
 
     private static string KeptDbDataNotice(DeletionPlan plan) =>
         $"ストレージアカウント {plan.StorageAccountName}（DB のデータ）は残します。料金がかかり続けます。同じアプリ名で --persist-db を付けて" +

@@ -119,6 +119,7 @@
 - 「設定」に「利用可能期限日」を加える。選べるのは「既定」（新しくデプロイする場合は今日から 32 日後、再デプロイは今の期限を引き継ぐ。D9・D11）、日付の指定、「期限なし」（D12）。画面には、既定で決まる日付も表示する。今日より前の日付は誤りにする
 - 期限は、期限日の終わり（その日の 23:59:59、利用者の PC の時刻帯）とする（D17）。タグには UTC の時刻（ISO 8601）で記録する
 - 記録する場所（D5）: 本ツールで作るリソース（Container Apps Environment・3 つの Container App・ストレージアカウント）のタグ。リソースグループは本ツールのものと限らない（既存のものを使える）ため、タグを付けない
+  - 実装（7d-1）では、**3 つの Container App だけ**に書く。Environment とストレージアカウントの管理タグは、新しく作るときだけ付け、既存のものは変更しない方針（README の管理タグ）で、デプロイのたびにタグを書き換えると、既存のリソースを変更し、タグの書き込みの権限（`Microsoft.Resources/tags/write` など）も新たに要るため。期限は Container App のタグから読む（tt → db → redis の順に、`tt-expires-at` のあるもの）。一覧（7d-2）・期限での削除（7d-3）も Container App のタグを読む
   | タグ | 値 | 付けるとき |
   |---|---|---|
   | `tt-deployed-at` | 最後にデプロイした時刻（UTC、ISO 8601） | デプロイのたび |
@@ -208,6 +209,15 @@
 - 通知領域のアイコンは、最初 PNG を指定し、起動時に `System.Drawing.Icon` が読めずに例外になった（CI の UI テストが、診断用のログの `Critical` で見つけた）。BMP の形式の ICO（`Assets/TrayIcon.ico`）にして直した
 - テスト: `Desktop.Core` のテスト 132 件成功（3 回続けて実行して不安定さなし）・行と分岐の網羅率 100%。UI テスト（CI）に 1 つだけ起動することの確認を加え、CI（run 39439054110）で 10 件成功（Azure のテスト 1 件はスキップ）。半自動の UI テスト（`AzureUiTests`）に、予定のジョブがある状態で閉じるとウィンドウが隠れて終了しないこと、もう一度起動すると隠したウィンドウが出ることを加えた。オーナーの確認の後、Desktop System Test（run 39443150877、UI テスト約 16 分）で成功（診断用のログの「起動しました」は 1 回だけで、2 つ目の起動は 1 つ目に渡された。`Critical` なし。これまでの確認（デプロイ・同時実行・停止・削除・リソースグループの削除、P1〜P4）も成功）
 - オーナーの実機で確かめること: 通知領域のアイコンとメニュー、通知と、通知を押したときの動き、ウィンドウを隠している間の WAM のサインインの画面（`desktop-app-check.md` の 5.2）
+
+**実施結果（7d-1）**
+- Domain: `DeploymentExpiry`（入力の形の誤り・今日より前の誤り・期限の決め方・期限日の終わり・タグの書式）と `ExpiryDecision`（決まった期限と決まり方 `Specified` / `Inherited` / `Default`、画面とログの説明）。`DeployOptions.ExpiresOn`・`LifecycleTags`。`DeploymentValidator` は Azure へのデプロイのときだけ形を確かめる（Dry-run では使わない）
+- Application: `DeploymentPlanner` が、今の Container App のタグから期限を決めて計画に入れる（`DeploymentPlan.Expiry`）。今日より前の日付は計画を止める理由（blocker）にし、引き継いだ期限が既に過ぎていれば警告する。`DeploymentRunner` は、Azure を変える前に今日より前の日付を拒み、`tt-expires-at`・`tt-deployed-at` を 3 つの Container App に書き、結果に期限を返す（`DeploymentResult.Expiry`）。時刻と時刻帯は `TimeProvider` から取る（テストで固定する）
+- Infrastructure: `ContainerAppSpecBuilder.WithManagedTags` が、期限のタグを、今のタグ（利用者が付けたものを含む）に上書きする
+- CLI: `--expires-on <yyyy-MM-dd|none>` とヘルプ。デプロイの後に期限と、期限での自動の削除（デスクトップアプリ）を表示する。MCP: `validate_deployment`・`plan_deployment` の `expires_on`、計画とジョブの結果の `expires_on`（UTC の時刻・表示・決まり方・注意）、instructions・`get_deployment_options` の制約・Resources の制約に期限と自動の削除を書いた
+- デスクトップアプリ: 「設定」に「利用可能期限日」（既定・日付を指定する・期限なし）、日付の入力（日付を指定するときだけ表示）、既定で決まる日付と期限での削除の説明。今日より前の日付は誤りに出す。「デプロイ」の計画と、ジョブの結果に期限を出す
+- テスト: Domain・Application・Infrastructure・CLI・MCP・Desktop.Core に期限のテストを加え、ソリューション全体 990 件（スキップ 5）成功。新しいコードの行と分岐の網羅率 100%（以前からの対象外: 各 `Program`、正規表現の生成コード、`AzureSdkExecutor` の再スローの後の閉じかっこ）。UI テスト（CI）に、「設定」の期限日の選択で日付の入力が出る・消えることを加えた
+- 期限での自動の削除は、7d-3 で行う（7d-1 では、期限を記録して表示するだけ）
 
 ## 11. 出典（2026-10-20 に確認）
 - x:Bind の関数の結び付け: https://learn.microsoft.com/windows/apps/develop/data-binding/function-bindings

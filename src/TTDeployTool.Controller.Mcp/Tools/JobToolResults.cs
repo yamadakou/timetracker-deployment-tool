@@ -19,7 +19,14 @@ public sealed record DeploymentPlanResult(
     ResolvedSettings Resolved,
     ResourceNames ResourceNames,
     bool PersistDb = false,
-    string? StorageAccount = null);
+    string? StorageAccount = null,
+    ExpiryInfo? ExpiresOn = null);
+
+/// <summary>
+/// 利用可能期限。<see cref="ExpiresAt"/> は UTC の ISO 8601（期限なしは null）、<see cref="Display"/> はサーバーの時刻帯の期限日と決まり方、
+/// <see cref="Source"/> は specified / inherited / default、<see cref="Note"/> は期限での削除の案内（期限なしは null）。
+/// </summary>
+public sealed record ExpiryInfo(string? ExpiresAt, string Display, string Source, string? Note);
 
 /// <summary>Azure を操作する ID（stdio ではサーバーの認証モードの資格情報）。</summary>
 public sealed record IdentityInfo(string AuthMode, string Display);
@@ -46,7 +53,8 @@ public sealed record JobLogInfo(string Level, string Message, DateTimeOffset At)
 /// <see cref="StorageAccount"/> は DB のデータを置いたストレージアカウント（永続化しない場合は null）。
 /// </summary>
 public sealed record DeploymentJobResult(
-    string ResourceGroup, string Environment, string Tt, string Db, string Redis, string? Endpoint, string? StorageAccount = null);
+    string ResourceGroup, string Environment, string Tt, string Db, string Redis, string? Endpoint, string? StorageAccount = null,
+    ExpiryInfo? ExpiresOn = null);
 
 public sealed record JobStatusResult(
     string JobId,

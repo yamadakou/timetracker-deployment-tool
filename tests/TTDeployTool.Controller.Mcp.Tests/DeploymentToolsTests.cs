@@ -54,7 +54,8 @@ public sealed class DeploymentToolsTests : IDisposable
         result.Defaults.Should().Be(new DefaultValues("japaneast", "timetracker", "postgresql", "timetracker", 1.5, 3.0, 1.0, 2.0, 0.5, 1.0));
         result.AppNameRule.Should().Be(new AppNameRule(2, 26, @"^[a-z]([a-z0-9-]*[a-z0-9])?$", true));
         result.ResourceSuffixes.Should().Equal("-env", "-db", "-redis", "-tt");
-        result.Constraints.Should().HaveCount(4);
+        result.Constraints.Should().HaveCount(5);
+        result.Constraints.Should().Contain(c => c.Contains("expires_on") && c.Contains(DeploymentTools.ExpiryNote));
         result.TagListUrl.Should().Be("https://hub.docker.com/r/densocreate/timetracker/tags");
         result.Server.Should().Be(new ServerStatus("stdio", "azure-cli", new PasswordEnvStatus(false, false), false, false, null));
     }
@@ -97,6 +98,21 @@ public sealed class DeploymentToolsTests : IDisposable
             "********（引数）", "********（環境変数）", 1.5, 3.0, 1.0, 2.0, 0.5, 1.0));
         result.ResourceNames.Should().Be(new ResourceNames("demo-env", "demo-tt", "demo-db", "demo-redis"));
         Json(result).Should().NotContain(DbPassword).And.NotContain(TrackerPassword);
+    }
+
+    [Theory]
+    [InlineData("2026-12-01", true)]
+    [InlineData(" none ", true)]
+    [InlineData("12/01", false)]
+    public void ValidateDeployment_Should_Check_The_Expiry_Format(string expiresOn, bool valid)
+    {
+        var settings = new McpServerSettings { DbPassword = DbPassword, TrackerPassword = TrackerPassword };
+
+        var result = Tools(settings).ValidateDeployment(subscription: "sub", resource_group: "rg", expires_on: expiresOn);
+
+        result.Valid.Should().Be(valid);
+        if (!valid)
+            result.Errors.Should().Equal("expires-on には yyyy-MM-dd の日付か none を指定してください: 12/01");
     }
 
     [Fact]

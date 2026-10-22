@@ -208,6 +208,11 @@ public sealed class JobViewModel : ObservableObject
         ? $"DB のデータはストレージアカウント {account}（Azure Files）に保存しています。"
         : null;
 
+    /// <summary>デプロイが成功した場合の、記録した利用可能期限。</summary>
+    public string? ExpirySummary => _snapshot?.Result is DeploymentResult { Expiry: { } expiry }
+        ? $"利用可能期限: {expiry.Describe(TimeZoneInfo.Local)}"
+        : null;
+
     /// <summary>削除が成功した場合の結果。</summary>
     public string? DeletionSummary => _snapshot?.Result is DeletionOutcome d
         ? $"削除したもの: {Join(d.Deleted)}。既に無かったもの: {Join(d.AlreadyDeleted)}。" +
@@ -280,6 +285,7 @@ public sealed class JobViewModel : ObservableObject
         OnPropertyChanged(nameof(Endpoint));
         OnPropertyChanged(nameof(HasEndpoint));
         OnPropertyChanged(nameof(PersistenceSummary));
+        OnPropertyChanged(nameof(ExpirySummary));
         OnPropertyChanged(nameof(DeletionSummary));
         CancelCommand.RaiseCanExecuteChanged();
         PauseCommand.RaiseCanExecuteChanged();

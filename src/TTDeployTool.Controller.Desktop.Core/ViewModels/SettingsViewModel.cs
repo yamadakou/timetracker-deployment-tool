@@ -8,12 +8,29 @@ namespace TTDeployTool.Controller.Desktop.Core.ViewModels;
 /// <summary>DB のデータの永続化の選択肢（<see cref="Value"/> は null で今の状態を引き継ぐ）。</summary>
 public sealed record PersistDbOption(bool? Value, string Label);
 
+/// <summary>利用可能期限日の決め方。</summary>
+public enum ExpiryMode
+{
+    /// <summary>既定（新しくデプロイする場合は今日から 32 日後、再デプロイは今の期限を引き継ぐ）。</summary>
+    Default,
+
+    /// <summary>日付を指定する。</summary>
+    Date,
+
+    /// <summary>期限なし。</summary>
+    None,
+}
+
+/// <summary>利用可能期限日の選択肢。</summary>
+public sealed record ExpiryOption(ExpiryMode Mode, string Label);
+
 /// <summary>設定から作ったデプロイの設定と、誤り・警告。<see cref="Options"/> は誤りがあれば null。</summary>
 public sealed record DeploymentInput(DeployOptions? Options, IReadOnlyList<string> Errors, IReadOnlyList<string> Warnings);
 
 /// <summary>
 /// デプロイの設定（DB 種別・タグ・パスワード・スペック）。誤りと警告は、入力のたびに CLI・MCP と同じ規則
 /// （<see cref="DeploymentValidator"/> / <see cref="DeploymentAdvisor"/>）で表示する。パスワードは保存しない（詳細設計 6）。
+/// 利用可能期限日は、CLI の --expires-on と同じ規則（<see cref="DeploymentExpiry"/>。docs/design/desktop-jobs.md の 6.1）。
 /// </summary>
 public sealed class SettingsViewModel : ObservableObject
 {
@@ -27,7 +44,18 @@ public sealed class SettingsViewModel : ObservableObject
         new(false, "永続化しない（DB コンテナの再起動でデータが失われる）"),
     ];
 
+    /// <summary>利用可能期限日の選択肢（CLI の --expires-on を指定しない / 日付 / none に対応する）。</summary>
+    public static readonly IReadOnlyList<ExpiryOption> ExpiryOptions =
+    [
+        new(ExpiryMode.Default, $"既定（新しくデプロイする場合は今日から {DeploymentExpiry.DefaultDays} 日後、再デプロイは今の期限を引き継ぐ）"),
+        new(ExpiryMode.Date, "日付を指定する"),
+        new(ExpiryMode.None, "期限なし"),
+    ];
+
     private readonly TargetViewModel _target;
+    private readonly TimeProvider _time;
+    private ExpiryOption _expiry = ExpiryOptions[0];
+    private DateTimeOffset _expiryDate;
     private string _dbType = DeployOptionsResolver.DefaultDbType;
     private string _dbName = Defaults.DbName;
     private string _ttTag = "";
@@ -41,9 +69,12 @@ public sealed class SettingsViewModel : ObservableObject
     private string _redisMemory = Format(Defaults.RedisMemoryGi);
     private PersistDbOption _persistDb = PersistDbOptions[0];
 
-    public SettingsViewModel(TargetViewModel target)
+    /// <param name="time">利用可能期限日の既定と、今日より前かを決める時刻と時刻帯（省略時はシステムの時刻）</param>
+    public SettingsViewModel(TargetViewModel target, TimeProvider? time = null)
     {
         _target = target;
+        _time = time ?? TimeProvider.System;
+        _expiryDate = DefaultExpiryDate();
         _target.Changed += (_, _) => Validate();
         Validate();
     }
@@ -84,6 +115,38 @@ public sealed class SettingsViewModel : ObservableObject
         }
     }
 
+    /// <summary>利用可能期限日の決め方。</summary>
+    public ExpiryOption Expiry
+    {
+        get => _expiry;
+        set
+        {
+            if (!SetProperty(ref _expiry, value, new Dependent(nameof(IsExpiryDate))))
+                return;
+            Validate();
+        }
+    }
+
+    /// <summary>期限日の入力を表示するか。</summary>
+    public bool IsExpiryDate => Expiry.Mode == ExpiryMode.Date;
+
+    /// <summary>指定する期限日（画面の日付の入力。既定は今日から 32 日後）。</summary>
+    public DateTimeOffset ExpiryDate
+    {
+        get => _expiryDate;
+        set
+        {
+            if (SetProperty(ref _expiryDate, value))
+                Validate();
+        }
+    }
+
+    /// <summary>既定で決まる期限と、期限を過ぎたときの動き。</summary>
+    public string ExpiryNotice =>
+        $"既定では、新しくデプロイする場合は {DeploymentExpiry.Today(_time.GetUtcNow(), _time.LocalTimeZone).AddDays(DeploymentExpiry.DefaultDays):yyyy-MM-dd}" +
+        $"（今日から {DeploymentExpiry.DefaultDays} 日後）、再デプロイは今の期限を引き継ぎます。期限は期限日の終わり（23:59:59）です。" +
+        "期限を過ぎると、このアプリが自動で削除します（DB のデータも消えます）。";
+
     /// <summary>Azure へのデプロイの設定の誤り（入力のたびに更新する）。</summary>
     public ObservableCollection<string> Errors { get; } = [];
 
@@ -112,8 +175,16 @@ public sealed class SettingsViewModel : ObservableObject
             RedisCpu            = Parse(RedisCpu, "redis-cpu", errors),
             RedisMemoryGi       = Parse(RedisMemoryGi, "redis-memory", errors),
             PersistDb           = PersistDb.Value,
+            ExpiresOn           = Expiry.Mode switch
+            {
+                ExpiryMode.Date => ExpiryDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                ExpiryMode.None => DeploymentExpiry.None,
+                _ => null,
+            },
         });
         errors.AddRange(DeploymentValidator.GetErrors(options, target));
+        if (target == ValidationTarget.Azure && DeploymentExpiry.PastDateError(options.ExpiresOn, _time.GetUtcNow(), _time.LocalTimeZone) is { } pastDate)
+            errors.Add(pastDate);
         var warnings = DeploymentAdvisor.GetWarnings(options, target);
         return new DeploymentInput(errors.Count == 0 ? options : null, errors, warnings);
     }
@@ -141,6 +212,13 @@ public sealed class SettingsViewModel : ObservableObject
             return value;
         errors.Add($"{name} には数値を指定してください（小数点は「.」）: '{text}'");
         return null;
+    }
+
+    // 既定の期限日（今日から 32 日後）を、日付の入力の初期値にする
+    private DateTimeOffset DefaultExpiryDate()
+    {
+        var date = DeploymentExpiry.Today(_time.GetUtcNow(), _time.LocalTimeZone).AddDays(DeploymentExpiry.DefaultDays).ToDateTime(TimeOnly.MinValue);
+        return new DateTimeOffset(date, _time.LocalTimeZone.GetUtcOffset(date));
     }
 
     private static string Format(double value) => value.ToString("0.0##", CultureInfo.InvariantCulture);

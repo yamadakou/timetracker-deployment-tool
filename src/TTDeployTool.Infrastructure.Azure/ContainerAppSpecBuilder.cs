@@ -62,11 +62,17 @@ public static class ContainerAppSpecBuilder
     /// <summary>
     /// Container App の定義に管理タグを付ける。更新時は既存のタグを引き継ぐ
     /// （PUT はタグを置き換えるため、送らないと利用者が付けたタグが消える）。
+    /// <paramref name="lifecycleTags"/>（利用可能期限・デプロイした時刻）があれば、それで上書きする。
     /// </summary>
-    public static ContainerAppData WithManagedTags(ContainerAppData data, string appName, IReadOnlyDictionary<string, string>? existingTags)
+    public static ContainerAppData WithManagedTags(
+        ContainerAppData data, string appName, IReadOnlyDictionary<string, string>? existingTags, IReadOnlyDictionary<string, string>? lifecycleTags = null)
     {
         data.Tags.Clear();
         foreach (var (key, value) in ManagedTags.Merge(existingTags, appName))
+        {
+            data.Tags[key] = value;
+        }
+        foreach (var (key, value) in lifecycleTags ?? new Dictionary<string, string>())
         {
             data.Tags[key] = value;
         }

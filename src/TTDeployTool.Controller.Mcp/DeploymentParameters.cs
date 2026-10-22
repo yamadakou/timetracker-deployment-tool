@@ -32,6 +32,9 @@ public sealed record DeploymentParameters
     public double? RedisMemoryGi { get; init; }
     public bool? PersistDb { get; init; }
 
+    /// <summary>利用可能期限日（yyyy-MM-dd か none。null は既定）。</summary>
+    public string? ExpiresOn { get; init; }
+
     /// <summary>
     /// 既定値を適用した設定を作る。subscription / resource_group は引数が無ければサーバーの既定値を使い、
     /// パスワードは引数 → 環境変数の順に取る（全体設計 4.10）。既定値の解決は CLI と同じ <see cref="DeployOptionsResolver"/> で行う。
@@ -58,6 +61,7 @@ public sealed record DeploymentParameters
             RedisCpu            = RedisCpu,
             RedisMemoryGi       = RedisMemoryGi,
             PersistDb           = PersistDb,
+            ExpiresOn           = ExpiresOn,
             AuthMode            = settings.AuthMode,
         });
         return new ResolvedParameters(options, dbSource, trackerSource);

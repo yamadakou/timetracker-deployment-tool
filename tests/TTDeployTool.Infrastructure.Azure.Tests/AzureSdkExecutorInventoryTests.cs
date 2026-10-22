@@ -304,6 +304,37 @@ public class AzureSdkExecutorInventoryTests
     }
 
     [Fact]
+    public async Task CreateOrUpdateContainerApp_Should_Overwrite_Lifecycle_Tags_On_All_Apps()
+    {
+        var sent = new Dictionary<string, ContainerAppData>();
+        _apps.Setup(c => c.GetIfExistsAsync("app-db", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Found(App("app-db", tags: """{ "tt-expires-at": "2026-01-01T00:00:00Z" }""").Object));
+        _apps.Setup(c => c.GetIfExistsAsync("app-redis", It.IsAny<CancellationToken>())).ReturnsAsync(NotFound<ContainerAppResource>());
+        _apps.Setup(c => c.GetIfExistsAsync("app-tt", It.IsAny<CancellationToken>())).ReturnsAsync(NotFound<ContainerAppResource>());
+        foreach (var name in new[] { "app-db", "app-redis", "app-tt" })
+        {
+            var op = new Mock<ArmOperation<ContainerAppResource>>();
+            op.SetupGet(o => o.Value).Returns(App(name).Object);
+            _apps.Setup(c => c.CreateOrUpdateAsync(WaitUntil.Completed, name, It.IsAny<ContainerAppData>(), It.IsAny<CancellationToken>()))
+                .Callback<WaitUntil, string, ContainerAppData, CancellationToken>((_, n, data, _) => sent[n] = data)
+                .ReturnsAsync(op.Object);
+        }
+        var lifecycle = new Dictionary<string, string>
+        {
+            [DeploymentExpiry.ExpiresAtKey] = "2026-11-23T14:59:59Z", [DeploymentExpiry.DeployedAtKey] = "2026-10-22T00:00:00Z",
+        };
+        var opts = new DeployOptions
+        {
+            Subscription = SubscriptionId, ResourceGroup = RgName, AppName = "app", DbPassword = "x", TrackerPassword = "x", LifecycleTags = lifecycle,
+        };
+
+        await Sut().CreateOrUpdateContainerAppAsync(SubscriptionId, RgName, "app", "japaneast", opts, Env().Object, Ct);
+
+        foreach (var name in new[] { "app-db", "app-redis", "app-tt" })
+            sent[name].Tags.Should().Contain(lifecycle).And.Contain("managed-by", "ttdeploytool");
+    }
+
+    [Fact]
     public async Task EnsureContainerAppEnv_Should_Create_Environment_With_Managed_Tags()
     {
         ContainerAppManagedEnvironmentData? sent = null;

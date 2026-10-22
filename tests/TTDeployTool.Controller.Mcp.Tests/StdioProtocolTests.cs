@@ -55,7 +55,7 @@ public sealed class StdioProtocolTests : IAsyncLifetime
     public void Initialize_Should_Return_Server_Info_And_Instructions()
     {
         _client.ServerInfo.Name.Should().Be("ttdeploytool");
-        _client.ServerInstructions.Should().Contain("get_deployment_options").And.Contain("検証環境向け");
+        _client.ServerInstructions.Should().Contain("get_deployment_options").And.Contain("検証環境向け").And.Contain("expires_on");
     }
 
     [Fact]

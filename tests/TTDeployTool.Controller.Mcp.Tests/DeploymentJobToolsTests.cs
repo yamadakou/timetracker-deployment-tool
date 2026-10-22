@@ -22,6 +22,9 @@ internal sealed class ManualTimeProvider : TimeProvider
     public DateTimeOffset Now { get; set; } = new(2026, 10, 15, 12, 0, 0, TimeSpan.Zero);
 
     public override DateTimeOffset GetUtcNow() => Now;
+
+    // 利用可能期限日をどの環境でも同じにする
+    public override TimeZoneInfo LocalTimeZone => TimeZoneInfo.Utc;
 }
 
 public sealed class DeploymentJobToolsTests
@@ -63,7 +66,7 @@ public sealed class DeploymentJobToolsTests
             _credentials.Add(credential);
             return _gateway.Object;
         },
-        NullLogger<DeploymentJobTools>.Instance);
+        NullLogger<DeploymentJobTools>.Instance, _time);
 
     private static string Json(object value) => JsonSerializer.Serialize(value, McpServerHost.JsonOptions);
 
@@ -84,6 +87,9 @@ public sealed class DeploymentJobToolsTests
                 It.IsAny<ContainerAppManagedEnvironmentResource>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ContainerAppsDeployment("demo-tt", "demo-db", "demo-redis", url));
     }
+
+    // 2026-10-15 から 32 日後の終わり（UTC）
+    private static readonly ExpiryInfo DefaultExpiry = new("2026-11-16T23:59:59.0000000Z", "2026-11-16（既定: 今日から 32 日後）", "default", DeploymentTools.ExpiryNote);
 
     private Task<DeploymentPlanResult> Plan(DeploymentJobTools? tools = null) => (tools ?? Tools()).PlanDeployment(app_name: "demo", cancellationToken: Ct);
 
@@ -131,7 +137,58 @@ public sealed class DeploymentJobToolsTests
         result.Warnings.Should().ContainSingle().Which.Should().Contain("リソースグループ 'rg' がまだ無い");
         result.Resolved.DbPassword.Should().Be("********（環境変数）");
         result.ResourceNames.Should().Be(new ResourceNames("demo-env", "demo-tt", "demo-db", "demo-redis"));
+        result.ExpiresOn.Should().Be(DefaultExpiry);
         Json(result).Should().NotContain(DbPassword).And.NotContain(TrackerPassword);
+        Json(result).Should().Contain("\"expires_on\":{\"expires_at\":\"2026-11-16T23:59:59.0000000Z\"");
+    }
+
+    [Fact]
+    public async Task PlanDeployment_Should_Use_The_Specified_Expiry_Date()
+    {
+        var result = await Tools().PlanDeployment(app_name: "demo", expires_on: "2026-12-01", cancellationToken: Ct);
+
+        result.Blockers.Should().BeEmpty();
+        result.ExpiresOn.Should().Be(new ExpiryInfo("2026-12-01T23:59:59.0000000Z", "2026-12-01", "specified", DeploymentTools.ExpiryNote));
+    }
+
+    [Fact]
+    public async Task PlanDeployment_Should_Allow_No_Expiry_Without_The_Auto_Delete_Note()
+    {
+        var result = await Tools().PlanDeployment(app_name: "demo", expires_on: "none", cancellationToken: Ct);
+
+        result.ExpiresOn.Should().Be(new ExpiryInfo(null, "期限なし", "specified", null));
+    }
+
+    [Fact]
+    public async Task PlanDeployment_Should_Inherit_The_Current_Expiry()
+    {
+        ExistingResourceGroup();
+        ExistingEnvironment();
+        _apps.Add(new ContainerAppInfo("demo-tt", EnvId,
+            new Dictionary<string, string>(ManagedTags.For("demo")) { [DeploymentExpiry.ExpiresAtKey] = "2026-10-31T14:59:59Z" }));
+
+        var result = await Plan();
+
+        result.ExpiresOn.Should().Be(new ExpiryInfo("2026-10-31T14:59:59.0000000Z", "2026-10-31（今の期限を引き継ぎます）", "inherited", DeploymentTools.ExpiryNote));
+    }
+
+    [Fact]
+    public async Task PlanDeployment_Should_Block_A_Past_Expiry_Date()
+    {
+        var result = await Tools().PlanDeployment(app_name: "demo", expires_on: "2026-10-14", cancellationToken: Ct);
+
+        result.PlanId.Should().BeNull();
+        result.Blockers.Should().ContainSingle().Which.Should().Contain("今日以降の日付を指定してください");
+    }
+
+    [Fact]
+    public async Task PlanDeployment_Should_Reject_A_Malformed_Expiry_Without_Reading_Azure()
+    {
+        var result = await Tools().PlanDeployment(app_name: "demo", expires_on: "2026/12/01", cancellationToken: Ct);
+
+        result.Blockers.Should().ContainSingle().Which.Should().Contain("yyyy-MM-dd");
+        result.ExpiresOn.Should().BeNull();
+        _gatewayLoggers.Should().BeEmpty();
     }
 
     [Fact]
@@ -194,7 +251,8 @@ public sealed class DeploymentJobToolsTests
         status.Kind.Should().Be("deploy");
         status.Target.Should().Be(new JobTargetInfo("sub", "rg", "demo"));
         status.CurrentStep.Should().Be(new JobStepInfo(3, 3, "Container Apps（DB / Redis / Timetracker）"));
-        status.Result.Should().Be(new DeploymentJobResult("rg", "demo-env", "demo-tt", "demo-db", "demo-redis", "https://demo-tt.example.io"));
+        status.Result.Should().Be(new DeploymentJobResult("rg", "demo-env", "demo-tt", "demo-db", "demo-redis", "https://demo-tt.example.io",
+            ExpiresOn: DefaultExpiry));
         status.Error.Should().BeNull();
         status.CompletedAt.Should().Be(_time.Now);
         // 計画は一度だけ使える

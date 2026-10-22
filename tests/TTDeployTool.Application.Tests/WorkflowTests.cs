@@ -173,7 +173,8 @@ public class DeploymentWorkflowTests
         var s = job.Snapshot();
         s.Status.Should().Be(JobStatus.Succeeded);
         s.CurrentStep.Should().Be(new JobStep(3, 3, "Container Apps（DB / Redis / Timetracker）"));
-        s.Result.Should().Be(new DeploymentResult("rg", "demo-env", "demo-tt", "demo-db", "demo-redis", "https://demo-tt.example.io"));
+        (s.Result.Should().BeOfType<DeploymentResult>().Which with { Expiry = null })
+            .Should().Be(new DeploymentResult("rg", "demo-env", "demo-tt", "demo-db", "demo-redis", "https://demo-tt.example.io"));
         // 計画は一度だけ使える
         (await Fails(() => _workflow.StartAsync(planId, false, SessionFor(), Ct))).Failure.Should().Be(WorkflowFailure.PlanNotFound);
     }

@@ -18,7 +18,7 @@ public sealed class CliArgs
     private static readonly IReadOnlySet<string> DeployValueOptions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
         "--subscription", "--resource-group", "--location", "--app-name", "--db-type", "--db-password", "--db-name",
-        "--tracker-password", "--tt-tag", "--auth-mode",
+        "--tracker-password", "--tt-tag", "--auth-mode", "--expires-on",
         "--tt-cpu", "--tt-memory", "--db-cpu", "--db-memory", "--redis-cpu", "--redis-memory",
     };
 
@@ -74,6 +74,9 @@ public sealed class CliArgs
           --redis-cpu / --redis-memory Redis の vCPU / メモリ(Gi)（既定: 0.5 / 1.0）
           --persist-db [true|false]   DB のデータを Azure Files に置き、DB コンテナの再起動の後も残す（ストレージの料金がかかる）。
                                       省略時は既存の DB アプリの今の状態を引き継ぐ（新規は永続化しない）。やめるには false を指定
+          --expires-on <yyyy-MM-dd|none> 利用可能期限日（期限日の終わり＝この PC の時刻帯の 23:59:59）。none は期限なし。
+                                      省略時は既存のデプロイの今の期限を引き継ぎ、無ければ今日から 32 日後。期限を過ぎると、
+                                      TTDeployTool のデスクトップアプリが自動で削除する（DB のデータも消える。CLI は削除しない）
           --dry-run [true|false]      Azure へ反映せず docker-compose.yml と .env を生成
           --verbose [true|false]      詳細ログを出力
           -h, --help                  このヘルプを表示

@@ -29,4 +29,7 @@ public sealed record DeployInput
 
     /// <summary>DB のデータを Azure Files に置くか（null は今の状態を引き継ぐ）。</summary>
     public bool? PersistDb { get; init; }
+
+    /// <summary>利用可能期限日（yyyy-MM-dd か none。null は既定。<see cref="DeploymentExpiry"/>）。</summary>
+    public string? ExpiresOn { get; init; }
 }

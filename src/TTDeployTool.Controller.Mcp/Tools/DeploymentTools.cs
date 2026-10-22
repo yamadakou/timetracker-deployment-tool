@@ -29,10 +29,19 @@ public sealed class DeploymentTools
     public const string PersistDbDescription =
         "Azure 上の DB のデータを Azure Files に置き、DB コンテナの再起動の後も残すか。省略時は既存の DB アプリの今の状態を引き継ぐ（新規は永続化しない）。永続化をやめるには false。ストレージの料金がかかる";
 
+    public const string ExpiresOnDescription =
+        "利用可能期限日（yyyy-MM-dd）、または none（期限なし）。期限は期限日の終わり（サーバーの時刻帯の 23:59:59）。" +
+        "省略時は、既存のデプロイの今の期限を引き継ぎ、無ければ今日から 32 日後。" + ExpiryNote;
+
+    /// <summary>期限での削除の案内（計画・結果・説明で同じ文にする）。</summary>
+    public const string ExpiryNote = "期限を過ぎると、TTDeployTool のデスクトップアプリが自動で削除します（DB のデータも消えます。CLI・MCP サーバーは期限での削除をしません）。";
+
     internal static readonly IReadOnlyList<string> Constraints =
     [
         "検証環境向けのツールです。Azure 上の DB のデータは、既定では永続化されません（DB コンテナの再起動・再デプロイ・削除で消えます）。" +
         "persist_db=true で Azure Files に置くと再起動の後も残ります（ストレージの料金がかかり、plan_deletion では keep_db_data=true を指定しない限り削除されます）。",
+        "デプロイには利用可能期限があります（expires_on。省略すると新しいデプロイは今日から 32 日後、再デプロイは今の期限を引き継ぎ、none で期限なし）。" +
+        DeploymentTools.ExpiryNote,
         "SQL Server は Developer エディションです（本番環境では使えません）。",
         "Azure 上の SQL Server 構成ではサンプル DB を作成できません（Timetracker のセットアップで空の DB を選択してください）。",
         "Timetracker のメモリが 2Gi 以下だと、サンプル DB の作成が OutOfMemory で失敗することがあります。",
@@ -106,14 +115,15 @@ public sealed class DeploymentTools
         [Description("DB のメモリ（Gi、既定 2.0）")] double? db_memory_gi = null,
         [Description("Redis の CPU（vCPU、既定 0.5）")] double? redis_cpu = null,
         [Description("Redis のメモリ（Gi、既定 1.0）")] double? redis_memory_gi = null,
-        [Description(PersistDbDescription)] bool? persist_db = null)
+        [Description(PersistDbDescription)] bool? persist_db = null,
+        [Description(ExpiresOnDescription)] string? expires_on = null)
     {
         var parameters = new DeploymentParameters
         {
             Subscription = subscription, ResourceGroup = resource_group, Location = location, AppName = app_name, DbType = db_type,
             DbName = db_name, TtTag = tt_tag, DbPassword = db_password, TrackerPassword = tracker_password,
             TtCpu = tt_cpu, TtMemoryGi = tt_memory_gi, DbCpu = db_cpu, DbMemoryGi = db_memory_gi, RedisCpu = redis_cpu, RedisMemoryGi = redis_memory_gi,
-            PersistDb = persist_db,
+            PersistDb = persist_db, ExpiresOn = expires_on,
         };
         var resolved = parameters.Resolve(_settings);
         var (validationTarget, targetError) = ParseTarget(target);

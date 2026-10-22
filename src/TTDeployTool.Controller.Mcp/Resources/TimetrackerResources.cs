@@ -30,6 +30,7 @@ public sealed class TimetrackerResources
         | Timetracker のメモリ | 3Gi 以上を推奨します |
         | スケールは 1 台固定 | 各コンテナとも 1 台で動作し、冗長化・スケールアウトは行いません |
         | 機密情報の取り扱い | generate_compose で生成する .env には DB パスワードなどが平文で書かれます。共有やリポジトリへのコミットは避けてください。Azure 上ではパスワードを Container Apps の secret として登録します |
+        | 利用可能期限 | デプロイには利用可能期限があり、本ツールで作る 3 つの Container App のタグ（tt-expires-at。UTC）に記録します。plan_deployment の expires_on で、期限日（yyyy-MM-dd。期限日の終わり＝サーバーの時刻帯の 23:59:59）か none（期限なし）を指定できます。省略すると、新しいデプロイは今日から 32 日後、再デプロイは今の期限を引き継ぎます（期限のタグが無い環境は 32 日後）。期限を過ぎると、TTDeployTool のデスクトップアプリが自動で削除します（DB のデータも消えます）。CLI・MCP サーバーは期限での削除をしません |
         | 不要になった環境の削除 | plan_deletion / start_deletion で、本ツールが作ったリソース（Container App と Environment）を削除できます。リソースグループは既定では削除しません。plan_deletion に delete_resource_group=true を指定すると、本ツールのリソースを削除した後にリソースグループが空になる場合だけ、リソースグループも削除します（ほかのリソースが残る場合は削除しません。元に戻せません） |
         """;
 

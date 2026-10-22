@@ -204,7 +204,7 @@ public class AzureSdkExecutor : IAzureDeploymentGateway
         try
         {
             dbAppOp = await apps.CreateOrUpdateAsync(WaitUntil.Completed, dbAppName,
-                ContainerAppSpecBuilder.WithManagedTags(ContainerAppSpecBuilder.BuildDbApp(opts, location, env.Id), appName, dbTags),
+                ContainerAppSpecBuilder.WithManagedTags(ContainerAppSpecBuilder.BuildDbApp(opts, location, env.Id), appName, dbTags, opts.LifecycleTags),
                 cancellationToken);
         }
         catch (Exception) when (stoppedDb != null)
@@ -227,7 +227,7 @@ public class AzureSdkExecutor : IAzureDeploymentGateway
         var redisAppName = ResourceNaming.RedisApp(appName);
         var redisTags = await GetExistingTagsAsync(apps, redisAppName, cancellationToken);
         var redisAppOp = await apps.CreateOrUpdateAsync(WaitUntil.Completed, redisAppName,
-            ContainerAppSpecBuilder.WithManagedTags(ContainerAppSpecBuilder.BuildRedisApp(opts, location, env.Id), appName, redisTags),
+            ContainerAppSpecBuilder.WithManagedTags(ContainerAppSpecBuilder.BuildRedisApp(opts, location, env.Id), appName, redisTags, opts.LifecycleTags),
             cancellationToken);
         var redisApp = redisAppOp.Value;
         var redisEndpointHost = redisAppName;
@@ -238,7 +238,7 @@ public class AzureSdkExecutor : IAzureDeploymentGateway
         var ttTags = await GetExistingTagsAsync(apps, ttAppName, cancellationToken);
         var ttAppOp = await apps.CreateOrUpdateAsync(WaitUntil.Completed, ttAppName,
             ContainerAppSpecBuilder.WithManagedTags(
-                ContainerAppSpecBuilder.BuildTimetrackerApp(opts, location, env.Id, dbEndpointHost, redisEndpointHost), appName, ttTags),
+                ContainerAppSpecBuilder.BuildTimetrackerApp(opts, location, env.Id, dbEndpointHost, redisEndpointHost), appName, ttTags, opts.LifecycleTags),
             cancellationToken);
         var ttApp = ttAppOp.Value;
         var ttUrl = ttApp.Data.Configuration?.Ingress?.Fqdn != null

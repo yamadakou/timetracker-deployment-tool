@@ -64,6 +64,8 @@ Azure を使わずに、ローカル用の `docker-compose.yml` を作るだけ�
 
 **DB のデータの永続化**: `plan_deployment` / `validate_deployment` に `persist_db=true` を付けると、DB のデータを Azure Files に置き、DB コンテナの再起動の後も残します（ストレージの料金がかかります。省略時は、既存の DB アプリの今の状態を引き継ぎます）。`plan_deletion` は、既定でそのストレージアカウントも削除の対象にし、`keep_db_data=true` で残せます。違いと注意点は README の [DB のデータの扱いと永続化](../README.md#db-のデータの扱いと永続化--persist-db) を参照してください。
 
+**利用可能期限**: `plan_deployment` / `validate_deployment` の `expires_on` に、期限日（`yyyy-MM-dd`。MCP サーバーが動く PC・サーバーの時刻帯で、その日の 23:59:59 まで）または `none`（期限なし）を指定できます。省略すると、既存のデプロイの今の期限を引き継ぎ、無ければ**今日から 32 日後**にします。計画と結果の `expires_on` に、決まった期限が出ます。期限を過ぎると、TTDeployTool のデスクトップアプリが自動で削除します（DB のデータも消えます。MCP サーバーと CLI は期限での削除をしません）。詳しくは README の `--expires-on` を参照してください。
+
 **利用者が気をつけること**:
 - `start_deployment` と `start_deletion` は、アシスタントの設定で**自動承認にしないでください**（実行の前に、計画の内容を確認できるように）
 - パスワードは、ツールの引数ではなく、サーバーの環境変数（`TT_MCP_DB_PASSWORD` / `TT_MCP_TRACKER_PASSWORD`）で渡すことをおすすめします。引数で渡すと、会話の履歴に残ります
@@ -164,6 +166,7 @@ claude mcp add ttdeploytool `
 |---|---|
 | 「Timetracker の検証環境を、Azure の rg-tt-demo に PostgreSQL で作ってください」 | 設定の確認と検証 → `plan_deployment` の結果（作るリソース・警告）が示されるので、確認して実行を指示します → 数分後に Timetracker の URL が返ります |
 | 「DB のデータを残したいので、永続化してデプロイしてください」 | `persist_db=true` で計画します。ストレージの料金と、削除での扱いが案内されます |
+| 「来月末まで使うので、期限を 2026-11-30 にしてデプロイしてください」 | `expires_on="2026-11-30"` で計画します。期限を過ぎるとデスクトップアプリが自動で削除することが案内されます |
 | 「ローカルの Docker で試したいので、C:\work\timetracker に compose ファイルを作ってください」 | `generate_compose` で `docker-compose.yml` と `.env` を作ります（Azure は使いません） |
 | 「rg-tt-demo の Timetracker を削除してください」 | `plan_deletion` の結果（削除するもの・残すもの）が示されるので、確認してアプリ名を入力します |
 

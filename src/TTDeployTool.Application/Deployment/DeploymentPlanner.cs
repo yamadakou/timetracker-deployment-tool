@@ -10,10 +10,30 @@ namespace TTDeployTool.Application.Deployment;
 public sealed class DeploymentPlanner
 {
     private readonly IAzureDeploymentGateway _gateway;
+    private readonly TimeProvider _time;
 
-    public DeploymentPlanner(IAzureDeploymentGateway gateway)
+    /// <param name="time">利用可能期限を決める時刻と時刻帯（省略時はシステムの時刻）</param>
+    public DeploymentPlanner(IAzureDeploymentGateway gateway, TimeProvider? time = null)
     {
         _gateway = gateway;
+        _time = time ?? TimeProvider.System;
+    }
+
+    /// <summary>
+    /// 今のデプロイの、利用可能期限のタグを持つ Container App のタグ（Timetracker → DB → Redis の順に探す。無ければ null）。
+    /// 期限は 3 つの Container App に記録する（Environment とストレージアカウントは、既存のものを変更しないため記録しない）。
+    /// </summary>
+    public static IReadOnlyDictionary<string, string>? CurrentLifecycleTags(IReadOnlyList<ContainerAppInfo> apps, string appName) =>
+        new[] { ResourceNaming.TimetrackerApp(appName), ResourceNaming.DbApp(appName), ResourceNaming.RedisApp(appName) }
+            .Select(name => apps.FirstOrDefault(a => string.Equals(a.Name, name, StringComparison.OrdinalIgnoreCase))?.Tags)
+            .FirstOrDefault(tags => tags != null && tags.Keys.Any(k => string.Equals(k, DeploymentExpiry.ExpiresAtKey, StringComparison.OrdinalIgnoreCase)));
+
+    /// <summary>利用可能期限を決める（今日より前の日付を指定した場合は、その誤りも返す）。</summary>
+    public (ExpiryDecision Decision, string? Error) ResolveExpiry(DeployOptions opts, IReadOnlyList<ContainerAppInfo> existingApps)
+    {
+        var now = _time.GetUtcNow();
+        return (DeploymentExpiry.Resolve(opts.ExpiresOn, CurrentLifecycleTags(existingApps, opts.AppName), now, _time.LocalTimeZone),
+            DeploymentExpiry.PastDateError(opts.ExpiresOn, now, _time.LocalTimeZone));
     }
 
     // 永続化する場合の、DB のストレージの今の状態
@@ -69,7 +89,8 @@ public sealed class DeploymentPlanner
             operations.AddRange(appNames.Select(n => new PlannedOperation(PlannedResourceKind.ContainerApp, n, PlannedAction.Create)));
             var notChecked = ResourceGroupMissing(opts);
             warnings.Add(notChecked.Note!);
-            return new DeploymentPlan(opts.WithPersistDb(persistNew), operations, blockers, warnings, notChecked);
+            var newExpiry = AddExpiryBlocker(opts, [], blockers, warnings);
+            return new DeploymentPlan(opts.WithPersistDb(persistNew), operations, blockers, warnings, notChecked, newExpiry);
         }
 
         operations.Add(new PlannedOperation(PlannedResourceKind.ResourceGroup, rg.Name, PlannedAction.UseExisting));
@@ -121,7 +142,19 @@ public sealed class DeploymentPlanner
         else if (permissions.Status == PermissionCheckStatus.NotChecked)
             warnings.Add($"権限を事前に確認できませんでした: {permissions.Note}");
 
-        return new DeploymentPlan(opts.WithPersistDb(persist), operations, blockers, warnings, permissions);
+        var expiry = AddExpiryBlocker(opts, existingApps, blockers, warnings);
+        return new DeploymentPlan(opts.WithPersistDb(persist), operations, blockers, warnings, permissions, expiry);
+    }
+
+    // 今日より前の日付は実行できない。引き継ぐ期限が既に過ぎていれば警告する
+    private ExpiryDecision AddExpiryBlocker(DeployOptions opts, IReadOnlyList<ContainerAppInfo> existingApps, List<string> blockers, List<string> warnings)
+    {
+        var (decision, error) = ResolveExpiry(opts, existingApps);
+        if (error != null)
+            blockers.Add(error);
+        if (decision is { Source: ExpirySource.Inherited, ExpiresAt: { } at } && at <= _time.GetUtcNow())
+            warnings.Add($"今の利用可能期限（{decision.Describe(_time.LocalTimeZone)}）を過ぎています。期限日を指定し直してください。");
+        return decision;
     }
 
     private static ContainerAppInfo? FindDbApp(IReadOnlyList<ContainerAppInfo> apps, DeployOptions opts) =>

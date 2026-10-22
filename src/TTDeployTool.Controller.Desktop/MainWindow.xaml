@@ -24,6 +24,7 @@
                     <TextBlock AutomationProperties.AutomationId="Job.Note" Text="{x:Bind Note, Mode=OneWay}" TextWrapping="Wrap" Foreground="{ThemeResource SystemFillColorCautionBrush}" />
                     <TextBlock AutomationProperties.AutomationId="Job.Error" Text="{x:Bind Error, Mode=OneWay}" TextWrapping="Wrap" Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
                     <TextBlock Text="{x:Bind PersistenceSummary, Mode=OneWay}" TextWrapping="Wrap" />
+                    <TextBlock AutomationProperties.AutomationId="Job.Expiry" Text="{x:Bind ExpirySummary, Mode=OneWay}" TextWrapping="Wrap" />
                     <TextBlock Text="{x:Bind DeletionSummary, Mode=OneWay}" TextWrapping="Wrap" />
                     <HyperlinkButton Content="{x:Bind Endpoint, Mode=OneWay}" NavigateUri="{x:Bind Endpoint, Mode=OneWay}"
                                      Visibility="{x:Bind HasEndpoint, Mode=OneWay}" />
@@ -121,6 +122,11 @@
                         <PasswordBox AutomationProperties.AutomationId="Settings.TrackerPassword" Header="Timetracker のパスワード（8 文字以上）" Password="{x:Bind ViewModel.Settings.TrackerPassword, Mode=TwoWay}" Width="480" HorizontalAlignment="Left" />
                         <ComboBox AutomationProperties.AutomationId="Settings.PersistDb" Header="DB のデータ" ItemsSource="{x:Bind vm:SettingsViewModel.PersistDbOptions}" DisplayMemberPath="Label"
                                   SelectedItem="{x:Bind ViewModel.Settings.PersistDb, Mode=OneWay}" SelectionChanged="OnPersistDbChanged" MinWidth="480" />
+                        <ComboBox AutomationProperties.AutomationId="Settings.Expiry" Header="利用可能期限日" ItemsSource="{x:Bind vm:SettingsViewModel.ExpiryOptions}" DisplayMemberPath="Label"
+                                  SelectedItem="{x:Bind ViewModel.Settings.Expiry, Mode=OneWay}" SelectionChanged="OnExpiryChanged" MinWidth="480" />
+                        <DatePicker AutomationProperties.AutomationId="Settings.ExpiryDate" Header="期限日" Date="{x:Bind ViewModel.Settings.ExpiryDate, Mode=TwoWay}"
+                                    Visibility="{x:Bind ViewModel.Settings.IsExpiryDate, Mode=OneWay}" />
+                        <TextBlock AutomationProperties.AutomationId="Settings.ExpiryNotice" TextWrapping="Wrap" Text="{x:Bind ViewModel.Settings.ExpiryNotice}" />
                         <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="CPU（vCPU）とメモリ（Gi）" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <TextBox AutomationProperties.AutomationId="Settings.TtCpu" Header="Timetracker の CPU" Text="{x:Bind ViewModel.Settings.TtCpu, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="150" />
@@ -157,6 +163,7 @@
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
                             <TextBlock Text="{x:Bind ViewModel.Deployment.PersistDbText, Mode=OneWay}" />
+                            <TextBlock AutomationProperties.AutomationId="Deploy.Expiry" Text="{x:Bind ViewModel.Deployment.ExpiryText, Mode=OneWay}" TextWrapping="Wrap" />
                             <TextBlock Text="{x:Bind ViewModel.Deployment.PermissionText, Mode=OneWay}" TextWrapping="Wrap" />
                             <TextBlock Text="{x:Bind ViewModel.Deployment.EstimatedDuration, Mode=OneWay}" />
                             <TextBlock Text="{x:Bind local:Ui.Time(ViewModel.Deployment.ExpiresAt), Mode=OneWay}" />

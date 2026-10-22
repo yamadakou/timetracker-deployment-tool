@@ -126,6 +126,13 @@ public class CiUiTests
             app.Show("Settings");
             app.Select("Settings.DbType", "sqlserver");
             app.Select("Settings.PersistDb", "Azure Files に永続化する（料金がかかる）");
+            // 利用可能期限日: 「日付を指定する」で日付の入力が現れ、既定に戻すと消える
+            app.TextOf("Settings.ExpiryNotice").Should().Contain("今日から 32 日後").And.Contain("自動で削除します");
+            app.Exists("Settings.ExpiryDate").Should().BeFalse();
+            app.Select("Settings.Expiry", "日付を指定する");
+            AppSession.WaitUntil(() => app.Exists("Settings.ExpiryDate"), "期限日の入力が表示される");
+            app.Select("Settings.Expiry", "期限なし");
+            AppSession.WaitUntil(() => !app.Exists("Settings.ExpiryDate"), "期限日の入力が消える");
             app.SetText("Settings.DbPassword", "UiTestDbPass1!");
             app.SetText("Settings.TrackerPassword", "UiTestTracker1!");
 
