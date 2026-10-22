@@ -45,7 +45,7 @@ public sealed class DeploymentViewModel : ObservableObject
         ScheduleCommand = new AsyncCommand(() => RegisterAsync(Schedule), () => CanStart);
         // 対象や設定を変えたら、前の計画は使わない（計画と違う内容で実行しないように）
         _target.Changed += (_, _) => Ticket = null;
-        _settings.PropertyChanged += (_, _) => Ticket = null;
+        _settings.InputChanged += (_, _) => Ticket = null;
     }
 
     public AsyncCommand PlanCommand { get; }

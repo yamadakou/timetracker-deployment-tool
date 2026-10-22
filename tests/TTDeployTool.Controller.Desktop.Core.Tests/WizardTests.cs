@@ -101,6 +101,26 @@ public class DeployWizardViewModelTests
     }
 
     [Fact]
+    public async Task Saving_A_Template_On_The_Last_Step_Should_Keep_The_Plan()
+    {
+        // 確認の画面でテンプレートを保存すると計画が消え、「今すぐ実行」が無くなっていた（Desktop System Test、2026-10-22）
+        var h = await new Harness().ReadyAsync();
+        h.Azure.ResourceGroup = null;
+        var settings = h.Main.Settings;
+        await h.Main.Deployment.PlanCommand.ExecuteAsync();
+
+        settings.TemplateName = "保存";
+        await settings.SaveTemplateCommand.ExecuteAsync();
+        settings.IncludePasswordsInCopy = true;
+        await settings.CopyMarkdownCommand.ExecuteAsync();
+        settings.SelectedTemplate = null;
+        h.Main.Deployment.HasPlan.Should().BeTrue("入力でないものの変更では計画を消さない");
+
+        settings.DbName = "changed";
+        h.Main.Deployment.HasPlan.Should().BeFalse("入力を変えたら計画を消す");
+    }
+
+    [Fact]
     public async Task Running_Now_Should_Open_The_Execution_Status_And_Read_Azure_After_The_Job()
     {
         var h = await new Harness().ReadyAsync();

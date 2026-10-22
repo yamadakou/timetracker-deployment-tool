@@ -101,6 +101,12 @@ public sealed class SettingsViewModel : ObservableObject
         Validate();
     }
 
+    /// <summary>
+    /// デプロイの入力が変わったとき（計画を消す）。テンプレートの名前・選択、コピー、メッセージなど、入力でないものの変更では知らせない
+    /// （確認の画面でテンプレートを保存すると計画が消え、「今すぐ実行」が無くなっていた。Desktop System Test、2026-10-22）。
+    /// </summary>
+    public event EventHandler? InputChanged;
+
     /// <summary>設定を Markdown の表にしてコピーする（パスワードは <see cref="IncludePasswordsInCopy"/> のときだけ値を出す）。</summary>
     public AsyncCommand CopyMarkdownCommand { get; }
 
@@ -397,6 +403,7 @@ public sealed class SettingsViewModel : ObservableObject
         var input = Build(ValidationTarget.Azure);
         Replace(Errors, input.Errors);
         Replace(Warnings, input.Warnings);
+        InputChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private static void Replace(ObservableCollection<string> items, IReadOnlyList<string> values)
