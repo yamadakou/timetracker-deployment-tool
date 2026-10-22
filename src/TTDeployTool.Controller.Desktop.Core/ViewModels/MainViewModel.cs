@@ -58,6 +58,11 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         var caller = new LocalCallerContext();
 
         Target = new TargetViewModel(signIn, clients, loggers.CreateLogger("TTDeployTool.Desktop.Target"), time);
+        Status = new StatusViewModel(Target, logger,
+            () => Queue.ActiveFor(Target.Subscription, Target.ResourceGroup, Target.AppName.ToLowerInvariant())?.IsRunning == true, clipboard);
+        // サインアウトしたときに一覧を消すため、サインインより先に作る
+        Deployments = new DeploymentListViewModel(Target, Status, Queue, logger, loggers.CreateLogger("TTDeployTool.Desktop.Deployments"), time,
+            launcher, clipboard, page => NavigationRequested?.Invoke(page));
         SignIn = new SignInViewModel(signIn, async signedIn =>
         {
             if (signedIn)
@@ -73,11 +78,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         Settings = new SettingsViewModel(Target, time, preferences, dialogs, clipboard);
         Deployment = new DeploymentViewModel(new DeploymentWorkflow(plans, jobs, caller, logger, time), Target, Settings, Queue, Show, time);
         Deletion = new DeletionViewModel(new DeletionWorkflow(plans, jobs, caller, logger, time), Target, Queue, Show, time, clipboard);
-        Status = new StatusViewModel(Target, logger,
-            () => Queue.ActiveFor(Target.Subscription, Target.ResourceGroup, Target.AppName.ToLowerInvariant())?.IsRunning == true, clipboard);
         DryRun = new DryRunViewModel(Settings, dialogs, launcher);
-        Deployments = new DeploymentListViewModel(Target, Status, Queue, logger, loggers.CreateLogger("TTDeployTool.Desktop.Deployments"), time,
-            launcher, clipboard, page => NavigationRequested?.Invoke(page));
         LogDirectory = (loggers as DiagnosticLog)?.Directory;
         OpenLogFolderCommand = new AsyncCommand(() =>
         {
