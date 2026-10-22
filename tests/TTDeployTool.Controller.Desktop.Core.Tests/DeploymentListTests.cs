@@ -197,14 +197,23 @@ public class DeploymentListViewModelTests
         string[] Names() => vm.Rows.Select(r => r.AppName).ToArray();
         DateTimeOffset Day(int month, int day) => new(2026, month, day, 0, 0, 0, TimeSpan.FromHours(9));
 
-        vm.SubscriptionFilter = " 本番 ";
+        // サブスクリプションの絞り込みは、「すべて」と読んだサブスクリプションから選ぶ
+        vm.SubscriptionFilters.Select(f => f.Label).Should().Equal("すべてのサブスクリプション", "本番（sub2、開発）", "検証（sub、開発）");
+        vm.SubscriptionFilter.Should().Be(DeploymentListViewModel.AllSubscriptions);
+        vm.SubscriptionFilter = vm.SubscriptionFilters[1];
         Names().Should().Equal("d", "c");
-        vm.SubscriptionFilter = "SUB2";
+        vm.SubscriptionFilter = new SubscriptionFilterOption("SUB2", "大文字");
         Names().Should().Equal("d", "c");
-        vm.SubscriptionFilter = "none";
+        // サブスクリプションを読み直しても、選んでいたものが残る
+        await h.Main.Target.LoadCommand.ExecuteAsync();
+        vm.SubscriptionFilter.SubscriptionId.Should().Be("sub2");
+        vm.SubscriptionFilter = new SubscriptionFilterOption("none", "無い");
         Names().Should().BeEmpty();
         vm.PageText.Should().Be("表示するデプロイはありません（全 4 件）。");
-        vm.SubscriptionFilter = "";
+        // 選んでいたものが無ければ、すべてにする
+        await h.Main.Target.LoadCommand.ExecuteAsync();
+        vm.SubscriptionFilter.Should().Be(DeploymentListViewModel.AllSubscriptions);
+        vm.SubscriptionFilter = DeploymentListViewModel.AllSubscriptions;
 
         vm.ResourceGroupFilter = "RG-";
         Names().Should().Equal("a", "b", "c");
@@ -307,7 +316,7 @@ public class DeploymentListViewModelTests
         await row.DeleteCommand.ExecuteAsync();
         await row.CheckStatusCommand.ExecuteAsync();
 
-        h.Navigations.Should().Equal("settings", "delete", "status");
+        h.Navigations.Should().Equal("wizard", "delete", "status");
         h.Main.Status.Summary.Should().Be("Container Apps Environment demo-env（japaneast、Succeeded）");
         h.Main.Deployments.Error.Should().BeNull();
     }

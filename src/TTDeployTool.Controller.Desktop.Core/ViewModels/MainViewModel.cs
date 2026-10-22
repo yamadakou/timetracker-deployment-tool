@@ -34,6 +34,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private JobViewModel? _currentJob;
     private JobViewModel? _currentDeployment;
     private JobViewModel? _currentDeletion;
+    private JobViewModel? _statusJob;
 
     public MainViewModel(
         ISignInService signIn, IAzureClients clients, IDialogService dialogs, ISystemLauncher launcher, TimeProvider time, ILoggerFactory loggers,
@@ -47,6 +48,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             Clipboard = clipboard,
         };
         Queue.Finished += NotifyFinished;
+        Queue.Finished += RefreshStatusWhenFinished;
         Queue.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(JobQueue.HasActive))
@@ -61,8 +63,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         Status = new StatusViewModel(Target, logger,
             () => Queue.ActiveFor(Target.Subscription, Target.ResourceGroup, Target.AppName.ToLowerInvariant())?.IsRunning == true, clipboard);
         // サインアウトしたときに一覧を消すため、サインインより先に作る
-        Deployments = new DeploymentListViewModel(Target, Status, Queue, logger, loggers.CreateLogger("TTDeployTool.Desktop.Deployments"), time,
-            launcher, clipboard, page => NavigationRequested?.Invoke(page));
+        Deployments = new DeploymentListViewModel(Target, Queue, logger, loggers.CreateLogger("TTDeployTool.Desktop.Deployments"), time,
+            launcher, clipboard, OpenAsync);
         SignIn = new SignInViewModel(signIn, async signedIn =>
         {
             if (signedIn)
@@ -79,6 +81,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         Deployment = new DeploymentViewModel(new DeploymentWorkflow(plans, jobs, caller, logger, time), Target, Settings, Queue, Show, time);
         Deletion = new DeletionViewModel(new DeletionWorkflow(plans, jobs, caller, logger, time), Target, Queue, Show, time, clipboard);
         DryRun = new DryRunViewModel(Settings, dialogs, launcher);
+        Wizard = new DeployWizardViewModel(Settings, Deployment);
         LogDirectory = (loggers as DiagnosticLog)?.Directory;
         OpenLogFolderCommand = new AsyncCommand(() =>
         {
@@ -111,10 +114,25 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
     public DryRunViewModel DryRun { get; }
 
+    /// <summary>デプロイのウィザード（設定 → 確認と実行）。</summary>
+    public DeployWizardViewModel Wizard { get; }
+
+    /// <summary>実行状況の画面に出すジョブ（無ければ、Azure の状態だけを出す）。</summary>
+    public JobViewModel? StatusJob
+    {
+        get => _statusJob;
+        private set => SetProperty(ref _statusJob, value, new Dependent(nameof(HasStatusJob)));
+    }
+
+    public bool HasStatusJob => StatusJob != null;
+
+    /// <summary>実行状況の画面で、ジョブが終わった後に Azure の状態を読み直した処理（テストで待つ）。</summary>
+    internal Task StatusRefresh { get; private set; } = Task.CompletedTask;
+
     /// <summary>デプロイの一覧（Azure から集める）。</summary>
     public DeploymentListViewModel Deployments { get; }
 
-    /// <summary>画面を切り替える要求（デプロイの一覧の行の操作。名前は画面の項目のタグ: settings・status・delete）。</summary>
+    /// <summary>画面を切り替える要求（デプロイの一覧の行の操作。名前は画面の項目のタグ: wizard・status・delete・jobs など）。</summary>
     public event Action<string>? NavigationRequested;
 
     /// <summary>診断用のログのフォルダー（ファイルに書かない場合は null）。</summary>
@@ -212,10 +230,54 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             $"{job.Title}: {job.StatusText}", details.Count == 0 ? "ジョブが終わりました。" : string.Join("\n", details), job.Id));
     }
 
-    // 登録したジョブを、デプロイ・削除の画面に表示する
+    /// <summary>
+    /// 画面を開く（docs/design/desktop-wizard.md の 2）。wizard はウィザードの最初の画面、status は対象の最も新しいジョブと Azure の状態、
+    /// delete は削除の画面（計画を作る）。そのほかは画面を切り替えるだけ。
+    /// </summary>
+    public async Task OpenAsync(string page)
+    {
+        switch (page)
+        {
+            case "wizard":
+                await Wizard.StartOverAsync();
+                NavigationRequested?.Invoke(page);
+                break;
+            case "status":
+                StatusJob = Jobs.FirstOrDefault(j => j.IsFor(Target.Subscription, Target.ResourceGroup, Target.AppName.ToLowerInvariant()));
+                NavigationRequested?.Invoke(page);
+                await Status.RefreshCommand.ExecuteAsync();
+                break;
+            case "delete":
+                NavigationRequested?.Invoke(page);
+                await Deletion.PlanCommand.ExecuteAsync();
+                break;
+            default:
+                NavigationRequested?.Invoke(page);
+                break;
+        }
+    }
+
+    // 実行状況の画面のジョブが終わったら、Azure の状態を読み直す
+    private void RefreshStatusWhenFinished(JobViewModel job)
+    {
+        if (job == StatusJob)
+            StatusRefresh = Status.RefreshCommand.ExecuteAsync();
+    }
+
+    // 登録したジョブを、デプロイ・削除の画面に表示する。今すぐ実行したものは実行状況の画面、予定に追加したものはジョブの画面を開く
     private void Show(JobViewModel job)
     {
         CurrentJob = job;
+        if (job.ScheduledAt == null)
+        {
+            StatusJob = job;
+            NavigationRequested?.Invoke("status");
+            StatusRefresh = Status.RefreshCommand.ExecuteAsync();
+        }
+        else
+        {
+            NavigationRequested?.Invoke("jobs");
+        }
         if (job.IsDeployment)
         {
             CurrentDeployment = job;

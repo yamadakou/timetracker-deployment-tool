@@ -39,9 +39,12 @@ public class AzureUiTests
             }
             app.Exists("SignIn.Error").Should().BeFalse();
 
+            // 7f: デプロイはウィザード（① 対象 → ② DB → ③ パスワード → ④ スペックと利用可能期限 → ⑤ 確認と実行）で行う
+            app.IsEnabled("Nav.Deployments").Should().BeTrue("サインインすると、デプロイの一覧を使える");
+            app.Show("Wizard");
+            WizardStep(app, "①");
             // サブスクリプションの読み込み（読めなかったテナントの注意は、結果に書き出す）
             app.SelectWhere("Target.Subscription", name => name.Contains(subscription!), $"サブスクリプション {subscription}", LoadTimeout);
-            app.Exists("Target.Error").Should().BeFalse();
             Log($"サブスクリプションの一覧: {string.Join(" / ", app.ItemsOf("Target.Subscription"))}");
             if (app.ScreenText().Split('\n').FirstOrDefault(l => l.StartsWith("テナント ") && l.Contains("読めませんでした")) is { } notice)
                 Log($"一覧の注意: {notice}");
@@ -54,64 +57,61 @@ public class AzureUiTests
             items.Should().OnlyHaveUniqueItems();
             app.SelectedOf("Target.Subscription").Should().Contain(subscription);
 
-            // 7e: リソースグループ・アプリ名・リージョンは「設定」で入力する
-            app.Show("Settings");
+            // ① 対象: リソースグループを入れるまで次へ進めない
+            app.IsEnabled("Wizard.Next").Should().BeFalse("リソースグループが無ければ次へ進めない");
             app.SetText("Target.ResourceGroup", resourceGroup!);
             app.SetText("Target.AppName", appName);
             app.SetText("Target.Location", location);
-            app.WaitForText("Target.TargetError", t => t.Length == 0, "対象の誤りが無い");
-
-            // まだ何も無いリソースグループの状態
-            app.Show("Status");
-            app.Invoke("Status.Refresh");
-            AppSession.WaitUntil(() => app.Exists("Status.Error") || app.TextOf("Status.Summary").Contains("ありません"),
-                "状態の確認の結果が表示されませんでした。", LoadTimeout);
-            Log($"デプロイ前の状態: {(app.Exists("Status.Error") ? app.TextOf("Status.Error") : app.TextOf("Status.Summary"))}");
-
-            // P1: パスワードを入れずに計画するとエラーが出て、直して計画し直すとエラーの領域ごと消える
-            app.Show("Deploy");
-            app.Invoke("Deploy.Plan");
-            app.WaitForText("Deploy.Error", t => t.Contains("設定に誤りがあります"), "パスワードの無い計画でエラーが出る");
-            app.Show("Settings");
+            Next(app, "②");
+            // ② DB は既定のまま
+            Next(app, "③");
+            // ③ パスワード: 入れるまで次へ進めない（誤りはこの画面に出る）
+            app.IsEnabled("Wizard.Next").Should().BeFalse("パスワードが無ければ次へ進めない");
+            app.TextOf("Wizard.Errors").Should().Contain("db-password");
             var dbPassword = "Ui" + Guid.NewGuid().ToString("N")[..12] + "!";
             app.SetText("Settings.DbPassword", dbPassword);
             app.SetText("Settings.TrackerPassword", "Ui" + Guid.NewGuid().ToString("N")[..12] + "!");
+            Next(app, "④");
+            // ④ 利用可能期限日: 「日付を指定する」で日付の入力が現れ、既定に戻すと消える
+            app.TextOf("Settings.ExpiryNotice").Should().Contain("今日から 32 日後");
+            app.Select("Settings.Expiry", "日付を指定する");
+            AppSession.WaitUntil(() => app.Exists("Settings.ExpiryDate"), "期限日の入力が表示される");
+            app.Select("Settings.Expiry", SelectedExpiryDefault(app));
+            AppSession.WaitUntil(() => !app.Exists("Settings.ExpiryDate"), "期限日の入力が消える");
+            app.IsEnabled("Settings.CopyMarkdown").Should().BeTrue("どの画面でも設定をコピーできる");
 
-            // デプロイ（計画 → 実行）。P3: 計画の間、処理中の表示と、Azure の何を読んでいるかが出る
-            app.Show("Deploy");
-            app.Invoke("Deploy.Plan");
+            // ⑤ 確認と実行: 開くと計画を作る。P3: 計画の間、処理中の表示と、Azure の何を読んでいるかが出る
+            app.Invoke("Wizard.Next");
             var planning = CollectBusy(app, "Deploy.Busy");
             Log($"計画の処理中の表示: {string.Join(" → ", planning)}");
             planning.Should().Contain(t => t.Contains("確認しています") || t.Contains("読んでいます"), "Azure を読む段階を知らせる");
             AppSession.WaitUntil(() => app.Exists("Deploy.Error") || app.Exists("Deploy.Start"), "デプロイの計画が表示されませんでした。", LoadTimeout);
-            app.Exists("Deploy.Error").Should().BeFalse(app.Exists("Deploy.Error") ? app.TextOf("Deploy.Error") : "P1: 計画し直すと、前のエラーの領域が消える");
+            app.Exists("Deploy.Error").Should().BeFalse(app.Exists("Deploy.Error") ? app.TextOf("Deploy.Error") : "");
             // 計画の一覧（ItemsControl）は UI Automation の要素にならないため、ウィンドウの中の文字列から読む
             var screen = app.ScreenText();
             screen.Should().Contain("作成する").And.Contain($"{appName}-env", "作るリソースが計画に出る");
-            // 計画の各行は、操作・名前・種類を横に並べた TextBlock なので、操作の数を書き出す
             Log($"デプロイの計画: 作成する {screen.Split('\n').Count(l => l == "作成する")} 件");
-            app.Invoke("Deploy.Start");
-            app.WaitForText("Job.Title", t => t.StartsWith("デプロイ"), "デプロイのジョブが表示される");
+            var template = "UI テスト " + Guid.NewGuid().ToString("N")[..6];
+            app.SetText("Settings.TemplateName", template);
+            app.Invoke("Settings.SaveTemplate");
+            app.WaitForText("Settings.Message", t => t.Contains($"テンプレート「{template}」を保存しました"), "テンプレートとして保存できる");
 
-            // P2: 実行中に状態を確認すると、まだ反映されていない場合がある旨が出て、環境が無ければ永続化の行は出ない
-            app.Show("Status");
-            app.Invoke("Status.Refresh");
+            // 今すぐ実行 → 実行状況の画面。P2: 実行中は、まだ反映されていない場合がある旨が出て、環境が無ければ永続化の行は出ない
+            app.Invoke("Deploy.Start");
+            app.Find("Panel.Status");
+            app.WaitForText("Job.Title", t => t.StartsWith("デプロイ"), "実行状況の画面にデプロイのジョブが出る");
             app.WaitForText("Status.Note", t => t.Contains("実行中のため"), "実行中の注意が出る", LoadTimeout);
             if (app.TextOf("Status.Summary").Contains("ありません"))
                 app.TextOf("Status.Persistence").Should().NotContain("永続化していません", "環境が無いときは永続化の行を出さない");
-            app.Show("Deploy");
-            app.WaitForText("Job.Title", t => t.StartsWith("デプロイ"), "デプロイの画面に戻ると、デプロイのジョブが表示される");
             var deployed = app.WaitForText("Job.Status", t => t.Contains("完了") || t.Contains("失敗"), "デプロイが終わる", JobTimeout);
             deployed.Should().Contain("完了", app.Exists("Job.Error") ? app.TextOf("Job.Error") : "");
             app.IsEnabled("Deploy.OpenEndpoint").Should().BeTrue("デプロイした Timetracker の URL がある");
-
-            // デプロイした環境の状態
-            app.Show("Status");
-            app.Invoke("Status.Refresh");
+            // ジョブが終わると、Azure の状態を読み直す
             app.WaitForText("Status.Summary", t => t.Contains("Container Apps Environment"), "デプロイした環境が表示される", LoadTimeout);
 
             // 7d-2: デプロイの一覧（Resource Graph に反映される前でも、このアプリのジョブの結果で出る）。パスワードの表示と、期限の変更
-            app.Show("Deployments");
+            app.Invoke("Status.BackToList");
+            app.Find("Panel.Deployments");
             app.SetText("Deployments.ResourceGroupFilter", resourceGroup!);
             app.Invoke("Deployments.Load");
             app.WaitForText("Deployments.Page", t => t.Contains("件目"), "一覧にデプロイが出る", LoadTimeout);
@@ -126,34 +126,39 @@ public class AzureUiTests
             app.WaitForText("Row.Message", t => t.Contains("期限なし"), "期限を変えられる", LoadTimeout);
             app.TextOf("Row.Expiry").Should().Be("期限なし");
 
-            // 削除（計画 → アプリ名の入力 → 実行）
-            app.Show("Delete");
+            // 一覧の「削除」→ 削除の画面（開くと計画を作る）。No.53: 本ツールのリソースを消した後の空のリソースグループも消す
+            app.Invoke("Row.Delete");
+            app.Find("Panel.Delete");
+            app.Find("Delete.ConfirmAppName", LoadTimeout);
+            app.SetChecked("Delete.DeleteResourceGroup", true);
             app.Invoke("Delete.Plan");
             app.Find("Delete.ConfirmAppName", LoadTimeout);
+            app.ScreenText().Should().Contain($"リソースグループ {resourceGroup} も削除します。元に戻せません。");
             app.IsEnabled("Delete.Start").Should().BeFalse("アプリ名を入れるまで削除できない");
+            app.IsEnabled("Delete.CopyAppName").Should().BeTrue("アプリ名をコピーできる");
             app.SetText("Delete.ConfirmAppName", appName);
             app.Invoke("Delete.Start");
-            // 表示が削除のジョブに切り替わってから、終わるのを待つ（デプロイのジョブの「完了」を読まない）
-            app.WaitForText("Job.Title", t => t.StartsWith("削除"), "削除のジョブが表示される");
+            // 今すぐ削除 → 実行状況の画面
+            app.Find("Panel.Status");
+            app.WaitForText("Job.Title", t => t.StartsWith("削除"), "実行状況の画面に削除のジョブが出る");
 
-            // P4: 同じ対象を削除している間、デプロイの画面には削除のジョブもデプロイの結果も出ず、「Timetracker を開く」は押せない
-            app.Show("Deploy");
-            app.Exists("Job.Title").Should().BeFalse("デプロイの画面に削除のジョブを出さない");
-            app.IsEnabled("Deploy.OpenEndpoint").Should().BeFalse("削除した環境の URL は開けない");
-
-            // 7b: ジョブのある対象は計画できない
+            // 7b: ジョブのある対象は計画できない（ウィザードの ⑤ で計画し直す）
+            app.Show("Wizard");
+            WizardStep(app, "⑤");
             app.Invoke("Deploy.Plan");
             app.WaitForText("Deploy.Error", t => t.Contains("この対象のジョブ"), "同じ対象のジョブがあれば計画できない", LoadTimeout);
 
-            // 7b: 別の対象を予定に追加し、上部の帯からジョブの画面に移って取り消す
+            // 7b: 別の対象を予定に追加し（ジョブの画面が開く）、上部の帯からジョブの画面に移って取り消す
             var second = appName + "b";
-            app.Show("Settings");
+            BackTo(app, "①");
             app.SetText("Target.AppName", second);
-            app.WaitForText("Target.TargetError", t => t.Length == 0, "対象の誤りが無い");
-            app.Show("Deploy");
-            app.Invoke("Deploy.Plan");
+            Next(app, "②");
+            Next(app, "③");
+            Next(app, "④");
+            app.Invoke("Wizard.Next");
             AppSession.WaitUntil(() => app.Exists("Deploy.Schedule") && app.IsEnabled("Deploy.Schedule"), "2 つ目の対象の計画が表示されませんでした。", LoadTimeout);
             app.Invoke("Deploy.Schedule");
+            app.Find("Panel.Jobs");
             app.WaitForText("Jobs.Banner", t => t.Contains("予定 1"), "上部の帯に予定が出る");
 
             // 7c: 終わっていないジョブがあれば、閉じても終了せずに通知領域に残り、もう一度起動するとウィンドウが出る
@@ -170,10 +175,11 @@ public class AzureUiTests
             app.WaitForText("Job.Status", t => t == "取り消し", "予定を取り消せる");
 
             // 7b: 削除の実行中に、別の対象のデプロイを同時に実行し（既定の上限は 2）、今の手順の後で止める
-            app.Show("Deploy");
+            app.Show("Wizard");
             app.Invoke("Deploy.Plan");
             AppSession.WaitUntil(() => app.Exists("Deploy.Start") && app.IsEnabled("Deploy.Start"), "2 つ目の対象の計画が表示されませんでした。", LoadTimeout);
             app.Invoke("Deploy.Start");
+            app.Find("Panel.Status");
             app.Show("Jobs");
             var concurrent = app.WaitForText("Job.Status", t => t is "実行中" or "待機中（同時に実行できる数に達しています）" or "完了" or "失敗", "2 つ目のデプロイが始まる", LoadTimeout);
             Log($"2 つ目のデプロイを始めたときのジョブ: {app.TextOf("Jobs.Summary")}");
@@ -183,51 +189,39 @@ public class AzureUiTests
             Log($"停止: {(app.Exists("Job.Error") ? app.TextOf("Job.Error") : stopped)}");
             stopped.Should().Be("停止");
 
-            app.Show("Delete");
-            app.WaitForText("Job.Title", t => t.StartsWith($"削除（{resourceGroup} / {appName}）"), "削除の画面には、1 つ目の対象の削除のジョブが表示されたまま");
-            var deleted = app.WaitForText("Job.Status", t => t.Contains("完了") || t.Contains("失敗"), "削除が終わる", JobTimeout);
-            deleted.Should().Contain("完了", app.Exists("Job.Error") ? app.TextOf("Job.Error") : "");
+            // 1 つ目の対象の削除（リソースグループを含む）が終わるのを待つ
+            app.WaitForText("Jobs.Summary", t => t.Length == 0, "終わっていないジョブが無くなる", JobTimeout);
+            var jobs = app.ScreenText();
+            Log($"ジョブ: {jobs.Replace('\n', ' ')}");
+            jobs.Should().Contain($"リソースグループ {resourceGroup} も削除しました。", "1 つ目の対象の削除で、空になったリソースグループも消す");
 
-            // 止めたデプロイの作りかけのリソースを消す（最初の手順の前に止まっていれば、消すものは無い）
-            app.Invoke("Delete.Plan");
-            if (AppSession.TryWait(() => app.Exists("Delete.ConfirmAppName"), LoadTimeout))
-            {
-                app.SetText("Delete.ConfirmAppName", second);
-                app.Invoke("Delete.Start");
-                app.WaitForText("Job.Title", t => t.StartsWith($"削除（{resourceGroup} / {second}）"), "2 つ目の対象の削除のジョブが表示される");
-                app.WaitForText("Job.Status", t => t.Contains("完了") || t.Contains("失敗"), "2 つ目の対象の削除が終わる", JobTimeout).Should().Contain("完了");
-            }
-            else
-            {
-                Log($"2 つ目の対象は、消すものがありませんでした: {app.ScreenText().Replace('\n', ' ')}");
-            }
-
-            foreach (var name in new[] { second, appName })
-            {
-                app.Show("Settings");
-                app.SetText("Target.AppName", name);
-                app.Show("Status");
-                app.Invoke("Status.Refresh");
-                app.WaitForText("Status.Summary", t => t.Contains("ありません"), $"削除した後は {name} の環境が無い", LoadTimeout);
-            }
-
-            // No.53: 本ツールのリソースを消した後の空のリソースグループを、「リソースグループも削除する」で消す
-            app.Show("Delete");
-            app.SetChecked("Delete.DeleteResourceGroup", true);
-            app.Invoke("Delete.Plan");
-            app.Find("Delete.ConfirmAppName", LoadTimeout);
-            app.ScreenText().Should().Contain($"リソースグループ {resourceGroup} も削除します。元に戻せません。");
-            app.SetText("Delete.ConfirmAppName", appName);
-            app.Invoke("Delete.Start");
-            // 削除の画面には、同じ対象の前の削除のジョブ（完了）が出ているため、リソースグループを削除した結果の文を待つ
-            app.WaitForScreenText(t => t.Contains($"リソースグループ {resourceGroup} も削除しました。") || t.Contains("失敗"),
-                "リソースグループの削除が終わる", JobTimeout);
-            app.ScreenText().Should().Contain($"リソースグループ {resourceGroup} も削除しました。", app.Exists("Job.Error") ? app.TextOf("Job.Error") : "");
-            app.Show("Status");
-            app.Invoke("Status.Refresh");
-            app.WaitForText("Status.Summary", t => t.Contains("デプロイされた環境はありません"), "リソースグループが無い", LoadTimeout);
+            // 削除した後は、一覧に出ない（このアプリで削除したものは、Resource Graph に反映される前でも消える）
+            app.Show("Deployments");
+            app.Invoke("Deployments.Load");
+            app.WaitForText("Deployments.Page", t => t.StartsWith("表示するデプロイはありません"), "削除した環境は一覧に出ない", LoadTimeout);
         });
     }
+
+    // ウィザードの今の画面（①〜⑤）を確かめる
+    private static void WizardStep(AppSession app, string step) =>
+        app.WaitForText("Wizard.Step", t => t.StartsWith(step), $"ウィザードの {step} の画面");
+
+    // 次へ進める（誤りが無くなって「次へ」が押せるようになるのを待つ）
+    private static void Next(AppSession app, string step)
+    {
+        app.Invoke("Wizard.Next");
+        WizardStep(app, step);
+    }
+
+    // 「戻る」で前の画面に戻る
+    private static void BackTo(AppSession app, string step)
+    {
+        while (!app.TextOf("Wizard.Step").StartsWith(step))
+            app.Invoke("Wizard.Back");
+    }
+
+    // 利用可能期限日の「既定」の選択肢（文言は日数を含むため、一覧から探す）
+    private static string SelectedExpiryDefault(AppSession app) => app.ItemsOf("Settings.Expiry").First(i => i.StartsWith("既定"));
 
     // 処理中の表示の段階を、表示が消えるまで集める（短い間隔で読む）
     private static List<string> CollectBusy(AppSession app, string automationId)

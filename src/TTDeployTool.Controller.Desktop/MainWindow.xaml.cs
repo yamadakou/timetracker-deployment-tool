@@ -34,7 +34,7 @@ public sealed partial class MainWindow : Window
         Bindings.Update();
         AppWindow.Closing += OnClosing;
         // デプロイの一覧の行の操作で、画面を切り替える
-        viewModel.NavigationRequested += tag => Nav.SelectedItem = Nav.MenuItems.OfType<NavigationViewItem>().First(i => (string)i.Tag == tag);
+        viewModel.NavigationRequested += Navigate;
         CreateTray();
         _ = viewModel.InitializeAsync();
         _ = CheckForUpdatesAsync(hwnd);
@@ -65,6 +65,15 @@ public sealed partial class MainWindow : Window
     private void OnTemplateChanged(object sender, SelectionChangedEventArgs e) =>
         ViewModel.Settings.SelectedTemplate = ((ComboBox)sender).SelectedItem as DeploymentTemplate;
 
+    private void OnSubscriptionFilterChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (((ComboBox)sender).SelectedItem is SubscriptionFilterOption option)
+            ViewModel.Deployments.SubscriptionFilter = option;
+    }
+
+    // 削除・実行状況の画面の「デプロイの一覧に戻る」
+    private void OnBackToList(object sender, RoutedEventArgs e) => Navigate("deployments");
+
     private void OnExpiryFilterChanged(object sender, SelectionChangedEventArgs e)
     {
         if (((ComboBox)sender).SelectedItem is ExpiryFilterOption option)
@@ -94,10 +103,28 @@ public sealed partial class MainWindow : Window
 
     private void OnNavigationChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
     {
-        var tag = (args.SelectedItem as NavigationViewItem)?.Tag as string;
+        // メニューに無い画面（削除・実行状況）を開いたときは、メニューの選択を外すだけ
+        if ((args.SelectedItem as NavigationViewItem)?.Tag is string tag)
+            ShowPanel(tag);
+    }
+
+    /// <summary>画面を開く（メニューにある画面はメニューを選び、削除・実行状況はメニューの選択を外して開く。docs/design/desktop-wizard.md の 2）。</summary>
+    private void Navigate(string tag)
+    {
+        if (Nav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => (string)i.Tag == tag) is { } item)
+        {
+            Nav.SelectedItem = item;
+            return;
+        }
+        Nav.SelectedItem = null;
+        ShowPanel(tag);
+    }
+
+    private void ShowPanel(string tag)
+    {
         foreach (var (panel, name) in new (FrameworkElement, string)[]
                  {
-                     (TargetPanel, "target"), (DeploymentsPanel, "deployments"), (SettingsPanel, "settings"), (DeployPanel, "deploy"), (StatusPanel, "status"),
+                     (TargetPanel, "target"), (DeploymentsPanel, "deployments"), (WizardPanel, "wizard"), (StatusPanel, "status"),
                      (DeletePanel, "delete"), (DryRunPanel, "dryrun"), (JobsPanel, "jobs"),
                  })
             panel.Visibility = name == tag ? Visibility.Visible : Visibility.Collapsed;

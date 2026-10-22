@@ -29,6 +29,9 @@ public enum ExpiryFilterMode
 /// <summary>利用可能期限日のフィルタの選択肢。</summary>
 public sealed record ExpiryFilterOption(ExpiryFilterMode Mode, string Label);
 
+/// <summary>サブスクリプションの絞り込みの選択肢（<see cref="SubscriptionId"/> が null なら、すべて）。</summary>
+public sealed record SubscriptionFilterOption(string? SubscriptionId, string Label);
+
 /// <summary>並べ替えの列。</summary>
 public enum DeploymentSortKey
 {
@@ -77,19 +80,20 @@ public sealed class DeploymentListViewModel : ObservableObject
     ];
 
     private readonly TargetViewModel _target;
-    private readonly StatusViewModel _status;
     private readonly IDeploymentLogger _deploymentLogger;
     private readonly ILogger _logger;
     private readonly ISystemLauncher _launcher;
     private readonly IClipboardService? _clipboard;
-    private readonly Action<string> _navigate;
+    private readonly Func<string, Task> _open;
     private readonly List<RecentChange> _recent = [];
     private IReadOnlyList<DeploymentEntry> _loaded = [];
     private IReadOnlyList<DeploymentEntry> _entries = [];
     private IReadOnlyList<DeploymentEntry> _filtered = [];
     private bool _hasLoaded;
     private string? _error;
-    private string _subscriptionFilter = "";
+    private SubscriptionFilterOption _subscriptionFilter = AllSubscriptions;
+    // 利用者が選んだサブスクリプション（読み直しで一覧が一度空になっても、また現れれば選び直す）
+    private string? _wantedSubscriptionId;
     private string _resourceGroupFilter = "";
     private DateTimeOffset? _deployedFrom;
     private DateTimeOffset? _deployedTo;
@@ -101,19 +105,24 @@ public sealed class DeploymentListViewModel : ObservableObject
     private int _pageIndex;
     private int _filteredCount;
 
-    /// <param name="navigate">画面を切り替える（「設定」「状態の確認」「削除」の名前: settings・status・delete）</param>
+    /// <summary>サブスクリプションの絞り込みの「すべて」。</summary>
+    public static readonly SubscriptionFilterOption AllSubscriptions = new(null, "すべてのサブスクリプション");
+
+    /// <param name="open">対象に入れた後に、画面を開く（ウィザード・実行状況・削除の名前: wizard・status・delete）</param>
     public DeploymentListViewModel(
-        TargetViewModel target, StatusViewModel status, JobQueue queue, IDeploymentLogger deploymentLogger, ILogger logger, TimeProvider time,
-        ISystemLauncher launcher, IClipboardService? clipboard, Action<string> navigate)
+        TargetViewModel target, JobQueue queue, IDeploymentLogger deploymentLogger, ILogger logger, TimeProvider time,
+        ISystemLauncher launcher, IClipboardService? clipboard, Func<string, Task> open)
     {
         _target = target;
-        _status = status;
         _deploymentLogger = deploymentLogger;
         _logger = logger;
         Time = time;
         _launcher = launcher;
         _clipboard = clipboard;
-        _navigate = navigate;
+        _open = open;
+        // 絞り込みの選択肢は、読んだサブスクリプション（一覧はすべてのサブスクリプションを読む）
+        SubscriptionFilters.Add(AllSubscriptions);
+        _target.Subscriptions.CollectionChanged += (_, _) => ResetSubscriptionFilters();
         LoadCommand = new AsyncCommand(() => Busy.RunAsync("デプロイの一覧を読んでいます", LoadAsync));
         PreviousPageCommand = new AsyncCommand(() => GoTo(_pageIndex - 1), () => _pageIndex > 0);
         NextPageCommand = new AsyncCommand(() => GoTo(_pageIndex + 1), () => _pageIndex < PageCount - 1);
@@ -164,8 +173,19 @@ public sealed class DeploymentListViewModel : ObservableObject
             : $"{_pageIndex * PageSize + 1}〜{Math.Min((_pageIndex + 1) * PageSize, FilteredCount)} 件目 / {FilteredCount} 件" +
               (FilteredCount == TotalCount ? "" : $"（全 {TotalCount} 件）") + $"　{_pageIndex + 1} / {PageCount} ページ";
 
-    /// <summary>サブスクリプション（名前・ID の中間一致）。</summary>
-    public string SubscriptionFilter { get => _subscriptionFilter; set => SetFilter(ref _subscriptionFilter, value.Trim()); }
+    /// <summary>サブスクリプションの絞り込みの選択肢（「すべて」と、読んだサブスクリプション）。</summary>
+    public ObservableCollection<SubscriptionFilterOption> SubscriptionFilters { get; } = [];
+
+    /// <summary>サブスクリプションの絞り込み（既定はすべて）。</summary>
+    public SubscriptionFilterOption SubscriptionFilter
+    {
+        get => _subscriptionFilter;
+        set
+        {
+            _wantedSubscriptionId = value.SubscriptionId;
+            SetFilter(ref _subscriptionFilter, value);
+        }
+    }
 
     /// <summary>リソースグループ名（中間一致）。</summary>
     public string ResourceGroupFilter { get => _resourceGroupFilter; set => SetFilter(ref _resourceGroupFilter, value.Trim()); }
@@ -218,7 +238,7 @@ public sealed class DeploymentListViewModel : ObservableObject
 
     internal void Copy(string text) => _clipboard!.CopyText(text);
 
-    /// <summary>行の操作: 対象に入れて、画面を切り替える（<paramref name="page"/> は settings・status・delete）。</summary>
+    /// <summary>行の操作: 対象に入れて、画面を開く（<paramref name="page"/> は wizard・status・delete）。</summary>
     internal async Task UseAsTargetAsync(DeploymentEntry entry, string page)
     {
         if (!_target.Select(entry.SubscriptionId, entry.ResourceGroup, entry.AppName))
@@ -227,9 +247,7 @@ public sealed class DeploymentListViewModel : ObservableObject
             return;
         }
         Error = null;
-        _navigate(page);
-        if (page == "status")
-            await _status.RefreshCommand.ExecuteAsync();
+        await _open(page);
     }
 
     /// <summary>行で期限を変えたとき（Resource Graph に反映されるまで、読んだ結果に重ねる）。</summary>
@@ -240,6 +258,19 @@ public sealed class DeploymentListViewModel : ObservableObject
             ExpiryKind = decision.ExpiresAt == null ? ExpiryKind.None : ExpiryKind.Date,
             ExpiresAt = decision.ExpiresAt,
         });
+    }
+
+    // サブスクリプションを読み直したら、絞り込みの選択肢を作り直す（選んでいたものが無くなれば、すべてに戻す）
+    private void ResetSubscriptionFilters()
+    {
+        var wanted = _wantedSubscriptionId;
+        SubscriptionFilters.Clear();
+        SubscriptionFilters.Add(AllSubscriptions);
+        foreach (var s in _target.Subscriptions)
+            SubscriptionFilters.Add(new SubscriptionFilterOption(s.SubscriptionId, s.Display));
+        SetFilter(ref _subscriptionFilter,
+            SubscriptionFilters.FirstOrDefault(f => string.Equals(f.SubscriptionId, wanted, StringComparison.OrdinalIgnoreCase)) ?? AllSubscriptions,
+            nameof(SubscriptionFilter));
     }
 
     private SubscriptionChoice? FindSubscription(string subscriptionId) =>
@@ -364,9 +395,7 @@ public sealed class DeploymentListViewModel : ObservableObject
             (from == null && to == null)
             || (value is { } v && (from == null || Date(v) >= Picked(from.Value)) && (to == null || Date(v) <= Picked(to.Value)));
 
-        if (SubscriptionFilter.Length > 0
-            && !e.SubscriptionId.Contains(SubscriptionFilter, StringComparison.OrdinalIgnoreCase)
-            && FindSubscription(e.SubscriptionId)?.DisplayName.Contains(SubscriptionFilter, StringComparison.OrdinalIgnoreCase) != true)
+        if (SubscriptionFilter.SubscriptionId is { } subscriptionId && !string.Equals(e.SubscriptionId, subscriptionId, StringComparison.OrdinalIgnoreCase))
             return false;
         if (ResourceGroupFilter.Length > 0 && !e.ResourceGroup.Contains(ResourceGroupFilter, StringComparison.OrdinalIgnoreCase))
             return false;

@@ -139,8 +139,11 @@ public sealed class JobQueue : ObservableObject, IDisposable
         Changed();
     }
 
-    /// <summary>テスト用: 終わっていないジョブがすべて終わるまで待つ（予定・一時停止のものがあれば、それも待つ）。</summary>
-    public Task WhenIdleAsync() => Task.WhenAll(Snapshot().Where(j => j.IsActive).Select(j => j.Finished));
+    /// <summary>
+    /// テスト用: ジョブがすべて終わるまで待つ（予定・一時停止のものがあれば、それも待つ）。終わった直後のジョブは、状態が変わってから
+    /// 終わったことの通知（<see cref="Finished"/>）までの間があるため、終わったジョブも、その通知の後に完了する Finished を待つ。
+    /// </summary>
+    public Task WhenIdleAsync() => Task.WhenAll(Snapshot().Select(j => j.Finished));
 
     internal void Cancel(JobViewModel job) => Change(job, DesktopJobState.Canceled, job.ScheduledAt, "取り消しました");
 

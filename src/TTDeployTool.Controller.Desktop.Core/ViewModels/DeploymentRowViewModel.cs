@@ -48,7 +48,7 @@ public sealed class DeploymentRowViewModel : ObservableObject
             _owner.Open(Url!);
             return Task.CompletedTask;
         }, () => Url != null);
-        UseAsTargetCommand = new AsyncCommand(() => _owner.UseAsTargetAsync(_entry, "settings"));
+        UseAsTargetCommand = new AsyncCommand(() => _owner.UseAsTargetAsync(_entry, "wizard"));
         CheckStatusCommand = new AsyncCommand(() => _owner.UseAsTargetAsync(_entry, "status"));
         DeleteCommand = new AsyncCommand(() => _owner.UseAsTargetAsync(_entry, "delete"));
         ShowPasswordsCommand = new AsyncCommand(() => Busy.RunAsync("パスワードを読んでいます", ReadPasswordsAsync), () => _entry.Timetracker != null);
@@ -66,13 +66,13 @@ public sealed class DeploymentRowViewModel : ObservableObject
 
     public AsyncCommand OpenCommand { get; }
 
-    /// <summary>対象に入れて、「設定」を開く（再デプロイのため。対象の入力は「設定」にある）。</summary>
+    /// <summary>対象に入れて、デプロイのウィザードを開く（再デプロイのため）。</summary>
     public AsyncCommand UseAsTargetCommand { get; }
 
-    /// <summary>対象に入れて、状態の確認の画面で読む。</summary>
+    /// <summary>対象に入れて、実行状況の画面で読む。</summary>
     public AsyncCommand CheckStatusCommand { get; }
 
-    /// <summary>対象に入れて、削除の画面を開く（計画 → アプリ名の入力 → 実行は、削除の画面で行う）。</summary>
+    /// <summary>対象に入れて、削除の画面を開き、計画を作る（アプリ名の入力 → 実行は、削除の画面で行う）。</summary>
     public AsyncCommand DeleteCommand { get; }
 
     public AsyncCommand ShowPasswordsCommand { get; }

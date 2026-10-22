@@ -8,7 +8,8 @@ namespace TTDeployTool.Controller.Desktop.UITests;
 /// </summary>
 public class CiUiTests
 {
-    private static readonly string[] Pages = ["Target", "Deployments", "Settings", "Deploy", "Status", "Delete", "DryRun", "Jobs"];
+    // 7f: 削除・実行状況はメニューに無く、デプロイの一覧はサインインするまで押せない（docs/design/desktop-wizard.md の 2）
+    private static readonly string[] Pages = ["Target", "Wizard", "DryRun", "Jobs"];
 
     [Fact]
     public void Startup_Should_Open_The_Window_And_Write_The_Diagnostic_Log() => AppSession.Run(app =>
@@ -48,33 +49,30 @@ public class CiUiTests
     });
 
     [Fact]
-    public void Deployments_Page_Should_Ask_To_Sign_In_Before_Loading() => AppSession.Run(app =>
+    public void Menu_Should_Have_No_Delete_Or_Status_And_The_List_Should_Need_Sign_In() => AppSession.Run(app =>
     {
-        app.Show("Deployments");
-        app.TextOf("Deployments.Page").Should().StartWith("「読み込む」を押すと");
-        app.IsEnabled("Deployments.Previous").Should().BeFalse();
-        app.IsEnabled("Deployments.Next").Should().BeFalse();
-        app.Exists("Deployments.ExpiryFrom").Should().BeFalse("日付の範囲を選ぶまで出さない");
-        app.Select("Deployments.ExpiryFilter", "日付の範囲");
-        AppSession.WaitUntil(() => app.Exists("Deployments.ExpiryFrom"), "期限日の範囲の入力が表示される");
-        app.Select("Deployments.ExpiryFilter", "すべて");
-
-        // サインインしていないため、サブスクリプションが無い
-        app.Invoke("Deployments.Load");
-        app.WaitForText("Deployments.Error", t => t.Contains("サブスクリプションがありません"), "サインインを求めるエラーが出る");
-        app.Exists("Row.AppName").Should().BeFalse();
+        foreach (var removed in new[] { "Nav.Settings", "Nav.Deploy", "Nav.Status", "Nav.Delete" })
+            app.Exists(removed).Should().BeFalse($"{removed} はメニューに無い");
+        app.IsEnabled("Nav.Deployments").Should().BeFalse("サインインするまでデプロイの一覧は押せない");
     });
 
     [Fact]
-    public void Deploy_And_Delete_Pages_Should_Not_Show_A_Job_Before_Any_Job() => AppSession.Run(app =>
+    public void The_Wizard_Should_Not_Go_Next_With_Errors_And_Copy_From_Any_Step() => AppSession.Run(app =>
     {
+        app.Show("Wizard");
+        app.TextOf("Wizard.Step").Should().Be("① 対象（1 / 5）");
+        app.IsEnabled("Wizard.Back").Should().BeFalse();
+        // サインインしていないため、サブスクリプションが無い
+        app.IsEnabled("Wizard.Next").Should().BeFalse("誤りがあれば次へ進めない");
+        app.TextOf("Wizard.Errors").Should().Contain("subscription は必須です。").And.Contain("resource-group は必須です。");
+        app.TextOf("Wizard.Blocked").Should().Be("誤りが 2 件あるため、次へ進めません。");
+        app.SetText("Target.ResourceGroup", "rg-wizard");
+        app.WaitForText("Wizard.Blocked", t => t == "誤りが 1 件あるため、次へ進めません。", "直した誤りは消える");
+        app.IsEnabled("Settings.CopyMarkdown").Should().BeTrue("どの画面にも設定のコピーがある");
+        app.Exists("Settings.Reset").Should().BeTrue("どの画面にも初期値に戻すがある");
         // ジョブが無いのに、ジョブの表示の型（「: 」と進み具合のバー）が出ていた（実機の確認、2026-10-21）
-        foreach (var page in new[] { "Deploy", "Delete" })
-        {
-            app.Show(page);
-            app.Exists("Job.Title").Should().BeFalse($"{page} の画面にジョブの題名を出さない");
-            app.Exists("Job.Progress").Should().BeFalse($"{page} の画面に進み具合のバーを出さない");
-        }
+        app.Exists("Job.Title").Should().BeFalse();
+        app.Exists("Job.Progress").Should().BeFalse();
     });
 
     [Fact]
@@ -82,14 +80,14 @@ public class CiUiTests
     {
         AppSession.Run(app =>
         {
-            app.Show("Settings");
+            app.Show("Jobs");
             app.ItemsOf("Settings.Concurrency").Should().Equal("1", "2", "3", "4");
             app.SelectedOf("Settings.Concurrency").Should().Be("2", "既定は 2");
             app.Select("Settings.Concurrency", "3");
         }, "Concurrency_Should_Be_Saved_Across_Restarts_1");
         AppSession.Run(app =>
         {
-            app.Show("Settings");
+            app.Show("Jobs");
             app.SelectedOf("Settings.Concurrency").Should().Be("3", "アプリのデータに保存する");
             // ほかのテストのために既定に戻す
             app.Select("Settings.Concurrency", "2");
@@ -102,48 +100,11 @@ public class CiUiTests
         app.TextOf("SignIn.Account").Should().StartWith("サインインしていません");
         app.IsEnabled("SignIn.SignIn").Should().BeTrue();
         app.IsEnabled("SignIn.SignOut").Should().BeFalse();
-        // 7e: 対象の入力は「設定」にある
-        app.Exists("Target.ResourceGroup").Should().BeFalse("「サインインと対象」には対象の入力を出さない");
-        app.Show("Settings");
-        app.TextOf("Settings.Subscription").Should().Contain("「サインインと対象」で選んでください");
-        app.TextOf("Target.TargetError").Should().Contain("サブスクリプションを選んでください。");
-    });
-
-    [Fact]
-    public void A_Template_Should_Be_Saved_And_Applied_After_A_Restart()
-    {
-        var name = "UI テスト " + Guid.NewGuid().ToString("N")[..6];
-        AppSession.Run(app =>
-        {
-            app.Show("Settings");
-            app.SetText("Target.ResourceGroup", "rg-template");
-            app.SetText("Settings.DbName", "uitemplate");
-            app.SetText("Settings.TemplateName", name);
-            app.Invoke("Settings.SaveTemplate");
-            app.WaitForText("Settings.Message", t => t.Contains($"テンプレート「{name}」を保存しました"), "テンプレートを保存できる");
-            app.IsEnabled("Settings.CopyMarkdown").Should().BeTrue();
-        }, "A_Template_Should_Be_Saved_And_Applied_After_A_Restart_1");
-        AppSession.Run(app =>
-        {
-            app.Show("Settings");
-            app.ValueOf("Settings.DbName").Should().Be("timetracker", "起動したときは既定の値");
-            app.Select("Settings.Template", name);
-            app.Invoke("Settings.ApplyTemplate");
-            AppSession.WaitUntil(() => app.ValueOf("Settings.DbName") == "uitemplate", "テンプレートの値が入る");
-            app.ValueOf("Target.ResourceGroup").Should().Be("rg-template");
-        }, "A_Template_Should_Be_Saved_And_Applied_After_A_Restart_2");
-    }
-
-    [Fact]
-    public void Settings_Should_Be_Validated_While_Typing() => AppSession.Run(app =>
-    {
-        app.Show("Settings");
-
-        app.SetText("Settings.TtCpu", "abc");
-        app.WaitForScreenText(t => t.Contains("tt-cpu には数値を指定してください"), "数値でない CPU の誤りが表示される");
-
-        app.SetText("Settings.TtCpu", "1.5");
-        app.WaitForScreenText(t => !t.Contains("tt-cpu"), "直すと誤りが消える");
+        // 7f: サブスクリプションと対象の入力は、ウィザードの ① にある
+        app.Exists("Target.Subscription").Should().BeFalse("サインインの画面には、サブスクリプションの選択を出さない");
+        app.Show("Wizard");
+        app.Exists("Target.Subscription").Should().BeTrue();
+        app.Exists("Target.ResourceGroup").Should().BeTrue();
     });
 
     [Fact]
@@ -169,28 +130,17 @@ public class CiUiTests
             app.Invoke("DryRun.Save");
             app.Find("DryRun.Error");
 
-            // コンボボックスの選択（選択の変更イベントで ViewModel に戻す）と、パスワードの入力
-            app.Show("Settings");
-            app.Select("Settings.DbType", "sqlserver");
-            app.Select("Settings.PersistDb", "Azure Files に永続化する（料金がかかる）");
-            // 利用可能期限日: 「日付を指定する」で日付の入力が現れ、既定に戻すと消える
-            app.TextOf("Settings.ExpiryNotice").Should().Contain("今日から 32 日後").And.Contain("自動で削除します");
-            app.Exists("Settings.ExpiryDate").Should().BeFalse();
-            app.Select("Settings.Expiry", "日付を指定する");
-            AppSession.WaitUntil(() => app.Exists("Settings.ExpiryDate"), "期限日の入力が表示される");
-            app.Select("Settings.Expiry", "期限なし");
-            AppSession.WaitUntil(() => !app.Exists("Settings.ExpiryDate"), "期限日の入力が消える");
-            app.SetText("Settings.DbPassword", "UiTestDbPass1!");
-            app.SetText("Settings.TrackerPassword", "UiTestTracker1!");
-
-            app.Show("DryRun");
+            // 7f: DB とパスワードは、この画面でも入れられる（ウィザードと同じ値）。コンボボックスの選択は、選択の変更イベントで ViewModel に戻す
+            app.Select("DryRun.DbType", "sqlserver");
+            app.SetText("DryRun.DbPassword", "UiTestDbPass1!");
+            app.SetText("DryRun.TrackerPassword", "UiTestTracker1!");
             app.Invoke("DryRun.Save");
             app.PickFolder(folder);
 
             app.WaitForText("DryRun.Compose", t => t.Contains("11.0.1-linux-mssql"), "SQL Server のイメージの docker-compose.yml が表示される");
             File.Exists(Path.Combine(folder, "docker-compose.yml")).Should().BeTrue();
             File.ReadAllText(Path.Combine(folder, ".env")).Should().Contain("UiTestDbPass1!");
-            app.ScreenText().Should().Contain("persist-db は Azure 向けの設定のため").And.Contain("docker compose up -d");
+            app.ScreenText().Should().Contain("docker compose up -d");
             app.IsEnabled("DryRun.OpenFolder").Should().BeTrue();
             // 保存できたら、前のエラーの表示（領域ごと）が消える（実機の確認の P1）
             app.Exists("DryRun.Error").Should().BeFalse();

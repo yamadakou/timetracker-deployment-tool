@@ -73,19 +73,16 @@
         <NavigationView Grid.Row="1" x:Name="Nav" PaneDisplayMode="Left" IsBackButtonVisible="Collapsed" IsSettingsVisible="False"
                         SelectionChanged="OnNavigationChanged">
             <NavigationView.MenuItems>
-                <NavigationViewItem AutomationProperties.AutomationId="Nav.Target" Content="サインインと対象" Tag="target" Icon="Contact" IsSelected="True" />
-                <NavigationViewItem AutomationProperties.AutomationId="Nav.Deployments" Content="デプロイの一覧" Tag="deployments" Icon="AllApps" />
-                <NavigationViewItem AutomationProperties.AutomationId="Nav.Settings" Content="設定" Tag="settings" Icon="Setting" />
-                <NavigationViewItem AutomationProperties.AutomationId="Nav.Deploy" Content="デプロイ" Tag="deploy" Icon="Upload" />
-                <NavigationViewItem AutomationProperties.AutomationId="Nav.Status" Content="状態の確認" Tag="status" Icon="View" />
-                <NavigationViewItem AutomationProperties.AutomationId="Nav.Delete" Content="削除" Tag="delete" Icon="Delete" />
+                <NavigationViewItem AutomationProperties.AutomationId="Nav.Target" Content="サインイン" Tag="target" Icon="Contact" IsSelected="True" />
+                <NavigationViewItem AutomationProperties.AutomationId="Nav.Deployments" Content="デプロイの一覧" Tag="deployments" Icon="AllApps" IsEnabled="{x:Bind ViewModel.SignIn.IsSignedIn, Mode=OneWay}" />
+                <NavigationViewItem AutomationProperties.AutomationId="Nav.Wizard" Content="新しくデプロイ" Tag="wizard" Icon="Upload" />
                 <NavigationViewItem AutomationProperties.AutomationId="Nav.DryRun" Content="ローカル検証（Dry-run）" Tag="dryrun" Icon="Save" />
                 <NavigationViewItem x:Name="JobsNavItem" AutomationProperties.AutomationId="Nav.Jobs" Content="ジョブ" Tag="jobs" Icon="List" />
             </NavigationView.MenuItems>
 
             <ScrollViewer Padding="24">
                 <Grid>
-                    <!-- サインインと対象 -->
+                    <!-- サインイン（サブスクリプションの一覧は、ウィザードの ① で選ぶ。docs/design/desktop-wizard.md の 2） -->
                     <StackPanel x:Name="TargetPanel" Spacing="12" MaxWidth="900" HorizontalAlignment="Left">
                         <TextBlock AutomationProperties.AutomationId="Panel.Target" Style="{StaticResource SubtitleTextBlockStyle}" Text="Azure へのサインイン" />
                         <TextBlock AutomationProperties.AutomationId="SignIn.Account" Text="{x:Bind ViewModel.SignIn.AccountDisplay, Mode=OneWay}" />
@@ -96,123 +93,137 @@
                         <StackPanel Orientation="Horizontal" Spacing="8" Visibility="{x:Bind ViewModel.SignIn.Busy.IsBusy, Mode=OneWay}"><ProgressRing IsActive="{x:Bind ViewModel.SignIn.Busy.IsBusy, Mode=OneWay}" Width="20" Height="20" /><TextBlock AutomationProperties.AutomationId="SignIn.Busy" VerticalAlignment="Center" Text="{x:Bind ViewModel.SignIn.Busy.Text, Mode=OneWay}" /></StackPanel>
                         <InfoBar AutomationProperties.AutomationId="SignIn.Error" AutomationProperties.Name="{x:Bind ViewModel.SignIn.Error, Mode=OneWay}" Severity="Error" IsOpen="True" IsClosable="False" Message="{x:Bind ViewModel.SignIn.Error, Mode=OneWay}"
                                  Visibility="{x:Bind ViewModel.SignIn.HasError, Mode=OneWay}" />
-
-                        <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="サブスクリプション" Margin="0,16,0,0" />
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <ComboBox AutomationProperties.AutomationId="Target.Subscription" Header="サブスクリプション" MinWidth="480" ItemsSource="{x:Bind ViewModel.Target.Subscriptions}"
-                                      SelectedItem="{x:Bind ViewModel.Target.SelectedSubscription, Mode=OneWay}" SelectionChanged="OnSubscriptionChanged"
-                                      DisplayMemberPath="Display" />
-                            <Button AutomationProperties.AutomationId="Target.Reload" Content="読み直す" VerticalAlignment="Bottom" Command="{x:Bind ViewModel.Target.LoadCommand}" />
-                        </StackPanel>
+                        <TextBlock TextWrapping="Wrap" Text="サインインすると「デプロイの一覧」が使えます。デプロイ先のサブスクリプションは「新しくデプロイ」で選びます。" />
                         <StackPanel Orientation="Horizontal" Spacing="8" Visibility="{x:Bind ViewModel.Target.Busy.IsBusy, Mode=OneWay}"><ProgressRing IsActive="{x:Bind ViewModel.Target.Busy.IsBusy, Mode=OneWay}" Width="20" Height="20" /><TextBlock AutomationProperties.AutomationId="Target.Busy" VerticalAlignment="Center" Text="{x:Bind ViewModel.Target.Busy.Text, Mode=OneWay}" /></StackPanel>
                         <ItemsControl AutomationProperties.AutomationId="Target.Notices" ItemsSource="{x:Bind ViewModel.Target.Notices}" ItemTemplate="{StaticResource LineTemplate}" />
                         <InfoBar AutomationProperties.AutomationId="Target.Error" AutomationProperties.Name="{x:Bind ViewModel.Target.Error, Mode=OneWay}" Severity="Error" IsOpen="True" IsClosable="False" Message="{x:Bind ViewModel.Target.Error, Mode=OneWay}"
                                  Visibility="{x:Bind ViewModel.Target.HasError, Mode=OneWay}" />
-                        <TextBlock TextWrapping="Wrap" Text="リソースグループ・アプリ名・リージョンは「設定」で入力します。" />
                     </StackPanel>
 
-                    <!-- 設定 -->
-                    <StackPanel x:Name="SettingsPanel" Spacing="12" MaxWidth="900" HorizontalAlignment="Left" Visibility="Collapsed">
-                        <TextBlock AutomationProperties.AutomationId="Panel.Settings" Style="{StaticResource SubtitleTextBlockStyle}" Text="デプロイの設定" />
-                        <!-- テンプレート・初期値に戻す・Markdown のコピー（docs/design/desktop-settings.md） -->
+                    <!-- デプロイのウィザード（docs/design/desktop-wizard.md の 3。入力は「設定」の ViewModel、計画と実行はデプロイの ViewModel） -->
+                    <StackPanel x:Name="WizardPanel" Spacing="12" MaxWidth="900" HorizontalAlignment="Left" Visibility="Collapsed">
+                        <TextBlock AutomationProperties.AutomationId="Panel.Wizard" Style="{StaticResource SubtitleTextBlockStyle}" Text="新しくデプロイ" />
+                        <TextBlock AutomationProperties.AutomationId="Wizard.Step" Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind ViewModel.Wizard.StepText, Mode=OneWay}" />
+                        <!-- どの画面にも出す: ①〜④のすべての入力の Markdown のコピーと、初期値に戻す（docs/design/desktop-settings.md） -->
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                            <ComboBox AutomationProperties.AutomationId="Settings.Template" Header="テンプレート" MinWidth="240" ItemsSource="{x:Bind ViewModel.Settings.Templates}" DisplayMemberPath="Name"
-                                      SelectedItem="{x:Bind ViewModel.Settings.SelectedTemplate, Mode=OneWay}" SelectionChanged="OnTemplateChanged" />
-                            <Button AutomationProperties.AutomationId="Settings.ApplyTemplate" Content="入力する" VerticalAlignment="Bottom" Command="{x:Bind ViewModel.Settings.ApplyTemplateCommand}" />
-                            <Button AutomationProperties.AutomationId="Settings.DeleteTemplate" Content="テンプレートを削除" VerticalAlignment="Bottom" Command="{x:Bind ViewModel.Settings.DeleteTemplateCommand}" />
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <TextBox AutomationProperties.AutomationId="Settings.TemplateName" Header="テンプレートの名前" Width="240" Text="{x:Bind ViewModel.Settings.TemplateName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                            <Button AutomationProperties.AutomationId="Settings.SaveTemplate" Content="テンプレートとして保存（パスワードは保存しません）" VerticalAlignment="Bottom" Command="{x:Bind ViewModel.Settings.SaveTemplateCommand}" />
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <Button AutomationProperties.AutomationId="Settings.CopyMarkdown" Content="Markdown でコピー" Command="{x:Bind ViewModel.Settings.CopyMarkdownCommand}" />
+                            <Button AutomationProperties.AutomationId="Settings.CopyMarkdown" Content="設定を Markdown でコピー" Command="{x:Bind ViewModel.Settings.CopyMarkdownCommand}" />
                             <CheckBox AutomationProperties.AutomationId="Settings.IncludePasswords" Content="パスワードも含める" IsChecked="{x:Bind ViewModel.Settings.IncludePasswordsInCopy, Mode=TwoWay}" />
                             <Button AutomationProperties.AutomationId="Settings.Reset" Content="初期値に戻す" Command="{x:Bind ViewModel.Settings.ResetCommand}" />
                         </StackPanel>
                         <TextBlock AutomationProperties.AutomationId="Settings.Message" Text="{x:Bind ViewModel.Settings.Message, Mode=OneWay}" TextWrapping="Wrap" />
-                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="対象" />
-                        <TextBlock AutomationProperties.AutomationId="Settings.Subscription" Text="{x:Bind ViewModel.Target.SubscriptionDisplay, Mode=OneWay}" TextWrapping="Wrap" />
-                        <TextBox AutomationProperties.AutomationId="Target.ResourceGroup" Header="リソースグループ名（無ければ作成します）" Text="{x:Bind ViewModel.Target.ResourceGroup, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxWidth="480" HorizontalAlignment="Left" Width="480" />
-                        <TextBox AutomationProperties.AutomationId="Target.AppName" Header="アプリ名（リソース名の接頭辞）" Text="{x:Bind ViewModel.Target.AppName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="480" HorizontalAlignment="Left" />
-                        <TextBox AutomationProperties.AutomationId="Target.Location" Header="リージョン" Text="{x:Bind ViewModel.Target.Location, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="480" HorizontalAlignment="Left" />
-                        <TextBlock AutomationProperties.AutomationId="Target.TargetError" Foreground="{ThemeResource SystemFillColorCautionBrush}" Text="{x:Bind ViewModel.Target.TargetError, Mode=OneWay}" />
-                        <ComboBox AutomationProperties.AutomationId="Settings.DbType" Header="DB 種別" ItemsSource="{x:Bind vm:SettingsViewModel.DbTypes}"
-                                  SelectedItem="{x:Bind ViewModel.Settings.DbType, Mode=OneWay}" SelectionChanged="OnDbTypeChanged" Width="240" />
-                        <TextBox AutomationProperties.AutomationId="Settings.DbName" Header="DB 名" Text="{x:Bind ViewModel.Settings.DbName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="480" HorizontalAlignment="Left" />
-                        <TextBox AutomationProperties.AutomationId="Settings.TtTag" Header="timetracker イメージのタグ（空なら既定のタグ）" PlaceholderText="{x:Bind ViewModel.Settings.DefaultTag, Mode=OneWay}"
-                                 Text="{x:Bind ViewModel.Settings.TtTag, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="480" HorizontalAlignment="Left" />
-                        <TextBlock Text="パスワードは保存しません（アプリを終了すると消えます）。" />
-                        <PasswordBox AutomationProperties.AutomationId="Settings.DbPassword" Header="DB のパスワード（8 文字以上）" Password="{x:Bind ViewModel.Settings.DbPassword, Mode=TwoWay}" Width="480" HorizontalAlignment="Left" />
-                        <PasswordBox AutomationProperties.AutomationId="Settings.TrackerPassword" Header="Timetracker のパスワード（8 文字以上）" Password="{x:Bind ViewModel.Settings.TrackerPassword, Mode=TwoWay}" Width="480" HorizontalAlignment="Left" />
-                        <ComboBox AutomationProperties.AutomationId="Settings.PersistDb" Header="DB のデータ" ItemsSource="{x:Bind vm:SettingsViewModel.PersistDbOptions}" DisplayMemberPath="Label"
-                                  SelectedItem="{x:Bind ViewModel.Settings.PersistDb, Mode=OneWay}" SelectionChanged="OnPersistDbChanged" MinWidth="480" />
-                        <ComboBox AutomationProperties.AutomationId="Settings.Expiry" Header="利用可能期限日" ItemsSource="{x:Bind vm:SettingsViewModel.ExpiryOptions}" DisplayMemberPath="Label"
-                                  SelectedItem="{x:Bind ViewModel.Settings.Expiry, Mode=OneWay}" SelectionChanged="OnExpiryChanged" MinWidth="480" />
-                        <DatePicker AutomationProperties.AutomationId="Settings.ExpiryDate" Header="期限日" Date="{x:Bind ViewModel.Settings.ExpiryDate, Mode=TwoWay}"
-                                    Visibility="{x:Bind ViewModel.Settings.IsExpiryDate, Mode=OneWay}" />
-                        <TextBlock AutomationProperties.AutomationId="Settings.ExpiryNotice" TextWrapping="Wrap" Text="{x:Bind ViewModel.Settings.ExpiryNotice}" />
-                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="CPU（vCPU）とメモリ（Gi）" />
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <TextBox AutomationProperties.AutomationId="Settings.TtCpu" Header="Timetracker の CPU" Text="{x:Bind ViewModel.Settings.TtCpu, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="150" />
-                            <TextBox Header="Timetracker のメモリ" Text="{x:Bind ViewModel.Settings.TtMemoryGi, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="150" />
-                            <TextBox Header="DB の CPU" Text="{x:Bind ViewModel.Settings.DbCpu, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="150" />
-                            <TextBox Header="DB のメモリ" Text="{x:Bind ViewModel.Settings.DbMemoryGi, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="150" />
-                            <TextBox Header="Redis の CPU" Text="{x:Bind ViewModel.Settings.RedisCpu, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="150" />
-                            <TextBox Header="Redis のメモリ" Text="{x:Bind ViewModel.Settings.RedisMemoryGi, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="150" />
-                        </StackPanel>
-                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="誤り" Visibility="{x:Bind local:Ui.IfAny(ViewModel.Settings.Errors.Count), Mode=OneWay}" />
-                        <ItemsControl AutomationProperties.AutomationId="Settings.Errors" ItemsSource="{x:Bind ViewModel.Settings.Errors}" Foreground="{ThemeResource SystemFillColorCriticalBrush}" ItemTemplate="{StaticResource LineTemplate}" />
-                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="警告" Visibility="{x:Bind local:Ui.IfAny(ViewModel.Settings.Warnings.Count), Mode=OneWay}" />
-                        <ItemsControl AutomationProperties.AutomationId="Settings.Warnings" ItemsSource="{x:Bind ViewModel.Settings.Warnings}" Foreground="{ThemeResource SystemFillColorCautionBrush}" ItemTemplate="{StaticResource LineTemplate}" />
 
-                        <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="ジョブ" Margin="0,16,0,0" />
-                        <ComboBox AutomationProperties.AutomationId="Settings.Concurrency" Header="同時に実行するジョブの数（対象が違うもの）" ItemsSource="{x:Bind jobs:JobQueue.ConcurrencyChoices}"
-                                  SelectedItem="{x:Bind ViewModel.Queue.MaxConcurrency, Mode=OneWay}" SelectionChanged="OnConcurrencyChanged" Width="240" />
-                    </StackPanel>
-
-                    <!-- デプロイ（計画 → 確認 → 実行） -->
-                    <StackPanel x:Name="DeployPanel" Spacing="12" MaxWidth="900" HorizontalAlignment="Left" Visibility="Collapsed">
-                        <TextBlock AutomationProperties.AutomationId="Panel.Deploy" Style="{StaticResource SubtitleTextBlockStyle}" Text="デプロイ" />
-                        <TextBlock TextWrapping="Wrap" Text="「計画」は Azure を読むだけで、変更しません。内容を確かめてから「実行」を押してください。" />
-                        <Button AutomationProperties.AutomationId="Deploy.Plan" Content="計画" Command="{x:Bind ViewModel.Deployment.PlanCommand}" />
-                        <StackPanel Orientation="Horizontal" Spacing="8" Visibility="{x:Bind ViewModel.Deployment.Busy.IsBusy, Mode=OneWay}"><ProgressRing IsActive="{x:Bind ViewModel.Deployment.Busy.IsBusy, Mode=OneWay}" Width="20" Height="20" /><TextBlock AutomationProperties.AutomationId="Deploy.Busy" VerticalAlignment="Center" Text="{x:Bind ViewModel.Deployment.Busy.Text, Mode=OneWay}" /></StackPanel>
-                        <InfoBar AutomationProperties.AutomationId="Deploy.Error" AutomationProperties.Name="{x:Bind ViewModel.Deployment.Error, Mode=OneWay}" Severity="Error" IsOpen="True" IsClosable="False" Message="{x:Bind ViewModel.Deployment.Error, Mode=OneWay}"
-                                 Visibility="{x:Bind ViewModel.Deployment.HasError, Mode=OneWay}" />
-                        <StackPanel Spacing="8" Visibility="{x:Bind local:Ui.IfTrue(ViewModel.Deployment.HasPlan), Mode=OneWay}">
-                            <ItemsControl AutomationProperties.AutomationId="Deploy.Operations" ItemsSource="{x:Bind ViewModel.Deployment.Operations}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="vm:OperationRow">
-                                        <StackPanel Orientation="Horizontal"><TextBlock Text="{x:Bind Action}" /><TextBlock Text="  " /><TextBlock Text="{x:Bind Name}" /><TextBlock Text="（" /><TextBlock Text="{x:Bind Resource}" /><TextBlock Text="）" /></StackPanel>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                            <TextBlock Text="{x:Bind ViewModel.Deployment.PersistDbText, Mode=OneWay}" />
-                            <TextBlock AutomationProperties.AutomationId="Deploy.Expiry" Text="{x:Bind ViewModel.Deployment.ExpiryText, Mode=OneWay}" TextWrapping="Wrap" />
-                            <TextBlock Text="{x:Bind ViewModel.Deployment.PermissionText, Mode=OneWay}" TextWrapping="Wrap" />
-                            <TextBlock Text="{x:Bind ViewModel.Deployment.EstimatedDuration, Mode=OneWay}" />
-                            <TextBlock Text="{x:Bind local:Ui.Time(ViewModel.Deployment.ExpiresAt), Mode=OneWay}" />
-                            <ItemsControl AutomationProperties.AutomationId="Deploy.Blockers" ItemsSource="{x:Bind ViewModel.Deployment.Blockers}" Foreground="{ThemeResource SystemFillColorCriticalBrush}" ItemTemplate="{StaticResource LineTemplate}" />
-                            <ItemsControl ItemsSource="{x:Bind ViewModel.Deployment.Warnings}" Foreground="{ThemeResource SystemFillColorCautionBrush}" ItemTemplate="{StaticResource LineTemplate}" />
-                            <CheckBox AutomationProperties.AutomationId="Deploy.DataLossAck" Content="DB のデータが失われることを理解しました" IsChecked="{x:Bind ViewModel.Deployment.DataLossAcknowledged, Mode=TwoWay}"
-                                      Visibility="{x:Bind local:Ui.IfTrue(ViewModel.Deployment.RequiresDataLossAck), Mode=OneWay}" />
-                            <Button AutomationProperties.AutomationId="Deploy.Start" Content="今すぐ実行" Command="{x:Bind ViewModel.Deployment.StartCommand}" Style="{StaticResource AccentButtonStyle}" />
+                        <!-- ① 対象 -->
+                        <StackPanel Spacing="12" Visibility="{x:Bind ViewModel.Wizard.IsTarget, Mode=OneWay}">
                             <StackPanel Orientation="Horizontal" Spacing="8">
-                                <DatePicker AutomationProperties.AutomationId="Deploy.ScheduleDate" Header="予定の日付" Date="{x:Bind ViewModel.Deployment.Schedule.Date, Mode=TwoWay}" />
-                                <TimePicker AutomationProperties.AutomationId="Deploy.ScheduleTime" Header="時刻" ClockIdentifier="24HourClock" Time="{x:Bind ViewModel.Deployment.Schedule.TimeOfDay, Mode=TwoWay}" />
-                                <Button AutomationProperties.AutomationId="Deploy.Schedule" Content="予定に追加" VerticalAlignment="Bottom" Command="{x:Bind ViewModel.Deployment.ScheduleCommand}" />
+                                <ComboBox AutomationProperties.AutomationId="Settings.Template" Header="テンプレート" MinWidth="240" ItemsSource="{x:Bind ViewModel.Settings.Templates}" DisplayMemberPath="Name"
+                                          SelectedItem="{x:Bind ViewModel.Settings.SelectedTemplate, Mode=OneWay}" SelectionChanged="OnTemplateChanged" />
+                                <Button AutomationProperties.AutomationId="Settings.ApplyTemplate" Content="テンプレートから入力" VerticalAlignment="Bottom" Command="{x:Bind ViewModel.Settings.ApplyTemplateCommand}" />
+                                <Button AutomationProperties.AutomationId="Settings.DeleteTemplate" Content="テンプレートを削除" VerticalAlignment="Bottom" Command="{x:Bind ViewModel.Settings.DeleteTemplateCommand}" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <ComboBox AutomationProperties.AutomationId="Target.Subscription" Header="サブスクリプション" MinWidth="480" ItemsSource="{x:Bind ViewModel.Target.Subscriptions}"
+                                          SelectedItem="{x:Bind ViewModel.Target.SelectedSubscription, Mode=OneWay}" SelectionChanged="OnSubscriptionChanged"
+                                          DisplayMemberPath="Display" />
+                                <Button AutomationProperties.AutomationId="Target.Reload" Content="読み直す" VerticalAlignment="Bottom" Command="{x:Bind ViewModel.Target.LoadCommand}" />
+                            </StackPanel>
+                            <TextBox AutomationProperties.AutomationId="Target.ResourceGroup" Header="リソースグループ名（無ければ作成します）" Text="{x:Bind ViewModel.Target.ResourceGroup, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxWidth="480" HorizontalAlignment="Left" Width="480" />
+                            <TextBox AutomationProperties.AutomationId="Target.AppName" Header="アプリ名（リソース名の接頭辞）" Text="{x:Bind ViewModel.Target.AppName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="480" HorizontalAlignment="Left" />
+                            <TextBox AutomationProperties.AutomationId="Target.Location" Header="リージョン" Text="{x:Bind ViewModel.Target.Location, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="480" HorizontalAlignment="Left" />
+                        </StackPanel>
+
+                        <!-- ② DB -->
+                        <StackPanel Spacing="12" Visibility="{x:Bind ViewModel.Wizard.IsDb, Mode=OneWay}">
+                            <ComboBox AutomationProperties.AutomationId="Settings.DbType" Header="DB 種別" ItemsSource="{x:Bind vm:SettingsViewModel.DbTypes}"
+                                      SelectedItem="{x:Bind ViewModel.Settings.DbType, Mode=OneWay}" SelectionChanged="OnDbTypeChanged" Width="240" />
+                            <TextBox AutomationProperties.AutomationId="Settings.DbName" Header="DB 名" Text="{x:Bind ViewModel.Settings.DbName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="480" HorizontalAlignment="Left" />
+                            <TextBox AutomationProperties.AutomationId="Settings.TtTag" Header="timetracker イメージのタグ（空なら既定のタグ）" PlaceholderText="{x:Bind ViewModel.Settings.DefaultTag, Mode=OneWay}"
+                                      Text="{x:Bind ViewModel.Settings.TtTag, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="480" HorizontalAlignment="Left" />
+                            <ComboBox AutomationProperties.AutomationId="Settings.PersistDb" Header="DB のデータ" ItemsSource="{x:Bind vm:SettingsViewModel.PersistDbOptions}" DisplayMemberPath="Label"
+                                      SelectedItem="{x:Bind ViewModel.Settings.PersistDb, Mode=OneWay}" SelectionChanged="OnPersistDbChanged" MinWidth="480" />
+                        </StackPanel>
+
+                        <!-- ③ パスワード -->
+                        <StackPanel Spacing="12" Visibility="{x:Bind ViewModel.Wizard.IsPasswords, Mode=OneWay}">
+                            <TextBlock TextWrapping="Wrap" Text="パスワードは保存しません（アプリを終了すると消えます。テンプレートにも保存しません）。" />
+                            <PasswordBox AutomationProperties.AutomationId="Settings.DbPassword" Header="DB のパスワード（8 文字以上）" Password="{x:Bind ViewModel.Settings.DbPassword, Mode=TwoWay}" Width="480" HorizontalAlignment="Left" />
+                            <PasswordBox AutomationProperties.AutomationId="Settings.TrackerPassword" Header="Timetracker のパスワード（8 文字以上）" Password="{x:Bind ViewModel.Settings.TrackerPassword, Mode=TwoWay}" Width="480" HorizontalAlignment="Left" />
+                        </StackPanel>
+
+                        <!-- ④ スペックと利用可能期限 -->
+                        <StackPanel Spacing="12" Visibility="{x:Bind ViewModel.Wizard.IsSpec, Mode=OneWay}">
+                            <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="CPU（vCPU）とメモリ（Gi）" />
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBox AutomationProperties.AutomationId="Settings.TtCpu" Header="Timetracker の CPU" Text="{x:Bind ViewModel.Settings.TtCpu, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="150" />
+                                <TextBox Header="Timetracker のメモリ" Text="{x:Bind ViewModel.Settings.TtMemoryGi, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="150" />
+                                <TextBox Header="DB の CPU" Text="{x:Bind ViewModel.Settings.DbCpu, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="150" />
+                                <TextBox Header="DB のメモリ" Text="{x:Bind ViewModel.Settings.DbMemoryGi, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="150" />
+                                <TextBox Header="Redis の CPU" Text="{x:Bind ViewModel.Settings.RedisCpu, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="150" />
+                                <TextBox Header="Redis のメモリ" Text="{x:Bind ViewModel.Settings.RedisMemoryGi, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="150" />
+                            </StackPanel>
+                            <ComboBox AutomationProperties.AutomationId="Settings.Expiry" Header="利用可能期限日" ItemsSource="{x:Bind vm:SettingsViewModel.ExpiryOptions}" DisplayMemberPath="Label"
+                                      SelectedItem="{x:Bind ViewModel.Settings.Expiry, Mode=OneWay}" SelectionChanged="OnExpiryChanged" MinWidth="480" />
+                            <DatePicker AutomationProperties.AutomationId="Settings.ExpiryDate" Header="期限日" Date="{x:Bind ViewModel.Settings.ExpiryDate, Mode=TwoWay}"
+                                      Visibility="{x:Bind ViewModel.Settings.IsExpiryDate, Mode=OneWay}" />
+                            <TextBlock AutomationProperties.AutomationId="Settings.ExpiryNotice" TextWrapping="Wrap" Text="{x:Bind ViewModel.Settings.ExpiryNotice}" />
+                        </StackPanel>
+
+                        <!-- ⑤ 確認と実行（開くと計画を作る） -->
+                        <StackPanel Spacing="12" Visibility="{x:Bind ViewModel.Wizard.IsConfirm, Mode=OneWay}">
+                            <TextBlock TextWrapping="Wrap" Text="「計画」は Azure を読むだけで、変更しません。内容を確かめてから「今すぐ実行」か「予定に追加」を押してください。" />
+                            <Button AutomationProperties.AutomationId="Deploy.Plan" Content="計画し直す" Command="{x:Bind ViewModel.Deployment.PlanCommand}" />
+                            <StackPanel Orientation="Horizontal" Spacing="8" Visibility="{x:Bind ViewModel.Deployment.Busy.IsBusy, Mode=OneWay}"><ProgressRing IsActive="{x:Bind ViewModel.Deployment.Busy.IsBusy, Mode=OneWay}" Width="20" Height="20" /><TextBlock AutomationProperties.AutomationId="Deploy.Busy" VerticalAlignment="Center" Text="{x:Bind ViewModel.Deployment.Busy.Text, Mode=OneWay}" /></StackPanel>
+                            <InfoBar AutomationProperties.AutomationId="Deploy.Error" AutomationProperties.Name="{x:Bind ViewModel.Deployment.Error, Mode=OneWay}" Severity="Error" IsOpen="True" IsClosable="False" Message="{x:Bind ViewModel.Deployment.Error, Mode=OneWay}"
+                                      Visibility="{x:Bind ViewModel.Deployment.HasError, Mode=OneWay}" />
+                            <StackPanel Spacing="8" Visibility="{x:Bind local:Ui.IfTrue(ViewModel.Deployment.HasPlan), Mode=OneWay}">
+                                <ItemsControl AutomationProperties.AutomationId="Deploy.Operations" ItemsSource="{x:Bind ViewModel.Deployment.Operations}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:OperationRow">
+                                            <StackPanel Orientation="Horizontal"><TextBlock Text="{x:Bind Action}" /><TextBlock Text="  " /><TextBlock Text="{x:Bind Name}" /><TextBlock Text="（" /><TextBlock Text="{x:Bind Resource}" /><TextBlock Text="）" /></StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Text="{x:Bind ViewModel.Deployment.PersistDbText, Mode=OneWay}" />
+                                <TextBlock AutomationProperties.AutomationId="Deploy.Expiry" Text="{x:Bind ViewModel.Deployment.ExpiryText, Mode=OneWay}" TextWrapping="Wrap" />
+                                <TextBlock Text="{x:Bind ViewModel.Deployment.PermissionText, Mode=OneWay}" TextWrapping="Wrap" />
+                                <TextBlock Text="{x:Bind ViewModel.Deployment.EstimatedDuration, Mode=OneWay}" />
+                                <TextBlock Text="{x:Bind local:Ui.Time(ViewModel.Deployment.ExpiresAt), Mode=OneWay}" />
+                                <ItemsControl AutomationProperties.AutomationId="Deploy.Blockers" ItemsSource="{x:Bind ViewModel.Deployment.Blockers}" Foreground="{ThemeResource SystemFillColorCriticalBrush}" ItemTemplate="{StaticResource LineTemplate}" />
+                                <ItemsControl ItemsSource="{x:Bind ViewModel.Deployment.Warnings}" Foreground="{ThemeResource SystemFillColorCautionBrush}" ItemTemplate="{StaticResource LineTemplate}" />
+                                <CheckBox AutomationProperties.AutomationId="Deploy.DataLossAck" Content="DB のデータが失われることを理解しました" IsChecked="{x:Bind ViewModel.Deployment.DataLossAcknowledged, Mode=TwoWay}"
+                                          Visibility="{x:Bind local:Ui.IfTrue(ViewModel.Deployment.RequiresDataLossAck), Mode=OneWay}" />
+                                <Button AutomationProperties.AutomationId="Deploy.Start" Content="今すぐ実行" Command="{x:Bind ViewModel.Deployment.StartCommand}" Style="{StaticResource AccentButtonStyle}" />
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <DatePicker AutomationProperties.AutomationId="Deploy.ScheduleDate" Header="予定の日付" Date="{x:Bind ViewModel.Deployment.Schedule.Date, Mode=TwoWay}" />
+                                    <TimePicker AutomationProperties.AutomationId="Deploy.ScheduleTime" Header="時刻" ClockIdentifier="24HourClock" Time="{x:Bind ViewModel.Deployment.Schedule.TimeOfDay, Mode=TwoWay}" />
+                                    <Button AutomationProperties.AutomationId="Deploy.Schedule" Content="予定に追加" VerticalAlignment="Bottom" Command="{x:Bind ViewModel.Deployment.ScheduleCommand}" />
+                                </StackPanel>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBox AutomationProperties.AutomationId="Settings.TemplateName" Header="テンプレートの名前" Width="240" Text="{x:Bind ViewModel.Settings.TemplateName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                <Button AutomationProperties.AutomationId="Settings.SaveTemplate" Content="この設定をテンプレートとして保存（パスワードは保存しません）" VerticalAlignment="Bottom" Command="{x:Bind ViewModel.Settings.SaveTemplateCommand}" />
                             </StackPanel>
                         </StackPanel>
-                        <ContentControl Content="{x:Bind ViewModel.CurrentDeployment, Mode=OneWay}" ContentTemplate="{StaticResource JobTemplate}"
-                                        Visibility="{x:Bind ViewModel.HasCurrentDeployment, Mode=OneWay}" />
-                        <Button AutomationProperties.AutomationId="Deploy.OpenEndpoint" Content="Timetracker を開く" Command="{x:Bind ViewModel.OpenEndpointCommand}" />
+
+                        <!-- この画面の誤りと警告（⑤ ではすべて） -->
+                        <ItemsControl AutomationProperties.AutomationId="Wizard.Errors" ItemsSource="{x:Bind ViewModel.Wizard.StepErrors}" Foreground="{ThemeResource SystemFillColorCriticalBrush}" ItemTemplate="{StaticResource LineTemplate}" />
+                        <ItemsControl AutomationProperties.AutomationId="Wizard.Warnings" ItemsSource="{x:Bind ViewModel.Wizard.StepWarnings}" Foreground="{ThemeResource SystemFillColorCautionBrush}" ItemTemplate="{StaticResource LineTemplate}" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button AutomationProperties.AutomationId="Wizard.Back" Content="戻る" Command="{x:Bind ViewModel.Wizard.BackCommand}" />
+                            <Button AutomationProperties.AutomationId="Wizard.Next" Content="次へ" Command="{x:Bind ViewModel.Wizard.NextCommand}" Style="{StaticResource AccentButtonStyle}" />
+                            <TextBlock AutomationProperties.AutomationId="Wizard.Blocked" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource SystemFillColorCautionBrush}" Text="{x:Bind ViewModel.Wizard.BlockedText, Mode=OneWay}" />
+                        </StackPanel>
                     </StackPanel>
 
-                    <!-- 状態の確認 -->
+                    <!-- 実行状況（今すぐ実行・今すぐ削除の後と、一覧の「状態を確認」から開く。docs/design/desktop-wizard.md の 2） -->
                     <StackPanel x:Name="StatusPanel" Spacing="12" MaxWidth="900" HorizontalAlignment="Left" Visibility="Collapsed">
-                        <TextBlock AutomationProperties.AutomationId="Panel.Status" Style="{StaticResource SubtitleTextBlockStyle}" Text="状態の確認" />
+                        <TextBlock AutomationProperties.AutomationId="Panel.Status" Style="{StaticResource SubtitleTextBlockStyle}" Text="実行状況" />
+                        <Button AutomationProperties.AutomationId="Status.BackToList" Content="デプロイの一覧に戻る" Click="OnBackToList" />
+                        <ContentControl AutomationProperties.AutomationId="Status.Job" Content="{x:Bind ViewModel.StatusJob, Mode=OneWay}" ContentTemplate="{StaticResource JobTemplate}"
+                                        Visibility="{x:Bind ViewModel.HasStatusJob, Mode=OneWay}" />
+                        <Button AutomationProperties.AutomationId="Deploy.OpenEndpoint" Content="Timetracker を開く" Command="{x:Bind ViewModel.OpenEndpointCommand}" />
+                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Azure の状態" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                            <Button AutomationProperties.AutomationId="Status.Refresh" Content="読み込む" Command="{x:Bind ViewModel.Status.RefreshCommand}" />
+                            <Button AutomationProperties.AutomationId="Status.Refresh" Content="読み直す" Command="{x:Bind ViewModel.Status.RefreshCommand}" />
                             <Button AutomationProperties.AutomationId="Status.Copy" Content="Markdown でコピー" Command="{x:Bind ViewModel.Status.CopyCommand}" />
                         </StackPanel>
                         <TextBlock AutomationProperties.AutomationId="Status.Message" Text="{x:Bind ViewModel.Status.Message, Mode=OneWay}" />
@@ -247,8 +258,8 @@
                         <ItemsControl AutomationProperties.AutomationId="Deployments.Notices" ItemsSource="{x:Bind ViewModel.Deployments.Notices}" ItemTemplate="{StaticResource LineTemplate}" />
                         <!-- フィルタ・並べ替え・ページの件数 -->
                         <VariableSizedWrapGrid Orientation="Horizontal" ItemWidth="260">
-                            <TextBox AutomationProperties.AutomationId="Deployments.SubscriptionFilter" Header="サブスクリプション（名前・ID）" Margin="0,0,8,8"
-                                     Text="{x:Bind ViewModel.Deployments.SubscriptionFilter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            <ComboBox AutomationProperties.AutomationId="Deployments.SubscriptionFilter" Header="サブスクリプション" Margin="0,0,8,8" ItemsSource="{x:Bind ViewModel.Deployments.SubscriptionFilters}"
+                                      DisplayMemberPath="Label" SelectedItem="{x:Bind ViewModel.Deployments.SubscriptionFilter, Mode=OneWay}" SelectionChanged="OnSubscriptionFilterChanged" />
                             <TextBox AutomationProperties.AutomationId="Deployments.ResourceGroupFilter" Header="リソースグループ名" Margin="0,0,8,8"
                                      Text="{x:Bind ViewModel.Deployments.ResourceGroupFilter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                             <CalendarDatePicker AutomationProperties.AutomationId="Deployments.DeployedFrom" Header="デプロイ日（から）" Margin="0,0,8,8" Date="{x:Bind ViewModel.Deployments.DeployedFrom, Mode=TwoWay}" />
@@ -326,12 +337,14 @@
                     <!-- 削除（計画 → アプリ名の入力 → 実行） -->
                     <StackPanel x:Name="DeletePanel" Spacing="12" MaxWidth="900" HorizontalAlignment="Left" Visibility="Collapsed">
                         <TextBlock AutomationProperties.AutomationId="Panel.Delete" Style="{StaticResource SubtitleTextBlockStyle}" Text="削除" />
+                        <Button AutomationProperties.AutomationId="Delete.BackToList" Content="デプロイの一覧に戻る" Click="OnBackToList" />
+                        <StackPanel Orientation="Horizontal" Spacing="4"><TextBlock Text="対象:" /><TextBlock AutomationProperties.AutomationId="Delete.Target" Text="{x:Bind ViewModel.Target.SubscriptionDisplay, Mode=OneWay}" /><TextBlock Text=" / " /><TextBlock Text="{x:Bind ViewModel.Target.ResourceGroup, Mode=OneWay}" /><TextBlock Text=" / " /><TextBlock Text="{x:Bind ViewModel.Target.AppName, Mode=OneWay}" /></StackPanel>
                         <TextBlock TextWrapping="Wrap" Text="本ツールで作ったリソースだけを削除します。リソースグループは、「リソースグループも削除する」を選んだ場合だけ、中が空になれば削除します。" />
                         <CheckBox AutomationProperties.AutomationId="Delete.IncludeUntagged" Content="管理タグの無いものも対象にする" IsChecked="{x:Bind ViewModel.Deletion.IncludeUntagged, Mode=TwoWay}" />
                         <CheckBox AutomationProperties.AutomationId="Delete.KeepDbData" Content="DB のデータを残す（ストレージアカウントを削除しない。料金がかかり続けます）" IsChecked="{x:Bind ViewModel.Deletion.KeepDbData, Mode=TwoWay}" />
                         <CheckBox AutomationProperties.AutomationId="Delete.DeleteResourceGroup" Content="リソースグループも削除する（本ツールのリソースを削除した後に、中が空になる場合だけ。元に戻せません）" IsChecked="{x:Bind ViewModel.Deletion.DeleteResourceGroup, Mode=TwoWay}" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                            <Button AutomationProperties.AutomationId="Delete.Plan" Content="計画" Command="{x:Bind ViewModel.Deletion.PlanCommand}" />
+                            <Button AutomationProperties.AutomationId="Delete.Plan" Content="計画し直す" Command="{x:Bind ViewModel.Deletion.PlanCommand}" />
                             <Button AutomationProperties.AutomationId="Delete.CopyPlan" Content="計画を Markdown でコピー" Command="{x:Bind ViewModel.Deletion.CopyPlanCommand}" />
                         </StackPanel>
                         <TextBlock AutomationProperties.AutomationId="Delete.Message" Text="{x:Bind ViewModel.Deletion.Message, Mode=OneWay}" />
@@ -364,14 +377,19 @@
                                 </StackPanel>
                             </StackPanel>
                         </StackPanel>
-                        <ContentControl Content="{x:Bind ViewModel.CurrentDeletion, Mode=OneWay}" ContentTemplate="{StaticResource JobTemplate}"
-                                        Visibility="{x:Bind ViewModel.HasCurrentDeletion, Mode=OneWay}" />
                     </StackPanel>
 
                     <!-- ローカル検証（Dry-run） -->
                     <StackPanel x:Name="DryRunPanel" Spacing="12" MaxWidth="900" HorizontalAlignment="Left" Visibility="Collapsed">
                         <TextBlock AutomationProperties.AutomationId="Panel.DryRun" Style="{StaticResource SubtitleTextBlockStyle}" Text="ローカル検証（Dry-run）" />
-                        <TextBlock TextWrapping="Wrap" Text="「設定」の内容で docker-compose.yml と .env を保存します。Azure には接続しません（サインインは不要です）。" />
+                        <TextBlock TextWrapping="Wrap" Text="次の内容で docker-compose.yml と .env を保存します（「新しくデプロイ」と同じ入力です）。Azure には接続しません（サインインは不要です）。" />
+                        <ComboBox AutomationProperties.AutomationId="DryRun.DbType" Header="DB 種別" ItemsSource="{x:Bind vm:SettingsViewModel.DbTypes}"
+                                  SelectedItem="{x:Bind ViewModel.Settings.DbType, Mode=OneWay}" SelectionChanged="OnDbTypeChanged" Width="240" />
+                        <TextBox AutomationProperties.AutomationId="DryRun.DbName" Header="DB 名" Text="{x:Bind ViewModel.Settings.DbName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="480" HorizontalAlignment="Left" />
+                        <TextBox AutomationProperties.AutomationId="DryRun.TtTag" Header="timetracker イメージのタグ（空なら既定のタグ）" PlaceholderText="{x:Bind ViewModel.Settings.DefaultTag, Mode=OneWay}"
+                                 Text="{x:Bind ViewModel.Settings.TtTag, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="480" HorizontalAlignment="Left" />
+                        <PasswordBox AutomationProperties.AutomationId="DryRun.DbPassword" Header="DB のパスワード（8 文字以上）" Password="{x:Bind ViewModel.Settings.DbPassword, Mode=TwoWay}" Width="480" HorizontalAlignment="Left" />
+                        <PasswordBox AutomationProperties.AutomationId="DryRun.TrackerPassword" Header="Timetracker のパスワード（8 文字以上）" Password="{x:Bind ViewModel.Settings.TrackerPassword, Mode=TwoWay}" Width="480" HorizontalAlignment="Left" />
                         <InfoBar Severity="Warning" IsOpen="True" IsClosable="False" Message="{x:Bind ViewModel.DryRun.EnvWarning}" />
                         <Button AutomationProperties.AutomationId="DryRun.Save" Content="保存先を選んで保存" Command="{x:Bind ViewModel.DryRun.SaveCommand}" Style="{StaticResource AccentButtonStyle}" />
                         <InfoBar AutomationProperties.AutomationId="DryRun.Error" AutomationProperties.Name="{x:Bind ViewModel.DryRun.Error, Mode=OneWay}" Severity="Error" IsOpen="True" IsClosable="False" Message="{x:Bind ViewModel.DryRun.Error, Mode=OneWay}"
@@ -386,8 +404,10 @@
                     <!-- ジョブ -->
                     <StackPanel x:Name="JobsPanel" Spacing="12" MaxWidth="900" HorizontalAlignment="Left" Visibility="Collapsed">
                         <TextBlock AutomationProperties.AutomationId="Panel.Jobs" Style="{StaticResource SubtitleTextBlockStyle}" Text="ジョブ（このアプリを終了すると消えます）" />
-                        <TextBlock TextWrapping="Wrap" Text="対象が違うジョブは同時に実行します（数は「設定」で変えられます）。実行中のジョブは、今の手順が終わってから止まります（作りかけのリソースは、もう一度実行すると続きから処理します）。" />
+                        <TextBlock TextWrapping="Wrap" Text="対象が違うジョブは同時に実行します（数は下で変えられます）。実行中のジョブは、今の手順が終わってから止まります（作りかけのリソースは、もう一度実行すると続きから処理します）。" />
                         <TextBlock AutomationProperties.AutomationId="Jobs.Resident" TextWrapping="Wrap" Text="終わっていないジョブがあるときにウィンドウを閉じると、通知領域に残って続けます（終了は通知領域のアイコンのメニューから）。ジョブが終わると通知します。Windows のサインアウト・再起動・シャットダウンではアプリが終わり、残ったジョブは消えます。PC のスリープ中は実行せず、予定の時刻を過ぎていれば、動けるようになってからすぐ実行します。" />
+                        <ComboBox AutomationProperties.AutomationId="Settings.Concurrency" Header="同時に実行するジョブの数（対象が違うもの）" ItemsSource="{x:Bind jobs:JobQueue.ConcurrencyChoices}"
+                                  SelectedItem="{x:Bind ViewModel.Queue.MaxConcurrency, Mode=OneWay}" SelectionChanged="OnConcurrencyChanged" Width="240" />
                         <TextBlock AutomationProperties.AutomationId="Jobs.Summary" Text="{x:Bind ViewModel.Queue.Summary, Mode=OneWay}" />
                         <Button AutomationProperties.AutomationId="Jobs.ClearFinished" Content="終わったジョブを一覧から消す" Command="{x:Bind ViewModel.ClearFinishedCommand}" />
                         <ItemsControl x:Name="JobsList" AutomationProperties.AutomationId="Jobs.List" ItemsSource="{x:Bind ViewModel.Jobs}" ItemTemplate="{StaticResource JobRowTemplate}" />

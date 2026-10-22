@@ -104,8 +104,9 @@ public class NotificationTests
         await h.Main.Deployment.StartCommand.ExecuteAsync();
         await h.Main.Queue.WhenIdleAsync();
 
-        h.Azure.Credentials.Last().Should().BeOfType<TimeLimitedCredential>().Which.Inner.Should().BeOfType<TenantScopedCredential>()
-            .Which.TenantId.Should().Be("t1");
+        // 実行状況の画面の読み込み（対話できる資格情報）とは別に、ジョブは時間を区切った資格情報で動く
+        h.Azure.Credentials.OfType<TimeLimitedCredential>().Should().NotBeEmpty().And.AllSatisfy(c =>
+            c.Inner.Should().BeOfType<TenantScopedCredential>().Which.TenantId.Should().Be("t1"));
     }
 }
 
