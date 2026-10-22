@@ -27,6 +27,16 @@ public sealed class FilePreferences : IAppPreferences
         }
     }
 
+    public IReadOnlyList<DeploymentTemplate> Templates
+    {
+        get => _data.Templates ?? [];
+        set
+        {
+            _data = _data with { Templates = value };
+            Save();
+        }
+    }
+
     private static Data Load(string path)
     {
         try
@@ -52,5 +62,5 @@ public sealed class FilePreferences : IAppPreferences
         }
     }
 
-    private sealed record Data(int? MaxConcurrentJobs = null);
+    private sealed record Data(int? MaxConcurrentJobs = null, IReadOnlyList<DeploymentTemplate>? Templates = null);
 }

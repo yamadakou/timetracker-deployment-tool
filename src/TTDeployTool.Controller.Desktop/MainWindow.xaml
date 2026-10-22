@@ -29,6 +29,10 @@
                     <HyperlinkButton Content="{x:Bind Endpoint, Mode=OneWay}" NavigateUri="{x:Bind Endpoint, Mode=OneWay}"
                                      Visibility="{x:Bind HasEndpoint, Mode=OneWay}" />
                     <ItemsControl AutomationProperties.AutomationId="Job.Logs" ItemsSource="{x:Bind Logs}" FontFamily="Consolas" ItemTemplate="{StaticResource LineTemplate}" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button AutomationProperties.AutomationId="Job.Copy" Content="Markdown でコピー" Command="{x:Bind CopyCommand}" />
+                        <TextBlock VerticalAlignment="Center" Text="{x:Bind CopyMessage, Mode=OneWay}" />
+                    </StackPanel>
                 </StackPanel>
             </DataTemplate>
             <!-- ジョブの画面の 1 件（進み具合と、取り消し・一時停止・再開・停止・予定の変更。詳細設計 desktop-jobs.md の 4.1） -->
@@ -93,7 +97,7 @@
                         <InfoBar AutomationProperties.AutomationId="SignIn.Error" AutomationProperties.Name="{x:Bind ViewModel.SignIn.Error, Mode=OneWay}" Severity="Error" IsOpen="True" IsClosable="False" Message="{x:Bind ViewModel.SignIn.Error, Mode=OneWay}"
                                  Visibility="{x:Bind ViewModel.SignIn.HasError, Mode=OneWay}" />
 
-                        <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="対象" Margin="0,16,0,0" />
+                        <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="サブスクリプション" Margin="0,16,0,0" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <ComboBox AutomationProperties.AutomationId="Target.Subscription" Header="サブスクリプション" MinWidth="480" ItemsSource="{x:Bind ViewModel.Target.Subscriptions}"
                                       SelectedItem="{x:Bind ViewModel.Target.SelectedSubscription, Mode=OneWay}" SelectionChanged="OnSubscriptionChanged"
@@ -104,15 +108,35 @@
                         <ItemsControl AutomationProperties.AutomationId="Target.Notices" ItemsSource="{x:Bind ViewModel.Target.Notices}" ItemTemplate="{StaticResource LineTemplate}" />
                         <InfoBar AutomationProperties.AutomationId="Target.Error" AutomationProperties.Name="{x:Bind ViewModel.Target.Error, Mode=OneWay}" Severity="Error" IsOpen="True" IsClosable="False" Message="{x:Bind ViewModel.Target.Error, Mode=OneWay}"
                                  Visibility="{x:Bind ViewModel.Target.HasError, Mode=OneWay}" />
-                        <TextBox AutomationProperties.AutomationId="Target.ResourceGroup" Header="リソースグループ名（無ければ作成します）" Text="{x:Bind ViewModel.Target.ResourceGroup, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxWidth="480" HorizontalAlignment="Left" Width="480" />
-                        <TextBox AutomationProperties.AutomationId="Target.AppName" Header="アプリ名（リソース名の接頭辞）" Text="{x:Bind ViewModel.Target.AppName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="480" HorizontalAlignment="Left" />
-                        <TextBox AutomationProperties.AutomationId="Target.Location" Header="リージョン" Text="{x:Bind ViewModel.Target.Location, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="480" HorizontalAlignment="Left" />
-                        <TextBlock AutomationProperties.AutomationId="Target.TargetError" Foreground="{ThemeResource SystemFillColorCautionBrush}" Text="{x:Bind ViewModel.Target.TargetError, Mode=OneWay}" />
+                        <TextBlock TextWrapping="Wrap" Text="リソースグループ・アプリ名・リージョンは「設定」で入力します。" />
                     </StackPanel>
 
                     <!-- 設定 -->
                     <StackPanel x:Name="SettingsPanel" Spacing="12" MaxWidth="900" HorizontalAlignment="Left" Visibility="Collapsed">
                         <TextBlock AutomationProperties.AutomationId="Panel.Settings" Style="{StaticResource SubtitleTextBlockStyle}" Text="デプロイの設定" />
+                        <!-- テンプレート・初期値に戻す・Markdown のコピー（docs/design/desktop-settings.md） -->
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <ComboBox AutomationProperties.AutomationId="Settings.Template" Header="テンプレート" MinWidth="240" ItemsSource="{x:Bind ViewModel.Settings.Templates}" DisplayMemberPath="Name"
+                                      SelectedItem="{x:Bind ViewModel.Settings.SelectedTemplate, Mode=OneWay}" SelectionChanged="OnTemplateChanged" />
+                            <Button AutomationProperties.AutomationId="Settings.ApplyTemplate" Content="入力する" VerticalAlignment="Bottom" Command="{x:Bind ViewModel.Settings.ApplyTemplateCommand}" />
+                            <Button AutomationProperties.AutomationId="Settings.DeleteTemplate" Content="テンプレートを削除" VerticalAlignment="Bottom" Command="{x:Bind ViewModel.Settings.DeleteTemplateCommand}" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBox AutomationProperties.AutomationId="Settings.TemplateName" Header="テンプレートの名前" Width="240" Text="{x:Bind ViewModel.Settings.TemplateName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            <Button AutomationProperties.AutomationId="Settings.SaveTemplate" Content="テンプレートとして保存（パスワードは保存しません）" VerticalAlignment="Bottom" Command="{x:Bind ViewModel.Settings.SaveTemplateCommand}" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button AutomationProperties.AutomationId="Settings.CopyMarkdown" Content="Markdown でコピー" Command="{x:Bind ViewModel.Settings.CopyMarkdownCommand}" />
+                            <CheckBox AutomationProperties.AutomationId="Settings.IncludePasswords" Content="パスワードも含める" IsChecked="{x:Bind ViewModel.Settings.IncludePasswordsInCopy, Mode=TwoWay}" />
+                            <Button AutomationProperties.AutomationId="Settings.Reset" Content="初期値に戻す" Command="{x:Bind ViewModel.Settings.ResetCommand}" />
+                        </StackPanel>
+                        <TextBlock AutomationProperties.AutomationId="Settings.Message" Text="{x:Bind ViewModel.Settings.Message, Mode=OneWay}" TextWrapping="Wrap" />
+                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="対象" />
+                        <TextBlock AutomationProperties.AutomationId="Settings.Subscription" Text="{x:Bind ViewModel.Target.SubscriptionDisplay, Mode=OneWay}" TextWrapping="Wrap" />
+                        <TextBox AutomationProperties.AutomationId="Target.ResourceGroup" Header="リソースグループ名（無ければ作成します）" Text="{x:Bind ViewModel.Target.ResourceGroup, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxWidth="480" HorizontalAlignment="Left" Width="480" />
+                        <TextBox AutomationProperties.AutomationId="Target.AppName" Header="アプリ名（リソース名の接頭辞）" Text="{x:Bind ViewModel.Target.AppName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="480" HorizontalAlignment="Left" />
+                        <TextBox AutomationProperties.AutomationId="Target.Location" Header="リージョン" Text="{x:Bind ViewModel.Target.Location, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="480" HorizontalAlignment="Left" />
+                        <TextBlock AutomationProperties.AutomationId="Target.TargetError" Foreground="{ThemeResource SystemFillColorCautionBrush}" Text="{x:Bind ViewModel.Target.TargetError, Mode=OneWay}" />
                         <ComboBox AutomationProperties.AutomationId="Settings.DbType" Header="DB 種別" ItemsSource="{x:Bind vm:SettingsViewModel.DbTypes}"
                                   SelectedItem="{x:Bind ViewModel.Settings.DbType, Mode=OneWay}" SelectionChanged="OnDbTypeChanged" Width="240" />
                         <TextBox AutomationProperties.AutomationId="Settings.DbName" Header="DB 名" Text="{x:Bind ViewModel.Settings.DbName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="480" HorizontalAlignment="Left" />
@@ -187,7 +211,11 @@
                     <!-- 状態の確認 -->
                     <StackPanel x:Name="StatusPanel" Spacing="12" MaxWidth="900" HorizontalAlignment="Left" Visibility="Collapsed">
                         <TextBlock AutomationProperties.AutomationId="Panel.Status" Style="{StaticResource SubtitleTextBlockStyle}" Text="状態の確認" />
-                        <Button AutomationProperties.AutomationId="Status.Refresh" Content="読み込む" Command="{x:Bind ViewModel.Status.RefreshCommand}" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button AutomationProperties.AutomationId="Status.Refresh" Content="読み込む" Command="{x:Bind ViewModel.Status.RefreshCommand}" />
+                            <Button AutomationProperties.AutomationId="Status.Copy" Content="Markdown でコピー" Command="{x:Bind ViewModel.Status.CopyCommand}" />
+                        </StackPanel>
+                        <TextBlock AutomationProperties.AutomationId="Status.Message" Text="{x:Bind ViewModel.Status.Message, Mode=OneWay}" />
                         <StackPanel Orientation="Horizontal" Spacing="8" Visibility="{x:Bind ViewModel.Status.Busy.IsBusy, Mode=OneWay}"><ProgressRing IsActive="{x:Bind ViewModel.Status.Busy.IsBusy, Mode=OneWay}" Width="20" Height="20" /><TextBlock AutomationProperties.AutomationId="Status.Busy" VerticalAlignment="Center" Text="{x:Bind ViewModel.Status.Busy.Text, Mode=OneWay}" /></StackPanel>
                         <InfoBar AutomationProperties.AutomationId="Status.Error" AutomationProperties.Name="{x:Bind ViewModel.Status.Error, Mode=OneWay}" Severity="Error" IsOpen="True" IsClosable="False" Message="{x:Bind ViewModel.Status.Error, Mode=OneWay}"
                                  Visibility="{x:Bind ViewModel.Status.HasError, Mode=OneWay}" />
@@ -302,7 +330,11 @@
                         <CheckBox AutomationProperties.AutomationId="Delete.IncludeUntagged" Content="管理タグの無いものも対象にする" IsChecked="{x:Bind ViewModel.Deletion.IncludeUntagged, Mode=TwoWay}" />
                         <CheckBox AutomationProperties.AutomationId="Delete.KeepDbData" Content="DB のデータを残す（ストレージアカウントを削除しない。料金がかかり続けます）" IsChecked="{x:Bind ViewModel.Deletion.KeepDbData, Mode=TwoWay}" />
                         <CheckBox AutomationProperties.AutomationId="Delete.DeleteResourceGroup" Content="リソースグループも削除する（本ツールのリソースを削除した後に、中が空になる場合だけ。元に戻せません）" IsChecked="{x:Bind ViewModel.Deletion.DeleteResourceGroup, Mode=TwoWay}" />
-                        <Button AutomationProperties.AutomationId="Delete.Plan" Content="計画" Command="{x:Bind ViewModel.Deletion.PlanCommand}" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button AutomationProperties.AutomationId="Delete.Plan" Content="計画" Command="{x:Bind ViewModel.Deletion.PlanCommand}" />
+                            <Button AutomationProperties.AutomationId="Delete.CopyPlan" Content="計画を Markdown でコピー" Command="{x:Bind ViewModel.Deletion.CopyPlanCommand}" />
+                        </StackPanel>
+                        <TextBlock AutomationProperties.AutomationId="Delete.Message" Text="{x:Bind ViewModel.Deletion.Message, Mode=OneWay}" />
                         <StackPanel Orientation="Horizontal" Spacing="8" Visibility="{x:Bind ViewModel.Deletion.Busy.IsBusy, Mode=OneWay}"><ProgressRing IsActive="{x:Bind ViewModel.Deletion.Busy.IsBusy, Mode=OneWay}" Width="20" Height="20" /><TextBlock AutomationProperties.AutomationId="Delete.Busy" VerticalAlignment="Center" Text="{x:Bind ViewModel.Deletion.Busy.Text, Mode=OneWay}" /></StackPanel>
                         <InfoBar AutomationProperties.AutomationId="Delete.Error" AutomationProperties.Name="{x:Bind ViewModel.Deletion.Error, Mode=OneWay}" Severity="Error" IsOpen="True" IsClosable="False" Message="{x:Bind ViewModel.Deletion.Error, Mode=OneWay}"
                                  Visibility="{x:Bind ViewModel.Deletion.HasError, Mode=OneWay}" />
@@ -320,7 +352,10 @@
                             <ItemsControl ItemsSource="{x:Bind ViewModel.Deletion.Warnings}" Foreground="{ThemeResource SystemFillColorCautionBrush}" ItemTemplate="{StaticResource LineTemplate}" />
                             <StackPanel Spacing="8" Visibility="{x:Bind ViewModel.Deletion.NeedsAppNameConfirmation, Mode=OneWay}">
                                 <StackPanel Orientation="Horizontal"><TextBlock Text="確認のため、アプリ名「" /><TextBlock Text="{x:Bind ViewModel.Deletion.AppNameToConfirm, Mode=OneWay}" /><TextBlock Text="」を入力してください。" /></StackPanel>
-                                <TextBox AutomationProperties.AutomationId="Delete.ConfirmAppName" Text="{x:Bind ViewModel.Deletion.ConfirmAppName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="320" HorizontalAlignment="Left" />
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBox AutomationProperties.AutomationId="Delete.ConfirmAppName" Text="{x:Bind ViewModel.Deletion.ConfirmAppName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="320" HorizontalAlignment="Left" />
+                                    <Button AutomationProperties.AutomationId="Delete.CopyAppName" Content="アプリ名をコピー" Command="{x:Bind ViewModel.Deletion.CopyAppNameCommand}" />
+                                </StackPanel>
                                 <Button AutomationProperties.AutomationId="Delete.Start" Content="今すぐ削除" Command="{x:Bind ViewModel.Deletion.StartCommand}" Style="{StaticResource AccentButtonStyle}" />
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <DatePicker AutomationProperties.AutomationId="Delete.ScheduleDate" Header="予定の日付" Date="{x:Bind ViewModel.Deletion.Schedule.Date, Mode=TwoWay}" />

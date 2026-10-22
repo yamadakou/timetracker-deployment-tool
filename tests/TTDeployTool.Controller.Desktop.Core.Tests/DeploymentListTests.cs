@@ -307,7 +307,7 @@ public class DeploymentListViewModelTests
         await row.DeleteCommand.ExecuteAsync();
         await row.CheckStatusCommand.ExecuteAsync();
 
-        h.Navigations.Should().Equal("target", "delete", "status");
+        h.Navigations.Should().Equal("settings", "delete", "status");
         h.Main.Status.Summary.Should().Be("Container Apps Environment demo-env（japaneast、Succeeded）");
         h.Main.Deployments.Error.Should().BeNull();
     }

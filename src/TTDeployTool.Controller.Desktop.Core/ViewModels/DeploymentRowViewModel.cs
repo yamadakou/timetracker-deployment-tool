@@ -48,7 +48,7 @@ public sealed class DeploymentRowViewModel : ObservableObject
             _owner.Open(Url!);
             return Task.CompletedTask;
         }, () => Url != null);
-        UseAsTargetCommand = new AsyncCommand(() => _owner.UseAsTargetAsync(_entry, "target"));
+        UseAsTargetCommand = new AsyncCommand(() => _owner.UseAsTargetAsync(_entry, "settings"));
         CheckStatusCommand = new AsyncCommand(() => _owner.UseAsTargetAsync(_entry, "status"));
         DeleteCommand = new AsyncCommand(() => _owner.UseAsTargetAsync(_entry, "delete"));
         ShowPasswordsCommand = new AsyncCommand(() => Busy.RunAsync("パスワードを読んでいます", ReadPasswordsAsync), () => _entry.Timetracker != null);
@@ -66,7 +66,7 @@ public sealed class DeploymentRowViewModel : ObservableObject
 
     public AsyncCommand OpenCommand { get; }
 
-    /// <summary>「サインインと対象」に入れる（再デプロイのため）。</summary>
+    /// <summary>対象に入れて、「設定」を開く（再デプロイのため。対象の入力は「設定」にある）。</summary>
     public AsyncCommand UseAsTargetCommand { get; }
 
     /// <summary>対象に入れて、状態の確認の画面で読む。</summary>

@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
 using TTDeployTool.Controller.Desktop.Core.Mvvm;
+using TTDeployTool.Controller.Desktop.Core.Services;
 using TTDeployTool.Domain.Deployment;
 
 namespace TTDeployTool.Controller.Desktop.Core.ViewModels;
@@ -54,6 +55,13 @@ public sealed class SettingsViewModel : ObservableObject
 
     private readonly TargetViewModel _target;
     private readonly TimeProvider _time;
+    private readonly IAppPreferences _preferences;
+    private readonly IDialogService? _dialogs;
+    private readonly IClipboardService? _clipboard;
+    private bool _includePasswordsInCopy;
+    private string _templateName = "";
+    private DeploymentTemplate? _selectedTemplate;
+    private string? _message;
     private ExpiryOption _expiry = ExpiryOptions[0];
     private DateTimeOffset _expiryDate;
     private string _dbType = DeployOptionsResolver.DefaultDbType;
@@ -70,13 +78,77 @@ public sealed class SettingsViewModel : ObservableObject
     private PersistDbOption _persistDb = PersistDbOptions[0];
 
     /// <param name="time">利用可能期限日の既定と、今日より前かを決める時刻と時刻帯（省略時はシステムの時刻）</param>
-    public SettingsViewModel(TargetViewModel target, TimeProvider? time = null)
+    /// <param name="preferences">テンプレートの保存先（省略時は保存しない）</param>
+    /// <param name="dialogs">上書き・初期値に戻す前の確認（省略時は確認せずに行う）</param>
+    /// <param name="clipboard">Markdown のコピー先（省略時はコピーできない）</param>
+    public SettingsViewModel(
+        TargetViewModel target, TimeProvider? time = null, IAppPreferences? preferences = null, IDialogService? dialogs = null, IClipboardService? clipboard = null)
     {
         _target = target;
         _time = time ?? TimeProvider.System;
+        _preferences = preferences ?? new InMemoryAppPreferences();
+        _dialogs = dialogs;
+        _clipboard = clipboard;
         _expiryDate = DefaultExpiryDate();
+        foreach (var template in _preferences.Templates.OrderBy(t => t.Name, StringComparer.CurrentCulture))
+            Templates.Add(template);
+        CopyMarkdownCommand = new AsyncCommand(CopyMarkdownAsync, () => _clipboard != null);
+        SaveTemplateCommand = new AsyncCommand(SaveTemplateAsync, () => TemplateName.Length > 0);
+        ApplyTemplateCommand = new AsyncCommand(ApplyTemplateAsync, () => SelectedTemplate != null);
+        DeleteTemplateCommand = new AsyncCommand(DeleteTemplateAsync, () => SelectedTemplate != null);
+        ResetCommand = new AsyncCommand(ResetAsync);
         _target.Changed += (_, _) => Validate();
         Validate();
+    }
+
+    /// <summary>設定を Markdown の表にしてコピーする（パスワードは <see cref="IncludePasswordsInCopy"/> のときだけ値を出す）。</summary>
+    public AsyncCommand CopyMarkdownCommand { get; }
+
+    /// <summary>今の入力を、<see cref="TemplateName"/> の名前でテンプレートとして保存する（同じ名前があれば確認して上書きする）。</summary>
+    public AsyncCommand SaveTemplateCommand { get; }
+
+    /// <summary>選んだテンプレートを入力に入れる（パスワードは変えない）。</summary>
+    public AsyncCommand ApplyTemplateCommand { get; }
+
+    public AsyncCommand DeleteTemplateCommand { get; }
+
+    /// <summary>確認してから、対象（サブスクリプションの選択を除く）と設定を起動したときの値に戻す。</summary>
+    public AsyncCommand ResetCommand { get; }
+
+    /// <summary>Markdown のコピーにパスワードの値を含めるか（既定は伏せ字）。</summary>
+    public bool IncludePasswordsInCopy { get => _includePasswordsInCopy; set => SetProperty(ref _includePasswordsInCopy, value); }
+
+    /// <summary>保存したテンプレート（名前の順）。</summary>
+    public ObservableCollection<DeploymentTemplate> Templates { get; } = [];
+
+    /// <summary>保存するテンプレートの名前（前後の空白は除く）。</summary>
+    public string TemplateName
+    {
+        get => _templateName;
+        set
+        {
+            if (SetProperty(ref _templateName, value.Trim()))
+                SaveTemplateCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    public DeploymentTemplate? SelectedTemplate
+    {
+        get => _selectedTemplate;
+        set
+        {
+            if (!SetProperty(ref _selectedTemplate, value))
+                return;
+            ApplyTemplateCommand.RaiseCanExecuteChanged();
+            DeleteTemplateCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    /// <summary>コピー・テンプレート・初期値に戻すの結果。</summary>
+    public string? Message
+    {
+        get => _message;
+        private set => SetProperty(ref _message, value);
     }
 
     public string DbType { get => _dbType; set => Set(ref _dbType, value); }
@@ -189,6 +261,137 @@ public sealed class SettingsViewModel : ObservableObject
         return new DeploymentInput(errors.Count == 0 ? options : null, errors, warnings);
     }
 
+    /// <summary>設定の Markdown（パスワードは <paramref name="includePasswords"/> のときだけ値を出し、ほかは伏せ字）。</summary>
+    public string ToMarkdown(bool includePasswords)
+    {
+        string Password(string value) => value.Length == 0 ? "（未入力）" : includePasswords ? value : "********（入力済み）";
+        string? expiry = Expiry.Mode switch
+        {
+            ExpiryMode.Date => ExpiryDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + "（期限日の終わり）",
+            ExpiryMode.None => "期限なし",
+            _ => Expiry.Label,
+        };
+        var appName = _target.AppName.ToLowerInvariant();
+        var rows = new List<IReadOnlyList<string?>>
+        {
+            new[] { "サブスクリプション", _target.SelectedSubscription?.Display ?? "（未選択）" },
+            new[] { "リソースグループ", _target.ResourceGroup.Length == 0 ? "（未入力）" : _target.ResourceGroup },
+            new[] { "アプリ名", _target.AppName },
+            new[] { "リージョン", _target.Location },
+            new[] { "DB 種別", DbType },
+            new[] { "DB 名", DbName },
+            new[] { "Timetracker のイメージのタグ", TtTag.Length == 0 ? $"{DefaultTag}（既定）" : TtTag },
+            new[] { "DB のパスワード", Password(DbPassword) },
+            new[] { "Timetracker のパスワード", Password(TrackerPassword) },
+            new[] { "Timetracker の CPU / メモリ", $"{TtCpu} vCPU / {TtMemoryGi} Gi" },
+            new[] { "DB の CPU / メモリ", $"{DbCpu} vCPU / {DbMemoryGi} Gi" },
+            new[] { "Redis の CPU / メモリ", $"{RedisCpu} vCPU / {RedisMemoryGi} Gi" },
+            new[] { "DB のデータの永続化", PersistDb.Label },
+            new[] { "利用可能期限日", expiry },
+            new[] { "作るリソース", string.Join("、", ResourceNaming.Environment(appName), ResourceNaming.TimetrackerApp(appName), ResourceNaming.DbApp(appName), ResourceNaming.RedisApp(appName)) },
+        };
+        return MarkdownText.Document("TTDeployTool のデプロイの設定",
+            (null, MarkdownText.Table(["項目", "値"], rows)),
+            ("誤り", MarkdownText.Bullets(Errors)),
+            ("警告", MarkdownText.Bullets(Warnings)));
+    }
+
+    // 今の入力のテンプレート（パスワードは含めない）
+    private DeploymentTemplate Snapshot(string name) => new(
+        name, _target.SelectedSubscription?.SubscriptionId, _target.ResourceGroup, _target.AppName, _target.Location,
+        DbType, DbName, TtTag, TtCpu, TtMemoryGi, DbCpu, DbMemoryGi, RedisCpu, RedisMemoryGi, PersistDb.Value, Expiry.Mode,
+        Expiry.Mode == ExpiryMode.Date ? ExpiryDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : null);
+
+    private Task CopyMarkdownAsync()
+    {
+        _clipboard!.CopyText(ToMarkdown(IncludePasswordsInCopy));
+        Message = IncludePasswordsInCopy
+            ? "設定を Markdown でコピーしました（パスワードを含みます。クリップボードの履歴には残しません）。"
+            : "設定を Markdown でコピーしました（パスワードは伏せ字です）。";
+        return Task.CompletedTask;
+    }
+
+    private async Task SaveTemplateAsync()
+    {
+        var name = TemplateName;
+        var existing = Templates.FirstOrDefault(t => string.Equals(t.Name, name, StringComparison.CurrentCultureIgnoreCase));
+        if (existing != null && _dialogs != null
+            && !await _dialogs.ConfirmAsync("テンプレートを上書きしますか？", $"テンプレート「{existing.Name}」を、今の入力で上書きします。", "上書きする"))
+            return;
+        var template = Snapshot(name);
+        var all = Templates.Where(t => t != existing).Append(template).OrderBy(t => t.Name, StringComparer.CurrentCulture).ToList();
+        _preferences.Templates = all;
+        Templates.Clear();
+        foreach (var t in all)
+            Templates.Add(t);
+        SelectedTemplate = template;
+        Message = $"テンプレート「{name}」を保存しました（パスワードは保存しません）。";
+    }
+
+    private Task ApplyTemplateAsync()
+    {
+        var t = SelectedTemplate!;
+        var notes = new List<string>();
+        if (t.SubscriptionId != null && !string.Equals(t.SubscriptionId, _target.SelectedSubscription?.SubscriptionId, StringComparison.OrdinalIgnoreCase)
+            && !_target.Select(t.SubscriptionId, t.ResourceGroup, t.AppName))
+            notes.Add($"サブスクリプション {t.SubscriptionId} が一覧に無いため、サブスクリプションは変えていません（サインインし、サブスクリプションを読んでください）。");
+        _target.ResourceGroup = t.ResourceGroup;
+        _target.AppName = t.AppName;
+        _target.Location = t.Location;
+        DbType = t.DbType;
+        DbName = t.DbName;
+        TtTag = t.TtTag;
+        TtCpu = t.TtCpu;
+        TtMemoryGi = t.TtMemoryGi;
+        DbCpu = t.DbCpu;
+        DbMemoryGi = t.DbMemoryGi;
+        RedisCpu = t.RedisCpu;
+        RedisMemoryGi = t.RedisMemoryGi;
+        PersistDb = PersistDbOptions.First(o => o.Value == t.PersistDb);
+        Expiry = ExpiryOptions.First(o => o.Mode == t.Expiry);
+        if (t.ExpiryDate != null && DateOnly.TryParseExact(t.ExpiryDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
+            ExpiryDate = Midnight(date);
+        Message = string.Join(" ", new[] { $"テンプレート「{t.Name}」を入力しました（パスワードはそのままです）。" }.Concat(notes));
+        return Task.CompletedTask;
+    }
+
+    private async Task DeleteTemplateAsync()
+    {
+        var t = SelectedTemplate!;
+        if (_dialogs != null && !await _dialogs.ConfirmAsync("テンプレートを削除しますか？", $"テンプレート「{t.Name}」を削除します。", "削除する"))
+            return;
+        Templates.Remove(t);
+        _preferences.Templates = Templates.ToList();
+        SelectedTemplate = null;
+        Message = $"テンプレート「{t.Name}」を削除しました。";
+    }
+
+    private async Task ResetAsync()
+    {
+        if (_dialogs != null && !await _dialogs.ConfirmAsync(
+                "初期値に戻しますか？", "リソースグループ・アプリ名・リージョン・パスワードを含め、入力を起動したときの値に戻します（サブスクリプションの選択は変えません）。", "初期値に戻す"))
+            return;
+        _target.ResourceGroup = "";
+        _target.AppName = Defaults.DefaultAppName;
+        _target.Location = Defaults.DefaultLocation;
+        DbType = DeployOptionsResolver.DefaultDbType;
+        DbName = Defaults.DbName;
+        TtTag = "";
+        DbPassword = "";
+        TrackerPassword = "";
+        TtCpu = Format(Defaults.TimetrackerCpu);
+        TtMemoryGi = Format(Defaults.TimetrackerMemoryGi);
+        DbCpu = Format(Defaults.DbCpu);
+        DbMemoryGi = Format(Defaults.DbMemoryGi);
+        RedisCpu = Format(Defaults.RedisCpu);
+        RedisMemoryGi = Format(Defaults.RedisMemoryGi);
+        PersistDb = PersistDbOptions[0];
+        Expiry = ExpiryOptions[0];
+        ExpiryDate = DefaultExpiryDate();
+        IncludePasswordsInCopy = false;
+        Message = "初期値に戻しました。";
+    }
+
     private void Validate()
     {
         var input = Build(ValidationTarget.Azure);
@@ -215,10 +418,12 @@ public sealed class SettingsViewModel : ObservableObject
     }
 
     // 既定の期限日（今日から 32 日後）を、日付の入力の初期値にする
-    private DateTimeOffset DefaultExpiryDate()
+    private DateTimeOffset DefaultExpiryDate() => Midnight(DeploymentExpiry.Today(_time.GetUtcNow(), _time.LocalTimeZone).AddDays(DeploymentExpiry.DefaultDays));
+
+    private DateTimeOffset Midnight(DateOnly date)
     {
-        var date = DeploymentExpiry.Today(_time.GetUtcNow(), _time.LocalTimeZone).AddDays(DeploymentExpiry.DefaultDays).ToDateTime(TimeOnly.MinValue);
-        return new DateTimeOffset(date, _time.LocalTimeZone.GetUtcOffset(date));
+        var local = date.ToDateTime(TimeOnly.MinValue);
+        return new DateTimeOffset(local, _time.LocalTimeZone.GetUtcOffset(local));
     }
 
     private static string Format(double value) => value.ToString("0.0##", CultureInfo.InvariantCulture);

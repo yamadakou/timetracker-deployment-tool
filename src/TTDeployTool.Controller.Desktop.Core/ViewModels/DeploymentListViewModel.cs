@@ -101,7 +101,7 @@ public sealed class DeploymentListViewModel : ObservableObject
     private int _pageIndex;
     private int _filteredCount;
 
-    /// <param name="navigate">画面を切り替える（「サインインと対象」「状態の確認」「削除」の名前: target・status・delete）</param>
+    /// <param name="navigate">画面を切り替える（「設定」「状態の確認」「削除」の名前: settings・status・delete）</param>
     public DeploymentListViewModel(
         TargetViewModel target, StatusViewModel status, JobQueue queue, IDeploymentLogger deploymentLogger, ILogger logger, TimeProvider time,
         ISystemLauncher launcher, IClipboardService? clipboard, Action<string> navigate)
@@ -218,7 +218,7 @@ public sealed class DeploymentListViewModel : ObservableObject
 
     internal void Copy(string text) => _clipboard!.CopyText(text);
 
-    /// <summary>行の操作: 対象に入れて、画面を切り替える（<paramref name="page"/> は target・status・delete）。</summary>
+    /// <summary>行の操作: 対象に入れて、画面を切り替える（<paramref name="page"/> は settings・status・delete）。</summary>
     internal async Task UseAsTargetAsync(DeploymentEntry entry, string page)
     {
         if (!_target.Select(entry.SubscriptionId, entry.ResourceGroup, entry.AppName))

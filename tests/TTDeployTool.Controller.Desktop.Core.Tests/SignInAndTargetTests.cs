@@ -222,7 +222,7 @@ public class TargetViewModelTests
         vm.ResourceGroup = "rg";
 
         changed.Should().Be(1);
-        changes.Names.Should().Equal("ResourceGroup", "Subscription", "TargetError");
+        changes.Names.Should().Equal("ResourceGroup", "Subscription", "SubscriptionDisplay", "TargetError");
     }
 
     [Fact]

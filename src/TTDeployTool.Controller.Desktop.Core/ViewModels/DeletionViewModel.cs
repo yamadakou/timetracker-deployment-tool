@@ -5,6 +5,7 @@ using TTDeployTool.Application.Permissions;
 using TTDeployTool.Application.Workflows;
 using TTDeployTool.Controller.Desktop.Core.Jobs;
 using TTDeployTool.Controller.Desktop.Core.Mvvm;
+using TTDeployTool.Controller.Desktop.Core.Services;
 
 namespace TTDeployTool.Controller.Desktop.Core.ViewModels;
 
@@ -35,11 +36,19 @@ public sealed class DeletionViewModel : ObservableObject
     private string _confirmAppName = "";
     private string? _error;
     private string? _note;
+    private string? _message;
+    private readonly IClipboardService? _clipboard;
 
     /// <param name="queue">ジョブの順番待ち（同じ対象のジョブがあれば、計画・登録しない）</param>
     /// <param name="registered">登録したジョブを画面に表示する</param>
-    public DeletionViewModel(DeletionWorkflow workflow, TargetViewModel target, JobQueue queue, Action<JobViewModel> registered, TimeProvider time)
+    /// <param name="clipboard">計画とアプリ名のコピー先（省略時はコピーできない）</param>
+    public DeletionViewModel(
+        DeletionWorkflow workflow, TargetViewModel target, JobQueue queue, Action<JobViewModel> registered, TimeProvider time, IClipboardService? clipboard = null)
     {
+        _clipboard = clipboard;
+        CopyPlanCommand = new AsyncCommand(() => Copy(ToMarkdown()!, "削除の計画を Markdown でコピーしました。"), () => _clipboard != null && HasPlan);
+        CopyAppNameCommand = new AsyncCommand(
+            () => Copy(AppNameToConfirm!, $"アプリ名 {AppNameToConfirm} をコピーしました。"), () => _clipboard != null && AppNameToConfirm != null);
         _workflow = workflow;
         _target = target;
         _queue = queue;
@@ -52,6 +61,29 @@ public sealed class DeletionViewModel : ObservableObject
     }
 
     public AsyncCommand PlanCommand { get; }
+
+    /// <summary>計画を Markdown でコピーする。</summary>
+    public AsyncCommand CopyPlanCommand { get; }
+
+    /// <summary>確認に入力するアプリ名をコピーする（Azure portal の削除の確認と同じ）。</summary>
+    public AsyncCommand CopyAppNameCommand { get; }
+
+    /// <summary>コピーの結果。</summary>
+    public string? Message
+    {
+        get => _message;
+        private set => SetProperty(ref _message, value);
+    }
+
+    /// <summary>計画の Markdown（計画が無ければ null）。</summary>
+    public string? ToMarkdown() => _ticket == null
+        ? null
+        : MarkdownText.Document($"TTDeployTool の削除の計画（{_ticket.Plan.ResourceGroup} / {_ticket.Plan.AppName}）",
+            (null, MarkdownText.Table(["操作", "名前", "種類", "理由"], Targets.Select(t => new[] { t.Decision, t.Name, t.Resource, t.Reason }))),
+            ("実行できない理由", MarkdownText.Bullets(Blockers)),
+            ("警告", MarkdownText.Bullets(Warnings)),
+            ("残すもの", KeptText),
+            ("注意", Note));
 
     /// <summary>計画の処理中の表示。</summary>
     public BusyState Busy { get; } = new();
@@ -196,6 +228,9 @@ public sealed class DeletionViewModel : ObservableObject
                 if (!plan.HasDeletions)
                     Note = "削除するリソースはありません。";
             }
+            Message = null;
+            CopyPlanCommand.RaiseCanExecuteChanged();
+            CopyAppNameCommand.RaiseCanExecuteChanged();
             OnPropertyChanged(nameof(HasPlan));
             OnPropertyChanged(nameof(AppNameToConfirm));
             OnPropertyChanged(nameof(NeedsAppNameConfirmation));
@@ -291,5 +326,12 @@ public sealed class DeletionViewModel : ObservableObject
                 throw new WorkflowException(WorkflowFailure.Changed);
             return await _workflow.StartAsync(fresh.Saved!.PlanId, confirmedAppName, _ => session, KeptNotice);
         }
+    }
+
+    private Task Copy(string text, string message)
+    {
+        _clipboard!.CopyText(text);
+        Message = message;
+        return Task.CompletedTask;
     }
 }

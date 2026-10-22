@@ -3,6 +3,7 @@ using System.Globalization;
 using TTDeployTool.Application.Deployment;
 using TTDeployTool.Common;
 using TTDeployTool.Controller.Desktop.Core.Mvvm;
+using TTDeployTool.Controller.Desktop.Core.Services;
 using TTDeployTool.Domain.Deployment;
 using TTDeployTool.Infrastructure.Azure;
 
@@ -20,18 +21,46 @@ public sealed class StatusViewModel : ObservableObject
     private DeploymentInfo? _info;
     private string? _error;
     private string? _note;
+    private string? _message;
+    private readonly IClipboardService? _clipboard;
 
     /// <param name="targetHasRunningJob">対象のデプロイ・削除が実行中か（実行中なら、まだ反映されていない場合がある旨を添える）</param>
-    public StatusViewModel(TargetViewModel target, IDeploymentLogger logger, Func<bool> targetHasRunningJob)
+    /// <param name="clipboard">読んだ内容のコピー先（省略時はコピーできない）</param>
+    public StatusViewModel(TargetViewModel target, IDeploymentLogger logger, Func<bool> targetHasRunningJob, IClipboardService? clipboard = null)
     {
         _target = target;
         _logger = logger;
         _targetHasRunningJob = targetHasRunningJob;
+        _clipboard = clipboard;
         RefreshCommand = new AsyncCommand(() => Busy.RunAsync("状態を読んでいます", RefreshAsync));
+        CopyCommand = new AsyncCommand(() =>
+        {
+            _clipboard!.CopyText(ToMarkdown()!);
+            Message = "状態を Markdown でコピーしました。";
+            return Task.CompletedTask;
+        }, () => _clipboard != null && _info != null);
         _target.Changed += (_, _) => Info = null;
     }
 
     public AsyncCommand RefreshCommand { get; }
+
+    /// <summary>読んだ内容を Markdown でコピーする。</summary>
+    public AsyncCommand CopyCommand { get; }
+
+    /// <summary>コピーの結果。</summary>
+    public string? Message
+    {
+        get => _message;
+        private set => SetProperty(ref _message, value);
+    }
+
+    /// <summary>読んだ内容の Markdown（読んでいなければ null）。</summary>
+    public string? ToMarkdown() => _info == null
+        ? null
+        : MarkdownText.Document($"TTDeployTool の状態の確認（{_info.ResourceGroup} / {_info.AppName}）",
+            (null, MarkdownText.Bullets([$"サブスクリプション: {_info.Subscription}", Summary, Endpoint?.ToString(), PersistenceText, Note])),
+            ("Container Apps", Apps.Count == 0 ? null : MarkdownText.Table(["役割", "名前", "状態", "イメージ", "CPU / メモリ", "リビジョン", "管理タグ"],
+                Apps.Select(a => new[] { a.Role, a.Name, a.State, a.Image, a.Resources, a.Revision, a.Managed ? "あり" : "なし" }))));
 
     /// <summary>状態の確認の処理中の表示。</summary>
     public BusyState Busy { get; } = new();
@@ -91,6 +120,8 @@ public sealed class StatusViewModel : ObservableObject
             OnPropertyChanged(nameof(Endpoint));
             OnPropertyChanged(nameof(HasEndpoint));
             OnPropertyChanged(nameof(PersistenceText));
+            Message = null;
+            CopyCommand.RaiseCanExecuteChanged();
         }
     }
 

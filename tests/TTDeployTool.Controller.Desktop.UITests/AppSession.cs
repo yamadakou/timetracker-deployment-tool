@@ -153,6 +153,9 @@ public sealed class AppSession : IDisposable
             toggle.Toggle();
     }
 
+    /// <summary>入力欄（TextBox）の値。</summary>
+    public string ValueOf(string automationId) => Find(automationId).Patterns.Value.Pattern.Value.Value ?? "";
+
     /// <summary>要素とその中の文字列（TextBlock の表示、ItemsControl の各行、InfoBar のメッセージ）をつなげて返す。</summary>
     public string TextOf(string automationId)
     {

@@ -42,7 +42,10 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         _dialogs = dialogs;
         _notifications = notifications;
         Queue = new JobQueue(time, pollInterval ?? JobViewModel.DefaultPollInterval, ScheduleCheckInterval,
-            preferences ?? new InMemoryAppPreferences(), loggers.CreateLogger("TTDeployTool.Desktop.Jobs"));
+            preferences ?? new InMemoryAppPreferences(), loggers.CreateLogger("TTDeployTool.Desktop.Jobs"))
+        {
+            Clipboard = clipboard,
+        };
         Queue.Finished += NotifyFinished;
         Queue.PropertyChanged += (_, e) =>
         {
@@ -67,11 +70,11 @@ public sealed class MainViewModel : ObservableObject, IDisposable
                 Deployments.Clear();
             }
         }, loggers.CreateLogger("TTDeployTool.Desktop.SignIn"));
-        Settings = new SettingsViewModel(Target, time);
+        Settings = new SettingsViewModel(Target, time, preferences, dialogs, clipboard);
         Deployment = new DeploymentViewModel(new DeploymentWorkflow(plans, jobs, caller, logger, time), Target, Settings, Queue, Show, time);
-        Deletion = new DeletionViewModel(new DeletionWorkflow(plans, jobs, caller, logger, time), Target, Queue, Show, time);
+        Deletion = new DeletionViewModel(new DeletionWorkflow(plans, jobs, caller, logger, time), Target, Queue, Show, time, clipboard);
         Status = new StatusViewModel(Target, logger,
-            () => Queue.ActiveFor(Target.Subscription, Target.ResourceGroup, Target.AppName.ToLowerInvariant())?.IsRunning == true);
+            () => Queue.ActiveFor(Target.Subscription, Target.ResourceGroup, Target.AppName.ToLowerInvariant())?.IsRunning == true, clipboard);
         DryRun = new DryRunViewModel(Settings, dialogs, launcher);
         Deployments = new DeploymentListViewModel(Target, Status, Queue, logger, loggers.CreateLogger("TTDeployTool.Desktop.Deployments"), time,
             launcher, clipboard, page => NavigationRequested?.Invoke(page));
@@ -110,7 +113,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     /// <summary>デプロイの一覧（Azure から集める）。</summary>
     public DeploymentListViewModel Deployments { get; }
 
-    /// <summary>画面を切り替える要求（デプロイの一覧の行の操作。名前は画面の項目のタグ: target・status・delete）。</summary>
+    /// <summary>画面を切り替える要求（デプロイの一覧の行の操作。名前は画面の項目のタグ: settings・status・delete）。</summary>
     public event Action<string>? NavigationRequested;
 
     /// <summary>診断用のログのフォルダー（ファイルに書かない場合は null）。</summary>

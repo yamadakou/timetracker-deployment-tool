@@ -54,6 +54,8 @@ public class AzureUiTests
             items.Should().OnlyHaveUniqueItems();
             app.SelectedOf("Target.Subscription").Should().Contain(subscription);
 
+            // 7e: リソースグループ・アプリ名・リージョンは「設定」で入力する
+            app.Show("Settings");
             app.SetText("Target.ResourceGroup", resourceGroup!);
             app.SetText("Target.AppName", appName);
             app.SetText("Target.Location", location);
@@ -145,7 +147,7 @@ public class AzureUiTests
 
             // 7b: 別の対象を予定に追加し、上部の帯からジョブの画面に移って取り消す
             var second = appName + "b";
-            app.Show("Target");
+            app.Show("Settings");
             app.SetText("Target.AppName", second);
             app.WaitForText("Target.TargetError", t => t.Length == 0, "対象の誤りが無い");
             app.Show("Deploy");
@@ -202,7 +204,7 @@ public class AzureUiTests
 
             foreach (var name in new[] { second, appName })
             {
-                app.Show("Target");
+                app.Show("Settings");
                 app.SetText("Target.AppName", name);
                 app.Show("Status");
                 app.Invoke("Status.Refresh");

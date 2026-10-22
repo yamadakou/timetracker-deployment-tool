@@ -102,8 +102,37 @@ public class CiUiTests
         app.TextOf("SignIn.Account").Should().StartWith("サインインしていません");
         app.IsEnabled("SignIn.SignIn").Should().BeTrue();
         app.IsEnabled("SignIn.SignOut").Should().BeFalse();
+        // 7e: 対象の入力は「設定」にある
+        app.Exists("Target.ResourceGroup").Should().BeFalse("「サインインと対象」には対象の入力を出さない");
+        app.Show("Settings");
+        app.TextOf("Settings.Subscription").Should().Contain("「サインインと対象」で選んでください");
         app.TextOf("Target.TargetError").Should().Contain("サブスクリプションを選んでください。");
     });
+
+    [Fact]
+    public void A_Template_Should_Be_Saved_And_Applied_After_A_Restart()
+    {
+        var name = "UI テスト " + Guid.NewGuid().ToString("N")[..6];
+        AppSession.Run(app =>
+        {
+            app.Show("Settings");
+            app.SetText("Target.ResourceGroup", "rg-template");
+            app.SetText("Settings.DbName", "uitemplate");
+            app.SetText("Settings.TemplateName", name);
+            app.Invoke("Settings.SaveTemplate");
+            app.WaitForText("Settings.Message", t => t.Contains($"テンプレート「{name}」を保存しました"), "テンプレートを保存できる");
+            app.IsEnabled("Settings.CopyMarkdown").Should().BeTrue();
+        }, "A_Template_Should_Be_Saved_And_Applied_After_A_Restart_1");
+        AppSession.Run(app =>
+        {
+            app.Show("Settings");
+            app.ValueOf("Settings.DbName").Should().Be("timetracker", "起動したときは既定の値");
+            app.Select("Settings.Template", name);
+            app.Invoke("Settings.ApplyTemplate");
+            AppSession.WaitUntil(() => app.ValueOf("Settings.DbName") == "uitemplate", "テンプレートの値が入る");
+            app.ValueOf("Target.ResourceGroup").Should().Be("rg-template");
+        }, "A_Template_Should_Be_Saved_And_Applied_After_A_Restart_2");
+    }
 
     [Fact]
     public void Settings_Should_Be_Validated_While_Typing() => AppSession.Run(app =>

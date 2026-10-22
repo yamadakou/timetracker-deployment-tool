@@ -86,6 +86,9 @@ public sealed class TargetViewModel : ObservableObject
 
     public string Subscription => SelectedSubscription?.SubscriptionId ?? "";
 
+    /// <summary>選んだサブスクリプションの表示（「設定」の対象の欄）。</summary>
+    public string SubscriptionDisplay => SelectedSubscription?.Display ?? "サブスクリプション: 「サインインと対象」で選んでください。";
+
     /// <summary>アプリ名の誤り（削除と状態の確認で、Azure を読む前に確かめる）。</summary>
     public string? TargetError =>
         SelectedSubscription == null ? "サブスクリプションを選んでください。"
@@ -200,6 +203,7 @@ public sealed class TargetViewModel : ObservableObject
         if (!SetProperty(ref field, value, propertyName))
             return;
         OnPropertyChanged(nameof(Subscription));
+        OnPropertyChanged(nameof(SubscriptionDisplay));
         OnPropertyChanged(nameof(TargetError));
         Changed?.Invoke(this, EventArgs.Empty);
     }

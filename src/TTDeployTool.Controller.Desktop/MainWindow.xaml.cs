@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Imaging;
 using TTDeployTool.Controller.Desktop.Core.Jobs;
 using TTDeployTool.Controller.Desktop.Core.Mvvm;
+using TTDeployTool.Controller.Desktop.Core.Services;
 using TTDeployTool.Controller.Desktop.Core.ViewModels;
 using Windows.Services.Store;
 
@@ -60,6 +61,9 @@ public sealed partial class MainWindow : Window
         if (((ComboBox)sender).SelectedItem is ExpiryOption option)
             ViewModel.Settings.Expiry = option;
     }
+
+    private void OnTemplateChanged(object sender, SelectionChangedEventArgs e) =>
+        ViewModel.Settings.SelectedTemplate = ((ComboBox)sender).SelectedItem as DeploymentTemplate;
 
     private void OnExpiryFilterChanged(object sender, SelectionChangedEventArgs e)
     {

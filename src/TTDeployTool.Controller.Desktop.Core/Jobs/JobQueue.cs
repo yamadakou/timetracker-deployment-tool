@@ -43,6 +43,9 @@ public sealed class JobQueue : ObservableObject, IDisposable
         _timer = time.CreateTimer(_ => Post(Pump), null, scheduleCheckInterval, scheduleCheckInterval);
     }
 
+    /// <summary>ジョブの内容のコピー先（無ければ、ジョブの「コピー」は押せない）。</summary>
+    public IClipboardService? Clipboard { get; init; }
+
     /// <summary>ジョブが終わったとき（完了・失敗・停止。取り消しは含めない）。画面のスレッドで呼ぶ。</summary>
     public event Action<JobViewModel>? Finished;
 

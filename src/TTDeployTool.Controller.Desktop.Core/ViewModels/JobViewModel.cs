@@ -3,6 +3,7 @@ using TTDeployTool.Application.Deployment;
 using TTDeployTool.Application.Jobs;
 using TTDeployTool.Application.Workflows;
 using TTDeployTool.Controller.Desktop.Core.Jobs;
+using TTDeployTool.Controller.Desktop.Core;
 using TTDeployTool.Controller.Desktop.Core.Mvvm;
 
 namespace TTDeployTool.Controller.Desktop.Core.ViewModels;
@@ -54,6 +55,7 @@ public sealed class JobViewModel : ObservableObject
     private DateTimeOffset? _scheduledAt;
     private string? _startError;
     private string? _note;
+    private string? _copyMessage;
     private DateTimeOffset _editDate;
     private TimeSpan _editTime;
 
@@ -80,7 +82,30 @@ public sealed class JobViewModel : ObservableObject
         ResumeCommand = new AsyncCommand(() => Run(q => q.Resume(this)), () => _queue != null && State == DesktopJobState.Paused);
         RescheduleCommand = new AsyncCommand(() => Run(q => q.Reschedule(this, EditScheduledAt)), () => _queue != null && State is DesktopJobState.Scheduled or DesktopJobState.Paused);
         StopCommand = new AsyncCommand(() => Run(q => q.Stop(this)), () => _queue != null && State == DesktopJobState.Running);
+        CopyCommand = new AsyncCommand(() =>
+        {
+            _queue!.Clipboard!.CopyText(ToMarkdown());
+            CopyMessage = "ジョブの内容を Markdown でコピーしました。";
+            return Task.CompletedTask;
+        }, () => _queue?.Clipboard != null);
     }
+
+    /// <summary>ジョブの内容を Markdown でコピーする。</summary>
+    public AsyncCommand CopyCommand { get; }
+
+    /// <summary>コピーの結果。</summary>
+    public string? CopyMessage
+    {
+        get => _copyMessage;
+        private set => SetProperty(ref _copyMessage, value);
+    }
+
+    /// <summary>ジョブの内容（題名・状態・手順・結果・エラー・注意・ログ）の Markdown。</summary>
+    public string ToMarkdown() => MarkdownText.Document($"TTDeployTool のジョブ: {Title}",
+        (null, MarkdownText.Bullets([$"状態: {StatusText}", StepText, Endpoint?.ToString(), PersistenceSummary, ExpirySummary, DeletionSummary])),
+        ("エラー", Error),
+        ("注意", Note),
+        ("ログ", Logs.Count == 0 ? null : "```\n" + string.Join("\n", Logs) + "\n```"));
 
     /// <summary>ジョブを始める処理（実行の直前の確認を含む）。</summary>
     internal Func<Task<Job>>? Starter { get; }
