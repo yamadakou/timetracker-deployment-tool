@@ -8,7 +8,7 @@ namespace TTDeployTool.Controller.Desktop.UITests;
 /// </summary>
 public class CiUiTests
 {
-    private static readonly string[] Pages = ["Target", "Settings", "Deploy", "Status", "Delete", "DryRun", "Jobs"];
+    private static readonly string[] Pages = ["Target", "Deployments", "Settings", "Deploy", "Status", "Delete", "DryRun", "Jobs"];
 
     [Fact]
     public void Startup_Should_Open_The_Window_And_Write_The_Diagnostic_Log() => AppSession.Run(app =>
@@ -45,6 +45,24 @@ public class CiUiTests
         app.Exists("Jobs.Banner").Should().BeFalse("ジョブが無ければ上部の帯を出さない");
         app.IsEnabled("Jobs.ClearFinished").Should().BeTrue();
         app.Exists("Job.Title").Should().BeFalse();
+    });
+
+    [Fact]
+    public void Deployments_Page_Should_Ask_To_Sign_In_Before_Loading() => AppSession.Run(app =>
+    {
+        app.Show("Deployments");
+        app.TextOf("Deployments.Page").Should().StartWith("「読み込む」を押すと");
+        app.IsEnabled("Deployments.Previous").Should().BeFalse();
+        app.IsEnabled("Deployments.Next").Should().BeFalse();
+        app.Exists("Deployments.ExpiryFrom").Should().BeFalse("日付の範囲を選ぶまで出さない");
+        app.Select("Deployments.ExpiryFilter", "日付の範囲");
+        AppSession.WaitUntil(() => app.Exists("Deployments.ExpiryFrom"), "期限日の範囲の入力が表示される");
+        app.Select("Deployments.ExpiryFilter", "すべて");
+
+        // サインインしていないため、サブスクリプションが無い
+        app.Invoke("Deployments.Load");
+        app.WaitForText("Deployments.Error", t => t.Contains("サブスクリプションがありません"), "サインインを求めるエラーが出る");
+        app.Exists("Row.AppName").Should().BeFalse();
     });
 
     [Fact]

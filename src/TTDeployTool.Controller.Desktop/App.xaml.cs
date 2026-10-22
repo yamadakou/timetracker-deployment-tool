@@ -52,7 +52,8 @@ public partial class App : Microsoft.UI.Xaml.Application
             TimeProvider.System,
             log,
             preferences: new FilePreferences(Path.Combine(DesktopSettings.DataDirectory, "preferences.json")),
-            notifications: new AppNotificationService());
+            notifications: new AppNotificationService(),
+            clipboard: new ClipboardService());
         // 常駐中に 2 つ目を起動したら、隠したウィンドウを出す（Program.cs）
         Program.Reactivated += (_, _) => _window.DispatcherQueue.TryEnqueue(_window.ShowFromTray);
         _window.Closed += (_, _) =>

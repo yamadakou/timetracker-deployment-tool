@@ -148,6 +148,21 @@
 - Resource Graph の反映の遅れ: デプロイ・削除の直後は、Resource Graph に反映されるまで数分かかることがある。このアプリのジョブで作った・消したものは、ジョブの結果で一覧を補う
 - 一覧の読み込みにも、処理中の表示（3.3）を出す
 
+### 6.4 7d-2 の詳細（2026-10-22 に一次情報で確認。オーナーの回答: 3 種類を読む・期限の変更は 7d-2 で作る）
+| 項目 | 決めたこと | 一次情報 |
+|---|---|---|
+| Resource Graph の SDK | `Azure.ResourceManager.ResourceGraph` 1.1.1（2026-10 時点の最新の安定版。依存は `Azure.ResourceManager` 1.14.0 で、本ツールと同じ）。`TenantResource.GetResourcesAsync(ResourceQueryContent)` | NuGet、パッケージの XML ドキュメント |
+| 問い合わせの範囲 | GA の API ではサブスクリプションの一覧を渡す。「サインインと対象」で読んだサブスクリプションを、テナントごとに分けて問い合わせる（テナントごとのトークンが要るため。`TenantScopedCredential`）。読めないテナントがあっても、ほかのテナントの一覧は続け、注意を出す。権限の無いサブスクリプションの結果は返らない（読み取りの権限が要る） | Overview of Azure Resource Graph（Permissions） |
+| 問い合わせ | `resources` から、種類が `microsoft.app/containerapps`・`microsoft.app/managedenvironments`・`microsoft.storage/storageaccounts` で、`tags['managed-by']` が `ttdeploytool` または以前の値のものを読む。`id`（文字列）を含めて `order by id asc` にする（全列が dynamic だと続きのページが返らないため）。Container App は、状態・最初のコンテナのイメージと CPU・メモリ・Ingress の FQDN・ボリュームのストレージ名を `project` で取り出す。結果の形式は `ObjectArray` | Work with large data sets（Paging results、Formatting results） |
+| ページング | 1 回 1,000 件（`$top` の上限）。`$skipToken` があれば続きを読む | 同上 |
+| まとめ方 | サブスクリプション・リソースグループ・`tt-app-name` の組（大文字・小文字を区別しない）ごとに 1 行。`tt-app-name` の無いものは出さない。期限とデプロイ日は Container App のタグ（tt → db → redis の順）。3 つの Container App と Environment がそろっていなければ「一部だけ」と出す（作りかけ・消しかけ）。DB 種別は DB アプリのイメージ（`mssql` / `postgres`）、永続化は DB アプリのボリュームのストレージ名（`dbdata`）。ストレージアカウントだけ残っていれば「以前の DB のデータが残っています」 | — |
+| 反映の遅れ | Resource Graph はすぐには反映されない（強い整合性ではない）。このアプリで 15 分以内に終えたデプロイ・削除と、変えた期限は、一覧を読んだ結果に重ねて表示する | Overview（How Resource Graph is kept current） |
+| パスワード | `ContainerAppResource.GetSecretsAsync`（`listSecrets`。値を含む）で、Timetracker アプリのシークレット `db-password`・`app-password` を読む。読む前に管理タグを確かめる。権限は `Microsoft.App/containerApps/listSecrets/action`（Contributor など）。押したときだけ読み、伏せ字で表示し、「表示」で見せる。値は一覧の行（ViewModel）にだけ置き、一覧を読み直す・ページを変える・サインアウトで消す（フィルタ・並べ替え・期限の変更では、同じデプロイの行を使い続ける）。診断用のログには読んだことだけを書く | Container Apps - List Secrets（REST、2026-07-01） |
+| コピー | `Clipboard.SetContentWithOptions` に `ClipboardContentOptions`（`IsAllowedInHistory = false`、`IsRoamable = false`）を渡し、クリップボードの履歴とほかの PC への同期に残さない（Windows 10 1809 以降） | ClipboardContentOptions Class |
+| 期限の変更 | 行で「日付」か「期限なし」を選んで変える（今日より前は誤り）。3 つの Container App のうち、あって管理タグが一致するものの `tt-expires-at` を、タグの API（`TagResource.UpdateAsync`、`PatchMode = Merge`）で書き換える。リソースの PUT は使わない（シークレットの値が GET で返らないため、PUT で上書きすると消える）。新しいリビジョンは作られない。権限は `Microsoft.Resources/tags/write`（Tag Contributor）か、リソースへの書き込み（Contributor） | Use tags to organize your Azure resources（Required access）、パッケージの XML ドキュメント |
+| 行の操作 | 「対象に入れる」（サインインと対象に、サブスクリプション・リソースグループ・アプリ名を入れる）、「状態を確認」（対象に入れて状態の確認の画面で読む）、「削除」（対象に入れて削除の画面を開く。計画 → アプリ名の入力 → 実行は今の画面のまま）、「開く」（URL）、「パスワードを表示」、期限の変更 |
+| フィルタ・並べ替え・ページング | 6.3 のとおり。利用可能期限日のフィルタは「すべて」「7 日以内（過ぎたものを含む）」「期限なし」「日付の範囲」。期限の色: 過ぎた → 赤、7 日以内 → 黄 |
+
 ## 7. テスト
 - `Desktop.Core`: ジョブの予定・待機・一時停止・取り消し・停止・同時実行の上限・同じ対象の拒否・計画し直しての比較（違えば失敗）を、偽の時刻（`TimeProvider`）と偽の Azure で確かめる。分岐網羅率 100%
 - Application: `IProgress<string>` を渡したときに段階が順に届くこと、渡さないときに今と同じこと。停止の要求で次の手順に進まないこと（MCP の既存のテストはそのまま通る）
@@ -218,6 +233,13 @@
 - デスクトップアプリ: 「設定」に「利用可能期限日」（既定・日付を指定する・期限なし）、日付の入力（日付を指定するときだけ表示）、既定で決まる日付と期限での削除の説明。今日より前の日付は誤りに出す。「デプロイ」の計画と、ジョブの結果に期限を出す
 - テスト: Domain・Application・Infrastructure・CLI・MCP・Desktop.Core に期限のテストを加え、ソリューション全体 990 件（スキップ 5）成功。新しいコードの行と分岐の網羅率 100%（以前からの対象外: 各 `Program`、正規表現の生成コード、`AzureSdkExecutor` の再スローの後の閉じかっこ）。UI テスト（CI）に、「設定」の期限日の選択で日付の入力が出る・消えることを加えた。CI（run 39704976174）で全ジョブ成功。オーナーの確認の後、Desktop System Test（run 39711635858）で、期限のタグを書くデプロイを含むこれまでの流れが成功（期限のタグの値は、この UI テストでは確かめていない）
 - 期限での自動の削除は、7d-3 で行う（7d-1 では、期限を記録して表示するだけ）
+
+**実施結果（7d-2）**
+- Infrastructure: `ResourceGraphDeploymentDirectory`（`Azure.ResourceManager.ResourceGraph` 1.1.1。3 種類のリソースを 1 回の問い合わせで読み、`$skipToken` で続きを読む）、`AzureSdkExecutor.GetContainerAppSecretsAsync`（`listSecrets`）・`UpdateContainerAppTagsAsync`（タグの API の Merge。アプリの PUT は使わない）
+- Application: `DeploymentCatalog`（サブスクリプション・リソースグループ・`tt-app-name` ごとにまとめる。作りかけ・消しかけ・ストレージアカウントだけ残ったものも 1 行にする）、`DeploymentMaintenance`（管理タグの一致する Container App だけの期限の変更と、Timetracker アプリのシークレットの読み取り）
+- Desktop.Core: `DeploymentListViewModel`（テナントごとの読み込み、フィルタ・並べ替え・ページング、このアプリで 15 分以内に終えたデプロイ・削除と変えた期限を重ねる）、`DeploymentRowViewModel`（表示、期限の色、パスワードの表示・伏せ字・コピー、期限の変更、対象に入れる・状態を確認・削除の画面へ）。`TargetViewModel.CreateSessionFor`（行のサブスクリプションのテナントで操作する）
+- 画面: 「デプロイの一覧」の項目。クリップボードは `ClipboardContentOptions` で履歴と同期に残さない
+- テスト: Infrastructure・Application・Desktop.Core に一覧のテストを加え、ソリューション全体 1,035 件（スキップ 5）成功。新しいコードの行と分岐の網羅率 100%。UI テスト（CI）に一覧の画面（サインインの前の読み込み、期限日の範囲の入力の表示）を、半自動の UI テスト（Azure）に、デプロイした環境が一覧に出ること・パスワードの表示・期限の変更を加えた
 
 ## 11. 出典（2026-10-20 に確認）
 - x:Bind の関数の結び付け: https://learn.microsoft.com/windows/apps/develop/data-binding/function-bindings

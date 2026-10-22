@@ -2,6 +2,7 @@ using Azure;
 using Azure.Core;
 using Azure.ResourceManager;
 using Azure.ResourceManager.Resources;
+using Azure.ResourceManager.Resources.Models;
 using Azure.ResourceManager.AppContainers;
 using Azure.ResourceManager.AppContainers.Models;
 using Azure.ResourceManager.Authorization;
@@ -328,6 +329,33 @@ public class AzureSdkExecutor : IAzureDeploymentGateway
                 StorageNames(app.Data)));
         }
         return result;
+    }
+
+    public async Task<IReadOnlyDictionary<string, string>?> GetContainerAppSecretsAsync(
+        string subscriptionId, string rgName, string name, CancellationToken cancellationToken = default)
+    {
+        var existing = await ResourceGroup(subscriptionId, rgName).GetContainerApps().GetIfExistsAsync(name, cancellationToken);
+        if (!existing.HasValue)
+            return null;
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        await foreach (var secret in existing.Value!.GetSecretsAsync(cancellationToken))
+        {
+            // Key Vault を参照するシークレットは値が返らない（本ツールは使わない）
+            if (secret.Name != null && secret.Value != null)
+                result[secret.Name] = secret.Value;
+        }
+        return result;
+    }
+
+    public async Task UpdateContainerAppTagsAsync(
+        string subscriptionId, string rgName, string name, IReadOnlyDictionary<string, string> tags, CancellationToken cancellationToken = default)
+    {
+        // リソースの PUT で書き換えると、GET で値の返らないシークレットが消えるため、タグの API で書き換える
+        var patch = new TagResourcePatch { PatchMode = TagPatchMode.Merge };
+        foreach (var (key, value) in tags)
+            patch.TagValues[key] = value;
+        var app = ContainerAppResource.CreateResourceIdentifier(subscriptionId, rgName, name);
+        await _arm.GetTagResource(TagResource.CreateResourceIdentifier(app)).UpdateAsync(WaitUntil.Completed, patch, cancellationToken);
     }
 
     public async Task<bool> DeleteContainerAppAsync(string subscriptionId, string rgName, string name, CancellationToken cancellationToken = default)

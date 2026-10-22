@@ -49,6 +49,19 @@ public interface IAzureDeploymentGateway
     Task<IReadOnlyList<ContainerAppDetails>> ListContainerAppDetailsAsync(
         string subscriptionId, string rgName, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Container App のシークレットの名前と値（<c>listSecrets</c>。存在しなければ null）。
+    /// 権限 <c>Microsoft.App/containerApps/listSecrets/action</c> が要る。値はログに書かない。
+    /// </summary>
+    Task<IReadOnlyDictionary<string, string>?> GetContainerAppSecretsAsync(
+        string subscriptionId, string rgName, string name, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Container App のタグに <paramref name="tags"/> を加える・上書きする（タグの API の Merge。ほかのタグとアプリの設定は変えず、新しいリビジョンも作らない）。
+    /// </summary>
+    Task UpdateContainerAppTagsAsync(
+        string subscriptionId, string rgName, string name, IReadOnlyDictionary<string, string> tags, CancellationToken cancellationToken = default);
+
     /// <summary>ストレージアカウントの情報（存在しなければ null）。</summary>
     Task<StorageAccountInfo?> GetStorageAccountAsync(string subscriptionId, string rgName, string name, CancellationToken cancellationToken = default);
 

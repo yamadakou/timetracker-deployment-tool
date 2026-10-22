@@ -71,7 +71,8 @@ public class AzureUiTests
             app.Invoke("Deploy.Plan");
             app.WaitForText("Deploy.Error", t => t.Contains("設定に誤りがあります"), "パスワードの無い計画でエラーが出る");
             app.Show("Settings");
-            app.SetText("Settings.DbPassword", "Ui" + Guid.NewGuid().ToString("N")[..12] + "!");
+            var dbPassword = "Ui" + Guid.NewGuid().ToString("N")[..12] + "!";
+            app.SetText("Settings.DbPassword", dbPassword);
             app.SetText("Settings.TrackerPassword", "Ui" + Guid.NewGuid().ToString("N")[..12] + "!");
 
             // デプロイ（計画 → 実行）。P3: 計画の間、処理中の表示と、Azure の何を読んでいるかが出る
@@ -106,6 +107,22 @@ public class AzureUiTests
             app.Show("Status");
             app.Invoke("Status.Refresh");
             app.WaitForText("Status.Summary", t => t.Contains("Container Apps Environment"), "デプロイした環境が表示される", LoadTimeout);
+
+            // 7d-2: デプロイの一覧（Resource Graph に反映される前でも、このアプリのジョブの結果で出る）。パスワードの表示と、期限の変更
+            app.Show("Deployments");
+            app.SetText("Deployments.ResourceGroupFilter", resourceGroup!);
+            app.Invoke("Deployments.Load");
+            app.WaitForText("Deployments.Page", t => t.Contains("件目"), "一覧にデプロイが出る", LoadTimeout);
+            Log($"デプロイの一覧: {app.TextOf("Deployments.Page")}、状態 {app.TextOf("Row.State")}、期限 {app.TextOf("Row.Expiry")}");
+            app.TextOf("Row.AppName").Should().Be(appName);
+            app.Invoke("Row.ShowPasswords");
+            app.WaitForText("Row.DbPassword", t => t == "••••••••", "パスワードは伏せ字で出る", LoadTimeout);
+            app.Invoke("Row.TogglePasswords");
+            app.WaitForText("Row.DbPassword", t => t == dbPassword, "表示すると、デプロイした DB のパスワードが出る");
+            app.SetChecked("Row.EditNoExpiry", true);
+            app.Invoke("Row.ChangeExpiry");
+            app.WaitForText("Row.Message", t => t.Contains("期限なし"), "期限を変えられる", LoadTimeout);
+            app.TextOf("Row.Expiry").Should().Be("期限なし");
 
             // 削除（計画 → アプリ名の入力 → 実行）
             app.Show("Delete");

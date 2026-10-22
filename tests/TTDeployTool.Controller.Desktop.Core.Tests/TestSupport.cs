@@ -77,6 +77,13 @@ internal sealed class FakeNotifications : INotificationService
     public void Show(AppNotice notice) => Shown.Add(notice);
 }
 
+internal sealed class FakeClipboard : IClipboardService
+{
+    public List<string> Copied { get; } = [];
+
+    public void CopyText(string text) => Copied.Add(text);
+}
+
 internal sealed class FakeLauncher : ISystemLauncher
 {
     public List<string> Opened { get; } = [];
@@ -183,6 +190,31 @@ internal sealed class FakeAzure : IAzureClients
     {
         Credentials.Add(credential);
         return GatewayMock.Object;
+    }
+
+    /// <summary>テナントごとの、Resource Graph の結果（無いテナントは空）。</summary>
+    public Dictionary<string, List<ManagedResourceRecord>> RecordsByTenant { get; } = [];
+
+    /// <summary>テナントごとの、Resource Graph の失敗。</summary>
+    public Dictionary<string, Exception> DirectoryErrors { get; } = [];
+
+    /// <summary>Resource Graph に問い合わせたテナントとサブスクリプション。</summary>
+    public List<(string? TenantId, IReadOnlyList<string> Subscriptions)> DirectoryQueries { get; } = [];
+
+    public IDeploymentDirectory Deployments(TokenCredential credential)
+    {
+        var tenantId = (credential as TenantScopedCredential)?.TenantId;
+        var directory = new Mock<IDeploymentDirectory>();
+        directory.Setup(d => d.ListAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
+            .Returns<IReadOnlyList<string>, CancellationToken>((subs, _) =>
+            {
+                DirectoryQueries.Add((tenantId, subs));
+                return tenantId != null && DirectoryErrors.TryGetValue(tenantId, out var error)
+                    ? Task.FromException<IReadOnlyList<ManagedResourceRecord>>(error)
+                    : Task.FromResult<IReadOnlyList<ManagedResourceRecord>>(
+                        tenantId != null && RecordsByTenant.TryGetValue(tenantId, out var records) ? records.ToList() : []);
+            });
+        return directory.Object;
     }
 }
 

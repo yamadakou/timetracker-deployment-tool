@@ -4,10 +4,12 @@ using Azure.Core;
 using Azure.ResourceManager;
 using Azure.ResourceManager.AppContainers;
 using Azure.ResourceManager.AppContainers.Mocking;
+using Azure.ResourceManager.AppContainers.Models;
 using Azure.ResourceManager.Authorization.Mocking;
 using Azure.ResourceManager.Authorization.Models;
 using Azure.ResourceManager.Models;
 using Azure.ResourceManager.Resources;
+using Azure.ResourceManager.Resources.Models;
 using FluentAssertions;
 using Moq;
 using TTDeployTool.Common;
@@ -348,5 +350,46 @@ public class AzureSdkExecutorInventoryTests
         await Sut().EnsureContainerAppEnvAsync(SubscriptionId, RgName, "app", "japaneast", Ct);
 
         sent!.Tags.Should().BeEquivalentTo(ManagedTags.For("app"));
+    }
+
+    [Fact]
+    public async Task GetContainerAppSecrets_Should_Return_Names_And_Values_Or_Null()
+    {
+        var app = App("app-tt");
+        app.Setup(a => a.GetSecretsAsync(It.IsAny<CancellationToken>())).Returns(Pageable(
+            ArmAppContainersModelFactory.ContainerAppSecret("db-password", "DbPassw0rd!", null, null),
+            ArmAppContainersModelFactory.ContainerAppSecret("app-password", "TrackerPass!", null, null),
+            // Key Vault を参照するシークレットは値が返らない
+            ArmAppContainersModelFactory.ContainerAppSecret("kv", null, "System", new Uri("https://kv.example/secrets/x"))));
+        _apps.Setup(c => c.GetIfExistsAsync("app-tt", It.IsAny<CancellationToken>())).ReturnsAsync(Found(app.Object));
+        _apps.Setup(c => c.GetIfExistsAsync("missing", It.IsAny<CancellationToken>())).ReturnsAsync(NotFound<ContainerAppResource>());
+
+        var secrets = await Sut().GetContainerAppSecretsAsync(SubscriptionId, RgName, "app-tt", Ct);
+
+        secrets.Should().BeEquivalentTo(new Dictionary<string, string> { ["db-password"] = "DbPassw0rd!", ["app-password"] = "TrackerPass!" });
+        secrets!["DB-PASSWORD"].Should().Be("DbPassw0rd!");
+        (await Sut().GetContainerAppSecretsAsync(SubscriptionId, RgName, "missing", Ct)).Should().BeNull();
+        _log.ToString().Should().NotContain("DbPassw0rd!");
+    }
+
+    [Fact]
+    public async Task UpdateContainerAppTags_Should_Merge_Through_The_Tags_Api()
+    {
+        var tag = new Mock<TagResource>();
+        ResourceIdentifier? id = null;
+        TagResourcePatch? sent = null;
+        _arm.Setup(a => a.GetTagResource(It.IsAny<ResourceIdentifier>())).Callback<ResourceIdentifier>(i => id = i).Returns(tag.Object);
+        tag.Setup(t => t.UpdateAsync(WaitUntil.Completed, It.IsAny<TagResourcePatch>(), It.IsAny<CancellationToken>()))
+            .Callback<WaitUntil, TagResourcePatch, CancellationToken>((_, patch, _) => sent = patch)
+            .ReturnsAsync(Mock.Of<ArmOperation<TagResource>>());
+
+        await Sut().UpdateContainerAppTagsAsync(SubscriptionId, RgName, "app-tt",
+            new Dictionary<string, string> { [DeploymentExpiry.ExpiresAtKey] = "none" }, Ct);
+
+        id!.ToString().Should().Be($"/subscriptions/{SubscriptionId}/resourceGroups/{RgName}/providers/Microsoft.App/containerApps/app-tt/providers/Microsoft.Resources/tags/default");
+        sent!.PatchMode.Should().Be(TagPatchMode.Merge);
+        sent.TagValues.Should().Equal(new Dictionary<string, string> { [DeploymentExpiry.ExpiresAtKey] = "none" });
+        // アプリの PUT は使わない（シークレットの値が消えるため）
+        _apps.Verify(c => c.CreateOrUpdateAsync(It.IsAny<WaitUntil>(), It.IsAny<string>(), It.IsAny<ContainerAppData>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }

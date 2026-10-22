@@ -32,6 +32,8 @@ public sealed partial class MainWindow : Window
         ViewModel = viewModel;
         Bindings.Update();
         AppWindow.Closing += OnClosing;
+        // デプロイの一覧の行の操作で、画面を切り替える
+        viewModel.NavigationRequested += tag => Nav.SelectedItem = Nav.MenuItems.OfType<NavigationViewItem>().First(i => (string)i.Tag == tag);
         CreateTray();
         _ = viewModel.InitializeAsync();
         _ = CheckForUpdatesAsync(hwnd);
@@ -59,6 +61,24 @@ public sealed partial class MainWindow : Window
             ViewModel.Settings.Expiry = option;
     }
 
+    private void OnExpiryFilterChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (((ComboBox)sender).SelectedItem is ExpiryFilterOption option)
+            ViewModel.Deployments.ExpiryFilter = option;
+    }
+
+    private void OnSortChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (((ComboBox)sender).SelectedItem is DeploymentSortOption option)
+            ViewModel.Deployments.Sort = option;
+    }
+
+    private void OnPageSizeChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (((ComboBox)sender).SelectedItem is int size)
+            ViewModel.Deployments.PageSize = size;
+    }
+
     private void OnConcurrencyChanged(object sender, SelectionChangedEventArgs e)
     {
         if (((ComboBox)sender).SelectedItem is int concurrency)
@@ -73,7 +93,7 @@ public sealed partial class MainWindow : Window
         var tag = (args.SelectedItem as NavigationViewItem)?.Tag as string;
         foreach (var (panel, name) in new (FrameworkElement, string)[]
                  {
-                     (TargetPanel, "target"), (SettingsPanel, "settings"), (DeployPanel, "deploy"), (StatusPanel, "status"),
+                     (TargetPanel, "target"), (DeploymentsPanel, "deployments"), (SettingsPanel, "settings"), (DeployPanel, "deploy"), (StatusPanel, "status"),
                      (DeletePanel, "delete"), (DryRunPanel, "dryrun"), (JobsPanel, "jobs"),
                  })
             panel.Visibility = name == tag ? Visibility.Visible : Visibility.Collapsed;

@@ -37,7 +37,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
     public MainViewModel(
         ISignInService signIn, IAzureClients clients, IDialogService dialogs, ISystemLauncher launcher, TimeProvider time, ILoggerFactory loggers,
-        TimeSpan? pollInterval = null, IAppPreferences? preferences = null, INotificationService? notifications = null)
+        TimeSpan? pollInterval = null, IAppPreferences? preferences = null, INotificationService? notifications = null, IClipboardService? clipboard = null)
     {
         _dialogs = dialogs;
         _notifications = notifications;
@@ -58,9 +58,14 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         SignIn = new SignInViewModel(signIn, async signedIn =>
         {
             if (signedIn)
+            {
                 await Target.LoadAsync();
+            }
             else
+            {
                 Target.Clear();
+                Deployments.Clear();
+            }
         }, loggers.CreateLogger("TTDeployTool.Desktop.SignIn"));
         Settings = new SettingsViewModel(Target, time);
         Deployment = new DeploymentViewModel(new DeploymentWorkflow(plans, jobs, caller, logger, time), Target, Settings, Queue, Show, time);
@@ -68,6 +73,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         Status = new StatusViewModel(Target, logger,
             () => Queue.ActiveFor(Target.Subscription, Target.ResourceGroup, Target.AppName.ToLowerInvariant())?.IsRunning == true);
         DryRun = new DryRunViewModel(Settings, dialogs, launcher);
+        Deployments = new DeploymentListViewModel(Target, Status, Queue, logger, loggers.CreateLogger("TTDeployTool.Desktop.Deployments"), time,
+            launcher, clipboard, page => NavigationRequested?.Invoke(page));
         LogDirectory = (loggers as DiagnosticLog)?.Directory;
         OpenLogFolderCommand = new AsyncCommand(() =>
         {
@@ -99,6 +106,12 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public StatusViewModel Status { get; }
 
     public DryRunViewModel DryRun { get; }
+
+    /// <summary>デプロイの一覧（Azure から集める）。</summary>
+    public DeploymentListViewModel Deployments { get; }
+
+    /// <summary>画面を切り替える要求（デプロイの一覧の行の操作。名前は画面の項目のタグ: target・status・delete）。</summary>
+    public event Action<string>? NavigationRequested;
 
     /// <summary>診断用のログのフォルダー（ファイルに書かない場合は null）。</summary>
     public string? LogDirectory { get; }

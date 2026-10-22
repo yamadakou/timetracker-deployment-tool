@@ -1,4 +1,6 @@
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Media;
+using TTDeployTool.Controller.Desktop.Core.ViewModels;
 
 namespace TTDeployTool.Controller.Desktop;
 
@@ -11,6 +13,16 @@ internal static class Ui
     public static Visibility IfTrue(bool value) => value ? Visibility.Visible : Visibility.Collapsed;
 
     public static Visibility IfAny(int count) => count > 0 ? Visibility.Visible : Visibility.Collapsed;
+
+    public static bool Not(bool value) => !value;
+
+    /// <summary>利用可能期限の近さの色（過ぎた → 赤、近い → 黄、ほかは文字の色）。</summary>
+    public static Brush ExpiryBrush(ExpiryLevel level) => (Brush)Microsoft.UI.Xaml.Application.Current.Resources[level switch
+    {
+        ExpiryLevel.Expired => "SystemFillColorCriticalBrush",
+        ExpiryLevel.Soon => "SystemFillColorCautionBrush",
+        _ => "TextFillColorPrimaryBrush",
+    }];
 
     public static string Time(DateTimeOffset? value) => value is { } t ? $"計画の有効期限: {t.ToLocalTime():HH:mm}" : "";
 }

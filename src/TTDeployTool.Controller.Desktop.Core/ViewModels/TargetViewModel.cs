@@ -156,7 +156,35 @@ public sealed class TargetViewModel : ObservableObject
     /// </summary>
     public IAzureSession CreateJobSession() => CreateSession(new TimeLimitedCredential(Credential(), _time));
 
-    private TokenCredential Credential() => SelectedSubscription?.TenantId is { } tenantId
+    /// <summary>
+    /// 一覧から選んだサブスクリプションのテナントで操作する接続（選んでいる対象とは別のサブスクリプションの行の操作に使う）。
+    /// </summary>
+    public IAzureSession CreateSessionFor(string subscriptionId, IProgress<string>? progress = null) =>
+        CreateSession(Credential(TenantOf(subscriptionId)), progress);
+
+    /// <summary>テナントのサブスクリプションの、本ツールで作ったリソースを読むもの（デプロイの一覧）。</summary>
+    public IDeploymentDirectory CreateDirectory(string? tenantId) => _clients.Deployments(Credential(tenantId));
+
+    /// <summary>
+    /// 対象を入れる（デプロイの一覧の「対象に入れる」）。サブスクリプションが一覧に無ければ入れずに false を返す。
+    /// </summary>
+    public bool Select(string subscriptionId, string resourceGroup, string appName)
+    {
+        var choice = Subscriptions.FirstOrDefault(c => string.Equals(c.SubscriptionId, subscriptionId, StringComparison.OrdinalIgnoreCase));
+        if (choice == null)
+            return false;
+        SelectedSubscription = choice;
+        ResourceGroup = resourceGroup;
+        AppName = appName;
+        return true;
+    }
+
+    private string? TenantOf(string subscriptionId) =>
+        Subscriptions.FirstOrDefault(c => string.Equals(c.SubscriptionId, subscriptionId, StringComparison.OrdinalIgnoreCase))?.TenantId;
+
+    private TokenCredential Credential() => Credential(SelectedSubscription?.TenantId);
+
+    private TokenCredential Credential(string? tenantId) => tenantId != null
         ? new TenantScopedCredential(_signIn.Credential, tenantId)
         : _signIn.Credential;
 

@@ -18,12 +18,15 @@ internal sealed class Harness
     public FakeLauncher Launcher { get; } = new();
     public TTDeployTool.Controller.Desktop.Core.Services.InMemoryAppPreferences Preferences { get; } = new();
     public FakeNotifications Notifications { get; } = new();
+    public FakeClipboard Clipboard { get; } = new();
+    public List<string> Navigations { get; } = [];
     public MainViewModel Main { get; }
 
-    public Harness(Microsoft.Extensions.Logging.ILoggerFactory? loggers = null, TimeProvider? time = null)
+    public Harness(Microsoft.Extensions.Logging.ILoggerFactory? loggers = null, TimeProvider? time = null, bool withClipboard = true)
     {
         Main = new MainViewModel(SignIn, Azure, Dialogs, Launcher, time ?? TimeProvider.System, loggers ?? NullLoggerFactory.Instance, TimeSpan.FromMilliseconds(5),
-            Preferences, Notifications);
+            Preferences, Notifications, withClipboard ? Clipboard : null);
+        Main.NavigationRequested += Navigations.Add;
     }
 
     /// <summary>サインインして、対象（sub / rg / demo）と正しい設定を入れる。</summary>

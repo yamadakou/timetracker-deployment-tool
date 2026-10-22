@@ -148,6 +148,9 @@ TimeTracker のコンテナイメージの詳細（クイックスタート、�
 | 永続化した DB アプリの更新（停止 → 更新 → 開始） | `Microsoft.App/containerApps/stop/action` / `start/action` | リソースグループ |
 | ストレージアカウントの削除（`delete`。`--keep-db-data` なし） | `Microsoft.Storage/storageAccounts/delete` | リソースグループ |
 | リソースグループの削除（`delete --delete-resource-group`） | `Microsoft.Resources/subscriptions/resourceGroups/delete`（中のリソースの一覧に `Microsoft.Resources/subscriptions/resourceGroups/resources/read`） | リソースグループ |
+| デスクトップアプリのデプロイの一覧（Azure Resource Graph） | 読み取り（`*/read`。Reader など。権限の無いサブスクリプションのものは出ません） | サブスクリプションまたはリソースグループ |
+| デスクトップアプリの一覧の「パスワードを表示」 | `Microsoft.App/containerApps/listSecrets/action` | リソースグループ |
+| デスクトップアプリの一覧の「期限を変える」（タグの書き換え） | `Microsoft.Resources/tags/write`、またはリソースへの書き込み（Contributor など） | リソースグループ |
 | 権限の事前確認（下記） | `Microsoft.Authorization/permissions/read`（自分の権限の一覧。通常はどのロールにも含まれます） | リソースグループ |
 
 **権限の事前確認**: `deploy` と `delete` は、Azure のリソースを変更する前に、上の表の権限が実行する ID にあるかを確かめます。足りなければ、足りない権限を表示して、何も変更せずに終了します（途中で権限のエラーになり、一部のリソースだけが作成・削除された状態になるのを防ぐため）。既存のリソースの更新・削除は、リソースグループでの権限に加えて、そのリソースに割り当てられたロールでも判定します（例: リソースグループでは閲覧者で、各 Container App と環境に共同作成者が割り当てられている場合）。新しく作るリソースには、リソースグループでの権限が必要です。次の場合は、確認をせずに続けます（`--verbose` で理由を表示します）。
@@ -567,6 +570,7 @@ CLI や AI アシスタントを使わずに、Windows の画面の操作で同�
 
 - できること: Azure へのサインイン（Windows のアカウント。`az login` は不要）、サブスクリプションの選択、デプロイ（計画 → 確認 → 実行）、状態の確認、削除（アプリ名の入力で確認）、ローカル検証（Dry-run）の docker-compose.yml と .env の保存
 - 安全策は CLI・MCP サーバーと同じです（実行の前に計画を示す、DB のデータが失われる更新は同意のチェックが必要、実行の直前に計画を作り直して状態が変わっていれば実行しない）
+- デプロイの一覧: サインインしたアカウントで読めるサブスクリプションから、本ツールでデプロイした環境（別の PC・CLI・MCP サーバーでデプロイしたものを含む）を読み、サブスクリプション・リソースグループ・デプロイ日・利用可能期限日で絞り込み・並べ替えできます。行から、状態の確認・削除・「対象に入れる」（再デプロイのため）・期限の変更・パスワードの表示ができます。パスワードは押したときだけ Azure から読み、コピーしてもクリップボードの履歴には残しません。Azure に反映されるまで数分かかることがあり、このアプリで直前に行った操作は反映済みとして表示します
 - パスワードは保存しません（アプリを終了すると消えます）
 - 対象: Windows 10（1809 以降）、Windows 11（x64 / arm64）
 - 設計: [docs/design/desktop-app.md](docs/design/desktop-app.md)、Windows での確認の手順: [docs/design/desktop-app-check.md](docs/design/desktop-app-check.md)、Store への提出の手順: [docs/design/desktop-app-store.md](docs/design/desktop-app-store.md)、プライバシー ポリシー（案）: [docs/PRIVACY.md](docs/PRIVACY.md)

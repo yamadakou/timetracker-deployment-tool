@@ -52,6 +52,14 @@ public interface ISystemLauncher
     void OpenUri(Uri uri);
 }
 
+/// <summary>
+/// クリップボード（OS の機能を使うため、画面の側で実装する）。パスワードのコピーに使うため、クリップボードの履歴とほかの PC への同期に残さない。
+/// </summary>
+public interface IClipboardService
+{
+    void CopyText(string text);
+}
+
 /// <summary>資格情報から Azure を読む・操作するものを作る（テストで差し替える）。</summary>
 public interface IAzureClients
 {
@@ -60,6 +68,9 @@ public interface IAzureClients
     ISubscriptionDirectory Subscriptions(TokenCredential credential);
 
     IAzureDeploymentGateway Gateway(IDeploymentLogger logger, TokenCredential credential);
+
+    /// <summary>本ツールで作ったリソースを、複数のサブスクリプションからまとめて読む（デプロイの一覧）。</summary>
+    IDeploymentDirectory Deployments(TokenCredential credential);
 }
 
 /// <summary>Azure の管理 API を、IPv6 と IPv4 を並行して試す通信（<see cref="HappyEyeballs"/>）で使う。</summary>
@@ -70,4 +81,6 @@ public sealed class AzureClients : IAzureClients
     public ISubscriptionDirectory Subscriptions(TokenCredential credential) => new AzureSubscriptionDirectory(HappyEyeballs.Arm(credential));
 
     public IAzureDeploymentGateway Gateway(IDeploymentLogger logger, TokenCredential credential) => new AzureSdkExecutor(logger, credential);
+
+    public IDeploymentDirectory Deployments(TokenCredential credential) => new ResourceGraphDeploymentDirectory(HappyEyeballs.Arm(credential));
 }

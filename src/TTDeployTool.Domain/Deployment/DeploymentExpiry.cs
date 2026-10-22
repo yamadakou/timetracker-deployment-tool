@@ -83,7 +83,7 @@ public static class DeploymentExpiry
         {
             if (IsNone(current))
                 return new ExpiryDecision(null, ExpirySource.Inherited);
-            if (DateTimeOffset.TryParseExact(current, TagFormat, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var at))
+            if (TryParseTag(current, out var at))
                 return new ExpiryDecision(at, ExpirySource.Inherited);
         }
         // 今の期限が無い（この機能より前にデプロイした）・読めない場合も、既定にする
@@ -102,6 +102,10 @@ public static class DeploymentExpiry
 
     /// <summary>デプロイした時刻・期限のタグの値（UTC の ISO 8601）。</summary>
     public static string FormatTag(DateTimeOffset value) => value.UtcDateTime.ToString(TagFormat, CultureInfo.InvariantCulture);
+
+    /// <summary>タグの時刻（<see cref="FormatTag"/> の形式）を読む。読めなければ false。</summary>
+    public static bool TryParseTag(string? value, out DateTimeOffset at) =>
+        DateTimeOffset.TryParseExact(value, TagFormat, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out at);
 
     /// <summary>今日（指定した時刻帯）。</summary>
     public static DateOnly Today(DateTimeOffset now, TimeZoneInfo timeZone) => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, timeZone).DateTime);

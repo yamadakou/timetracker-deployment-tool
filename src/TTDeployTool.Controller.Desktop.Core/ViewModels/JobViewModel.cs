@@ -177,6 +177,12 @@ public sealed class JobViewModel : ObservableObject
     /// <summary>デプロイのジョブか（false なら削除）。</summary>
     public bool IsDeployment => _kind == JobKind.Deploy;
 
+    /// <summary>ジョブの対象。</summary>
+    public JobTarget Target => _target;
+
+    /// <summary>成功したジョブの結果（デプロイは <see cref="DeploymentResult"/>、削除は <see cref="DeletionOutcome"/>。終わっていなければ null）。</summary>
+    public object? Result => _snapshot?.Result;
+
     /// <summary>予定の変更の日付（画面の入力）。</summary>
     public DateTimeOffset EditDate
     {

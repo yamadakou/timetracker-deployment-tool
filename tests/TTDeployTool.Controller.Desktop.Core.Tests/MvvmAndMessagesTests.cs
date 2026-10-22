@@ -141,6 +141,7 @@ public class ServicesTests
         clients.Tenants(credential).Should().BeOfType<AzureTenantDirectory>();
         clients.Subscriptions(credential).Should().BeOfType<AzureSubscriptionDirectory>();
         clients.Gateway(new DesktopDeploymentLogger(Mock.Of<ILogger>()), credential).Should().BeOfType<AzureSdkExecutor>();
+        clients.Deployments(credential).Should().BeOfType<ResourceGraphDeploymentDirectory>();
     }
 
     [Fact]
