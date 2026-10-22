@@ -210,11 +210,13 @@ jobs:
       shell: pwsh
       run: ./.github/scripts/check-msix.ps1 -PackageDir AppPackages -ExpectedVersion 0.1.0.0
 
+    # パッケージは 1 回で約 190MB あり、既定の 90 日では溜まりすぎるため、7 日で消す（Store に出すパッケージは release.yml で Release に載せる）
     - name: Upload package
       uses: actions/upload-artifact@v7
       with:
         name: ttdeploytool-desktop-msixupload
         path: AppPackages/**/*.msixupload
+        retention-days: 7
 
   # デスクトップアプリの UI テスト（docs/design/desktop-ui-tests.md）。x64 の MSIX を一時的な自己署名の証明書で署名して導入し、
   # UI Automation（FlaUI）で操作する。Azure は使わない。証明書はこのジョブの中だけで使い、保存しない
