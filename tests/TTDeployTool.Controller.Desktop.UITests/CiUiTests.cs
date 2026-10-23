@@ -65,7 +65,7 @@ public class CiUiTests
         // サインインしていないため、サブスクリプションが無い
         app.IsEnabled("Wizard.Next").Should().BeFalse("誤りがあれば次へ進めない");
         // 誤りの一覧（ItemsControl）は UI Automation の要素にならないため、ウィンドウの中の文字列から読む
-        app.ScreenText().Should().Contain("subscription は必須です。").And.Contain("resource-group は必須です。");
+        app.WaitForScreenText(t => t.Contains("subscription は必須です。") && t.Contains("resource-group は必須です。"), "① の誤りが出る");
         app.TextOf("Wizard.Blocked").Should().Be("誤りが 2 件あるため、次へ進めません。");
         app.SetText("Target.ResourceGroup", "rg-wizard");
         app.WaitForText("Wizard.Blocked", t => t == "誤りが 1 件あるため、次へ進めません。", "直した誤りは消える");

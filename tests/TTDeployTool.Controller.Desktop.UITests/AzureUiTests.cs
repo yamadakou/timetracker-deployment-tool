@@ -67,7 +67,8 @@ public class AzureUiTests
             Next(app, "③");
             // ③ パスワード: 入れるまで次へ進めない（誤りはこの画面に出る）
             app.IsEnabled("Wizard.Next").Should().BeFalse("パスワードが無ければ次へ進めない");
-            app.ScreenText().Should().Contain("db-password が不足または短すぎます。");
+            // 誤りの一覧は、画面を切り替えた直後には UI Automation に出ていないことがあるため、出るのを待つ
+            app.WaitForScreenText(t => t.Contains("db-password が不足または短すぎます。"), "パスワードの誤りがこの画面に出る");
             var dbPassword = "Ui" + Guid.NewGuid().ToString("N")[..12] + "!";
             app.SetText("Settings.DbPassword", dbPassword);
             app.SetText("Settings.TrackerPassword", "Ui" + Guid.NewGuid().ToString("N")[..12] + "!");
