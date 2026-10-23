@@ -327,7 +327,7 @@ public sealed class DeploymentListViewModel : ObservableObject
                 var at = Time.GetUtcNow();
                 // デプロイの実行は、必ず期限を記録する（DeploymentRunner）
                 var expiry = r.Expiry!;
-                Remember(t.Subscription, t.ResourceGroup, t.AppName, e => (e ?? Placeholder(t.Subscription, t.ResourceGroup, t.AppName, r)) with
+                Remember(t.Subscription, t.ResourceGroup, t.AppName, e => Deployed(e, Placeholder(t.Subscription, t.ResourceGroup, t.AppName, r)) with
                 {
                     Url = r.TimetrackerUrl ?? e?.Url,
                     DeployedAt = at,
@@ -346,6 +346,20 @@ public sealed class DeploymentListViewModel : ObservableObject
         subscriptionId, resourceGroup, appName, null, null, null, ExpiryKind.Missing, null,
         new AppEntry(r.TimetrackerAppName, null, null, null, null, null), new AppEntry(r.DbAppName, null, null, null, null, null),
         new AppEntry(r.RedisAppName, null, null, null, null, null), r.EnvironmentName, r.StorageAccountName, r.StorageAccountName != null);
+
+    // デプロイしたものを重ねる。Resource Graph に一部だけ反映されている場合（デプロイの直後に Timetracker のアプリが無い、など）は、無いものを
+    // デプロイの結果で補う（「パスワードを表示」が押せなかった。Desktop System Test、2026-10-23）
+    private static DeploymentEntry Deployed(DeploymentEntry? e, DeploymentEntry placeholder) => e == null
+        ? placeholder
+        : e with
+        {
+            Timetracker = e.Timetracker ?? placeholder.Timetracker,
+            Db = e.Db ?? placeholder.Db,
+            Redis = e.Redis ?? placeholder.Redis,
+            EnvironmentName = e.EnvironmentName ?? placeholder.EnvironmentName,
+            StorageAccountName = e.StorageAccountName ?? placeholder.StorageAccountName,
+            DbPersisted = e.DbPersisted || placeholder.DbPersisted,
+        };
 
     // 削除したものを除く（何も残らなければ一覧から消す）
     private static DeploymentEntry? Without(DeploymentEntry? e, HashSet<string> gone, bool resourceGroupDeleted)

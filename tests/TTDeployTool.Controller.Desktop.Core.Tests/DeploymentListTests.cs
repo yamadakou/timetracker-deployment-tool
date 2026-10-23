@@ -496,6 +496,47 @@ public class DeploymentListViewModelTests
     }
 
     [Fact]
+    public async Task A_Partly_Reflected_Deployment_Should_Be_Completed_By_The_Job_Result()
+    {
+        // デプロイの直後は、Resource Graph に Timetracker のアプリがまだ無いことがある（Desktop System Test、2026-10-23）
+        var h = await LoadedAsync(Deployment("sub", "rg", "demo").Where(r => r.Name != "demo-tt").Select(r => r.Name == "demo-db"
+            ? r with { App = new ContainerAppSnapshot("Succeeded", "Running", "postgres:16", 1, "2Gi", null, ["dbdata"]) }
+            : r));
+        h.Main.Deployments.Rows.Single().StateText.Should().Be("一部だけ（Timetracker がありません）");
+        h.Azure.ResourceGroup = null;
+        h.Main.Settings.PersistDb = SettingsViewModel.PersistDbOptions[1];
+
+        await h.Main.Deployment.PlanCommand.ExecuteAsync();
+        await h.Main.Deployment.StartCommand.ExecuteAsync();
+        await h.Main.Queue.WhenIdleAsync();
+
+        var row = h.Main.Deployments.Rows.Single();
+        row.Entry.IsComplete.Should().BeTrue();
+        row.Entry.Timetracker!.Name.Should().Be("demo-tt");
+        row.ShowPasswordsCommand.CanExecute(null).Should().BeTrue();
+        row.PersistenceText.Should().Be("Azure Files に永続化");
+        row.Entry.StorageAccountName.Should().Be(FakeAzure.StorageAccountName);
+    }
+
+    [Fact]
+    public async Task A_Deployment_Over_Leftover_Data_Should_Fill_Every_Missing_Resource()
+    {
+        // 以前の DB のデータ（ストレージアカウント）だけが残っている環境に、永続化しないでデプロイする
+        var h = await LoadedAsync([new ManagedResourceRecord(
+            "/s/st", FakeAzure.StorageAccountName, ManagedResourceRecord.StorageAccountType, "sub", "rg", "japaneast", Tags("demo"))]);
+        h.Azure.ResourceGroup = null;
+
+        await h.Main.Deployment.PlanCommand.ExecuteAsync();
+        await h.Main.Deployment.StartCommand.ExecuteAsync();
+        await h.Main.Queue.WhenIdleAsync();
+
+        var row = h.Main.Deployments.Rows.Single();
+        (row.Entry.Timetracker!.Name, row.Entry.Db!.Name, row.Entry.Redis!.Name, row.Entry.EnvironmentName).Should().Be(("demo-tt", "demo-db", "demo-redis", "demo-env"));
+        row.Entry.StorageAccountName.Should().Be(FakeAzure.StorageAccountName);
+        row.PersistenceText.Should().Be("永続化していない（以前の DB のデータが残っています）");
+    }
+
+    [Fact]
     public async Task A_Redeployment_Should_Update_The_Listed_Row()
     {
         var h = await LoadedAsync(Deployment("sub", "rg", "demo", "none"));
