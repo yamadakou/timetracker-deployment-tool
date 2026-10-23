@@ -399,8 +399,10 @@ public class AzureSdkExecutorInventoryTests
         var ids = new List<string>();
         var tag = new Mock<TagResource>();
         _arm.Setup(a => a.GetTagResource(It.IsAny<ResourceIdentifier>())).Callback<ResourceIdentifier>(i => ids.Add(i.ToString())).Returns(tag.Object);
-        tag.Setup(t => t.UpdateAsync(WaitUntil.Completed, It.Is<TagResourcePatch>(p => p.PatchMode == TagPatchMode.Merge && p.TagValues["tt-expires-at"] == "none"),
+        var waits = new List<WaitUntil>();
+        tag.Setup(t => t.UpdateAsync(It.IsAny<WaitUntil>(), It.Is<TagResourcePatch>(p => p.PatchMode == TagPatchMode.Merge && p.TagValues["tt-expires-at"] == "none"),
                 It.IsAny<CancellationToken>()))
+            .Callback<WaitUntil, TagResourcePatch, CancellationToken>((w, _, _) => waits.Add(w))
             .ReturnsAsync(Mock.Of<ArmOperation<TagResource>>());
         var tags = new Dictionary<string, string> { [DeploymentExpiry.ExpiresAtKey] = "none" };
 
@@ -410,6 +412,7 @@ public class AzureSdkExecutorInventoryTests
         ids.Should().Equal(
             $"/subscriptions/{SubscriptionId}/resourceGroups/{RgName}/providers/Microsoft.App/managedEnvironments/app-env/providers/Microsoft.Resources/tags/default",
             $"/subscriptions/{SubscriptionId}/resourceGroups/{RgName}/providers/Microsoft.Storage/storageAccounts/ttapp12345678/providers/Microsoft.Resources/tags/default");
-        tag.Verify(t => t.UpdateAsync(WaitUntil.Completed, It.IsAny<TagResourcePatch>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+        // Environment は受け付けられたら戻る（完了まで待つと 2 分以上かかった）。ストレージアカウントは完了を待つ
+        waits.Should().Equal(WaitUntil.Started, WaitUntil.Completed);
     }
 }

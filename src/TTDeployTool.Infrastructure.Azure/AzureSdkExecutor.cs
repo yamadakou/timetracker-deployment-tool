@@ -352,21 +352,24 @@ public class AzureSdkExecutor : IAzureDeploymentGateway
         string subscriptionId, string rgName, string name, IReadOnlyDictionary<string, string> tags, CancellationToken cancellationToken = default) =>
         MergeTagsAsync(ContainerAppResource.CreateResourceIdentifier(subscriptionId, rgName, name), tags, cancellationToken);
 
+    // Container Apps Environment は、タグの変更も時間のかかる非同期の操作として扱われ、完了まで待つと一覧の「期限を変える」が 2 分以上終わらなかった
+    // （Desktop System Test、2026-10-23）。受け付けられたら戻る（権限・入力の誤りは、受け付けの時点で返る）
     public Task UpdateEnvironmentTagsAsync(
         string subscriptionId, string rgName, string envName, IReadOnlyDictionary<string, string> tags, CancellationToken cancellationToken = default) =>
-        MergeTagsAsync(ContainerAppManagedEnvironmentResource.CreateResourceIdentifier(subscriptionId, rgName, envName), tags, cancellationToken);
+        MergeTagsAsync(ContainerAppManagedEnvironmentResource.CreateResourceIdentifier(subscriptionId, rgName, envName), tags, cancellationToken, WaitUntil.Started);
 
     public Task UpdateStorageAccountTagsAsync(
         string subscriptionId, string rgName, string accountName, IReadOnlyDictionary<string, string> tags, CancellationToken cancellationToken = default) =>
         MergeTagsAsync(StorageAccountResource.CreateResourceIdentifier(subscriptionId, rgName, accountName), tags, cancellationToken);
 
     // タグの API の Merge（指定したタグだけを加える・上書きする。リソースの設定は変えず、新しいリビジョンも作らない）
-    private async Task MergeTagsAsync(ResourceIdentifier resource, IReadOnlyDictionary<string, string> tags, CancellationToken cancellationToken)
+    private async Task MergeTagsAsync(
+        ResourceIdentifier resource, IReadOnlyDictionary<string, string> tags, CancellationToken cancellationToken, WaitUntil waitUntil = WaitUntil.Completed)
     {
         var patch = new TagResourcePatch { PatchMode = TagPatchMode.Merge };
         foreach (var (key, value) in tags)
             patch.TagValues[key] = value;
-        await _arm.GetTagResource(TagResource.CreateResourceIdentifier(resource)).UpdateAsync(WaitUntil.Completed, patch, cancellationToken);
+        await _arm.GetTagResource(TagResource.CreateResourceIdentifier(resource)).UpdateAsync(waitUntil, patch, cancellationToken);
     }
 
     public async Task<bool> DeleteContainerAppAsync(string subscriptionId, string rgName, string name, CancellationToken cancellationToken = default)

@@ -120,7 +120,7 @@
 - 期限は、期限日の終わり（その日の 23:59:59、利用者の PC の時刻帯）とする（D17）。タグには UTC の時刻（ISO 8601）で記録する
 - 記録する場所（D5）: 本ツールで作るリソース（Container Apps Environment・3 つの Container App・ストレージアカウント）のタグ。リソースグループは本ツールのものと限らない（既存のものを使える）ため、タグを付けない
   - 実装（7d-1）では、**3 つの Container App だけ**に書いた（次の理由。No.60 で変更）。Environment とストレージアカウントの管理タグは、新しく作るときだけ付け、既存のものは変更しない方針（README の管理タグ）で、デプロイのたびにタグを書き換えると、既存のリソースを変更し、タグの書き込みの権限（`Microsoft.Resources/tags/write` など）も新たに要るため。期限は Container App のタグから読む（tt → db → redis の順に、`tt-expires-at` のあるもの）。一覧（7d-2）・期限での削除（7d-3）も Container App のタグを読む
-  - 変更（No.60、オーナーの判断 2026-10-23）: 途中で失敗して Environment・ストレージアカウントだけが残った場合も期限で削除できるよう、**本ツールで作った（管理タグの一致する）Environment とストレージアカウントにも書く**。デプロイでは、Environment・ストレージアカウントを作った直後（Container App より前）に、タグの API の Merge で `tt-expires-at`・`tt-deployed-at` だけを書く（設定とほかのタグは変えない）。権限の事前確認に、その Environment・ストレージアカウントへの書き込み（`managedEnvironments/write`・`storageAccounts/write`。リソースに割り当てたロールでもよい）を加えた。リソースグループには書かない
+  - 変更（No.60、オーナーの判断 2026-10-23）: 途中で失敗して Environment・ストレージアカウントだけが残った場合も期限で削除できるよう、**本ツールで作った（管理タグの一致する）Environment とストレージアカウントにも書く**。デプロイでは、Environment・ストレージアカウントを作った直後（Container App より前）に、タグの API の Merge で `tt-expires-at`・`tt-deployed-at` だけを書く（設定とほかのタグは変えない）。権限の事前確認に、その Environment・ストレージアカウントへの書き込み（`managedEnvironments/write`・`storageAccounts/write`。リソースに割り当てたロールでもよい）を加えた。リソースグループには書かない。Environment のタグの書き換えは、完了まで待つと 2 分以上かかったため（Desktop System Test、2026-10-23）、受け付けられたら戻る（`WaitUntil.Started`）
   - 複数のリソースの値のまとめ方（オーナーの判断 2026-10-23）: `none` が 1 つでもあれば期限なし、ほかは最も遅い期限（`DeploymentExpiry.Combine`。誤って早く削除しないため）。デプロイ日は最も新しいもの。値が食い違っていれば、一覧の行に注意を出す（「期限を変える」で揃う）。再デプロイで期限を省略したときは、3 つの Container App の値をこの規則でまとめて引き継ぐ
   | タグ | 値 | 付けるとき |
   |---|---|---|
