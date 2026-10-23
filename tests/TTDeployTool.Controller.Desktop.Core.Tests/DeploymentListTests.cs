@@ -454,6 +454,29 @@ public class DeploymentListViewModelTests
     }
 
     [Fact]
+    public async Task Disagreeing_Expiry_Tags_Should_Be_Warned_Until_They_Are_Aligned()
+    {
+        var records = Deployment("sub", "rg", "demo", "2026-11-23T14:59:59Z").Select(r => r.Name == "demo-env"
+            ? r with { Tags = Tags("demo", "2026-11-01T14:59:59Z") }
+            : r).ToList();
+        var h = await LoadedAsync(records);
+        h.Azure.Deployed();
+        h.Azure.GatewayMock.Setup(g => g.UpdateContainerAppTagsAsync("sub", "rg", It.IsAny<string>(), It.IsAny<IReadOnlyDictionary<string, string>>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        var row = h.Main.Deployments.Rows.Single();
+
+        row.ExpiryText.Should().Be("2026-11-23", "遅い方の期限");
+        row.HasExpiryWarning.Should().BeTrue();
+        row.ExpiryWarning.Should().StartWith("リソースごとに利用可能期限のタグが違います");
+
+        row.EditNoExpiry = true;
+        await row.ChangeExpiryCommand.ExecuteAsync();
+
+        row.HasExpiryWarning.Should().BeFalse("期限を変えると揃う");
+        row.ExpiryWarning.Should().BeNull();
+    }
+
+    [Fact]
     public async Task Expiry_Failures_Should_Be_Shown()
     {
         var h = await LoadedAsync(Deployment("sub", "rg", "demo", "none"));
@@ -468,7 +491,7 @@ public class DeploymentListViewModelTests
 
         row.EditExpiryDate = new DateTimeOffset(2026, 12, 1, 0, 0, 0, TimeSpan.FromHours(9));
         await row.ChangeExpiryCommand.ExecuteAsync();
-        row.Error.Should().Contain("本ツールで作った Container App がありません");
+        row.Error.Should().Contain("本ツールで作ったリソースがありません");
 
         h.Azure.Deployed();
         h.Azure.GatewayMock.Setup(g => g.UpdateContainerAppTagsAsync("sub", "rg", It.IsAny<string>(), It.IsAny<IReadOnlyDictionary<string, string>>(), It.IsAny<CancellationToken>()))

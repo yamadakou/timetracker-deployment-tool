@@ -103,6 +103,23 @@ public static class DeploymentExpiry
     /// <summary>デプロイした時刻・期限のタグの値（UTC の ISO 8601）。</summary>
     public static string FormatTag(DateTimeOffset value) => value.UtcDateTime.ToString(TagFormat, CultureInfo.InvariantCulture);
 
+    /// <summary>
+    /// 複数のリソースの <see cref="ExpiresAtKey"/> の値をまとめる（オーナーの判断、2026-10-23）。<see cref="None"/> が 1 つでもあれば期限なし、
+    /// ほかは最も遅い期限（誤って早く削除しないため）。読める値が無ければ null。
+    /// </summary>
+    public static string? Combine(IEnumerable<string?> values)
+    {
+        var list = values.OfType<string>().ToList();
+        if (list.Any(IsNone))
+            return None;
+        var dates = list.Select(v => TryParseTag(v, out var at) ? at : (DateTimeOffset?)null).OfType<DateTimeOffset>().ToList();
+        return dates.Count == 0 ? null : FormatTag(dates.Max());
+    }
+
+    /// <summary>リソースごとの <see cref="ExpiresAtKey"/> の値が食い違っているか（期限の変更の途中の失敗、ポータルでの書き換えなど）。</summary>
+    public static bool Differ(IEnumerable<string?> values) =>
+        values.OfType<string>().Select(v => IsNone(v) ? None : v.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).Count() > 1;
+
     /// <summary>タグの時刻（<see cref="FormatTag"/> の形式）を読む。読めなければ false。</summary>
     public static bool TryParseTag(string? value, out DateTimeOffset at) =>
         DateTimeOffset.TryParseExact(value, TagFormat, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out at);

@@ -120,4 +120,20 @@ public class DeploymentExpiryTests
         tagged.LifecycleTags.Should().ContainKey("tt-expires-at");
         options.LifecycleTags.Should().BeNull();
     }
+
+    [Theory]
+    [InlineData(new[] { "2026-11-01T14:59:59Z", "2026-11-30T14:59:59Z", null }, "2026-11-30T14:59:59Z")]
+    [InlineData(new[] { "2026-11-30T14:59:59Z", " NONE " }, "none")]
+    [InlineData(new[] { "someday", null }, null)]
+    [InlineData(new string?[0], null)]
+    public void Combine_Should_Prefer_No_Expiry_Then_The_Latest(string?[] values, string? expected) =>
+        DeploymentExpiry.Combine(values).Should().Be(expected);
+
+    [Theory]
+    [InlineData(new[] { "2026-11-30T14:59:59Z", "2026-11-30T14:59:59Z", null }, false)]
+    [InlineData(new[] { "none", " NONE" }, false)]
+    [InlineData(new[] { "2026-11-30T14:59:59Z", "none" }, true)]
+    [InlineData(new[] { "2026-11-01T14:59:59Z", "2026-11-30T14:59:59Z" }, true)]
+    public void Differ_Should_Tell_Disagreeing_Tags(string?[] values, bool expected) =>
+        DeploymentExpiry.Differ(values).Should().Be(expected);
 }

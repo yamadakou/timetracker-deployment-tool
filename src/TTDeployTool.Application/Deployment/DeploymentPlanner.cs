@@ -20,13 +20,15 @@ public sealed class DeploymentPlanner
     }
 
     /// <summary>
-    /// 今のデプロイの、利用可能期限のタグを持つ Container App のタグ（Timetracker → DB → Redis の順に探す。無ければ null）。
-    /// 期限は 3 つの Container App に記録する（Environment とストレージアカウントは、既存のものを変更しないため記録しない）。
+    /// 今のデプロイの利用可能期限（3 つの Container App のタグを <see cref="DeploymentExpiry.Combine"/> でまとめたもの。無ければ null）。
+    /// 再デプロイで期限を省略したときに引き継ぐ。
     /// </summary>
     public static IReadOnlyDictionary<string, string>? CurrentLifecycleTags(IReadOnlyList<ContainerAppInfo> apps, string appName) =>
-        new[] { ResourceNaming.TimetrackerApp(appName), ResourceNaming.DbApp(appName), ResourceNaming.RedisApp(appName) }
-            .Select(name => apps.FirstOrDefault(a => string.Equals(a.Name, name, StringComparison.OrdinalIgnoreCase))?.Tags)
-            .FirstOrDefault(tags => tags != null && tags.Keys.Any(k => string.Equals(k, DeploymentExpiry.ExpiresAtKey, StringComparison.OrdinalIgnoreCase)));
+        DeploymentExpiry.Combine(new[] { ResourceNaming.TimetrackerApp(appName), ResourceNaming.DbApp(appName), ResourceNaming.RedisApp(appName) }
+                .Select(name => apps.FirstOrDefault(a => string.Equals(a.Name, name, StringComparison.OrdinalIgnoreCase))?.Tags)
+                .Select(tags => tags?.FirstOrDefault(t => string.Equals(t.Key, DeploymentExpiry.ExpiresAtKey, StringComparison.OrdinalIgnoreCase)).Value)) is { } value
+            ? new Dictionary<string, string> { [DeploymentExpiry.ExpiresAtKey] = value }
+            : null;
 
     /// <summary>利用可能期限を決める（今日より前の日付を指定した場合は、その誤りも返す）。</summary>
     public (ExpiryDecision Decision, string? Error) ResolveExpiry(DeployOptions opts, IReadOnlyList<ContainerAppInfo> existingApps)
@@ -37,7 +39,7 @@ public sealed class DeploymentPlanner
     }
 
     // 永続化する場合の、DB のストレージの今の状態
-    private sealed record StorageState(string AccountName, bool AccountExists, bool ShareExists, bool EnvironmentStorageExists);
+    private sealed record StorageState(string AccountName, bool AccountExists, bool ShareExists, bool EnvironmentStorageExists, bool AccountManaged);
 
     /// <summary>既存の DB アプリが、DB のデータを置くストレージ（Azure Files）を使っているか（リソースグループや DB アプリが無ければ false）。</summary>
     public static async Task<bool> UsesDbStorageAsync(IAzureDeploymentGateway gateway, DeployOptions opts, CancellationToken cancellationToken = default)
@@ -58,7 +60,7 @@ public sealed class DeploymentPlanner
         var env = await _gateway.GetEnvironmentAsync(opts.Subscription, opts.ResourceGroup, ResourceNaming.Environment(opts.AppName), cancellationToken);
         var persist = opts.PersistDb ?? FindDbApp(existingApps, opts)?.UsesDbStorage == true;
         var storage = persist ? await ReadStorageStateAsync(opts, env != null, cancellationToken) : null;
-        return await CheckPermissionsAsync(opts, existingApps, env != null, storage, cancellationToken);
+        return await CheckPermissionsAsync(opts, existingApps, env, storage, cancellationToken);
     }
 
     /// <summary>
@@ -85,7 +87,7 @@ public sealed class DeploymentPlanner
             operations.Add(new PlannedOperation(PlannedResourceKind.ResourceGroup, opts.ResourceGroup, PlannedAction.Create));
             operations.Add(new PlannedOperation(PlannedResourceKind.Environment, envName, PlannedAction.Create));
             if (persistNew)
-                await AddStorageOperationsAsync(opts, new StorageState(StorageAccountName(opts), false, false, false), operations, blockers, warnings, cancellationToken);
+                await AddStorageOperationsAsync(opts, new StorageState(StorageAccountName(opts), false, false, false, false), operations, blockers, warnings, cancellationToken);
             operations.AddRange(appNames.Select(n => new PlannedOperation(PlannedResourceKind.ContainerApp, n, PlannedAction.Create)));
             var notChecked = ResourceGroupMissing(opts);
             warnings.Add(notChecked.Note!);
@@ -135,7 +137,7 @@ public sealed class DeploymentPlanner
                 PlannedResourceKind.ContainerApp, name, exists ? PlannedAction.Update : PlannedAction.Create, dataLossWarning != null));
         }
 
-        var permissions = await CheckPermissionsAsync(opts.WithPersistDb(persist), existingApps, env != null, storage, cancellationToken);
+        var permissions = await CheckPermissionsAsync(opts.WithPersistDb(persist), existingApps, env, storage, cancellationToken);
         if (permissions.Status == PermissionCheckStatus.Missing)
             blockers.Add($"権限が不足しています: {string.Join(", ", permissions.MissingActions)}。" +
                          "README の「必要な RBAC ロールと権限」を参照し、ロールの割り当てを確認してください。");
@@ -172,7 +174,7 @@ public sealed class DeploymentPlanner
         var envStorageExists = envExists &&
                                await _gateway.EnvironmentStorageExistsAsync(
                                    opts.Subscription, opts.ResourceGroup, ResourceNaming.Environment(opts.AppName), DbPersistence.StorageName, cancellationToken);
-        return new StorageState(accountName, account != null, shareExists, envStorageExists);
+        return new StorageState(accountName, account != null, shareExists, envStorageExists, ManagedTags.IsManaged(account?.Tags, opts.AppName));
     }
 
     // ストレージアカウント → ファイル共有 → Environment のストレージ（キーを登録し直すため、既存なら更新）
@@ -201,7 +203,7 @@ public sealed class DeploymentPlanner
             "（作成する権限が無い場合は最初の手順で失敗し、リソースは作成されません）。");
 
     private async Task<PermissionCheckResult> CheckPermissionsAsync(
-        DeployOptions opts, IReadOnlyList<ContainerAppInfo> existingApps, bool envExists, StorageState? storage, CancellationToken cancellationToken)
+        DeployOptions opts, IReadOnlyList<ContainerAppInfo> existingApps, ManagedEnvironmentInfo? env, StorageState? storage, CancellationToken cancellationToken)
     {
         // 既存のリソースへの操作は、リソースに割り当てられたロールでも許可される。作成するものはリソースグループでの権限が必要
         var requirements = new List<PermissionRequirement>();
@@ -215,20 +217,20 @@ public sealed class DeploymentPlanner
         }
 
         var envName = ResourceNaming.Environment(opts.AppName);
-        var envResource = envExists ? TargetResource.Environment(envName) : null;
+        var envResource = env != null ? TargetResource.Environment(envName) : null;
         requirements.Add(new PermissionRequirement(AzurePermissions.EnvironmentRead, envResource));
         requirements.Add(new PermissionRequirement(AzurePermissions.EnvironmentJoin, envResource));
-        if (!envExists)
-        {
-            requirements.Add(new PermissionRequirement(AzurePermissions.EnvironmentWrite));
-        }
+        // 作る Environment と、本ツールで作った既存の Environment には、利用可能期限のタグを書く（タグの API。リソースへの書き込みの権限で許可される）
+        if (env == null || ManagedTags.IsManaged(env.Tags, opts.AppName))
+            requirements.Add(new PermissionRequirement(AzurePermissions.EnvironmentWrite, envResource));
 
         if (storage != null)
         {
             var account = storage.AccountExists ? TargetResource.StorageAccount(storage.AccountName) : null;
             requirements.Add(new PermissionRequirement(AzurePermissions.StorageAccountRead, account));
-            if (!storage.AccountExists)
-                requirements.Add(new PermissionRequirement(AzurePermissions.StorageAccountWrite));
+            // 作るストレージアカウントと、本ツールで作った既存のものには、利用可能期限のタグを書く
+            if (!storage.AccountExists || storage.AccountManaged)
+                requirements.Add(new PermissionRequirement(AzurePermissions.StorageAccountWrite, account));
             requirements.Add(new PermissionRequirement(AzurePermissions.StorageAccountListKeys, account));
             requirements.Add(new PermissionRequirement(AzurePermissions.FileShareRead, account));
             if (!storage.ShareExists)

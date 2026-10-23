@@ -119,7 +119,9 @@
 - 「設定」に「利用可能期限日」を加える。選べるのは「既定」（新しくデプロイする場合は今日から 32 日後、再デプロイは今の期限を引き継ぐ。D9・D11）、日付の指定、「期限なし」（D12）。画面には、既定で決まる日付も表示する。今日より前の日付は誤りにする
 - 期限は、期限日の終わり（その日の 23:59:59、利用者の PC の時刻帯）とする（D17）。タグには UTC の時刻（ISO 8601）で記録する
 - 記録する場所（D5）: 本ツールで作るリソース（Container Apps Environment・3 つの Container App・ストレージアカウント）のタグ。リソースグループは本ツールのものと限らない（既存のものを使える）ため、タグを付けない
-  - 実装（7d-1）では、**3 つの Container App だけ**に書く。Environment とストレージアカウントの管理タグは、新しく作るときだけ付け、既存のものは変更しない方針（README の管理タグ）で、デプロイのたびにタグを書き換えると、既存のリソースを変更し、タグの書き込みの権限（`Microsoft.Resources/tags/write` など）も新たに要るため。期限は Container App のタグから読む（tt → db → redis の順に、`tt-expires-at` のあるもの）。一覧（7d-2）・期限での削除（7d-3）も Container App のタグを読む
+  - 実装（7d-1）では、**3 つの Container App だけ**に書いた（次の理由。No.60 で変更）。Environment とストレージアカウントの管理タグは、新しく作るときだけ付け、既存のものは変更しない方針（README の管理タグ）で、デプロイのたびにタグを書き換えると、既存のリソースを変更し、タグの書き込みの権限（`Microsoft.Resources/tags/write` など）も新たに要るため。期限は Container App のタグから読む（tt → db → redis の順に、`tt-expires-at` のあるもの）。一覧（7d-2）・期限での削除（7d-3）も Container App のタグを読む
+  - 変更（No.60、オーナーの判断 2026-10-23）: 途中で失敗して Environment・ストレージアカウントだけが残った場合も期限で削除できるよう、**本ツールで作った（管理タグの一致する）Environment とストレージアカウントにも書く**。デプロイでは、Environment・ストレージアカウントを作った直後（Container App より前）に、タグの API の Merge で `tt-expires-at`・`tt-deployed-at` だけを書く（設定とほかのタグは変えない）。権限の事前確認に、その Environment・ストレージアカウントへの書き込み（`managedEnvironments/write`・`storageAccounts/write`。リソースに割り当てたロールでもよい）を加えた。リソースグループには書かない
+  - 複数のリソースの値のまとめ方（オーナーの判断 2026-10-23）: `none` が 1 つでもあれば期限なし、ほかは最も遅い期限（`DeploymentExpiry.Combine`。誤って早く削除しないため）。デプロイ日は最も新しいもの。値が食い違っていれば、一覧の行に注意を出す（「期限を変える」で揃う）。再デプロイで期限を省略したときは、3 つの Container App の値をこの規則でまとめて引き継ぐ
   | タグ | 値 | 付けるとき |
   |---|---|---|
   | `tt-deployed-at` | 最後にデプロイした時刻（UTC、ISO 8601） | デプロイのたび |
@@ -132,7 +134,7 @@
 - アプリは、起動したとき・サインインしたとき・その後 30 分ごとに、デプロイの一覧（6.3）を読み、期限が近いもの・過ぎたものを探す
 - 期限の 3 日前と前日に通知する（D7）。同じ通知を何度も出さないよう、出した通知（デプロイの ID と種類）をアプリのデータに記録する（パスワードなどは含まない。正は Azure のタグで、この記録は通知の重複を防ぐためだけに使う）。通知と一覧から、期限を延ばせる（タグを書き換える）
 - 期限を過ぎたものは、確認なしで削除のジョブを登録する（D7。7b のジョブの仕組みを使い、同時実行の上限と、同じ対象のジョブを登録させない決まりに従う）。削除の直前に計画し直し、本ツールで作ったもの（管理タグがあるもの）だけを消す。期限での削除は、DB のデータ（ストレージアカウント）も消す（`--keep-db-data` を使わない）。デプロイのときに本ツールが作ったリソースグループ（`managed-by` のタグがある）は、空になればリソースグループも削除する（`resource-group-deletion.md` の Q4）
-- 削除の前に、`tt-expires-at` を Azure から読み直す。別の PC や一覧で期限が延ばされていれば削除しない
+- 削除の前に、`tt-expires-at` を Azure から読み直す（すべてのリソースの値を 6.1 の規則でまとめる。`none` が 1 つでもあれば削除しない）。別の PC や一覧で期限が延ばされていれば削除しない
 - 複数の PC のアプリが同時に削除しようとしても、削除は冪等（既に無いものは「既に無い」として続ける）なので害は無い
 - サインインしたアカウントに権限が無いサブスクリプションの期限切れは削除できない。一覧に「権限が無いため削除できません」と出し、通知する
 - 確実に削除できるよう、Windows のサインイン時に、ウィンドウを出さずに通知領域で起動できるようにする（MSIX の `StartupTask`。D16）。どの PC でもアプリが動いていなければ、次にどれかの PC で動いたときに削除する（削除が遅れる）。この制約は画面と手順書に書く
@@ -159,7 +161,7 @@
 | 反映の遅れ | Resource Graph はすぐには反映されない（強い整合性ではない）。このアプリで 15 分以内に終えたデプロイ・削除と、変えた期限は、一覧を読んだ結果に重ねて表示する | Overview（How Resource Graph is kept current） |
 | パスワード | `ContainerAppResource.GetSecretsAsync`（`listSecrets`。値を含む）で、Timetracker アプリのシークレット `db-password`・`app-password` を読む。読む前に管理タグを確かめる。権限は `Microsoft.App/containerApps/listSecrets/action`（Contributor など）。押したときだけ読み、伏せ字で表示し、「表示」で見せる。値は一覧の行（ViewModel）にだけ置き、一覧を読み直す・ページを変える・サインアウトで消す（フィルタ・並べ替え・期限の変更では、同じデプロイの行を使い続ける）。診断用のログには読んだことだけを書く | Container Apps - List Secrets（REST、2026-07-01） |
 | コピー | `Clipboard.SetContentWithOptions` に `ClipboardContentOptions`（`IsAllowedInHistory = false`、`IsRoamable = false`）を渡し、クリップボードの履歴とほかの PC への同期に残さない（Windows 10 1809 以降） | ClipboardContentOptions Class |
-| 期限の変更 | 行で「日付」か「期限なし」を選んで変える（今日より前は誤り）。3 つの Container App のうち、あって管理タグが一致するものの `tt-expires-at` を、タグの API（`TagResource.UpdateAsync`、`PatchMode = Merge`）で書き換える。リソースの PUT は使わない（シークレットの値が GET で返らないため、PUT で上書きすると消える）。新しいリビジョンは作られない。権限は `Microsoft.Resources/tags/write`（Tag Contributor）か、リソースへの書き込み（Contributor） | Use tags to organize your Azure resources（Required access）、パッケージの XML ドキュメント |
+| 期限の変更 | 行で「日付」か「期限なし」を選んで変える（今日より前は誤り）。3 つの Container App・Environment・ストレージアカウントのうち、あって管理タグが一致するものの `tt-expires-at` を、タグの API（`TagResource.UpdateAsync`、`PatchMode = Merge`）で書き換える。リソースの PUT は使わない（シークレットの値が GET で返らないため、PUT で上書きすると消える）。新しいリビジョンは作られない。権限は `Microsoft.Resources/tags/write`（Tag Contributor）か、リソースへの書き込み（Contributor） | Use tags to organize your Azure resources（Required access）、パッケージの XML ドキュメント |
 | 行の操作 | 「対象に入れる」（サインインと対象に、サブスクリプション・リソースグループ・アプリ名を入れる）、「状態を確認」（対象に入れて状態の確認の画面で読む）、「削除」（対象に入れて削除の画面を開く。計画 → アプリ名の入力 → 実行は今の画面のまま）、「開く」（URL）、「パスワードを表示」、期限の変更 |
 | フィルタ・並べ替え・ページング | 6.3 のとおり。利用可能期限日のフィルタは「すべて」「7 日以内（過ぎたものを含む）」「期限なし」「日付の範囲」。期限の色: 過ぎた → 赤、7 日以内 → 黄 |
 

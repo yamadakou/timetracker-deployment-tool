@@ -392,4 +392,24 @@ public class AzureSdkExecutorInventoryTests
         // アプリの PUT は使わない（シークレットの値が消えるため）
         _apps.Verify(c => c.CreateOrUpdateAsync(It.IsAny<WaitUntil>(), It.IsAny<string>(), It.IsAny<ContainerAppData>(), It.IsAny<CancellationToken>()), Times.Never);
     }
+
+    [Fact]
+    public async Task Environment_And_Storage_Tags_Should_Be_Merged_Through_The_Tags_Api()
+    {
+        var ids = new List<string>();
+        var tag = new Mock<TagResource>();
+        _arm.Setup(a => a.GetTagResource(It.IsAny<ResourceIdentifier>())).Callback<ResourceIdentifier>(i => ids.Add(i.ToString())).Returns(tag.Object);
+        tag.Setup(t => t.UpdateAsync(WaitUntil.Completed, It.Is<TagResourcePatch>(p => p.PatchMode == TagPatchMode.Merge && p.TagValues["tt-expires-at"] == "none"),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Mock.Of<ArmOperation<TagResource>>());
+        var tags = new Dictionary<string, string> { [DeploymentExpiry.ExpiresAtKey] = "none" };
+
+        await Sut().UpdateEnvironmentTagsAsync(SubscriptionId, RgName, "app-env", tags, Ct);
+        await Sut().UpdateStorageAccountTagsAsync(SubscriptionId, RgName, "ttapp12345678", tags, Ct);
+
+        ids.Should().Equal(
+            $"/subscriptions/{SubscriptionId}/resourceGroups/{RgName}/providers/Microsoft.App/managedEnvironments/app-env/providers/Microsoft.Resources/tags/default",
+            $"/subscriptions/{SubscriptionId}/resourceGroups/{RgName}/providers/Microsoft.Storage/storageAccounts/ttapp12345678/providers/Microsoft.Resources/tags/default");
+        tag.Verify(t => t.UpdateAsync(WaitUntil.Completed, It.IsAny<TagResourcePatch>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+    }
 }

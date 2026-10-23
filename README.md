@@ -90,12 +90,13 @@ TimeTracker のコンテナイメージの詳細（クイックスタート、�
 |---|---|
 | `managed-by` | `ttdeploytool` |
 | `tt-app-name` | アプリ名（`--app-name`） |
-| `tt-expires-at` | 利用可能期限（UTC。例: `2026-11-23T14:59:59Z`）。期限なしは `none`（`--expires-on`。3 つの Container App だけ） |
-| `tt-deployed-at` | 最後にデプロイした時刻（UTC。3 つの Container App だけ） |
+| `tt-expires-at` | 利用可能期限（UTC。例: `2026-11-23T14:59:59Z`）。期限なしは `none`（`--expires-on`。3 つの Container App・Container Apps 環境・ストレージアカウント） |
+| `tt-deployed-at` | 最後にデプロイした時刻（UTC。3 つの Container App・Container Apps 環境・ストレージアカウント） |
 
 - 3 つの Container App には、作成するときと更新するときに付けます。更新するときは、利用者が付けたほかのタグを残したまま、管理タグを加えます
 - Container Apps 環境とストレージアカウントには、新しく作成するときだけ付けます（既存のものは変更しないため）
-- `tt-expires-at` と `tt-deployed-at` は、デプロイのたびに 3 つの Container App へ書きます（期限を省略した再デプロイでは、`tt-expires-at` は今の値のまま）。Container Apps 環境・ストレージアカウントには付けません（既存のものを変更しないため）
+- `tt-expires-at` と `tt-deployed-at` は、デプロイのたびに 3 つの Container App と、本ツールで作った Container Apps 環境・ストレージアカウント（`--persist-db` の場合）へ書きます（期限を省略した再デプロイでは、`tt-expires-at` は今の値のまま）。環境とストレージアカウントには作った直後に書くため、途中で失敗して残った場合も期限で削除できます。既存の環境とストレージアカウントには、[タグの API](https://learn.microsoft.com/ja-jp/azure/azure-resource-manager/management/tag-resources) でこの 2 つのタグだけを書き加え、設定とほかのタグは変えません。リソースグループには付けません
+- リソースごとの `tt-expires-at` が食い違っている場合（期限の変更の途中の失敗、ポータルでの書き換えなど）は、`none` が 1 つでもあれば期限なし、ほかは最も遅い期限とみなします（誤って早く削除しないため）
 - リソースグループは、本ツールが新しく作成したときだけ `managed-by` を付けます（`tt-app-name` は付けません。同じリソースグループに複数のアプリ名でデプロイできるため）。既存のリソースグループは変更しません
 - 以前の名前（timetracker-deployment-tool）の版（v0.8.1 まで）は `managed-by` に `timetracker-deployment-tool` を付けていました。この値のリソースも本ツールのものとして扱い、削除の対象にします。更新すると `ttdeploytool` に置き換わります
 - タグは誤って削除しないための目印で、セキュリティの制限ではありません（削除できるかどうかは、Azure の RBAC で決まります）

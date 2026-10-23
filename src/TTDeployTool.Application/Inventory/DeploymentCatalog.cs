@@ -21,7 +21,7 @@ public sealed record AppEntry(string Name, string? ProvisioningState, string? Ru
 
 /// <summary>
 /// デプロイの一覧の 1 行（サブスクリプション・リソースグループ・アプリ名の組。docs/design/desktop-jobs.md の 6.3・6.4）。
-/// 無いリソースは null（作りかけ・消しかけ）。
+/// 無いリソースは null（作りかけ・消しかけ）。<see cref="ExpiryDiffers"/> は、リソースごとの期限のタグが食い違っているか。
 /// </summary>
 public sealed record DeploymentEntry(
     string SubscriptionId,
@@ -37,7 +37,8 @@ public sealed record DeploymentEntry(
     AppEntry? Redis,
     string? EnvironmentName,
     string? StorageAccountName,
-    bool DbPersisted)
+    bool DbPersisted,
+    bool ExpiryDiffers = false)
 {
     /// <summary>DB 種別（DB アプリのイメージから。分からなければ null）。</summary>
     public string? DbType => Db?.Image switch
@@ -94,25 +95,25 @@ public static class DeploymentCatalog
         var env = Find(ManagedResourceRecord.EnvironmentType, ResourceNaming.Environment(appName));
         var storage = Find(ManagedResourceRecord.StorageAccountType);
         var first = records[0];
-        // 期限とデプロイ日は Container App にだけ書く（tt → db → redis の順に、タグのあるもの）
-        var apps = new[] { tt, db, redis }.OfType<ManagedResourceRecord>().ToList();
-        var expiresTag = apps.Select(a => a.Tags.GetValueOrDefault(DeploymentExpiry.ExpiresAtKey)).FirstOrDefault(v => v != null);
-        var deployedTag = apps.Select(a => a.Tags.GetValueOrDefault(DeploymentExpiry.DeployedAtKey)).FirstOrDefault(v => v != null);
-        var (kind, expiresAt) = expiresTag switch
-        {
-            { } v when string.Equals(v, DeploymentExpiry.None, StringComparison.OrdinalIgnoreCase) => (ExpiryKind.None, (DateTimeOffset?)null),
-            { } v when DeploymentExpiry.TryParseTag(v, out var at) => (ExpiryKind.Date, at),
-            _ => (ExpiryKind.Missing, null),
-        };
+        // 期限とデプロイ日は、本ツールで作るリソースのタグ（期限は、期限なしが 1 つでもあれば期限なし、ほかは最も遅いもの。デプロイ日は最も新しいもの）
+        var resources = new[] { tt, db, redis, env, storage }.OfType<ManagedResourceRecord>().ToList();
+        var expiresTags = resources.Select(r => r.Tags.GetValueOrDefault(DeploymentExpiry.ExpiresAtKey)).ToList();
+        var expiresTag = DeploymentExpiry.Combine(expiresTags);
+        var deployedTag = resources.Select(r => DeploymentExpiry.TryParseTag(r.Tags.GetValueOrDefault(DeploymentExpiry.DeployedAtKey), out var at) ? at : (DateTimeOffset?)null)
+            .Max();
+        // Combine は、期限なし（none）・読める期限・null（読めるものが無い）のどれかを返す
+        var kind = expiresTag == null ? ExpiryKind.Missing : expiresTag == DeploymentExpiry.None ? ExpiryKind.None : ExpiryKind.Date;
+        DateTimeOffset? expiresAt = DeploymentExpiry.TryParseTag(expiresTag, out var at) ? at : null;
         return new DeploymentEntry(
             first.SubscriptionId, first.ResourceGroup, appName,
             (tt ?? env ?? first).Location is { Length: > 0 } location ? location : null,
             tt?.App?.Fqdn is { } fqdn ? $"https://{fqdn}" : null,
-            DeploymentExpiry.TryParseTag(deployedTag, out var deployedAt) ? deployedAt : null,
+            deployedTag,
             kind, expiresAt,
             App(tt), App(db), App(redis),
             env?.Name, storage?.Name,
-            db?.App?.UsesDbStorage == true);
+            db?.App?.UsesDbStorage == true,
+            DeploymentExpiry.Differ(expiresTags));
     }
 
     private static AppEntry? App(ManagedResourceRecord? record) => record == null

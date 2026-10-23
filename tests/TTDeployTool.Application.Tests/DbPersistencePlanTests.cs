@@ -174,6 +174,27 @@ public class DbPersistencePlanTests
         plan.Blockers.Should().ContainSingle().Which.Should().Contain(AzurePermissions.StorageAccountWrite);
     }
 
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    public async Task Should_Require_Writing_The_Expiry_Tag_Only_On_The_Managed_Storage_Account(bool managed, bool required)
+    {
+        // 本ツールで作った既存のストレージアカウントには、利用可能期限のタグを書くため、書き込みの権限が要る
+        ResourceGroup();
+        Environment();
+        ExistingStorage();
+        if (managed)
+            _gateway.Setup(g => g.GetStorageAccountAsync("sub", "rg", Account, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new StorageAccountInfo(Account, "japaneast", ManagedTags.For("demo")));
+        _gateway.Setup(g => g.GetPermissionsAsync("sub", "rg", It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new PermissionSet(["Microsoft.App/*", "Microsoft.Resources/*", "Microsoft.Storage/storageAccounts/read",
+                "Microsoft.Storage/storageAccounts/listkeys/action", "Microsoft.Storage/storageAccounts/fileServices/shares/read"], [])]);
+
+        var plan = await Plan(true);
+
+        plan.PermissionCheck.MissingActions.Contains(AzurePermissions.StorageAccountWrite).Should().Be(required);
+    }
+
     [Fact]
     public async Task Should_Check_Existing_Storage_And_Stop_Start_Permissions_On_The_Resources()
     {

@@ -257,6 +257,7 @@ public sealed class DeploymentListViewModel : ObservableObject
         {
             ExpiryKind = decision.ExpiresAt == null ? ExpiryKind.None : ExpiryKind.Date,
             ExpiresAt = decision.ExpiresAt,
+            ExpiryDiffers = false,
         });
     }
 

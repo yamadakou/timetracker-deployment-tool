@@ -297,6 +297,8 @@
                                                 <TextBlock Text="　デプロイ日:" /><TextBlock Text="{x:Bind DeployedText, Mode=OneWay}" />
                                                 <TextBlock Text="　状態:" /><TextBlock AutomationProperties.AutomationId="Row.State" Text="{x:Bind StateText, Mode=OneWay}" />
                                             </StackPanel>
+                                            <TextBlock AutomationProperties.AutomationId="Row.ExpiryWarning" Text="{x:Bind ExpiryWarning, Mode=OneWay}" TextWrapping="Wrap" Foreground="{ThemeResource SystemFillColorCautionBrush}"
+                                                       Visibility="{x:Bind HasExpiryWarning, Mode=OneWay}" />
                                             <StackPanel Orientation="Horizontal" Spacing="4">
                                                 <TextBlock Text="{x:Bind DbTypeText, Mode=OneWay}" /><TextBlock Text="、" /><TextBlock Text="{x:Bind PersistenceText, Mode=OneWay}" /><TextBlock Text="、" />
                                                 <TextBlock Text="{x:Bind SpecText, Mode=OneWay}" TextWrapping="Wrap" />

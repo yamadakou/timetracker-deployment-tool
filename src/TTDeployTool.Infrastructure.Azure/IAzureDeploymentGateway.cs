@@ -62,6 +62,14 @@ public interface IAzureDeploymentGateway
     Task UpdateContainerAppTagsAsync(
         string subscriptionId, string rgName, string name, IReadOnlyDictionary<string, string> tags, CancellationToken cancellationToken = default);
 
+    /// <summary>Container Apps Environment のタグに <paramref name="tags"/> を加える・上書きする（タグの API の Merge。設定とほかのタグは変えない）。</summary>
+    Task UpdateEnvironmentTagsAsync(
+        string subscriptionId, string rgName, string envName, IReadOnlyDictionary<string, string> tags, CancellationToken cancellationToken = default);
+
+    /// <summary>ストレージアカウントのタグに <paramref name="tags"/> を加える・上書きする（タグの API の Merge。設定とほかのタグは変えない）。</summary>
+    Task UpdateStorageAccountTagsAsync(
+        string subscriptionId, string rgName, string accountName, IReadOnlyDictionary<string, string> tags, CancellationToken cancellationToken = default);
+
     /// <summary>ストレージアカウントの情報（存在しなければ null）。</summary>
     Task<StorageAccountInfo?> GetStorageAccountAsync(string subscriptionId, string rgName, string name, CancellationToken cancellationToken = default);
 

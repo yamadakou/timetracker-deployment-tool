@@ -23,11 +23,11 @@ public sealed class DeploymentMaintenance
     }
 
     /// <summary>
-    /// 利用可能期限を変える（<paramref name="expiresOn"/> は yyyy-MM-dd か none）。3 つの Container App のうち、あるものの
-    /// <see cref="DeploymentExpiry.ExpiresAtKey"/> を書き換える。Container App が 1 つも無ければ変えない。
+    /// 利用可能期限を変える（<paramref name="expiresOn"/> は yyyy-MM-dd か none）。本ツールで作ったリソース（3 つの Container App・Environment・
+    /// ストレージアカウント）のうち、あって管理タグが一致するものの <see cref="DeploymentExpiry.ExpiresAtKey"/> を書き換える。1 つも無ければ変えない。
     /// </summary>
     /// <exception cref="ArgumentException">入力の誤り・今日より前の日付</exception>
-    /// <exception cref="InvalidOperationException">本ツールで作った Container App が無い</exception>
+    /// <exception cref="InvalidOperationException">本ツールで作ったリソースが無い</exception>
     public async Task<ExpiryDecision> ChangeExpiryAsync(
         string subscriptionId, string resourceGroup, string appName, string expiresOn, CancellationToken cancellationToken = default)
     {
@@ -39,12 +39,20 @@ public sealed class DeploymentMaintenance
         var decision = DeploymentExpiry.Resolve(expiresOn, null, now, _time.LocalTimeZone);
 
         var names = await ManagedAppsAsync(subscriptionId, resourceGroup, appName, cancellationToken);
-        if (names.Count == 0)
+        var envName = ResourceNaming.Environment(appName);
+        var env = ManagedTags.IsManaged((await _gateway.GetEnvironmentAsync(subscriptionId, resourceGroup, envName, cancellationToken))?.Tags, appName);
+        var account = ResourceNaming.StorageAccount(subscriptionId, resourceGroup, appName);
+        var storage = ManagedTags.IsManaged((await _gateway.GetStorageAccountAsync(subscriptionId, resourceGroup, account, cancellationToken))?.Tags, appName);
+        if (names.Count == 0 && !env && !storage)
             throw new InvalidOperationException(
-                $"リソースグループ {resourceGroup} に、アプリ名 {appName} の、本ツールで作った Container App がありません（削除された可能性があります）。一覧を読み直してください。");
+                $"リソースグループ {resourceGroup} に、アプリ名 {appName} の、本ツールで作ったリソースがありません（削除された可能性があります）。一覧を読み直してください。");
         var tags = new Dictionary<string, string> { [DeploymentExpiry.ExpiresAtKey] = decision.TagValue };
         foreach (var name in names)
             await _gateway.UpdateContainerAppTagsAsync(subscriptionId, resourceGroup, name, tags, cancellationToken);
+        if (env)
+            await _gateway.UpdateEnvironmentTagsAsync(subscriptionId, resourceGroup, envName, tags, cancellationToken);
+        if (storage)
+            await _gateway.UpdateStorageAccountTagsAsync(subscriptionId, resourceGroup, account, tags, cancellationToken);
         return decision;
     }
 

@@ -114,6 +114,13 @@ public sealed class DeploymentRowViewModel : ObservableObject
         _ => "記録なし",
     };
 
+    /// <summary>リソースごとの期限のタグが食い違っている場合の注意（揃っていれば null）。</summary>
+    public string? ExpiryWarning => _entry.ExpiryDiffers
+        ? "リソースごとに利用可能期限のタグが違います（遅い方の期限で判断します。期限なしが 1 つでもあれば期限なし）。「期限を変える」で揃えてください。"
+        : null;
+
+    public bool HasExpiryWarning => ExpiryWarning != null;
+
     /// <summary>期限の近さ（画面の色）。</summary>
     public ExpiryLevel Level => _entry is { ExpiryKind: ExpiryKind.Date, ExpiresAt: { } at }
         ? at <= _owner.Time.GetUtcNow() ? ExpiryLevel.Expired
@@ -196,7 +203,8 @@ public sealed class DeploymentRowViewModel : ObservableObject
         _entry = entry;
         foreach (var name in new[]
                  {
-                     nameof(Entry), nameof(Url), nameof(HasUrl), nameof(DeployedText), nameof(ExpiryText), nameof(Level), nameof(IsExpired), nameof(IsExpirySoon),
+                     nameof(Entry), nameof(Url), nameof(HasUrl), nameof(DeployedText), nameof(ExpiryText), nameof(ExpiryWarning), nameof(HasExpiryWarning),
+                     nameof(Level), nameof(IsExpired), nameof(IsExpirySoon),
                      nameof(DbTypeText), nameof(PersistenceText), nameof(SpecText), nameof(StateText),
                  })
             OnPropertyChanged(name);

@@ -130,14 +130,67 @@ public class DeploymentExpiryPlanTests
     }
 
     [Fact]
-    public void Lifecycle_Tags_Should_Be_Found_In_Order()
+    public void The_Current_Expiry_Should_Be_The_Latest_Of_The_Apps()
     {
+        // ほかのアプリ名のものは見ない。読めない値は無視する
         var apps = new List<ContainerAppInfo>
         {
-            new("demo-redis", "id", Tags("redis")), new("demo-db", "id", Tags(null)), new("other-tt", "id", Tags("other")),
+            new("demo-redis", "id", Tags("2026-11-30T14:59:59Z")), new("demo-db", "id", Tags("2026-11-01T14:59:59Z")),
+            new("demo-tt", "id", Tags("someday")), new("other-tt", "id", Tags("2027-01-01T00:00:00Z")),
         };
 
-        DeploymentPlanner.CurrentLifecycleTags(apps, "demo")![DeploymentExpiry.ExpiresAtKey].Should().Be("redis");
+        DeploymentPlanner.CurrentLifecycleTags(apps, "demo")![DeploymentExpiry.ExpiresAtKey].Should().Be("2026-11-30T14:59:59Z");
+        DeploymentPlanner.CurrentLifecycleTags([new("demo-db", "id", Tags(null))], "demo").Should().BeNull();
         DeploymentPlanner.CurrentLifecycleTags([], "demo").Should().BeNull();
+    }
+
+    [Fact]
+    public async Task The_Expiry_Should_Be_Written_To_The_Managed_Environment_And_Storage_Right_After_Creating_Them()
+    {
+        // Environment とストレージアカウントにも、作った直後に書く（後の手順で失敗して残っても、期限で削除できるように）
+        var envTags = new List<IReadOnlyDictionary<string, string>>();
+        var storageTags = new List<(string Account, IReadOnlyDictionary<string, string> Tags)>();
+        var order = new List<string>();
+        var account = ResourceNaming.StorageAccount("sub", "rg", "demo");
+        _gateway.Setup(g => g.GetEnvironmentAsync("sub", "rg", "demo-env", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ManagedEnvironmentInfo("id", "demo-env", "japaneast", ManagedTags.For("demo")));
+        _gateway.Setup(g => g.GetStorageAccountAsync("sub", "rg", account, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new StorageAccountInfo(account, "japaneast", ManagedTags.For("demo")));
+        _gateway.Setup(g => g.UpdateEnvironmentTagsAsync("sub", "rg", "demo-env", It.IsAny<IReadOnlyDictionary<string, string>>(), It.IsAny<CancellationToken>()))
+            .Callback<string, string, string, IReadOnlyDictionary<string, string>, CancellationToken>((_, _, _, t, _) => { envTags.Add(t); order.Add("env"); })
+            .Returns(Task.CompletedTask);
+        _gateway.Setup(g => g.EnsureDbStorageAsync("sub", "rg", "demo", "japaneast", _env, It.IsAny<CancellationToken>()))
+            .Callback(() => order.Add("storage")).Returns(Task.CompletedTask);
+        _gateway.Setup(g => g.UpdateStorageAccountTagsAsync("sub", "rg", account, It.IsAny<IReadOnlyDictionary<string, string>>(), It.IsAny<CancellationToken>()))
+            .Callback<string, string, string, IReadOnlyDictionary<string, string>, CancellationToken>((_, _, a, t, _) => { storageTags.Add((a, t)); order.Add("storage-tags"); })
+            .Returns(Task.CompletedTask);
+        _gateway.Setup(g => g.CreateOrUpdateContainerAppAsync("sub", "rg", "demo", "japaneast", It.IsAny<DeployOptions>(), _env, It.IsAny<CancellationToken>()))
+            .Callback(() => order.Add("apps"))
+            .ReturnsAsync(new ContainerAppsDeployment("demo-tt", "demo-db", "demo-redis", null));
+
+        await new DeploymentRunner(_gateway.Object, _time).RunAsync(Opts().WithPersistDb(true), cancellationToken: Ct);
+
+        var expected = new Dictionary<string, string> { ["tt-expires-at"] = "2026-11-23T14:59:59Z", ["tt-deployed-at"] = "2026-10-21T20:00:00Z" };
+        envTags.Should().ContainSingle().Which.Should().Equal(expected);
+        storageTags.Should().ContainSingle().Which.Should().Be((account, (IReadOnlyDictionary<string, string>)storageTags[0].Tags));
+        storageTags[0].Tags.Should().Equal(expected);
+        order.Should().Equal("env", "storage", "storage-tags", "apps");
+    }
+
+    [Fact]
+    public async Task The_Expiry_Should_Not_Be_Written_To_Resources_Of_Others()
+    {
+        // 管理タグの無い（本ツールで作っていない）Environment・ストレージアカウントには書かない
+        var account = ResourceNaming.StorageAccount("sub", "rg", "demo");
+        _gateway.Setup(g => g.GetEnvironmentAsync("sub", "rg", "demo-env", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ManagedEnvironmentInfo("id", "demo-env", "japaneast", new Dictionary<string, string>()));
+        _gateway.Setup(g => g.GetStorageAccountAsync("sub", "rg", account, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new StorageAccountInfo(account, "japaneast", ManagedTags.For("other")));
+        _gateway.Setup(g => g.EnsureDbStorageAsync("sub", "rg", "demo", "japaneast", _env, It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+
+        await new DeploymentRunner(_gateway.Object, _time).RunAsync(Opts().WithPersistDb(true), cancellationToken: Ct);
+
+        _gateway.Verify(g => g.UpdateEnvironmentTagsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyDictionary<string, string>>(), It.IsAny<CancellationToken>()), Times.Never);
+        _gateway.Verify(g => g.UpdateStorageAccountTagsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyDictionary<string, string>>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }

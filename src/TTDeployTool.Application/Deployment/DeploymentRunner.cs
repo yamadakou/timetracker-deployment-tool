@@ -30,7 +30,8 @@ public sealed class DeploymentRunner
         var persist = opts.PersistDb ?? await DeploymentPlanner.UsesDbStorageAsync(_gateway, opts, cancellationToken);
         opts = opts.WithPersistDb(persist);
 
-        // 利用可能期限を、実行する時刻と今のデプロイのタグで決め、3 つの Container App に記録する（docs/design/desktop-jobs.md の 6.1）
+        // 利用可能期限を、実行する時刻と今のデプロイのタグで決め、本ツールで作るリソース（Environment・ストレージアカウント・3 つの Container App）に記録する
+        // （docs/design/desktop-jobs.md の 6.1）
         var existingApps = await _gateway.GetResourceGroupAsync(opts.Subscription, opts.ResourceGroup, cancellationToken) == null
             ? []
             : await _gateway.ListContainerAppsAsync(opts.Subscription, opts.ResourceGroup, cancellationToken);
@@ -51,6 +52,9 @@ public sealed class DeploymentRunner
         var envName = ResourceNaming.Environment(opts.AppName);
         progress?.Report(new DeploymentProgress(DeploymentStep.Environment, ++index, total, $"Container Apps Environment {envName}"));
         var env = await _gateway.EnsureContainerAppEnvAsync(opts.Subscription, opts.ResourceGroup, opts.AppName, opts.Location, cancellationToken);
+        // 作った直後に期限を記録する（後の手順で失敗して残った場合も、期限で削除できるように）
+        if (ManagedTags.IsManaged((await _gateway.GetEnvironmentAsync(opts.Subscription, opts.ResourceGroup, envName, cancellationToken))?.Tags, opts.AppName))
+            await _gateway.UpdateEnvironmentTagsAsync(opts.Subscription, opts.ResourceGroup, envName, opts.LifecycleTags, cancellationToken);
 
         string? storageAccount = null;
         if (persist)
@@ -58,6 +62,8 @@ public sealed class DeploymentRunner
             storageAccount = ResourceNaming.StorageAccount(opts.Subscription, opts.ResourceGroup, opts.AppName);
             progress?.Report(new DeploymentProgress(DeploymentStep.DbStorage, ++index, total, $"DB のストレージ {storageAccount}（Azure Files）"));
             await _gateway.EnsureDbStorageAsync(opts.Subscription, opts.ResourceGroup, opts.AppName, opts.Location, env, cancellationToken);
+            if (ManagedTags.IsManaged((await _gateway.GetStorageAccountAsync(opts.Subscription, opts.ResourceGroup, storageAccount, cancellationToken))?.Tags, opts.AppName))
+                await _gateway.UpdateStorageAccountTagsAsync(opts.Subscription, opts.ResourceGroup, storageAccount, opts.LifecycleTags, cancellationToken);
         }
 
         progress?.Report(new DeploymentProgress(DeploymentStep.ContainerApps, ++index, total, "Container Apps（DB / Redis / Timetracker）"));
