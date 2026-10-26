@@ -10,6 +10,10 @@ on:
         description: "パッケージの版 X.Y.Z（空なら 0.1.<実行番号>。評価者が上書きで更新できるよう、前の配布より大きくする）"
         required: false
         default: ""
+  # ワークフロー自体を変えたときは、push でも実行して確かめる（workflow_dispatch は既定のブランチにあるワークフローしか実行できないため）
+  push:
+    paths:
+    - .github/workflows/desktop-preview.yml
 
 concurrency:
   group: desktop-preview

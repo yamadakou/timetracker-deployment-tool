@@ -2,7 +2,7 @@
 
 Microsoft Store に提出する前に、少数の**評価者**にデスクトップアプリを試してもらうため、自己署名の証明書で署名した MSIX を作って渡す手順の設計です（REVIEW_ISSUES No.65。Store 以外の配布の検討は [`desktop-app.md`](desktop-app.md) の 8.3）。
 
-- ワークフロー: [`.github/workflows/desktop-preview.yml`](../../.github/workflows/desktop-preview.yml)（手動で実行。Azure は使わない）
+- ワークフロー: [`.github/workflows/desktop-preview.yml`](../../.github/workflows/desktop-preview.yml)（手動で実行。ワークフローのファイルを変えた push でも実行して確かめる。Azure は使わない）
 - 評価者の手順書: [`docs/DESKTOP_PREVIEW_INSTALL.md`](../DESKTOP_PREVIEW_INSTALL.md)（成果物にも `INSTALL.md` として入る）
 - 一次情報の確認日: 2026-10-26（出典は 6）
 
