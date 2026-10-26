@@ -57,6 +57,26 @@ public sealed class FilePreferences : IAppPreferences
         }
     }
 
+    public IReadOnlyList<SavedJob> SavedJobs
+    {
+        get => _data.SavedJobs ?? [];
+        set
+        {
+            _data = _data with { SavedJobs = value };
+            Save();
+        }
+    }
+
+    public StartupLaunch? LastStartupLaunch
+    {
+        get => _data.LastStartupLaunch;
+        set
+        {
+            _data = _data with { LastStartupLaunch = value };
+            Save();
+        }
+    }
+
     private static Data Load(string path)
     {
         try
@@ -83,5 +103,6 @@ public sealed class FilePreferences : IAppPreferences
     }
 
     private sealed record Data(
-        int? MaxConcurrentJobs = null, IReadOnlyList<DeploymentTemplate>? Templates = null, IReadOnlyList<string>? ExpiryNotices = null, bool StartupTaskAsked = false);
+        int? MaxConcurrentJobs = null, IReadOnlyList<DeploymentTemplate>? Templates = null, IReadOnlyList<string>? ExpiryNotices = null, bool StartupTaskAsked = false,
+        IReadOnlyList<SavedJob>? SavedJobs = null, StartupLaunch? LastStartupLaunch = null);
 }

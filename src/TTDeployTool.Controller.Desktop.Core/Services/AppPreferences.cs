@@ -39,6 +39,12 @@ public interface IAppPreferences
 
     /// <summary>Windows のサインイン時の起動を尋ねたか（一度だけ尋ねる。D16）。</summary>
     bool StartupTaskAsked { get; set; }
+
+    /// <summary>アプリを終了しても残す予定のジョブ（docs/design/desktop-jobs.md の 6.6）。</summary>
+    IReadOnlyList<SavedJob> SavedJobs { get; set; }
+
+    /// <summary>前回の Windows のサインイン時の起動（まだ無ければ null）。</summary>
+    StartupLaunch? LastStartupLaunch { get; set; }
 }
 
 /// <summary>保存しない設定（テストと、保存先が無い場合）。</summary>
@@ -51,4 +57,8 @@ public sealed class InMemoryAppPreferences : IAppPreferences
     public IReadOnlyList<string> ExpiryNotices { get; set; } = [];
 
     public bool StartupTaskAsked { get; set; }
+
+    public IReadOnlyList<SavedJob> SavedJobs { get; set; } = [];
+
+    public StartupLaunch? LastStartupLaunch { get; set; }
 }

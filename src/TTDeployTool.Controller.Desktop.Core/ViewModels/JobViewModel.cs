@@ -5,6 +5,7 @@ using TTDeployTool.Application.Workflows;
 using TTDeployTool.Controller.Desktop.Core.Jobs;
 using TTDeployTool.Controller.Desktop.Core;
 using TTDeployTool.Controller.Desktop.Core.Mvvm;
+using TTDeployTool.Controller.Desktop.Core.Services;
 
 namespace TTDeployTool.Controller.Desktop.Core.ViewModels;
 
@@ -136,6 +137,9 @@ public sealed class JobViewModel : ObservableObject
 
     /// <summary>利用可能期限を過ぎたための、確認なしの削除か（docs/design/desktop-jobs.md の 6.5）。</summary>
     public bool IsExpiryDeletion { get; init; }
+
+    /// <summary>アプリを終了しても残す削除の計画（docs/design/desktop-jobs.md の 6.6。デプロイと期限での削除は null）。</summary>
+    public SavedDeletion? Saved { get; init; }
 
     public ObservableCollection<string> Logs { get; } = [];
 

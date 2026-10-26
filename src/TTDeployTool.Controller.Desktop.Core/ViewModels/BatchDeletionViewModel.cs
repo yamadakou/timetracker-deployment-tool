@@ -5,6 +5,7 @@ using TTDeployTool.Application.Jobs;
 using TTDeployTool.Application.Workflows;
 using TTDeployTool.Controller.Desktop.Core.Jobs;
 using TTDeployTool.Controller.Desktop.Core.Mvvm;
+using TTDeployTool.Controller.Desktop.Core.Services;
 
 namespace TTDeployTool.Controller.Desktop.Core.ViewModels;
 
@@ -196,7 +197,7 @@ public sealed class BatchDeletionViewModel : ObservableObject
             try
             {
                 jobs.Add(_queue.Register(JobKind.Delete, new JobTarget(plan.Subscription, plan.ResourceGroup, plan.AppName), schedule?.At,
-                    () => _start(ticket, plan.AppName, session)));
+                    () => _start(ticket, plan.AppName, session), saved: SavedDeletion.From(plan, plan.AppName)));
             }
             catch (InvalidOperationException ex)
             {

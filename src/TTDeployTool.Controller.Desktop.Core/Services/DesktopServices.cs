@@ -50,6 +50,9 @@ public sealed record AppNotice(string Title, string Message, string? JobId = nul
 public interface INotificationService
 {
     void Show(AppNotice notice);
+
+    /// <summary>Windows の設定で、このアプリの通知が許可されているか（docs/design/desktop-jobs.md の 6.6）。</summary>
+    NotificationPermission Permission { get; }
 }
 
 /// <summary>Windows のサインイン時の起動の状態（<c>Windows.ApplicationModel.StartupTaskState</c> と、使えない場合）。</summary>

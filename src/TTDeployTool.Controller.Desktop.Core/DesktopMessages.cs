@@ -48,7 +48,7 @@ public static class DesktopMessages
     public static string ForAzure(Exception ex) => ex switch
     {
         WorkflowException workflow => For(workflow),
-        ExpiryDeletionSkippedException skipped => skipped.Message,
+        DeletionSkippedException skipped => skipped.Message,
         AuthenticationRequiredException => $"サインインが必要です。{SignInAgain}",
         CredentialUnavailableException unavailable => $"サインインできませんでした。{SignInAgain}（{unavailable.Message}）",
         SignInTimeoutException timeout => $"{timeout.Message}{SignInAgain}",

@@ -16,15 +16,19 @@ internal sealed class Harness
     public FakeAzure Azure { get; } = new();
     public FakeDialogs Dialogs { get; } = new();
     public FakeLauncher Launcher { get; } = new();
-    public TTDeployTool.Controller.Desktop.Core.Services.InMemoryAppPreferences Preferences { get; } = new();
+    public TTDeployTool.Controller.Desktop.Core.Services.InMemoryAppPreferences Preferences { get; }
     public FakeNotifications Notifications { get; } = new();
     public FakeClipboard Clipboard { get; } = new();
     public FakeStartupTask StartupTask { get; } = new();
     public List<string> Navigations { get; } = [];
     public MainViewModel Main { get; }
 
-    public Harness(Microsoft.Extensions.Logging.ILoggerFactory? loggers = null, TimeProvider? time = null, bool withClipboard = true, bool withNotifications = true)
+    /// <param name="preferences">前回のアプリが保存した設定（無ければ空）</param>
+    public Harness(
+        Microsoft.Extensions.Logging.ILoggerFactory? loggers = null, TimeProvider? time = null, bool withClipboard = true, bool withNotifications = true,
+        InMemoryAppPreferences? preferences = null)
     {
+        Preferences = preferences ?? new();
         Main = new MainViewModel(SignIn, Azure, Dialogs, Launcher, time ?? TimeProvider.System, loggers ?? NullLoggerFactory.Instance, TimeSpan.FromMilliseconds(5),
             Preferences, withNotifications ? Notifications : null, withClipboard ? Clipboard : null, StartupTask);
         Main.NavigationRequested += Navigations.Add;

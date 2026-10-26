@@ -10,6 +10,22 @@ namespace TTDeployTool.Controller.Desktop.Services;
 /// </summary>
 internal sealed class AppNotificationService : INotificationService
 {
+    // Windows の設定での通知の許可（読めない環境では「確かめられない」）
+    public NotificationPermission Permission
+    {
+        get
+        {
+            try
+            {
+                return NotificationPermissions.FromWindowsSetting(AppNotificationManager.Default.Setting.ToString());
+            }
+            catch (Exception)
+            {
+                return NotificationPermission.Unavailable;
+            }
+        }
+    }
+
     public void Show(AppNotice notice)
     {
         var builder = new AppNotificationBuilder().AddText(notice.Title).AddText(notice.Message);

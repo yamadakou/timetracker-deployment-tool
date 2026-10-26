@@ -9,8 +9,8 @@ using TTDeployTool.Domain.Deployment;
 
 namespace TTDeployTool.Controller.Desktop.Core.Jobs;
 
-/// <summary>期限での削除を、削除せずに終えた理由（期限が延ばされた・削除するものが無い）。</summary>
-public sealed class ExpiryDeletionSkippedException(string message) : InvalidOperationException(message);
+/// <summary>削除のジョブを、削除せずに終えた理由（期限が延ばされた・削除するものが無い）。期限での削除と、前回の削除の予定を戻したもので使う。</summary>
+public sealed class DeletionSkippedException(string message) : InvalidOperationException(message);
 
 /// <summary>
 /// 利用可能期限の確認（docs/design/desktop-jobs.md の 6.2・6.5、D21）。サインインできたときにデプロイの一覧を読み、期限の 3 日前と前日に通知し、
@@ -180,7 +180,7 @@ public sealed class ExpiryWatcher : IDisposable
         var expiry = await new DeploymentMaintenance(session.CreateGateway(_deploymentLogger), _time)
             .ReadExpiryAsync(entry.SubscriptionId, entry.ResourceGroup, entry.AppName);
         if (!DeploymentExpiry.TryParseTag(expiry, out var at) || at > _time.GetUtcNow())
-            throw new ExpiryDeletionSkippedException(
+            throw new DeletionSkippedException(
                 $"利用可能期限が延ばされていたため、削除しませんでした（今の期限: {Describe(expiry)}）。");
         var resourceGroup = await session.CreateGateway(_deploymentLogger).GetResourceGroupAsync(entry.SubscriptionId, entry.ResourceGroup);
         // 管理タグのあるものだけを、DB のデータも含めて消す。リソースグループは本ツールが作ったものだけ、空になれば消す
@@ -189,7 +189,7 @@ public sealed class ExpiryWatcher : IDisposable
         if (ticket.Blockers.Count > 0)
             throw new WorkflowException(WorkflowFailure.Blocked, ticket.Blockers);
         if (ticket.Saved == null)
-            throw new ExpiryDeletionSkippedException("削除するものはありませんでした（既に削除されています）。");
+            throw new DeletionSkippedException("削除するものはありませんでした（既に削除されています）。");
         return await _workflow.StartAsync(ticket.Saved.PlanId, ticket.Plan.AppName, _ => session, DeletionViewModel.KeptNotice);
     }
 

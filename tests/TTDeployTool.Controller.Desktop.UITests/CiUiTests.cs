@@ -56,6 +56,13 @@ public class CiUiTests
         app.TextOf("Nav.Jobs").Should().Contain("ジョブの一覧");
         app.Show("AppSettings");
         app.TextOf("Settings.StartupStatus").Should().NotBeEmpty();
+        // Windows との連携（No.67）: 前回のサインイン時の起動・通知の許可・閉じたときの動き・予定
+        app.TextOf("Settings.LastStartup").Should().StartWith("Windows のサインイン時に起動したことは、まだありません");
+        app.TextOf("Settings.NotificationStatus").Should().NotBeEmpty();
+        app.TextOf("Settings.CloseBehavior").Should().StartWith("今ウィンドウを閉じると、アプリを終了します");
+        app.TextOf("Settings.ScheduledJobs").Should().Be("まだ始めていないジョブ（予定・待機中・一時停止）はありません。");
+        app.Invoke("Settings.RefreshSystem");
+        app.TextOf("Settings.CloseBehavior").Should().StartWith("今ウィンドウを閉じると、アプリを終了します");
     });
 
     [Fact]

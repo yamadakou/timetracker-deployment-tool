@@ -31,6 +31,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
     private readonly IDialogService _dialogs;
     private readonly INotificationService? _notifications;
+    private readonly IAppPreferences _preferences;
+    private readonly TimeProvider _time;
     private bool _hiddenOnce;
     private JobViewModel? _currentJob;
     private JobViewModel? _currentDeployment;
@@ -46,6 +48,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         _dialogs = dialogs;
         _notifications = notifications;
         preferences ??= new InMemoryAppPreferences();
+        _preferences = preferences;
+        _time = time;
         Queue = new JobQueue(time, pollInterval ?? JobViewModel.DefaultPollInterval, ScheduleCheckInterval,
             preferences, loggers.CreateLogger("TTDeployTool.Desktop.Jobs"))
         {
@@ -78,6 +82,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             if (signedIn)
             {
                 await Target.LoadAsync();
+                // 前回のアプリで保存した削除の予定を、期限の確認より先に戻す（docs/design/desktop-jobs.md の 6.6）
+                ScheduledJobs!.Restore();
                 // サインインできたら、利用可能期限を確かめ、その後は最も近い期限の時刻か 6 時間ごとに確かめる（docs/design/desktop-jobs.md の 6.5、D21）
                 await Expiry.StartAsync();
             }
@@ -95,6 +101,12 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         DryRun = new DryRunViewModel(Settings, dialogs, launcher);
         Wizard = new DeployWizardViewModel(Settings, Deployment);
         JobList = new JobListViewModel(Queue, time);
+        ScheduledJobs = new ScheduledJobStore(Queue, preferences, () => SignIn.Account?.UserName, saved =>
+        {
+            var session = Target.CreateJobSessionFor(saved.Subscription);
+            return () => Deletion.StartSavedAsync(saved.Target, saved.Deletion!, session);
+        }, notifications, loggers.CreateLogger("TTDeployTool.Desktop.Jobs"));
+        Integration = new SystemStatusViewModel(Startup, notifications, preferences, Queue, ScheduledJobs, () => CloseBehaviorText, launcher);
         BatchDeletion = new BatchDeletionViewModel(deletions, Target, Queue, Deletion.StartPlannedAsync, ShowRegistered, time);
         LogDirectory = (loggers as DiagnosticLog)?.Directory;
         OpenLogFolderCommand = new AsyncCommand(() =>
@@ -119,8 +131,14 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     /// <summary>利用可能期限の確認（期限の前の通知と、期限での削除）。</summary>
     public ExpiryWatcher Expiry { get; }
 
-    /// <summary>Windows のサインイン時の起動（「ジョブ」の画面）。</summary>
+    /// <summary>Windows のサインイン時の起動（「設定」の画面）。</summary>
     public StartupSettingViewModel Startup { get; }
+
+    /// <summary>アプリを終了しても残す予定（削除は次にサインインしたときに戻す）。</summary>
+    public ScheduledJobStore ScheduledJobs { get; }
+
+    /// <summary>「設定」の画面の「Windows との連携」（docs/design/desktop-jobs.md の 6.6、D22）。</summary>
+    public SystemStatusViewModel Integration { get; }
 
     public TargetViewModel Target { get; }
 
@@ -254,6 +272,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public async Task InitializeAtStartupAsync()
     {
         await InitializeAsync();
+        // 起動したこと（と、サインインできたか）を残し、「設定」の画面で確かめられるようにする（6.6）
+        _preferences.LastStartupLaunch = new StartupLaunch(_time.GetUtcNow(), SignIn.IsSignedIn);
         if (!SignIn.IsSignedIn)
             _notifications?.Show(new AppNotice(
                 "サインインが必要です",
@@ -267,22 +287,32 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     /// </summary>
     public CloseAction RequestClose()
     {
-        // ジョブが無くても、利用可能期限日のあるデプロイがあれば、期限を確かめるために残る（D18）
-        var watching = SignIn.IsSignedIn && Deployments.HasExpiringDeployments;
-        if (!HasRunningJob && !watching)
+        if (StayReason is not { } reason)
             return CloseAction.Exit;
         if (!_hiddenOnce)
         {
             _hiddenOnce = true;
-            var reason = HasRunningJob
-                ? $"ジョブ（{Queue.Summary}）があるため"
-                : "利用可能期限のあるデプロイを確かめる（期限の前の通知と、期限での削除）ため";
             _notifications?.Show(new AppNotice(
                 "バックグラウンドで実行を続けています",
                 $"{reason}、通知領域に残ります。開くには通知領域のアイコンを押し、終了するにはそのメニューの「終了」を選んでください。"));
         }
         return CloseAction.Hide;
     }
+
+    /// <summary>今ウィンドウを閉じたらどうなるか（「設定」の画面の「Windows との連携」。判断は <see cref="RequestClose"/> と同じ）。</summary>
+    public string CloseBehaviorText => StayReason is { } reason
+        ? $"今ウィンドウを閉じると、{reason}、通知領域に残ります。"
+        : "今ウィンドウを閉じると、アプリを終了します（終わっていないジョブも、利用可能期限日のあるデプロイもないため）。";
+
+    // 閉じても残る理由（無ければ null）。ジョブが無くても、利用可能期限日のあるデプロイがあれば、期限を確かめるために残る（D18）
+    private string? StayReason => HasRunningJob
+        ? $"ジョブ（{Queue.Summary}）があるため"
+        : SignIn.IsSignedIn && Deployments.HasExpiringDeployments
+            ? "利用可能期限のあるデプロイを確かめる（期限の前の通知と、期限での削除）ため"
+            : null;
+
+    /// <summary>画面を開いたとき（画面の側から）。「設定」の画面なら、Windows との連携の状態を読み直す。</summary>
+    public Task PageShownAsync(string page) => page == Pages.Settings ? Integration.RefreshAsync() : Task.CompletedTask;
 
     /// <summary>
     /// アプリを終了してよいか（通知領域の「終了」）。終わっていないジョブがあれば確認する（終了すると実行中のジョブは止まり、予定・待機中のジョブは消える）。

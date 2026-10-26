@@ -162,6 +162,7 @@ public sealed partial class MainWindow : Window
     {
         foreach (var panel in PagesHost.Children.OfType<FrameworkElement>())
             panel.Visibility = (string)panel.Tag == tag ? Visibility.Visible : Visibility.Collapsed;
+        _ = ViewModel.PageShownAsync(tag);
     }
 
     // 終わっていないジョブがあれば、終了せずにウィンドウを隠して通知領域に残る（D3）。無ければ終了する

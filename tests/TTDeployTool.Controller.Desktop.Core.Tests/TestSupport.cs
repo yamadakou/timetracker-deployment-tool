@@ -75,6 +75,8 @@ internal sealed class FakeNotifications : INotificationService
     public List<AppNotice> Shown { get; } = [];
 
     public void Show(AppNotice notice) => Shown.Add(notice);
+
+    public NotificationPermission Permission { get; set; } = NotificationPermission.Enabled;
 }
 
 internal sealed class FakeStartupTask : IStartupTaskService

@@ -188,6 +188,22 @@
 | 部品 | Desktop.Core に `ExpiryWatcher`（確認・通知・登録。時刻は `TimeProvider`、次の確認のタイマーは `TimeProvider.CreateTimer` を確認のたびに合わせ直す）と `IStartupTaskService`（状態の取得・有効にする・無効にする。画面の側で `Windows.ApplicationModel.StartupTask` で実装）を加える。期限の読み直しは Application の `DeploymentMaintenance.ReadExpiryAsync`（6.1 の規則でまとめる） | — |
 
 
+### 6.6 Windows との連携の確かめ方と、再起動の後の削除の予定（No.67。2026-10-26 に一次情報で確認。オーナーの回答: D22〜D24）
+オーナーの実機（評価版 0.1.1）で、未来の時刻にデプロイの予定を入れ、サインイン時の起動を有効にしたつもりで PC を再起動したところ、通知も出ず、通知領域にも残っていなかった。
+サインイン時に起動したのか・起動して何をしたのかを画面で確かめる手段が無く、また、予定のジョブは 5 の制約のとおり再起動で消える（デプロイの予定はパスワードを持つため保存しない。`desktop-app.md` の Q4）ことが、予定を入れる画面からは分からなかった。
+
+| 項目 | 決めたこと | 一次情報 |
+|---|---|---|
+| 置き場所（D22） | 「設定」の画面に区画「Windows との連携」を足す（メニューは増やさない）。画面を開いたときと「状態を読み直す」で読み直す | — |
+| サインイン時の起動 | 今の状態（6.5）に加え、前回サインイン時に起動した日時と、そのとき対話なしでサインインできたか（アプリのデータに記録する。パスワード・トークンは含まない）。「Windows のスタートアップ アプリの設定を開く」（`ms-settings:startupapps`） | Launch Windows Settings（Apps の Startup apps） |
+| 通知の許可 | Windows の設定でこのアプリの通知が許可されているか（`AppNotificationManager.Default.Setting`: Enabled・DisabledForApplication・DisabledForUser・DisabledByGroupPolicy・DisabledByManifest・Unsupported）。許可されていなければ、期限の前の通知・ジョブの終わりの通知・サインインが要ることの通知が出ないことを示す。「Windows の通知の設定を開く」（`ms-settings:notifications`） | AppNotificationSetting、Launch Windows Settings（System の Notifications） |
+| 常駐の状態 | 今ウィンドウを閉じると、通知領域に残るか終了するかと、その理由（終わっていないジョブ・期限日のあるデプロイ・どちらも無い）。判断は閉じるとき（5・D18）と同じもの | — |
+| 再起動で消える予定 | 予定・待機中・一時停止のジョブの件数を、デプロイ（アプリの終了・再起動・サインアウトで消える）と削除（次の起動でサインインしたときに戻す）に分けて示す。前回から戻していない削除の予定があれば、その件数も | — |
+| 削除の予定の保存（D23） | まだ始めていない（予定・待機中・一時停止の）削除のジョブを、アプリのデータ（`preferences.json`）に保存する。内容は、対象（サブスクリプション・リソースグループ・アプリ名）・予定の時刻・一時停止か・計画の選択（管理タグの無いものも消すか・DB のデータを残すか・リソースグループを消すか）・確かめたアプリ名・確かめた計画の中身（対象ごとの名前と削除するか、リソースグループを消すか）・サインインしたアカウントの名前。パスワード・トークンは含まない（削除のジョブは持たない）。期限での削除（6.5）は保存しない（次の確認で登録し直すため） | — |
+| 削除の予定を戻す | 次に起動してサインインできたとき（サインイン時の起動を含む）、期限の確認（6.5）より先に、同じアカウントで保存したものをジョブとして登録し直す（予定の時刻を過ぎていれば、すぐ実行する。D14）。始めるときに計画を作り直し、確かめた計画と中身が同じ場合だけ削除する（4.2 と同じ。違えば「計画が変わった」で失敗にする）。同じ対象の終わっていないジョブがあれば戻さない。違うアカウントで保存したものは、そのアカウントでサインインするまで残す。戻したら「前回の削除の予定を戻しました（N 件）」と通知する | — |
+| デプロイの予定（D24） | 保存しない（パスワードを保存しない決定のまま）。対象・予定の時刻だけを記録し、次の起動でサインインしたときに「前回のデプロイの予定は、アプリが終了したため消えました（N 件: リソースグループ / アプリ名 MM/dd HH:mm）」と通知して記録を消す。予定を入れる画面（ウィザードの確認）に、デプロイの予定はアプリの終了・再起動・サインアウトで消えることを、削除の画面に、削除の予定は次の起動で戻すことを書く | — |
+| 部品 | Desktop.Core に `ScheduledJobStore`（ジョブの変化で保存し、サインインしたときに戻す）と `SystemStatusViewModel`（区画の表示とボタン）を加える。`INotificationService` に通知の許可の状態、`IAppPreferences` に保存した予定とサインイン時の起動の記録を加える。Windows の型は画面の側で名前から読み替える（`StartupTaskStates` と同じく、単体テストで確かめるため） | — |
+
 ## 7. テスト
 - `Desktop.Core`: ジョブの予定・待機・一時停止・取り消し・停止・同時実行の上限・同じ対象の拒否・計画し直しての比較（違えば失敗）を、偽の時刻（`TimeProvider`）と偽の Azure で確かめる。分岐網羅率 100%
 - Application: `IProgress<string>` を渡したときに段階が順に届くこと、渡さないときに今と同じこと。停止の要求で次の手順に進まないこと（MCP の既存のテストはそのまま通る）
@@ -219,6 +235,9 @@
 | D19 | サインイン時に起動して、対話なしのサインインができない（2026-10-26） | **通知して通知領域で待つ**（押すとサインインの画面を開く。推奨どおり） |
 | D20 | 期限の前の通知の操作（2026-10-26） | **一覧を開くだけ**（期限は行で変える。推奨どおり） |
 | D21 | 期限を確かめる時期（2026-10-26。最初は 30 分ごとにしていた） | **最も近い期限（3 日前・前日を含む）の時刻と、6 時間ごとの読み直し**（A 案。推奨どおり。削除がほぼ遅れず、読み直しを減らす。外の変化の反映は最大 6 時間遅れるが、削除の直前に Azure のタグを読み直すため、延ばされたものは消さない） |
+| D22 | Windows との連携の状態を確かめる画面（2026-10-26） | **「設定」の画面に区画を足す**（サインイン時の起動の状態と前回の起動・通知の許可・常駐の状態・再起動で消える予定。推奨どおり） |
+| D23 | 再起動・アプリの終了の後の予定（2026-10-26） | **削除の予定だけ保存して戻す**（パスワードを持たないため。推奨どおり） |
+| D24 | デプロイの予定（2026-10-26） | **保存せず、消えたことを次の起動で通知し、予定を入れる画面にも書く**（D23 とともに推奨どおり。パスワードを保存しない決定 Q4 は変えない） |
 
 ## 9. 論点
 すべて決定した（8 の D1〜D21）。
@@ -288,3 +307,5 @@
 - サインイン時の起動（StartupTask。パッケージのデスクトップ アプリでは同意のダイアログが出ない）: https://learn.microsoft.com/uwp/api/windows.applicationmodel.startuptask 、https://learn.microsoft.com/uwp/schemas/appxpackage/uapmanifestschema/element-desktop-startuptask
 - 起動の種類（`ExtendedActivationKind.StartupTask`。パッケージのアプリは UWP のすべての起動の種類に対応）: https://learn.microsoft.com/windows/apps/windows-app-sdk/applifecycle/applifecycle-rich-activation （2026-10-26 に確認）
 - 通知の引数・ボタンと、アプリが動いていないときに押された場合の起動: https://learn.microsoft.com/windows/apps/develop/notifications/app-notifications/app-notifications-quickstart （2026-10-26 に確認）
+- 通知の許可の状態（`AppNotificationSetting`）: https://learn.microsoft.com/windows/windows-app-sdk/api/winrt/microsoft.windows.appnotifications.appnotificationsetting （2026-10-26 に確認）
+- Windows の設定を開く URI（`ms-settings:startupapps`・`ms-settings:notifications`）: https://learn.microsoft.com/windows/apps/develop/launch/launch-settings （2026-10-26 に確認）

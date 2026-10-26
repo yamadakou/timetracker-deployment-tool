@@ -95,14 +95,19 @@ public sealed class JobQueue : ObservableObject, IDisposable
     /// <param name="starter">ジョブを始める処理（実行の直前の確認を含む。失敗すると、ジョブは始めずに失敗にする）</param>
     /// <exception cref="InvalidOperationException">同じ対象の、終わっていないジョブがある</exception>
     /// <param name="expiryDeletion">利用可能期限を過ぎたための削除か（題名に出す）</param>
-    public JobViewModel Register(JobKind kind, JobTarget target, DateTimeOffset? scheduledAt, Func<Task<Job>> starter, bool expiryDeletion = false)
+    /// <param name="saved">アプリを終了しても残す削除の計画（docs/design/desktop-jobs.md の 6.6。無ければ残さない）</param>
+    /// <param name="paused">一時停止にして登録する（前回の一時停止を戻すとき）</param>
+    public JobViewModel Register(
+        JobKind kind, JobTarget target, DateTimeOffset? scheduledAt, Func<Task<Job>> starter, bool expiryDeletion = false, SavedDeletion? saved = null, bool paused = false)
     {
         JobViewModel job;
         lock (_lock)
         {
             if (ActiveFor(target.Subscription, target.ResourceGroup, target.AppName) is { } active)
                 throw new InvalidOperationException(ActiveMessage(active));
-            job = new JobViewModel(kind, target, scheduledAt, this, starter) { Order = ++_order, IsExpiryDeletion = expiryDeletion };
+            job = new JobViewModel(kind, target, scheduledAt, this, starter) { Order = ++_order, IsExpiryDeletion = expiryDeletion, Saved = saved };
+            if (paused)
+                job.SetPending(DesktopJobState.Paused, scheduledAt);
             // 終わったことを、ジョブの Finished が完了する前に知らせる（状態の変更の通知は、Finished の完了より先に呼ばれる）
             var notified = false;
             job.PropertyChanged += (_, e) =>

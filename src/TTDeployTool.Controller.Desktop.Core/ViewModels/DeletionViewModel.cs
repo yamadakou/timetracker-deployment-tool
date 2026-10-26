@@ -295,7 +295,7 @@ public sealed class DeletionViewModel : ObservableObject
         try
         {
             _registered(_queue.Register(JobKind.Delete, new JobTarget(plan.Subscription, plan.ResourceGroup, plan.AppName), schedule?.At,
-                () => StartPlannedAsync(ticket, confirmed, session)));
+                () => StartPlannedAsync(ticket, confirmed, session), saved: SavedDeletion.From(plan, confirmed)));
             // 登録した計画は使ったものとして、画面から外す（次は計画からやり直す）
             Ticket = null;
         }
@@ -327,6 +327,22 @@ public sealed class DeletionViewModel : ObservableObject
                 throw new WorkflowException(WorkflowFailure.Changed);
             return await _workflow.StartAsync(fresh.Saved!.PlanId, confirmedAppName, _ => session, KeptNotice);
         }
+    }
+
+    /// <summary>
+    /// 前回のアプリで保存した削除の予定を始める（docs/design/desktop-jobs.md の 6.6）。計画を作り直し、確かめた計画と同じものを削除する場合だけ始める。
+    /// </summary>
+    internal async Task<Job> StartSavedAsync(JobTarget target, SavedDeletion saved, IAzureSession session)
+    {
+        var fresh = await _workflow.PlanAsync(session, target.Subscription, target.ResourceGroup, target.AppName, saved.IncludeUntagged, saved.KeepDbData,
+            deleteResourceGroup: saved.DeleteResourceGroup);
+        if (fresh.Blockers.Count > 0)
+            throw new WorkflowException(WorkflowFailure.Blocked, fresh.Blockers);
+        if (!fresh.CanRun)
+            throw new DeletionSkippedException("削除するものはありませんでした（既に削除されています）。");
+        if (!saved.Matches(fresh.Plan))
+            throw new WorkflowException(WorkflowFailure.Changed);
+        return await _workflow.StartAsync(fresh.Saved!.PlanId, saved.ConfirmedAppName, _ => session, KeptNotice);
     }
 
     private Task Copy(string text, string message)
