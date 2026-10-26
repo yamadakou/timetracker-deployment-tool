@@ -166,6 +166,28 @@
 | 行の操作 | 「対象に入れる」（サインインと対象に、サブスクリプション・リソースグループ・アプリ名を入れる）、「状態を確認」（対象に入れて状態の確認の画面で読む）、「削除」（対象に入れて削除の画面を開く。計画 → アプリ名の入力 → 実行は今の画面のまま）、「開く」（URL）、「パスワードを表示」、期限の変更。同じ対象の終わっていないジョブ（実行の準備中・実行中・待機中・予定・一時停止・停止中）があれば、行に「削除のジョブがあります（実行中）」などと「ジョブを見る」を出し、「対象に入れる」「削除」「期限の変更」を押せなくする（「開く」「状態を確認」「パスワードを表示」は押せる。ほかの行・画面はそのまま使える）。ジョブの状態が変わるたびに表示を変え、終わると戻る（No.61、オーナーの回答 2026-10-26） |
 | フィルタ・並べ替え・ページング | 6.3 のとおり。利用可能期限日のフィルタは「すべて」「7 日以内（過ぎたものを含む）」「期限なし」「日付の範囲」。期限の色: 過ぎた → 赤、7 日以内 → 黄 |
 
+### 6.5 7d-3 の詳細（2026-10-26 に一次情報で確認。オーナーの回答: D18〜D20）
+6.2 を、次のとおり作る。
+
+| 項目 | 決めたこと | 一次情報 |
+|---|---|---|
+| 確認する時期 | サインインできたとき（起動時の前回のサインインの復元を含む）と、その後 30 分ごと。デプロイの一覧（6.3）を読み直し、読んだすべてのデプロイ（ページやフィルタによらない。このアプリで終えた操作の重ね合わせの後）を見る。サインインしていない間は確認しない | — |
+| 期限の前の通知 | 期限が 3 日以内で 1 日より先なら「3 日前」、1 日以内なら「前日」を 1 回ずつ通知する（題名「利用可能期限が近づいています」、本文はアプリ名・リソースグループ・期限日と、期限を過ぎると DB のデータも含めて削除される旨）。通知を押すとウィンドウを出してデプロイの一覧を開く（D20。期限は行で変える） | アプリの通知の引数（`AppNotificationBuilder.AddArgument`）と `NotificationInvoked` |
+| 通知の記録 | 出した通知を、アプリのデータ（`preferences.json`）に「サブスクリプション・リソースグループ・アプリ名・種類（3 日前・前日）・そのときの期限（UTC）」で記録し、同じものは出さない。期限が変われば別のものとして通知する。期限を過ぎた記録は消す。パスワードなどは含まない | — |
+| 期限を過ぎたもの | 同じ対象の終わっていないジョブが無ければ、確認なしで削除のジョブ（すぐ実行）を登録し、「期限を過ぎたため削除します」と通知する。ジョブの題名は「期限での削除（リソースグループ / アプリ名）」。同時実行の上限と同じ対象の決まりは 4 のとおり。一覧の行にはジョブが出る（No.61） | — |
+| 削除の直前の確認 | ジョブを始めるときに、Azure から今のタグを読み直す（3 つの Container App とストレージアカウントの `tt-expires-at` を 6.1 の規則でまとめる。どちらも無ければ Environment）。期限を過ぎていなければ（延ばされた・期限なしにされた・タグが無い）削除せず、「期限が延ばされていたため、削除しませんでした」でジョブを終える（失敗として表示する） | — |
+| 削除の範囲 | 管理タグのあるものだけ（`includeUntagged` なし）、DB のデータ（ストレージアカウント）も消す（`keepDbData` なし）。リソースグループは、`managed-by` のタグがある（本ツールが作った）場合だけ `deleteResourceGroup` を指定し、空になれば消す（resource-group-deletion.md の Q4）。計画は始めるときに作る（確認の入力は無いため、アプリ名は計画のものを使う） | — |
+| 失敗したとき | ジョブの終わりの通知（5）で知らせる。権限の不足などで失敗した対象は、6 時間たつまで登録し直さない（30 分ごとに失敗と通知を繰り返さないため。記録はアプリの中だけで、再起動すると次の確認で登録し直す） | — |
+| 閉じたとき（D18） | 終わっていないジョブが無くても、読んだ一覧に期限日のあるデプロイが 1 つでもあれば、終了せずに通知領域に残る（初めて隠すときに、その旨を通知する）。期限日のあるデプロイが無ければ、今までどおり終了する。終了は通知領域の「終了」から | — |
+| サインイン時の起動 | パッケージのマニフェストに `uap5:Extension Category="windows.startupTask"`（`Executable` はアプリの exe、`EntryPoint="Windows.FullTrustApplication"`、`uap5:StartupTask TaskId="TTDeployToolStartup" Enabled="false" DisplayName="TTDeployTool"`）を加える。有効にするのは利用者が選んだときだけ（D16）。パッケージのデスクトップ アプリでは `RequestEnableAsync` で同意のダイアログは出ない。タスク マネージャーや「設定」のスタートアップで無効にされた（`DisabledByUser`）場合は、アプリから有効にできないため、その旨と場所を表示する。`DisabledByPolicy` は「ポリシーで無効」と表示する | StartupTask クラス（Remarks、マニフェストの例、`RequestEnableAsync`） |
+| サインイン時の起動を選ぶ場所 | 「ジョブ」の画面（同時に実行する数の下）に「Windows のサインイン時に、通知領域で起動する（期限の確認と削除のため）」。期限日のあるデプロイのジョブを初めて登録したときに、まだ有効でなく、尋ねたことが無ければ、確認のダイアログで尋ねる（D16。尋ねたことはアプリのデータに記録し、一度だけ） | — |
+| サインイン時に起動されたとき | `AppInstance.GetCurrent().GetActivatedEventArgs().Kind` が `ExtendedActivationKind.StartupTask` なら、ウィンドウを出さずに通知領域のアイコンだけを出して、前回のサインインを対話なしで復元する。復元できれば 30 分ごとの確認を始める | Rich activation（パッケージのアプリは UWP のすべての起動の種類に対応。`StartupTask` の種類） |
+| 対話なしのサインインができない（D19） | 「サインインが必要です。期限の確認と削除ができません」と通知し、通知領域で待つ。通知か通知領域のアイコンを押すとウィンドウを出し、サインインの画面を開く | — |
+| 通知の引数 | 今のジョブの ID（`jobId`）に加え、開く画面（`page=deployments`・`page=signin`）を入れる。押されたら、その画面を開く | 同上（通知） |
+| 画面の文言 | 「（次の版から）」（No.61 で添えた）を消す。どの PC でもアプリが動いていなければ削除が遅れることを、「ジョブ」の画面のサインイン時の起動の説明と README に書く | — |
+| 部品 | Desktop.Core に `ExpiryWatcher`（確認・通知・登録。時刻は `TimeProvider`、30 分ごとの確認は `TimeProvider.CreateTimer`）と `IStartupTaskService`（状態の取得・有効にする・無効にする。画面の側で `Windows.ApplicationModel.StartupTask` で実装）を加える。期限の読み直しは Application の `DeploymentMaintenance.ReadExpiryAsync`（6.1 の規則でまとめる） | — |
+
+
 ## 7. テスト
 - `Desktop.Core`: ジョブの予定・待機・一時停止・取り消し・停止・同時実行の上限・同じ対象の拒否・計画し直しての比較（違えば失敗）を、偽の時刻（`TimeProvider`）と偽の Azure で確かめる。分岐網羅率 100%
 - Application: `IProgress<string>` を渡したときに段階が順に届くこと、渡さないときに今と同じこと。停止の要求で次の手順に進まないこと（MCP の既存のテストはそのまま通る）
@@ -193,9 +215,12 @@
 | D15 | 通知領域のアイコン | **H.NotifyIcon.WinUI**（Q3） |
 | D16 | Windows のサインイン時の起動 | **設定で選べ、期限日のあるデプロイを初めて実行したときに尋ねる**（Q5） |
 | D17 | 期限の時刻 | **期限日の終わり（23:59:59、時刻帯は実行する PC・サーバーのもの）**（Q6） |
+| D18 | ジョブが無いときにウィンドウを閉じる（2026-10-26） | **期限日のあるデプロイがあれば常駐する**（無ければ終了する。推奨どおり） |
+| D19 | サインイン時に起動して、対話なしのサインインができない（2026-10-26） | **通知して通知領域で待つ**（押すとサインインの画面を開く。推奨どおり） |
+| D20 | 期限の前の通知の操作（2026-10-26） | **一覧を開くだけ**（期限は行で変える。推奨どおり） |
 
 ## 9. 論点
-すべて決定した（8 の D1〜D17）。
+すべて決定した（8 の D1〜D20）。
 
 ## 10. 実施の順序
 | フェーズ | 内容 | 完了条件 |
@@ -253,3 +278,5 @@
 - Azure Resource Graph の .NET SDK（`GetResourcesAsync`）: https://learn.microsoft.com/dotnet/api/azure.resourcemanager.resourcegraph.resourcegraphextensions.getresourcesasync
 - Container Apps の listSecrets（REST・.NET の `GetSecrets`）と、シークレットを読める権限の注意: https://learn.microsoft.com/rest/api/resource-manager/containerapps/container-apps/list-secrets 、https://learn.microsoft.com/dotnet/api/azure.resourcemanager.appcontainers.containerappresource.getsecrets 、https://learn.microsoft.com/azure/container-apps/security
 - サインイン時の起動（StartupTask。パッケージのデスクトップ アプリでは同意のダイアログが出ない）: https://learn.microsoft.com/uwp/api/windows.applicationmodel.startuptask 、https://learn.microsoft.com/uwp/schemas/appxpackage/uapmanifestschema/element-desktop-startuptask
+- 起動の種類（`ExtendedActivationKind.StartupTask`。パッケージのアプリは UWP のすべての起動の種類に対応）: https://learn.microsoft.com/windows/apps/windows-app-sdk/applifecycle/applifecycle-rich-activation （2026-10-26 に確認）
+- 通知の引数・ボタンと、アプリが動いていないときに押された場合の起動: https://learn.microsoft.com/windows/apps/develop/notifications/app-notifications/app-notifications-quickstart （2026-10-26 に確認）
