@@ -155,7 +155,7 @@ public sealed class ExpiryWatcher : IDisposable
             kind == "1d" ? "利用可能期限は明日までです" : "利用可能期限が近づいています",
             $"{entry.AppName}（{entry.ResourceGroup}）の利用可能期限は {date} です。期限を過ぎると、このアプリが DB のデータも含めて削除します。" +
             "延ばすには、デプロイの一覧で期限を変えてください。",
-            Page: "deployments"));
+            Page: Pages.Deployments));
     }
 
     private void RegisterDeletion(DeploymentEntry entry, DateTimeOffset now)

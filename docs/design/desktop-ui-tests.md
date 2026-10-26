@@ -115,6 +115,19 @@ CI のジョブ: `ci.yml` に `desktop-ui`（windows-latest）を加える。`de
 - テストごとにアプリを起動し直す（前のテストの状態を引き継がない）
 - 文言ではなく AutomationId で要素を探す。AutomationId を変えるときは、テストも同じ変更で直す
 
+## 9.1 単体テストで確かめる画面の取り決め（No.64、オーナーの依頼 2026-10-26）
+No.63 の Desktop System Test の失敗のうち、アプリの側の誤り（絞り込みの「閉じる」に AutomationId が無い）は、XAML と画面の側のコード（MainWindow.xaml.cs・App.xaml.cs）にあり、単体テストが届いていなかった。オーナーの依頼で、次の 2 つを行った（A・B 案）。
+
+- **A. 画面の側の判断を Desktop.Core に移す**: 画面の側は、受け取って渡すだけにする
+  - 表（ListView）の選択と ViewModel の選択の受け渡し: `SelectionSync<T>`（表の `SelectedItems` を `Attach` し、`SelectionChanged` で `ViewChanged` を呼ぶ。ViewModel が選び直したら表に戻し、戻している間の表の変更は返さない）。デプロイの一覧・ジョブの一覧の `TableSelection`
+  - 見出しの Tag からの並べ替え: `SortBy(string)`（列の名前）
+  - 画面の名前: `Pages`（MainViewModel が開く画面、XAML の各画面とメニューの Tag）。画面の切り替えは、`PagesHost` の子のうち Tag が一致するものを出す
+  - 起動の種類の振り分け: `MainViewModel.StartAsync(atStartup)`
+  - 通知を押したときに開く画面: `MainViewModel.OpenFromNotificationAsync`（引数のキーは `AppNotice.PageArgument`・`JobArgument`）
+  - StartupTask の状態の読み替え: `StartupTaskStates.FromWindowsState`（WinRT の型を使わず、名前で受け取る）
+- **B. XAML を読む単体テスト（XamlContractTests。Linux でも動く）**: AutomationId がウィンドウと各テンプレートの中で重複しないこと、UI テストが使う AutomationId（`app.Invoke("…")` などの文字列と `Show("X")` の `Nav.X`・`Panel.X`）が XAML にあること、画面とメニューの Tag が `Pages` と一致すること、`x:Bind` の名前が ViewModel（テンプレートの中は `x:DataType` の型）にあること、イベントの処理が MainWindow.xaml.cs にあること、`local:Ui` の関数が Ui.cs にあること。わざと 6 種類の誤り（今回の AutomationId の抜け、名前の誤り、重複、画面の名前、処理の名前、テンプレートの中の名前）を入れて、すべて失敗することを確かめた
+- 単体テストで確かめられないもの（見た目、ListView の選択の見え方、通知の表示、通知領域、サインイン時の起動、WAM）は、今までどおり UI テストと実機で確かめる
+
 ## 10. 出典（2026-10-19 に確認）
 - winapp CLI の UI Automation（パターンを使う命令は CI・ロックされた画面でも動く）: https://learn.microsoft.com/windows/apps/dev-tools/winapp-cli/ui-automation 、https://learn.microsoft.com/windows/apps/dev-tools/winapp-cli/guides/winui
 - AutomationProperties.AutomationId: https://learn.microsoft.com/windows/windows-app-sdk/api/winrt/microsoft.ui.xaml.automation.automationproperties.automationidproperty

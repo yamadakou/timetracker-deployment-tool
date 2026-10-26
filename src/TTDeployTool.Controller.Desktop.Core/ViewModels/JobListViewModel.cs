@@ -63,6 +63,7 @@ public sealed class JobListViewModel : ObservableObject
         PauseSelectedCommand = new AsyncCommand(() => Apply("一時停止", j => j.PauseCommand), () => _selected.Count > 0);
         ResumeSelectedCommand = new AsyncCommand(() => Apply("再開", j => j.ResumeCommand), () => _selected.Count > 0);
         RescheduleSelectedCommand = new AsyncCommand(RescheduleSelectedAsync, () => _selected.Count > 0);
+        TableSelection = new SelectionSync<JobViewModel>(() => _selected, SetSelection);
         ClearSelectionCommand = new AsyncCommand(() =>
         {
             SetSelection([]);
@@ -125,6 +126,12 @@ public sealed class JobListViewModel : ObservableObject
         Refresh();
     }
 
+    /// <summary>見出しの Tag（列の名前。<see cref="JobSortKey"/> の名前）で並べ替える（画面の側から）。</summary>
+    public void SortBy(string column) => SortBy(Enum.Parse<JobSortKey>(column));
+
+    /// <summary>表の選択と、この一覧の選択を合わせる。</summary>
+    public SelectionSync<JobViewModel> TableSelection { get; }
+
     /// <summary>選んだ行（表の複数の選択）。</summary>
     public IReadOnlyList<JobViewModel> Selected => _selected;
 
@@ -148,6 +155,7 @@ public sealed class JobListViewModel : ObservableObject
         OnPropertyChanged(nameof(SelectionText));
         foreach (var command in new[] { CancelSelectedCommand, PauseSelectedCommand, ResumeSelectedCommand, RescheduleSelectedCommand, ClearSelectionCommand })
             command.RaiseCanExecuteChanged();
+        TableSelection.ViewModelChanged();
     }
 
     /// <summary>選択をすべて外す。</summary>

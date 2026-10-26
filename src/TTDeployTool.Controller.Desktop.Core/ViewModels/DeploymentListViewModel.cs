@@ -136,6 +136,7 @@ public sealed class DeploymentListViewModel : ObservableObject
         ChangeSelectedExpiryCommand = new AsyncCommand(() => BatchBusy.RunAsync("選んだデプロイの利用可能期限を変えています", ChangeSelectedExpiryAsync),
             () => _selected.Count > 0);
         DeleteSelectedCommand = new AsyncCommand(DeleteSelectedAsync, () => _selected.Count > 0);
+        TableSelection = new SelectionSync<DeploymentRowViewModel>(() => _selected, SetSelection);
         ClearSelectionCommand = new AsyncCommand(() =>
         {
             SetSelection([]);
@@ -232,6 +233,12 @@ public sealed class DeploymentListViewModel : ObservableObject
 
     public string DeployedHeader => Header("デプロイ日", DeploymentSortKey.DeployedAt);
 
+    /// <summary>見出しの Tag（列の名前。<see cref="DeploymentSortKey"/> の名前）で並べ替える（画面の側から）。</summary>
+    public void SortBy(string column) => SortBy(Enum.Parse<DeploymentSortKey>(column));
+
+    /// <summary>表の選択と、この一覧の選択を合わせる。</summary>
+    public SelectionSync<DeploymentRowViewModel> TableSelection { get; }
+
     private string Header(string label, DeploymentSortKey key) => Sort.Key != key ? label : label + (Sort.Descending ? " ▼" : " ▲");
 
     /// <summary>選んだ行（表の複数の選択）。</summary>
@@ -259,6 +266,7 @@ public sealed class DeploymentListViewModel : ObservableObject
         ChangeSelectedExpiryCommand.RaiseCanExecuteChanged();
         DeleteSelectedCommand.RaiseCanExecuteChanged();
         ClearSelectionCommand.RaiseCanExecuteChanged();
+        TableSelection.ViewModelChanged();
     }
 
     /// <summary>選択をすべて外す。</summary>
@@ -675,7 +683,7 @@ public sealed class DeploymentListViewModel : ObservableObject
             if (_selected[0].HasActiveJob)
                 BatchMessage = $"{_selected[0].AppName} にはジョブがあるため、削除できません。ジョブが終わるか、取り消してから削除してください。";
             else
-                await UseAsTargetAsync(_selected[0].Entry, "delete");
+                await UseAsTargetAsync(_selected[0].Entry, Pages.Delete);
             return;
         }
         await _openBatchDeletion(_selected.Select(r => r.Entry).ToList());

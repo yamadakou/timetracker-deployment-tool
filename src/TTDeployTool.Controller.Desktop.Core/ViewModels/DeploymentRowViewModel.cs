@@ -52,11 +52,11 @@ public sealed class DeploymentRowViewModel : ObservableObject
             _owner.Open(Url!);
             return Task.CompletedTask;
         }, () => Url != null);
-        UseAsTargetCommand = new AsyncCommand(() => _owner.UseAsTargetAsync(_entry, "wizard"), () => !HasActiveJob);
-        CheckStatusCommand = new AsyncCommand(() => _owner.UseAsTargetAsync(_entry, "status"));
-        DeleteCommand = new AsyncCommand(() => _owner.UseAsTargetAsync(_entry, "delete"), () => !HasActiveJob);
+        UseAsTargetCommand = new AsyncCommand(() => _owner.UseAsTargetAsync(_entry, Pages.Wizard), () => !HasActiveJob);
+        CheckStatusCommand = new AsyncCommand(() => _owner.UseAsTargetAsync(_entry, Pages.Status));
+        DeleteCommand = new AsyncCommand(() => _owner.UseAsTargetAsync(_entry, Pages.Delete), () => !HasActiveJob);
         // そのジョブの実行状況を開く（「戻る」はデプロイの一覧。No.63）
-        ShowJobsCommand = new AsyncCommand(() => _owner.UseAsTargetAsync(_entry, "status"), () => HasActiveJob);
+        ShowJobsCommand = new AsyncCommand(() => _owner.UseAsTargetAsync(_entry, Pages.Status), () => HasActiveJob);
         ShowPasswordsCommand = new AsyncCommand(() => Busy.RunAsync("パスワードを読んでいます", ReadPasswordsAsync), () => _entry.Timetracker != null);
         TogglePasswordsCommand = new AsyncCommand(() =>
         {

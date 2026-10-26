@@ -18,7 +18,6 @@ namespace TTDeployTool.Controller.Desktop;
 public sealed partial class MainWindow : Window
 {
     private bool _exiting;
-    private bool _syncingSelection;
     private TaskbarIcon? _tray;
 
     public MainWindow()
@@ -37,18 +36,11 @@ public sealed partial class MainWindow : Window
         AppWindow.Closing += OnClosing;
         // デプロイの一覧の行の操作で、画面を切り替える
         viewModel.NavigationRequested += Navigate;
-        viewModel.Deployments.PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName == nameof(DeploymentListViewModel.Selected))
-                SyncSelection(DeploymentsTable, viewModel.Deployments.Selected);
-        };
-        viewModel.JobList.PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName == nameof(JobListViewModel.Selected))
-                SyncSelection(JobsList, viewModel.JobList.Selected);
-        };
+        // 表の選択と ViewModel の選択は、Core の SelectionSync が合わせる（画面の側は渡すだけ）
+        viewModel.Deployments.TableSelection.Attach(DeploymentsTable.SelectedItems);
+        viewModel.JobList.TableSelection.Attach(JobsList.SelectedItems);
         CreateTray();
-        _ = atStartup ? viewModel.InitializeAtStartupAsync() : viewModel.InitializeAsync();
+        _ = viewModel.StartAsync(atStartup);
         _ = CheckForUpdatesAsync(hwnd);
     }
 
@@ -84,7 +76,7 @@ public sealed partial class MainWindow : Window
     }
 
     // 削除・実行状況の画面の「デプロイの一覧に戻る」
-    private void OnBackToList(object sender, RoutedEventArgs e) => Navigate("deployments");
+    private void OnBackToList(object sender, RoutedEventArgs e) => Navigate(Pages.Deployments);
 
     private void OnExpiryFilterChanged(object sender, SelectionChangedEventArgs e)
     {
@@ -93,11 +85,9 @@ public sealed partial class MainWindow : Window
     }
 
     // 表の見出しを押すと並べ替える（Tag は列の名前。docs/design/desktop-wizard.md の 7）
-    private void OnSortDeployments(object sender, RoutedEventArgs e) =>
-        ViewModel.Deployments.SortBy(Enum.Parse<DeploymentSortKey>((string)((Button)sender).Tag));
+    private void OnSortDeployments(object sender, RoutedEventArgs e) => ViewModel.Deployments.SortBy((string)((Button)sender).Tag);
 
-    private void OnSortJobs(object sender, RoutedEventArgs e) =>
-        ViewModel.JobList.SortBy(Enum.Parse<JobSortKey>((string)((Button)sender).Tag));
+    private void OnSortJobs(object sender, RoutedEventArgs e) => ViewModel.JobList.SortBy((string)((Button)sender).Tag);
 
     private void OnJobFilterChanged(object sender, SelectionChangedEventArgs e)
     {
@@ -112,37 +102,10 @@ public sealed partial class MainWindow : Window
             popup.IsOpen = false;
     }
 
-    // 表で選んだ行を ViewModel に伝える（ListView の SelectedItems は結び付けられないため）。ViewModel が選び直したときは、表に戻す
-    private void OnDeploymentsSelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (!_syncingSelection)
-            ViewModel.Deployments.SetSelection(DeploymentsTable.SelectedItems.OfType<DeploymentRowViewModel>());
-    }
+    // 表で選んだ行を ViewModel に伝える（ListView の SelectedItems は結び付けられないため。Core の SelectionSync）
+    private void OnDeploymentsSelectionChanged(object sender, SelectionChangedEventArgs e) => ViewModel.Deployments.TableSelection.ViewChanged();
 
-    private void OnJobsSelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (!_syncingSelection)
-            ViewModel.JobList.SetSelection(JobsList.SelectedItems.OfType<JobViewModel>());
-    }
-
-    // 一覧を表示し直した後に ViewModel が保った選択を、表に戻す
-    private void SyncSelection(ListView table, IEnumerable<object> selected)
-    {
-        var wanted = selected.ToList();
-        if (table.SelectedItems.SequenceEqual(wanted))
-            return;
-        _syncingSelection = true;
-        try
-        {
-            table.SelectedItems.Clear();
-            foreach (var item in wanted)
-                table.SelectedItems.Add(item);
-        }
-        finally
-        {
-            _syncingSelection = false;
-        }
-    }
+    private void OnJobsSelectionChanged(object sender, SelectionChangedEventArgs e) => ViewModel.JobList.TableSelection.ViewChanged();
 
     // ジョブの一覧の「詳細」と、行のダブルクリック: 実行状況の画面で開く
     private void OnShowJobDetail(object sender, RoutedEventArgs e)
@@ -173,7 +136,7 @@ public sealed partial class MainWindow : Window
     }
 
     // 上部の帯の「ジョブを見る」
-    private void OnShowJobs(object sender, RoutedEventArgs e) => Navigate("jobs");
+    private void OnShowJobs(object sender, RoutedEventArgs e) => Navigate(Pages.Jobs);
 
     private void OnNavigationChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
     {
@@ -194,14 +157,11 @@ public sealed partial class MainWindow : Window
         ShowPanel(tag);
     }
 
+    // 画面は、Tag が画面の名前（Pages）のもの（XAML の対応は単体テスト XamlContractTests で確かめる）
     private void ShowPanel(string tag)
     {
-        foreach (var (panel, name) in new (FrameworkElement, string)[]
-                 {
-                     (TargetPanel, "target"), (DeploymentsPanel, "deployments"), (WizardPanel, "wizard"), (StatusPanel, "status"),
-                     (DeletePanel, "delete"), (DryRunPanel, "dryrun"), (JobsPanel, "jobs"), (BatchDeletePanel, "batchdelete"), (SettingsPanel, "settings"),
-                 })
-            panel.Visibility = name == tag ? Visibility.Visible : Visibility.Collapsed;
+        foreach (var panel in PagesHost.Children.OfType<FrameworkElement>())
+            panel.Visibility = (string)panel.Tag == tag ? Visibility.Visible : Visibility.Collapsed;
     }
 
     // 終わっていないジョブがあれば、終了せずにウィンドウを隠して通知領域に残る（D3）。無ければ終了する
@@ -223,21 +183,11 @@ public sealed partial class MainWindow : Window
         Activate();
     }
 
-    /// <summary>通知から、画面を開く（deployments はデプロイの一覧、signin はサインインの画面）。</summary>
-    public void ShowPage(string page)
+    /// <summary>通知を押したとき: ウィンドウを出し、開く画面は ViewModel が決める（MainViewModel.OpenFromNotificationAsync）。</summary>
+    public void ShowFromNotification(IReadOnlyDictionary<string, string> arguments)
     {
         ShowFromTray();
-        Navigate(page == "signin" ? "target" : page);
-    }
-
-    /// <summary>通知から、ジョブの詳細（実行状況）を開く（一覧から消した場合などは、ジョブの一覧を開く）。</summary>
-    public void ShowJob(string? jobId)
-    {
-        ShowFromTray();
-        if (jobId != null && ViewModel.FindJob(jobId) is { } job)
-            _ = ViewModel.OpenJobAsync(job);
-        else
-            Navigate("jobs");
+        _ = ViewModel.OpenFromNotificationAsync(arguments);
     }
 
     // 通知領域のアイコン（押すと開く。メニューは「開く」「終了」）。ツールチップに、終わっていないジョブの状況を出す

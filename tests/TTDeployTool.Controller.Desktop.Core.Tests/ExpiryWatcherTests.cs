@@ -414,7 +414,7 @@ public class StartupAndResidencyTests
         h.Notifications.Shown.Should().ContainSingle().Which.Should().Be(new AppNotice(
             "サインインが必要です",
             "利用可能期限の確認と、期限を過ぎたデプロイの削除ができません。この通知か通知領域のアイコンを押して、サインインしてください。",
-            Page: "signin"));
+            Page: Pages.Target));
 
         // 復元できれば通知しない
         var restored = new Harness(time: _time);

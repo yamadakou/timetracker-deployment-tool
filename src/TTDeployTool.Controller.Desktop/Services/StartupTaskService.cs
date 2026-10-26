@@ -17,7 +17,7 @@ internal sealed class StartupTaskService : IStartupTaskService
     {
         try
         {
-            return Map((await StartupTask.GetAsync(TaskId)).State);
+            return StartupTaskStates.FromWindowsState((await StartupTask.GetAsync(TaskId)).State.ToString());
         }
         catch (Exception)
         {
@@ -25,15 +25,8 @@ internal sealed class StartupTaskService : IStartupTaskService
         }
     }
 
-    public async Task<StartupTaskStatus> EnableAsync() => Map(await (await StartupTask.GetAsync(TaskId)).RequestEnableAsync());
+    public async Task<StartupTaskStatus> EnableAsync() =>
+        StartupTaskStates.FromWindowsState((await (await StartupTask.GetAsync(TaskId)).RequestEnableAsync()).ToString());
 
     public async Task DisableAsync() => (await StartupTask.GetAsync(TaskId)).Disable();
-
-    private static StartupTaskStatus Map(StartupTaskState state) => state switch
-    {
-        StartupTaskState.Enabled or StartupTaskState.EnabledByPolicy => StartupTaskStatus.Enabled,
-        StartupTaskState.DisabledByUser => StartupTaskStatus.DisabledByUser,
-        StartupTaskState.DisabledByPolicy => StartupTaskStatus.DisabledByPolicy,
-        _ => StartupTaskStatus.Disabled,
-    };
 }

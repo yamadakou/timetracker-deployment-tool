@@ -10,19 +10,13 @@ namespace TTDeployTool.Controller.Desktop.Services;
 /// </summary>
 internal sealed class AppNotificationService : INotificationService
 {
-    /// <summary>通知の引数の、開くジョブの ID のキー。</summary>
-    public const string JobArgument = "job";
-
-    /// <summary>通知の引数の、開く画面（deployments・signin）のキー。</summary>
-    public const string PageArgument = "page";
-
     public void Show(AppNotice notice)
     {
         var builder = new AppNotificationBuilder().AddText(notice.Title).AddText(notice.Message);
         if (notice.JobId != null)
-            builder.AddArgument(JobArgument, notice.JobId);
+            builder.AddArgument(AppNotice.JobArgument, notice.JobId);
         if (notice.Page != null)
-            builder.AddArgument(PageArgument, notice.Page);
+            builder.AddArgument(AppNotice.PageArgument, notice.Page);
         try
         {
             AppNotificationManager.Default.Show(builder.BuildNotification());

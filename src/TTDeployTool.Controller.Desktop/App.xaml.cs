@@ -75,14 +75,7 @@ public partial class App : Microsoft.UI.Xaml.Application
     // 通知を押した（アプリが動いている間。終わった後に押された場合は、ジョブが残っていないため普通に起動する）
     private void OnNotificationInvoked(AppNotificationManager sender, AppNotificationActivatedEventArgs args)
     {
-        var jobId = args.Arguments.TryGetValue(AppNotificationService.JobArgument, out var id) ? id : null;
-        var page = args.Arguments.TryGetValue(AppNotificationService.PageArgument, out var p) ? p : null;
-        _window?.DispatcherQueue.TryEnqueue(() =>
-        {
-            if (page != null)
-                _window.ShowPage(page);
-            else
-                _window.ShowJob(jobId);
-        });
+        var arguments = new Dictionary<string, string>(args.Arguments);
+        _window?.DispatcherQueue.TryEnqueue(() => _window.ShowFromNotification(arguments));
     }
 }

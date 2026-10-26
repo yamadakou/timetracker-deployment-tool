@@ -36,8 +36,15 @@ public interface IDialogService
 }
 
 /// <summary>Windows の通知 1 件。<see cref="JobId"/> は、押したときに開くジョブ（無ければ、アプリを開くだけ）。</summary>
-/// <param name="Page">押されたときに開く画面（deployments・signin。無ければジョブか、ウィンドウを出すだけ）</param>
-public sealed record AppNotice(string Title, string Message, string? JobId = null, string? Page = null);
+/// <param name="Page">押されたときに開く画面（<see cref="ViewModels.Pages"/> の名前。無ければジョブか、ジョブの一覧）</param>
+public sealed record AppNotice(string Title, string Message, string? JobId = null, string? Page = null)
+{
+    /// <summary>通知の引数の、開くジョブの ID のキー。</summary>
+    public const string JobArgument = "job";
+
+    /// <summary>通知の引数の、開く画面の名前のキー。</summary>
+    public const string PageArgument = "page";
+}
 
 /// <summary>Windows の通知（OS の機能を使うため、画面の側で実装する。詳細設計 desktop-jobs.md の 5）。</summary>
 public interface INotificationService
@@ -59,6 +66,19 @@ public enum StartupTaskStatus
 
     /// <summary>パッケージで動いていないなど、確かめられない。</summary>
     Unavailable,
+}
+
+/// <summary>Windows の StartupTaskState の読み替え（画面の側の StartupTaskService が使う。WinRT の型を使わずに単体テストで確かめるため、名前で受け取る）。</summary>
+public static class StartupTaskStates
+{
+    /// <summary><c>Windows.ApplicationModel.StartupTaskState</c> の名前から読み替える（ポリシーで有効なものは有効、知らない名前は無効）。</summary>
+    public static StartupTaskStatus FromWindowsState(string name) => name switch
+    {
+        "Enabled" or "EnabledByPolicy" => StartupTaskStatus.Enabled,
+        "DisabledByUser" => StartupTaskStatus.DisabledByUser,
+        "DisabledByPolicy" => StartupTaskStatus.DisabledByPolicy,
+        _ => StartupTaskStatus.Disabled,
+    };
 }
 
 /// <summary>Windows のサインイン時の起動（MSIX の StartupTask。画面の側で実装する。docs/design/desktop-jobs.md の 6.5）。</summary>

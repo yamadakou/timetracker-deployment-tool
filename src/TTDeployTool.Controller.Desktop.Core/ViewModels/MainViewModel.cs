@@ -36,7 +36,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private JobViewModel? _currentDeployment;
     private JobViewModel? _currentDeletion;
     private JobViewModel? _statusJob;
-    private string _returnPage = "deployments";
+    private string _returnPage = Pages.Deployments;
 
     public MainViewModel(
         ISignInService signIn, IAzureClients clients, IDialogService dialogs, ISystemLauncher launcher, TimeProvider time, ILoggerFactory loggers,
@@ -86,7 +86,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
                 Target.Clear();
                 Deployments.Clear();
                 // デプロイの一覧・ウィザード・ジョブの一覧は、サインインするまで押せないため、サインインの画面に戻す（No.63）
-                NavigationRequested?.Invoke("target");
+                NavigationRequested?.Invoke(Pages.Target);
             }
         }, loggers.CreateLogger("TTDeployTool.Desktop.SignIn"));
         Settings = new SettingsViewModel(Target, time, preferences, dialogs, clipboard);
@@ -150,7 +150,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         private set => SetProperty(ref _returnPage, value, new Dependent(nameof(ReturnText)));
     }
 
-    public string ReturnText => ReturnPage == "jobs" ? "ジョブの一覧に戻る" : "デプロイの一覧に戻る";
+    public string ReturnText => ReturnPage == Pages.Jobs ? "ジョブの一覧に戻る" : "デプロイの一覧に戻る";
 
     /// <summary>実行状況の画面に出すジョブ（無ければ、Azure の状態だけを出す）。</summary>
     public JobViewModel? StatusJob
@@ -231,6 +231,23 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         await SignIn.RestoreAsync();
     }
 
+    /// <summary>起動したとき（Windows のサインイン時の起動なら <see cref="InitializeAtStartupAsync"/>、ほかは <see cref="InitializeAsync"/>）。</summary>
+    public Task StartAsync(bool atStartup) => atStartup ? InitializeAtStartupAsync() : InitializeAsync();
+
+    /// <summary>
+    /// 通知を押したとき（引数は <see cref="AppNotice.PageArgument"/> か <see cref="AppNotice.JobArgument"/>）。画面の名前があればその画面を、
+    /// ジョブがあればその詳細（実行状況）を開く。ジョブが一覧から消えていれば、ジョブの一覧を開く。
+    /// </summary>
+    public async Task OpenFromNotificationAsync(IReadOnlyDictionary<string, string> arguments)
+    {
+        if (arguments.TryGetValue(AppNotice.PageArgument, out var page) && Pages.All.Contains(page))
+            NavigationRequested?.Invoke(page);
+        else if (arguments.TryGetValue(AppNotice.JobArgument, out var id) && FindJob(id) is { } job)
+            await OpenJobAsync(job);
+        else
+            NavigationRequested?.Invoke(Pages.Jobs);
+    }
+
     /// <summary>
     /// Windows のサインイン時に起動されたとき（ウィンドウは出さない）。前回のサインインを対話なしで復元し、できなければ、サインインが要ることを通知して待つ（D19）。
     /// </summary>
@@ -241,7 +258,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             _notifications?.Show(new AppNotice(
                 "サインインが必要です",
                 "利用可能期限の確認と、期限を過ぎたデプロイの削除ができません。この通知か通知領域のアイコンを押して、サインインしてください。",
-                Page: "signin"));
+                Page: Pages.Target));
     }
 
     /// <summary>
@@ -302,17 +319,17 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     {
         switch (page)
         {
-            case "wizard":
+            case Pages.Wizard:
                 await Wizard.StartOverAsync();
                 NavigationRequested?.Invoke(page);
                 break;
-            case "status":
+            case Pages.Status:
                 StatusJob = Jobs.FirstOrDefault(j => j.IsFor(Target.Subscription, Target.ResourceGroup, Target.AppName.ToLowerInvariant()));
-                ReturnPage = "deployments";
+                ReturnPage = Pages.Deployments;
                 NavigationRequested?.Invoke(page);
                 await Status.RefreshCommand.ExecuteAsync();
                 break;
-            case "delete":
+            case Pages.Delete:
                 NavigationRequested?.Invoke(page);
                 await Deletion.PlanCommand.ExecuteAsync();
                 break;
@@ -329,9 +346,9 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public async Task OpenJobAsync(JobViewModel job)
     {
         StatusJob = job;
-        ReturnPage = "jobs";
+        ReturnPage = Pages.Jobs;
         var selected = Target.Select(job.Target.Subscription, job.Target.ResourceGroup, job.Target.AppName);
-        NavigationRequested?.Invoke("status");
+        NavigationRequested?.Invoke(Pages.Status);
         if (selected)
             await Status.RefreshCommand.ExecuteAsync();
     }
@@ -339,7 +356,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     // まとめての削除の画面を開いて、選んだデプロイを計画する
     private async Task OpenBatchDeletionAsync(IReadOnlyList<DeploymentEntry> entries)
     {
-        NavigationRequested?.Invoke("batchdelete");
+        NavigationRequested?.Invoke(Pages.BatchDelete);
         await BatchDeletion.OpenAsync(entries);
     }
 
@@ -348,7 +365,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     {
         if (jobs.Count > 0)
             CurrentDeletion = jobs[0];
-        NavigationRequested?.Invoke("jobs");
+        NavigationRequested?.Invoke(Pages.Jobs);
     }
 
     // 実行状況の画面のジョブが終わったら、Azure の状態を読み直す
@@ -365,13 +382,13 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         if (job.ScheduledAt == null)
         {
             StatusJob = job;
-            ReturnPage = "deployments";
-            NavigationRequested?.Invoke("status");
+            ReturnPage = Pages.Deployments;
+            NavigationRequested?.Invoke(Pages.Status);
             StatusRefresh = Status.RefreshCommand.ExecuteAsync();
         }
         else
         {
-            NavigationRequested?.Invoke("jobs");
+            NavigationRequested?.Invoke(Pages.Jobs);
         }
         if (job.IsDeployment)
         {
