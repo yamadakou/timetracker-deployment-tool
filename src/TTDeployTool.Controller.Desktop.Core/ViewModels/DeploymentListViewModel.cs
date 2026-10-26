@@ -597,8 +597,8 @@ public sealed class DeploymentListViewModel : ObservableObject
     private void ShowPage(bool keepRows)
     {
         var previous = keepRows ? Rows.ToList() : [];
-        // 行を使い続ける場合は、選んでいた行の選択も保つ（行を消す間に画面の表が選択を外すため、先に覚えておく）
-        var selected = keepRows ? _selected.ToList() : [];
+        // 選んでいたデプロイがまた出れば、選んだままにする（読み直し・期限の確認の読み直しでも外さない。行を消す間に画面の表が選択を外すため、先に覚えておく）
+        var selected = _selected.Select(r => r.Entry).ToList();
         Rows.Clear();
         foreach (var entry in _filtered.Skip(_pageIndex * PageSize).Take(PageSize))
         {
@@ -611,7 +611,7 @@ public sealed class DeploymentListViewModel : ObservableObject
         }
         ShowJobs();
         // 行を作り直したら、選択もやり直す。使い続けた行は選んだままにする（画面の表は Selected の変更で選び直す）
-        SetSelection(selected.Where(Rows.Contains));
+        SetSelection(Rows.Where(r => selected.Any(e => r.Entry.IsFor(e.SubscriptionId, e.ResourceGroup, e.AppName))));
         _logger.LogInformation("デプロイの一覧を表示し直しました: {Count} 行（選択 {Selected} 行、行を使い続ける {KeepRows}）", Rows.Count, _selected.Count, keepRows);
         OnPropertyChanged(nameof(TotalCount));
         OnPropertyChanged(nameof(FilteredCount));

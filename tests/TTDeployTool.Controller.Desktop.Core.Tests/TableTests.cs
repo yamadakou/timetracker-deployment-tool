@@ -68,9 +68,16 @@ public class DeploymentTableTests
         (vm.Current, vm.SelectionText).Should().Be((null, "2 件を選んでいます。"));
         vm.ChangeSelectedExpiryCommand.CanExecute(null).Should().BeTrue();
 
-        // 読み直すと行を作り直すため、選択も消える
+        // 読み直しても、同じデプロイは選んだまま（行は作り直す）
+        var before = vm.Rows[0];
         await vm.LoadCommand.ExecuteAsync();
-        vm.Selected.Should().BeEmpty();
+        vm.Selected.Select(r => r.AppName).Should().Equal("a", "b");
+        vm.Rows[0].Should().NotBeSameAs(before);
+
+        // 一覧から消えたデプロイは、選択から外す
+        h.Azure.RecordsByTenant["t1"] = [.. Deployment("sub", "rg", "a")];
+        await vm.LoadCommand.ExecuteAsync();
+        vm.Selected.Select(r => r.AppName).Should().Equal("a");
     }
 
     [Fact]

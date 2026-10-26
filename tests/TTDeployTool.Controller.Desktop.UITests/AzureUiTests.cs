@@ -120,6 +120,8 @@ public class AzureUiTests
             app.SetText("Deployments.ResourceGroupFilter", resourceGroup!);
             app.Invoke("Deployments.ResourceGroupFilterClose");
             app.Invoke("Deployments.Load");
+            // 読み込みが終わるまで待つ（件数の表示は、デプロイの直後に重ねた結果で読み込む前から出ているため、それでは待てない。Desktop System Test、2026-10-26）
+            AppSession.WaitUntil(() => app.IsEnabled("Deployments.Load"), "デプロイの一覧の読み込みが終わりませんでした。", LoadTimeout);
             app.WaitForText("Deployments.Page", t => t.Contains("件目"), "一覧にデプロイが出る", LoadTimeout);
             Log($"デプロイの一覧: {app.TextOf("Deployments.Page")}、状態 {app.TextOf("Row.State")}、期限 {app.TextOf("Row.Expiry")}");
             app.TextOf("Row.AppName").Should().Be(appName);
@@ -218,6 +220,7 @@ public class AzureUiTests
             // 削除した後は、一覧に出ない（このアプリで削除したものは、Resource Graph に反映される前でも消える）
             app.Show("Deployments");
             app.Invoke("Deployments.Load");
+            AppSession.WaitUntil(() => app.IsEnabled("Deployments.Load"), "デプロイの一覧の読み込みが終わりませんでした。", LoadTimeout);
             app.WaitForText("Deployments.Page", t => t.StartsWith("表示するデプロイはありません"), "削除した環境は一覧に出ない", LoadTimeout);
         });
     }
