@@ -180,11 +180,11 @@
 | 失敗したとき | ジョブの終わりの通知（5）で知らせる。権限の不足などで失敗した対象は、6 時間たつまで登録し直さない（確認のたびに失敗と通知を繰り返さないため。記録はアプリの中だけで、再起動すると次の確認で登録し直す） | — |
 | 閉じたとき（D18） | 終わっていないジョブが無くても、読んだ一覧に期限日のあるデプロイが 1 つでもあれば、終了せずに通知領域に残る（初めて隠すときに、その旨を通知する）。期限日のあるデプロイが無ければ、今までどおり終了する。終了は通知領域の「終了」から | — |
 | サインイン時の起動 | パッケージのマニフェストに `uap5:Extension Category="windows.startupTask"`（`Executable` はアプリの exe、`EntryPoint="Windows.FullTrustApplication"`、`uap5:StartupTask TaskId="TTDeployToolStartup" Enabled="false" DisplayName="TTDeployTool"`）を加える。有効にするのは利用者が選んだときだけ（D16）。パッケージのデスクトップ アプリでは `RequestEnableAsync` で同意のダイアログは出ない。タスク マネージャーや「設定」のスタートアップで無効にされた（`DisabledByUser`）場合は、アプリから有効にできないため、その旨と場所を表示する。`DisabledByPolicy` は「ポリシーで無効」と表示する | StartupTask クラス（Remarks、マニフェストの例、`RequestEnableAsync`） |
-| サインイン時の起動を選ぶ場所 | 「ジョブ」の画面（同時に実行する数の下）に「Windows のサインイン時に、通知領域で起動する（期限の確認と削除のため）」。期限日のあるデプロイのジョブを初めて登録したときに、まだ有効でなく、尋ねたことが無ければ、確認のダイアログで尋ねる（D16。尋ねたことはアプリのデータに記録し、一度だけ） | — |
+| サインイン時の起動を選ぶ場所 | 「設定」の画面（同時に実行する数の下。No.63 で「ジョブ」の画面から移した）に「Windows のサインイン時に、通知領域で起動する（期限の確認と削除のため）」。期限日のあるデプロイのジョブを初めて登録したときに、まだ有効でなく、尋ねたことが無ければ、確認のダイアログで尋ねる（D16。尋ねたことはアプリのデータに記録し、一度だけ） | — |
 | サインイン時に起動されたとき | `AppInstance.GetCurrent().GetActivatedEventArgs().Kind` が `ExtendedActivationKind.StartupTask` なら、ウィンドウを出さずに通知領域のアイコンだけを出して、前回のサインインを対話なしで復元する。復元できれば期限の確認を始める（D21 の時刻） | Rich activation（パッケージのアプリは UWP のすべての起動の種類に対応。`StartupTask` の種類） |
 | 対話なしのサインインができない（D19） | 「サインインが必要です。期限の確認と削除ができません」と通知し、通知領域で待つ。通知か通知領域のアイコンを押すとウィンドウを出し、サインインの画面を開く | — |
 | 通知の引数 | 今のジョブの ID（`jobId`）に加え、開く画面（`page=deployments`・`page=signin`）を入れる。押されたら、その画面を開く | 同上（通知） |
-| 画面の文言 | 「（次の版から）」（No.61 で添えた）を消す。どの PC でもアプリが動いていなければ削除が遅れることを、「ジョブ」の画面のサインイン時の起動の説明と README に書く | — |
+| 画面の文言 | 「（次の版から）」（No.61 で添えた）を消す。どの PC でもアプリが動いていなければ削除が遅れることを、「設定」の画面のサインイン時の起動の説明と README に書く | — |
 | 部品 | Desktop.Core に `ExpiryWatcher`（確認・通知・登録。時刻は `TimeProvider`、次の確認のタイマーは `TimeProvider.CreateTimer` を確認のたびに合わせ直す）と `IStartupTaskService`（状態の取得・有効にする・無効にする。画面の側で `Windows.ApplicationModel.StartupTask` で実装）を加える。期限の読み直しは Application の `DeploymentMaintenance.ReadExpiryAsync`（6.1 の規則でまとめる） | — |
 
 
@@ -273,7 +273,7 @@
 **実施結果（7d-3）**
 - Application: `DeploymentMaintenance.ReadExpiryAsync`（3 つの Container App とストレージアカウントの `tt-expires-at` を 6.1 の規則でまとめ、どちらも無ければ Environment）
 - Desktop.Core: `ExpiryWatcher`（サインインしたときと、最も近い期限・3 日前・前日の時刻か 6 時間ごとの早い方に一覧を読み直し、3 日前・前日の通知、期限を過ぎたものの削除のジョブの登録。削除の直前に期限を読み直し、計画して始める。失敗した対象は 6 時間登録し直さない）、`StartupSettingViewModel`（サインイン時の起動の状態・切り替え・一度だけ尋ねる）、`MainViewModel.RequestClose`（期限日のあるデプロイがあれば常駐。D18）・`InitializeAtStartupAsync`（復元できなければ通知。D19）、`IAppPreferences.ExpiryNotices`・`StartupTaskAsked`、`JobViewModel.IsExpiryDeletion`（題名「期限での削除」）、`DeploymentListViewModel.ReloadAsync`（ページ・フィルタを保って読み直す）
-- 画面の側: マニフェストの `windows.startupTask`（既定は無効）、`StartupTaskService`（`Windows.ApplicationModel.StartupTask`）、`App`（`ExtendedActivationKind.StartupTask` ならウィンドウを出さない）、通知の引数 `page`（`deployments`・`signin`）、「ジョブ」の画面のサインイン時の起動
+- 画面の側: マニフェストの `windows.startupTask`（既定は無効）、`StartupTaskService`（`Windows.ApplicationModel.StartupTask`）、`App`（`ExtendedActivationKind.StartupTask` ならウィンドウを出さない）、通知の引数 `page`（`deployments`・`signin`）、「設定」の画面のサインイン時の起動（No.63 で移した）
 - 「（次の版から）」（No.61 で添えた）を消した
 - テスト: Application と Desktop.Core に 7d-3 のテストを加え、ソリューション全体 1,124 件成功。新しいコードの行と分岐の網羅率 100%
 
