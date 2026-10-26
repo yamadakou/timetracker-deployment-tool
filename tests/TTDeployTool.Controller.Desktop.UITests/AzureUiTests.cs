@@ -30,7 +30,9 @@ public class AzureUiTests
 
         AppSession.Run(app =>
         {
-            // サインイン（前回のサインインを復元できなければ、利用者が WAM の画面でサインインする）
+            // サインイン（前回のサインインを復元できなければ、利用者が WAM の画面でサインインする）。
+            // 起動時の前回のサインインの確認が終わるまでは、どちらのボタンも押せないため、終わるのを待ってから決める（Desktop System Test、2026-10-26）
+            AppSession.WaitUntil(() => app.IsEnabled("SignIn.SignOut") || app.IsEnabled("SignIn.SignIn"), "前回のサインインの確認が終わりませんでした。", LoadTimeout);
             if (!app.IsEnabled("SignIn.SignOut"))
             {
                 Log("サインインの画面が開きます。サインインしてください（最大 5 分待ちます）。");
