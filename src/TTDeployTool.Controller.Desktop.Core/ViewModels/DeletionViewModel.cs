@@ -146,6 +146,7 @@ public sealed class DeletionViewModel : ObservableObject
             {
                 OnPropertyChanged(nameof(CanStart));
                 StartCommand.RaiseCanExecuteChanged();
+                ScheduleCommand.RaiseCanExecuteChanged();
             }
         }
     }

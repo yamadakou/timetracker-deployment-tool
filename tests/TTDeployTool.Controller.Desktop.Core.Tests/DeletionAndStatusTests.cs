@@ -59,6 +59,31 @@ public class DeletionViewModelTests
         vm.ConfirmAppName.Should().BeEmpty();
     }
 
+    // オーナーの実機（2026-10-26）: アプリ名を入れても「予定に追加」が押せないままだった（画面のボタンは CanExecuteChanged で状態を読み直すため）
+    [Fact]
+    public async Task Typing_The_App_Name_Should_Enable_Both_Buttons_On_The_Screen()
+    {
+        var h = await new Harness().ReadyAsync();
+        h.Azure.Deployed();
+        h.Main.Target.AppName = "demo";
+        var vm = h.Main.Deletion;
+        await vm.PlanCommand.ExecuteAsync();
+        var shown = new Dictionary<string, bool>
+        {
+            ["start"] = vm.StartCommand.CanExecute(null),
+            ["schedule"] = vm.ScheduleCommand.CanExecute(null),
+        };
+        vm.StartCommand.CanExecuteChanged += (_, _) => shown["start"] = vm.StartCommand.CanExecute(null);
+        vm.ScheduleCommand.CanExecuteChanged += (_, _) => shown["schedule"] = vm.ScheduleCommand.CanExecute(null);
+        shown.Values.Should().AllBeEquivalentTo(false);
+
+        vm.ConfirmAppName = "demo";
+        shown.Values.Should().AllBeEquivalentTo(true);
+
+        vm.ConfirmAppName = "dem";
+        shown.Values.Should().AllBeEquivalentTo(false);
+    }
+
     [Fact]
     public async Task The_Resource_Group_Should_Be_Deleted_Last_When_Chosen()
     {
