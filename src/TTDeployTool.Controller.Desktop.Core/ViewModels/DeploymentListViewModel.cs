@@ -246,6 +246,7 @@ public sealed class DeploymentListViewModel : ObservableObject
         if (selected.SequenceEqual(_selected))
             return;
         _selected = selected;
+        _logger.LogInformation("デプロイの一覧の選択: {Count} 行", selected.Count);
         OnPropertyChanged(nameof(Selected));
         OnPropertyChanged(nameof(Current));
         OnPropertyChanged(nameof(HasCurrent));

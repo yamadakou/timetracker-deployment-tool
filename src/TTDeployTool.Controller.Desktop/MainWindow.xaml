@@ -371,50 +371,44 @@
                             <TextBlock VerticalAlignment="Center" Text="件ずつ表示" />
                         </StackPanel>
 
-                        <!-- 1 行だけ選んだときの詳細 -->
-                        <ContentControl AutomationProperties.AutomationId="Deployments.Detail" Content="{x:Bind ViewModel.Deployments.Current, Mode=OneWay}"
-                                        Visibility="{x:Bind ViewModel.Deployments.HasCurrent, Mode=OneWay}" HorizontalContentAlignment="Stretch">
-                            <ContentControl.ContentTemplate>
-                                <DataTemplate x:DataType="vm:DeploymentRowViewModel">
-                                    <Border BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="12">
-                                        <StackPanel Spacing="4">
-                                            <StackPanel Orientation="Horizontal" Spacing="4">
-                                                <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind AppName}" />
-                                                <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="（" /><TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind ResourceGroup}" /><TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="）" />
-                                            </StackPanel>
-                                            <HyperlinkButton Content="{x:Bind Url, Mode=OneWay}" Command="{x:Bind OpenCommand}" Visibility="{x:Bind HasUrl, Mode=OneWay}" Padding="0" />
-                                            <TextBlock AutomationProperties.AutomationId="Row.ExpiryWarning" Text="{x:Bind ExpiryWarning, Mode=OneWay}" TextWrapping="Wrap" Foreground="{ThemeResource SystemFillColorCautionBrush}"
-                                                       Visibility="{x:Bind HasExpiryWarning, Mode=OneWay}" />
-                                            <StackPanel Orientation="Horizontal" Spacing="4">
-                                                <TextBlock Text="{x:Bind DbTypeText, Mode=OneWay}" /><TextBlock Text="、" /><TextBlock Text="{x:Bind PersistenceText, Mode=OneWay}" /><TextBlock Text="、" />
-                                                <TextBlock Text="{x:Bind SpecText, Mode=OneWay}" TextWrapping="Wrap" />
-                                            </StackPanel>
-                                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                                <Button AutomationProperties.AutomationId="Row.UseAsTarget" Content="対象に入れる" Command="{x:Bind UseAsTargetCommand}" />
-                                                <Button AutomationProperties.AutomationId="Row.CheckStatus" Content="状態を確認" Command="{x:Bind CheckStatusCommand}" />
-                                                <Button AutomationProperties.AutomationId="Row.ShowJobs" Content="ジョブを見る" Command="{x:Bind ShowJobsCommand}" />
-                                                <Button AutomationProperties.AutomationId="Row.ShowPasswords" Content="パスワードを表示" Command="{x:Bind ShowPasswordsCommand}" />
-                                            </StackPanel>
-                                            <StackPanel Spacing="4" Visibility="{x:Bind HasPasswords, Mode=OneWay}">
-                                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                                    <TextBlock VerticalAlignment="Center" Text="DB のパスワード:" /><TextBlock AutomationProperties.AutomationId="Row.DbPassword" VerticalAlignment="Center" IsTextSelectionEnabled="False" Text="{x:Bind DbPasswordText, Mode=OneWay}" />
-                                                    <Button Content="コピー" Command="{x:Bind CopyDbPasswordCommand}" />
-                                                </StackPanel>
-                                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                                    <TextBlock VerticalAlignment="Center" Text="Timetracker のパスワード:" /><TextBlock AutomationProperties.AutomationId="Row.TrackerPassword" VerticalAlignment="Center" IsTextSelectionEnabled="False" Text="{x:Bind TrackerPasswordText, Mode=OneWay}" />
-                                                    <Button Content="コピー" Command="{x:Bind CopyTrackerPasswordCommand}" />
-                                                </StackPanel>
-                                                <Button AutomationProperties.AutomationId="Row.TogglePasswords" Content="表示する・伏せる" Command="{x:Bind TogglePasswordsCommand}" />
-                                            </StackPanel>
-                                            <StackPanel Orientation="Horizontal" Spacing="8" Visibility="{x:Bind Busy.IsBusy, Mode=OneWay}"><ProgressRing IsActive="{x:Bind Busy.IsBusy, Mode=OneWay}" Width="16" Height="16" /><TextBlock VerticalAlignment="Center" Text="{x:Bind Busy.Text, Mode=OneWay}" /></StackPanel>
-                                            <TextBlock AutomationProperties.AutomationId="Row.Message" Text="{x:Bind Message, Mode=OneWay}" TextWrapping="Wrap" />
-                                            <TextBlock AutomationProperties.AutomationId="Row.Error" Text="{x:Bind Error, Mode=OneWay}" TextWrapping="Wrap" Foreground="{ThemeResource SystemFillColorCriticalBrush}"
-                                                       Visibility="{x:Bind HasError, Mode=OneWay}" />
-                                        </StackPanel>
-                                    </Border>
-                                </DataTemplate>
-                            </ContentControl.ContentTemplate>
-                        </ContentControl>
+                        <!-- 1 行だけ選んだときの詳細（選んだ行の値を ViewModel から直接結び付ける。テンプレートの ContentControl では、パスワードを読んだ後の表示が変わらなかった） -->
+                        <Border AutomationProperties.AutomationId="Deployments.Detail" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="12"
+                                Visibility="{x:Bind ViewModel.Deployments.HasCurrent, Mode=OneWay}">
+                            <StackPanel Spacing="4">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind ViewModel.Deployments.Current.AppName, Mode=OneWay}" />
+                                    <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="（" /><TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind ViewModel.Deployments.Current.ResourceGroup, Mode=OneWay}" /><TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="）" />
+                                </StackPanel>
+                                <HyperlinkButton Content="{x:Bind ViewModel.Deployments.Current.Url, Mode=OneWay}" Command="{x:Bind ViewModel.Deployments.Current.OpenCommand, Mode=OneWay}" Visibility="{x:Bind ViewModel.Deployments.Current.HasUrl, Mode=OneWay}" Padding="0" />
+                                <TextBlock AutomationProperties.AutomationId="Row.ExpiryWarning" Text="{x:Bind ViewModel.Deployments.Current.ExpiryWarning, Mode=OneWay}" TextWrapping="Wrap" Foreground="{ThemeResource SystemFillColorCautionBrush}"
+                                           Visibility="{x:Bind ViewModel.Deployments.Current.HasExpiryWarning, Mode=OneWay}" />
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <TextBlock Text="{x:Bind ViewModel.Deployments.Current.DbTypeText, Mode=OneWay}" /><TextBlock Text="、" /><TextBlock Text="{x:Bind ViewModel.Deployments.Current.PersistenceText, Mode=OneWay}" /><TextBlock Text="、" />
+                                    <TextBlock Text="{x:Bind ViewModel.Deployments.Current.SpecText, Mode=OneWay}" TextWrapping="Wrap" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button AutomationProperties.AutomationId="Row.UseAsTarget" Content="対象に入れる" Command="{x:Bind ViewModel.Deployments.Current.UseAsTargetCommand, Mode=OneWay}" />
+                                    <Button AutomationProperties.AutomationId="Row.CheckStatus" Content="状態を確認" Command="{x:Bind ViewModel.Deployments.Current.CheckStatusCommand, Mode=OneWay}" />
+                                    <Button AutomationProperties.AutomationId="Row.ShowJobs" Content="ジョブを見る" Command="{x:Bind ViewModel.Deployments.Current.ShowJobsCommand, Mode=OneWay}" />
+                                    <Button AutomationProperties.AutomationId="Row.ShowPasswords" Content="パスワードを表示" Command="{x:Bind ViewModel.Deployments.Current.ShowPasswordsCommand, Mode=OneWay}" />
+                                </StackPanel>
+                                <StackPanel Spacing="4" Visibility="{x:Bind ViewModel.Deployments.Current.HasPasswords, Mode=OneWay}">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock VerticalAlignment="Center" Text="DB のパスワード:" /><TextBlock AutomationProperties.AutomationId="Row.DbPassword" VerticalAlignment="Center" IsTextSelectionEnabled="False" Text="{x:Bind ViewModel.Deployments.Current.DbPasswordText, Mode=OneWay}" />
+                                        <Button Content="コピー" Command="{x:Bind ViewModel.Deployments.Current.CopyDbPasswordCommand, Mode=OneWay}" />
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock VerticalAlignment="Center" Text="Timetracker のパスワード:" /><TextBlock AutomationProperties.AutomationId="Row.TrackerPassword" VerticalAlignment="Center" IsTextSelectionEnabled="False" Text="{x:Bind ViewModel.Deployments.Current.TrackerPasswordText, Mode=OneWay}" />
+                                        <Button Content="コピー" Command="{x:Bind ViewModel.Deployments.Current.CopyTrackerPasswordCommand, Mode=OneWay}" />
+                                    </StackPanel>
+                                    <Button AutomationProperties.AutomationId="Row.TogglePasswords" Content="表示する・伏せる" Command="{x:Bind ViewModel.Deployments.Current.TogglePasswordsCommand, Mode=OneWay}" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Spacing="8" Visibility="{x:Bind ViewModel.Deployments.Current.Busy.IsBusy, Mode=OneWay}"><ProgressRing IsActive="{x:Bind ViewModel.Deployments.Current.Busy.IsBusy, Mode=OneWay}" Width="16" Height="16" /><TextBlock VerticalAlignment="Center" Text="{x:Bind ViewModel.Deployments.Current.Busy.Text, Mode=OneWay}" /></StackPanel>
+                                <TextBlock AutomationProperties.AutomationId="Row.Message" Text="{x:Bind ViewModel.Deployments.Current.Message, Mode=OneWay}" TextWrapping="Wrap" />
+                                <TextBlock AutomationProperties.AutomationId="Row.Error" Text="{x:Bind ViewModel.Deployments.Current.Error, Mode=OneWay}" TextWrapping="Wrap" Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                                           Visibility="{x:Bind ViewModel.Deployments.Current.HasError, Mode=OneWay}" />
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
 
                     <!-- 削除（計画 → アプリ名の入力 → 実行） -->
