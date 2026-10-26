@@ -36,12 +36,40 @@ public interface IDialogService
 }
 
 /// <summary>Windows の通知 1 件。<see cref="JobId"/> は、押したときに開くジョブ（無ければ、アプリを開くだけ）。</summary>
-public sealed record AppNotice(string Title, string Message, string? JobId = null);
+/// <param name="Page">押されたときに開く画面（deployments・signin。無ければジョブか、ウィンドウを出すだけ）</param>
+public sealed record AppNotice(string Title, string Message, string? JobId = null, string? Page = null);
 
 /// <summary>Windows の通知（OS の機能を使うため、画面の側で実装する。詳細設計 desktop-jobs.md の 5）。</summary>
 public interface INotificationService
 {
     void Show(AppNotice notice);
+}
+
+/// <summary>Windows のサインイン時の起動の状態（<c>Windows.ApplicationModel.StartupTaskState</c> と、使えない場合）。</summary>
+public enum StartupTaskStatus
+{
+    Disabled,
+    Enabled,
+
+    /// <summary>タスク マネージャーや「設定」のスタートアップで無効にされた（アプリからは有効にできない）。</summary>
+    DisabledByUser,
+
+    /// <summary>グループ ポリシーで無効、またはこの PC では使えない。</summary>
+    DisabledByPolicy,
+
+    /// <summary>パッケージで動いていないなど、確かめられない。</summary>
+    Unavailable,
+}
+
+/// <summary>Windows のサインイン時の起動（MSIX の StartupTask。画面の側で実装する。docs/design/desktop-jobs.md の 6.5）。</summary>
+public interface IStartupTaskService
+{
+    Task<StartupTaskStatus> GetStatusAsync();
+
+    /// <summary>有効にする（パッケージのデスクトップ アプリでは同意のダイアログは出ない）。結果の状態を返す。</summary>
+    Task<StartupTaskStatus> EnableAsync();
+
+    Task DisableAsync();
 }
 
 /// <summary>フォルダーや URL を OS の既定のアプリで開く。</summary>

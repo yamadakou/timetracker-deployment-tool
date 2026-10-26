@@ -85,6 +85,9 @@ public class DeploymentListViewModelTests
         h.Azure.RecordsByTenant["t3"] = Deployment("sub4", "rg4", "other").ToList();
         await h.ReadyAsync();
         var vm = h.Main.Deployments;
+        // サインインしたときに、利用可能期限を確かめるため一度読んでいる（6.5）
+        h.Azure.DirectoryQueries.Should().HaveCount(3);
+        h.Azure.DirectoryQueries.Clear();
 
         await vm.LoadCommand.ExecuteAsync();
 
@@ -104,8 +107,9 @@ public class DeploymentListViewModelTests
     [Fact]
     public async Task When_Every_Tenant_Fails_The_List_Should_Not_Change()
     {
-        var h = await new Harness(time: _time).ReadyAsync();
+        var h = new Harness(time: _time);
         h.Azure.DirectoryErrors["t1"] = new RequestFailedException(500, "失敗");
+        await h.ReadyAsync();
 
         await h.Main.Deployments.LoadCommand.ExecuteAsync();
 

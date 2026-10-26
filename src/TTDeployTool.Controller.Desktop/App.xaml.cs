@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
+using Microsoft.Windows.AppLifecycle;
 using Microsoft.Windows.AppNotifications;
 using TTDeployTool.Controller.Desktop.Core.Diagnostics;
 using TTDeployTool.Controller.Desktop.Core.Services;
@@ -53,7 +54,8 @@ public partial class App : Microsoft.UI.Xaml.Application
             log,
             preferences: new FilePreferences(Path.Combine(DesktopSettings.DataDirectory, "preferences.json")),
             notifications: new AppNotificationService(),
-            clipboard: new ClipboardService());
+            clipboard: new ClipboardService(),
+            startupTask: new StartupTaskService());
         // 常駐中に 2 つ目を起動したら、隠したウィンドウを出す（Program.cs）
         Program.Reactivated += (_, _) => _window.DispatcherQueue.TryEnqueue(_window.ShowFromTray);
         _window.Closed += (_, _) =>
@@ -62,14 +64,25 @@ public partial class App : Microsoft.UI.Xaml.Application
             AppNotificationManager.Default.Unregister();
             _azureEvents?.Dispose();
         };
-        _window.Initialize(viewModel, hwnd);
-        _window.Activate();
+        // Windows のサインイン時に起動されたら、ウィンドウを出さずに通知領域だけで動く（docs/design/desktop-jobs.md の 6.5。Register の後に読む）
+        var atStartup = AppInstance.GetCurrent().GetActivatedEventArgs().Kind == ExtendedActivationKind.StartupTask;
+        appLogger.LogInformation("起動の種類: {Kind}", atStartup ? "サインイン時の起動" : "通常");
+        _window.Initialize(viewModel, hwnd, atStartup);
+        if (!atStartup)
+            _window.Activate();
     }
 
     // 通知を押した（アプリが動いている間。終わった後に押された場合は、ジョブが残っていないため普通に起動する）
     private void OnNotificationInvoked(AppNotificationManager sender, AppNotificationActivatedEventArgs args)
     {
         var jobId = args.Arguments.TryGetValue(AppNotificationService.JobArgument, out var id) ? id : null;
-        _window?.DispatcherQueue.TryEnqueue(() => _window.ShowJob(jobId));
+        var page = args.Arguments.TryGetValue(AppNotificationService.PageArgument, out var p) ? p : null;
+        _window?.DispatcherQueue.TryEnqueue(() =>
+        {
+            if (page != null)
+                _window.ShowPage(page);
+            else
+                _window.ShowJob(jobId);
+        });
     }
 }

@@ -38,12 +38,14 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
     public MainViewModel(
         ISignInService signIn, IAzureClients clients, IDialogService dialogs, ISystemLauncher launcher, TimeProvider time, ILoggerFactory loggers,
-        TimeSpan? pollInterval = null, IAppPreferences? preferences = null, INotificationService? notifications = null, IClipboardService? clipboard = null)
+        TimeSpan? pollInterval = null, IAppPreferences? preferences = null, INotificationService? notifications = null, IClipboardService? clipboard = null,
+        IStartupTaskService? startupTask = null)
     {
         _dialogs = dialogs;
         _notifications = notifications;
+        preferences ??= new InMemoryAppPreferences();
         Queue = new JobQueue(time, pollInterval ?? JobViewModel.DefaultPollInterval, ScheduleCheckInterval,
-            preferences ?? new InMemoryAppPreferences(), loggers.CreateLogger("TTDeployTool.Desktop.Jobs"))
+            preferences, loggers.CreateLogger("TTDeployTool.Desktop.Jobs"))
         {
             Clipboard = clipboard,
         };
@@ -65,11 +67,17 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         // サインアウトしたときに一覧を消すため、サインインより先に作る
         Deployments = new DeploymentListViewModel(Target, Queue, logger, loggers.CreateLogger("TTDeployTool.Desktop.Deployments"), time,
             launcher, clipboard, OpenAsync);
+        var deletions = new DeletionWorkflow(plans, jobs, caller, logger, time);
+        Expiry = new ExpiryWatcher(Deployments, Queue, Target, deletions, logger, preferences, notifications, time,
+            loggers.CreateLogger("TTDeployTool.Desktop.Expiry"), () => SignIn!.IsSignedIn);
+        Startup = new StartupSettingViewModel(startupTask, preferences, dialogs, loggers.CreateLogger("TTDeployTool.Desktop.Startup"));
         SignIn = new SignInViewModel(signIn, async signedIn =>
         {
             if (signedIn)
             {
                 await Target.LoadAsync();
+                // サインインできたら、利用可能期限を確かめ、その後 30 分ごとに確かめる（docs/design/desktop-jobs.md の 6.5）
+                await Expiry.StartAsync();
             }
             else
             {
@@ -79,7 +87,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         }, loggers.CreateLogger("TTDeployTool.Desktop.SignIn"));
         Settings = new SettingsViewModel(Target, time, preferences, dialogs, clipboard);
         Deployment = new DeploymentViewModel(new DeploymentWorkflow(plans, jobs, caller, logger, time), Target, Settings, Queue, Show, time);
-        Deletion = new DeletionViewModel(new DeletionWorkflow(plans, jobs, caller, logger, time), Target, Queue, Show, time, clipboard);
+        Deletion = new DeletionViewModel(deletions, Target, Queue, Show, time, clipboard);
         DryRun = new DryRunViewModel(Settings, dialogs, launcher);
         Wizard = new DeployWizardViewModel(Settings, Deployment);
         LogDirectory = (loggers as DiagnosticLog)?.Directory;
@@ -101,6 +109,12 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     }
 
     public SignInViewModel SignIn { get; }
+
+    /// <summary>利用可能期限の確認（期限の前の通知と、期限での削除）。</summary>
+    public ExpiryWatcher Expiry { get; }
+
+    /// <summary>Windows のサインイン時の起動（「ジョブ」の画面）。</summary>
+    public StartupSettingViewModel Startup { get; }
 
     public TargetViewModel Target { get; }
 
@@ -125,6 +139,9 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     }
 
     public bool HasStatusJob => StatusJob != null;
+
+    /// <summary>サインイン時の起動を尋ねた処理（テストで待つ）。</summary>
+    internal Task StartupQuestion { get; private set; } = Task.CompletedTask;
 
     /// <summary>実行状況の画面で、ジョブが終わった後に Azure の状態を読み直した処理（テストで待つ）。</summary>
     internal Task StatusRefresh { get; private set; } = Task.CompletedTask;
@@ -186,8 +203,25 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     /// <summary>終わっていないジョブ（予定・待機中・一時停止を含む）があるか。</summary>
     public bool HasRunningJob => Queue.HasActive;
 
-    /// <summary>起動時の処理（前回のサインインを復元し、サブスクリプションを読む）。</summary>
-    public Task InitializeAsync() => SignIn.RestoreAsync();
+    /// <summary>起動時の処理（前回のサインインを復元し、サブスクリプションを読む。サインイン時の起動の状態も読む）。</summary>
+    public async Task InitializeAsync()
+    {
+        await Startup.RefreshAsync();
+        await SignIn.RestoreAsync();
+    }
+
+    /// <summary>
+    /// Windows のサインイン時に起動されたとき（ウィンドウは出さない）。前回のサインインを対話なしで復元し、できなければ、サインインが要ることを通知して待つ（D19）。
+    /// </summary>
+    public async Task InitializeAtStartupAsync()
+    {
+        await InitializeAsync();
+        if (!SignIn.IsSignedIn)
+            _notifications?.Show(new AppNotice(
+                "サインインが必要です",
+                "利用可能期限の確認と、期限を過ぎたデプロイの削除ができません。この通知か通知領域のアイコンを押して、サインインしてください。",
+                Page: "signin"));
+    }
 
     /// <summary>
     /// ウィンドウを閉じるとき。終わっていないジョブがあれば、アプリを終了せずにウィンドウを隠して通知領域に残る（D3）。
@@ -195,14 +229,19 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     /// </summary>
     public CloseAction RequestClose()
     {
-        if (!HasRunningJob)
+        // ジョブが無くても、利用可能期限日のあるデプロイがあれば、期限を確かめるために残る（D18）
+        var watching = SignIn.IsSignedIn && Deployments.HasExpiringDeployments;
+        if (!HasRunningJob && !watching)
             return CloseAction.Exit;
         if (!_hiddenOnce)
         {
             _hiddenOnce = true;
+            var reason = HasRunningJob
+                ? $"ジョブ（{Queue.Summary}）があるため"
+                : "利用可能期限のあるデプロイを確かめる（期限の前の通知と、期限での削除）ため";
             _notifications?.Show(new AppNotice(
                 "バックグラウンドで実行を続けています",
-                $"ジョブ（{Queue.Summary}）があるため、通知領域に残ります。開くには通知領域のアイコンを押し、終了するにはそのメニューの「終了」を選んでください。"));
+                $"{reason}、通知領域に残ります。開くには通知領域のアイコンを押し、終了するにはそのメニューの「終了」を選んでください。"));
         }
         return CloseAction.Hide;
     }
@@ -220,7 +259,11 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     /// <summary>通知から開くジョブ（一覧から消した場合などは null）。</summary>
     public JobViewModel? FindJob(string id) => Jobs.FirstOrDefault(j => j.Id == id);
 
-    public void Dispose() => Queue.Dispose();
+    public void Dispose()
+    {
+        Expiry.Dispose();
+        Queue.Dispose();
+    }
 
     // ジョブが終わったことを、ウィンドウを隠していても分かるように通知する（結果か失敗の理由と、予定より遅れた旨を添える）
     private void NotifyFinished(JobViewModel job)
@@ -281,6 +324,9 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         if (job.IsDeployment)
         {
             CurrentDeployment = job;
+            // 期限日のあるデプロイを初めて登録したら、サインイン時の起動を一度だけ尋ねる（D16）
+            if (Settings.Expiry.Mode != ExpiryMode.None)
+                StartupQuestion = Startup.AskOnceAsync();
         }
         else
         {

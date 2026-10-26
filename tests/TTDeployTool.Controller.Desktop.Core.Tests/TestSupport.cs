@@ -77,6 +77,29 @@ internal sealed class FakeNotifications : INotificationService
     public void Show(AppNotice notice) => Shown.Add(notice);
 }
 
+internal sealed class FakeStartupTask : IStartupTaskService
+{
+    /// <summary>今の状態（既定は使えない。尋ねるダイアログをほかのテストに出さないため）。</summary>
+    public StartupTaskStatus Status { get; set; } = StartupTaskStatus.Unavailable;
+
+    /// <summary>有効にしたときの結果（既定は有効）。</summary>
+    public StartupTaskStatus EnableResult { get; set; } = StartupTaskStatus.Enabled;
+
+    public Task<StartupTaskStatus> GetStatusAsync() => Task.FromResult(Status);
+
+    public Task<StartupTaskStatus> EnableAsync()
+    {
+        Status = EnableResult;
+        return Task.FromResult(Status);
+    }
+
+    public Task DisableAsync()
+    {
+        Status = StartupTaskStatus.Disabled;
+        return Task.CompletedTask;
+    }
+}
+
 internal sealed class FakeClipboard : IClipboardService
 {
     public List<string> Copied { get; } = [];
@@ -198,6 +221,9 @@ internal sealed class FakeAzure : IAzureClients
     /// <summary>テナントごとの、Resource Graph の失敗。</summary>
     public Dictionary<string, Exception> DirectoryErrors { get; } = [];
 
+    /// <summary>Resource Graph の問い合わせを、これが終わるまで待たせる（確認が重ならないことを確かめる）。</summary>
+    public Task DirectoryRelease { get; set; } = Task.CompletedTask;
+
     /// <summary>Resource Graph に問い合わせたテナントとサブスクリプション。</summary>
     public List<(string? TenantId, IReadOnlyList<string> Subscriptions)> DirectoryQueries { get; } = [];
 
@@ -206,13 +232,13 @@ internal sealed class FakeAzure : IAzureClients
         var tenantId = (credential as TenantScopedCredential)?.TenantId;
         var directory = new Mock<IDeploymentDirectory>();
         directory.Setup(d => d.ListAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
-            .Returns<IReadOnlyList<string>, CancellationToken>((subs, _) =>
+            .Returns<IReadOnlyList<string>, CancellationToken>(async (subs, _) =>
             {
                 DirectoryQueries.Add((tenantId, subs));
+                await DirectoryRelease;
                 return tenantId != null && DirectoryErrors.TryGetValue(tenantId, out var error)
-                    ? Task.FromException<IReadOnlyList<ManagedResourceRecord>>(error)
-                    : Task.FromResult<IReadOnlyList<ManagedResourceRecord>>(
-                        tenantId != null && RecordsByTenant.TryGetValue(tenantId, out var records) ? records.ToList() : []);
+                    ? throw error
+                    : tenantId != null && RecordsByTenant.TryGetValue(tenantId, out var records) ? records.ToList() : [];
             });
         return directory.Object;
     }

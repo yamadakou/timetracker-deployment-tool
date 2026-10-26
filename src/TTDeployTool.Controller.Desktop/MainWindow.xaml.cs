@@ -28,7 +28,8 @@ public sealed partial class MainWindow : Window
 
     public MainViewModel ViewModel { get; private set; } = null!;
 
-    public void Initialize(MainViewModel viewModel, IntPtr hwnd)
+    /// <param name="atStartup">Windows のサインイン時に起動された（ウィンドウを出さず、サインインできなければ通知する）</param>
+    public void Initialize(MainViewModel viewModel, IntPtr hwnd, bool atStartup = false)
     {
         ViewModel = viewModel;
         Bindings.Update();
@@ -36,7 +37,7 @@ public sealed partial class MainWindow : Window
         // デプロイの一覧の行の操作で、画面を切り替える
         viewModel.NavigationRequested += Navigate;
         CreateTray();
-        _ = viewModel.InitializeAsync();
+        _ = atStartup ? viewModel.InitializeAtStartupAsync() : viewModel.InitializeAsync();
         _ = CheckForUpdatesAsync(hwnd);
     }
 
@@ -147,6 +148,13 @@ public sealed partial class MainWindow : Window
     {
         AppWindow.Show();
         Activate();
+    }
+
+    /// <summary>通知から、画面を開く（deployments はデプロイの一覧、signin はサインインの画面）。</summary>
+    public void ShowPage(string page)
+    {
+        ShowFromTray();
+        Navigate(page == "signin" ? "target" : page);
     }
 
     /// <summary>通知から、ジョブの画面を開く（ジョブが一覧に残っていれば、そこまで送る）。</summary>

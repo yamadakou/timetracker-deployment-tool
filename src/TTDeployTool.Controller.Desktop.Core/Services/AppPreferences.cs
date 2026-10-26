@@ -33,6 +33,12 @@ public interface IAppPreferences
 
     /// <summary>デプロイの設定のテンプレート（名前の順）。</summary>
     IReadOnlyList<DeploymentTemplate> Templates { get; set; }
+
+    /// <summary>出した期限の前の通知（同じ通知を出さないため。docs/design/desktop-jobs.md の 6.5）。</summary>
+    IReadOnlyList<string> ExpiryNotices { get; set; }
+
+    /// <summary>Windows のサインイン時の起動を尋ねたか（一度だけ尋ねる。D16）。</summary>
+    bool StartupTaskAsked { get; set; }
 }
 
 /// <summary>保存しない設定（テストと、保存先が無い場合）。</summary>
@@ -41,4 +47,8 @@ public sealed class InMemoryAppPreferences : IAppPreferences
     public int? MaxConcurrentJobs { get; set; }
 
     public IReadOnlyList<DeploymentTemplate> Templates { get; set; } = [];
+
+    public IReadOnlyList<string> ExpiryNotices { get; set; } = [];
+
+    public bool StartupTaskAsked { get; set; }
 }

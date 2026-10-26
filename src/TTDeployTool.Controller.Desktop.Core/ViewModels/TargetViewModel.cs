@@ -165,6 +165,10 @@ public sealed class TargetViewModel : ObservableObject
     public IAzureSession CreateSessionFor(string subscriptionId, IProgress<string>? progress = null) =>
         CreateSession(Credential(TenantOf(subscriptionId)), progress);
 
+    /// <summary>一覧から選んだサブスクリプションのテナントで、ジョブに使う接続（期限での削除。<see cref="CreateJobSession"/> と同じく時間を区切る）。</summary>
+    public IAzureSession CreateJobSessionFor(string subscriptionId) =>
+        CreateSession(new TimeLimitedCredential(Credential(TenantOf(subscriptionId)), _time));
+
     /// <summary>テナントのサブスクリプションの、本ツールで作ったリソースを読むもの（デプロイの一覧）。</summary>
     public IDeploymentDirectory CreateDirectory(string? tenantId) => _clients.Deployments(Credential(tenantId));
 

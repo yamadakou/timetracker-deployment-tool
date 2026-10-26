@@ -184,6 +184,52 @@ public class DeploymentMaintenanceTests
 
     private DeploymentMaintenance Sut() => new(_gateway.Object, _time);
 
+    private static Dictionary<string, string> Expiring(string appName, string? expires)
+    {
+        var tags = new Dictionary<string, string>(ManagedTags.For(appName));
+        if (expires != null)
+            tags[DeploymentExpiry.ExpiresAtKey] = expires;
+        return tags;
+    }
+
+    [Fact]
+    public async Task ReadExpiry_Should_Combine_The_Managed_Apps_And_Storage_Account()
+    {
+        // 期限での削除の直前に読み直す（docs/design/desktop-jobs.md の 6.5）。管理タグの無い・別のアプリのものは見ない
+        var account = ResourceNaming.StorageAccount("sub", "rg", "demo");
+        _apps.Add(new ContainerAppInfo("demo-tt", "env", Expiring("demo", "2026-10-20T14:59:59Z")));
+        _apps.Add(new ContainerAppInfo("demo-db", "env", new Dictionary<string, string> { [DeploymentExpiry.ExpiresAtKey] = "none" }));
+        _apps.Add(new ContainerAppInfo("other-tt", "env", Expiring("other", "none")));
+        _gateway.Setup(g => g.GetStorageAccountAsync("sub", "rg", account, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new StorageAccountInfo(account, "japaneast", Expiring("demo", "2026-11-30T14:59:59Z")));
+
+        (await Sut().ReadExpiryAsync("sub", "rg", "demo", Ct)).Should().Be("2026-11-30T14:59:59Z", "遅い方（延ばされた値）");
+        _gateway.Verify(g => g.GetEnvironmentAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+
+        // 期限なしが 1 つでもあれば期限なし
+        _apps.Add(new ContainerAppInfo("demo-redis", "env", Expiring("demo", "none")));
+        (await Sut().ReadExpiryAsync("sub", "rg", "demo", Ct)).Should().Be("none");
+    }
+
+    [Fact]
+    public async Task ReadExpiry_Should_Use_The_Environment_Only_When_Nothing_Else_Is_Left()
+    {
+        _gateway.Setup(g => g.GetEnvironmentAsync("sub", "rg", "demo-env", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ManagedEnvironmentInfo("id", "demo-env", "japaneast", Expiring("demo", "2026-10-20T14:59:59Z")));
+        (await Sut().ReadExpiryAsync("sub", "rg", "demo", Ct)).Should().Be("2026-10-20T14:59:59Z");
+
+        // 管理タグの無い Environment・何も無い場合は null
+        _gateway.Setup(g => g.GetEnvironmentAsync("sub", "rg", "demo-env", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ManagedEnvironmentInfo("id", "demo-env", "japaneast", new Dictionary<string, string> { [DeploymentExpiry.ExpiresAtKey] = "none" }));
+        (await Sut().ReadExpiryAsync("sub", "rg", "demo", Ct)).Should().BeNull();
+        _gateway.Setup(g => g.GetEnvironmentAsync("sub", "rg", "demo-env", It.IsAny<CancellationToken>())).ReturnsAsync((ManagedEnvironmentInfo?)null);
+        (await Sut().ReadExpiryAsync("sub", "rg", "demo", Ct)).Should().BeNull();
+
+        // 期限のタグが無いアプリだけなら null（Environment は見ない）
+        _apps.Add(new ContainerAppInfo("demo-tt", "env", Expiring("demo", null)));
+        (await Sut().ReadExpiryAsync("sub", "rg", "demo", Ct)).Should().BeNull();
+    }
+
     [Fact]
     public async Task ChangeExpiry_Should_Rewrite_The_Tag_Of_The_Managed_Apps_Only()
     {

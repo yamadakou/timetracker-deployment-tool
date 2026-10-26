@@ -94,14 +94,15 @@ public sealed class JobQueue : ObservableObject, IDisposable
     /// <summary>ジョブを登録する。予定の時刻が無ければ、上限に空きがあればすぐ始め、無ければ待機中にする。</summary>
     /// <param name="starter">ジョブを始める処理（実行の直前の確認を含む。失敗すると、ジョブは始めずに失敗にする）</param>
     /// <exception cref="InvalidOperationException">同じ対象の、終わっていないジョブがある</exception>
-    public JobViewModel Register(JobKind kind, JobTarget target, DateTimeOffset? scheduledAt, Func<Task<Job>> starter)
+    /// <param name="expiryDeletion">利用可能期限を過ぎたための削除か（題名に出す）</param>
+    public JobViewModel Register(JobKind kind, JobTarget target, DateTimeOffset? scheduledAt, Func<Task<Job>> starter, bool expiryDeletion = false)
     {
         JobViewModel job;
         lock (_lock)
         {
             if (ActiveFor(target.Subscription, target.ResourceGroup, target.AppName) is { } active)
                 throw new InvalidOperationException(ActiveMessage(active));
-            job = new JobViewModel(kind, target, scheduledAt, this, starter) { Order = ++_order };
+            job = new JobViewModel(kind, target, scheduledAt, this, starter) { Order = ++_order, IsExpiryDeletion = expiryDeletion };
             // 終わったことを、ジョブの Finished が完了する前に知らせる（状態の変更の通知は、Finished の完了より先に呼ばれる）
             var notified = false;
             job.PropertyChanged += (_, e) =>

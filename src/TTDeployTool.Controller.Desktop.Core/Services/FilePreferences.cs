@@ -37,6 +37,26 @@ public sealed class FilePreferences : IAppPreferences
         }
     }
 
+    public IReadOnlyList<string> ExpiryNotices
+    {
+        get => _data.ExpiryNotices ?? [];
+        set
+        {
+            _data = _data with { ExpiryNotices = value };
+            Save();
+        }
+    }
+
+    public bool StartupTaskAsked
+    {
+        get => _data.StartupTaskAsked;
+        set
+        {
+            _data = _data with { StartupTaskAsked = value };
+            Save();
+        }
+    }
+
     private static Data Load(string path)
     {
         try
@@ -62,5 +82,6 @@ public sealed class FilePreferences : IAppPreferences
         }
     }
 
-    private sealed record Data(int? MaxConcurrentJobs = null, IReadOnlyList<DeploymentTemplate>? Templates = null);
+    private sealed record Data(
+        int? MaxConcurrentJobs = null, IReadOnlyList<DeploymentTemplate>? Templates = null, IReadOnlyList<string>? ExpiryNotices = null, bool StartupTaskAsked = false);
 }

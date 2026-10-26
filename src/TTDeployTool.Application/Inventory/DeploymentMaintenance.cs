@@ -71,6 +71,30 @@ public sealed class DeploymentMaintenance
             secrets.GetValueOrDefault(ContainerAppSpecBuilder.AppPasswordSecretName));
     }
 
+    /// <summary>
+    /// 今の利用可能期限のタグを Azure から読み直す（期限での削除の直前の確認。docs/design/desktop-jobs.md の 6.5）。
+    /// 本ツールで作った 3 つの Container App とストレージアカウントの値を <see cref="DeploymentExpiry.Combine"/> でまとめ、どちらも無ければ
+    /// Environment の値を使う（Environment のタグは作ったときの値のまま。6.1）。読める値が無ければ null。
+    /// </summary>
+    public async Task<string?> ReadExpiryAsync(string subscriptionId, string resourceGroup, string appName, CancellationToken cancellationToken = default)
+    {
+        var names = new[] { ResourceNaming.TimetrackerApp(appName), ResourceNaming.DbApp(appName), ResourceNaming.RedisApp(appName) };
+        var tags = (await _gateway.ListContainerAppsAsync(subscriptionId, resourceGroup, cancellationToken))
+            .Where(a => names.Contains(a.Name, StringComparer.OrdinalIgnoreCase) && ManagedTags.IsManaged(a.Tags, appName))
+            .Select(a => a.Tags)
+            .ToList();
+        var storage = await _gateway.GetStorageAccountAsync(subscriptionId, resourceGroup, ResourceNaming.StorageAccount(subscriptionId, resourceGroup, appName), cancellationToken);
+        if (ManagedTags.IsManaged(storage?.Tags, appName))
+            tags.Add(storage!.Tags);
+        if (tags.Count == 0)
+        {
+            var env = await _gateway.GetEnvironmentAsync(subscriptionId, resourceGroup, ResourceNaming.Environment(appName), cancellationToken);
+            if (ManagedTags.IsManaged(env?.Tags, appName))
+                tags.Add(env!.Tags);
+        }
+        return DeploymentExpiry.Combine(tags.Select(t => t.FirstOrDefault(x => string.Equals(x.Key, DeploymentExpiry.ExpiresAtKey, StringComparison.OrdinalIgnoreCase)).Value));
+    }
+
     // 3 つの Container App のうち、あって管理タグが一致するもの
     private async Task<IReadOnlyList<string>> ManagedAppsAsync(string subscriptionId, string resourceGroup, string appName, CancellationToken cancellationToken)
     {

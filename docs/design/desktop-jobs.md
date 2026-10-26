@@ -269,6 +269,13 @@
 - 画面: 「デプロイの一覧」の項目。クリップボードは `ClipboardContentOptions` で履歴と同期に残さない
 - テスト: Infrastructure・Application・Desktop.Core に一覧のテストを加え、ソリューション全体 1,035 件（スキップ 5）成功。新しいコードの行と分岐の網羅率 100%。UI テスト（CI）に一覧の画面（サインインの前の読み込み、期限日の範囲の入力の表示）を、半自動の UI テスト（Azure）に、デプロイした環境が一覧に出ること・パスワードの表示・期限の変更を加えた。CI（run 39715667398）で全ジョブ成功。オーナーの確認の後、Desktop System Test（run 39754936888）で、デプロイした環境が一覧に出ること・パスワードの表示・期限の変更を確かめた（一覧は Resource Graph の結果に、このアプリのジョブの結果を重ねて表示。状態は InProgress）
 
+**実施結果（7d-3）**
+- Application: `DeploymentMaintenance.ReadExpiryAsync`（3 つの Container App とストレージアカウントの `tt-expires-at` を 6.1 の規則でまとめ、どちらも無ければ Environment）
+- Desktop.Core: `ExpiryWatcher`（サインインしたときと 30 分ごとに一覧を読み直し、3 日前・前日の通知、期限を過ぎたものの削除のジョブの登録。削除の直前に期限を読み直し、計画して始める。失敗した対象は 6 時間登録し直さない）、`StartupSettingViewModel`（サインイン時の起動の状態・切り替え・一度だけ尋ねる）、`MainViewModel.RequestClose`（期限日のあるデプロイがあれば常駐。D18）・`InitializeAtStartupAsync`（復元できなければ通知。D19）、`IAppPreferences.ExpiryNotices`・`StartupTaskAsked`、`JobViewModel.IsExpiryDeletion`（題名「期限での削除」）、`DeploymentListViewModel.ReloadAsync`（ページ・フィルタを保って読み直す）
+- 画面の側: マニフェストの `windows.startupTask`（既定は無効）、`StartupTaskService`（`Windows.ApplicationModel.StartupTask`）、`App`（`ExtendedActivationKind.StartupTask` ならウィンドウを出さない）、通知の引数 `page`（`deployments`・`signin`）、「ジョブ」の画面のサインイン時の起動
+- 「（次の版から）」（No.61 で添えた）を消した
+- テスト: Application と Desktop.Core に 7d-3 のテストを加え、ソリューション全体 1,124 件成功。新しいコードの行と分岐の網羅率 100%
+
 ## 11. 出典（2026-10-20 に確認）
 - x:Bind の関数の結び付け: https://learn.microsoft.com/windows/apps/develop/data-binding/function-bindings
 - アプリの通知（AppNotificationManager）: https://learn.microsoft.com/windows/apps/develop/notifications/app-notifications/app-notifications-quickstart

@@ -273,6 +273,16 @@ public sealed class SettingsToolsTests : IDisposable
         read.Templates.Should().Equal(Template("a", expiry: ExpiryMode.Date, date: "2026-12-01"));
         read.MaxConcurrentJobs.Should().Be(3);
         File.ReadAllText(path).Should().NotContain("Password");
+        read.ExpiryNotices.Should().BeEmpty();
+        read.StartupTaskAsked.Should().BeFalse();
+
+        // 期限の前の通知の記録と、サインイン時の起動を尋ねたこと（6.5）
+        read.ExpiryNotices = ["sub/rg/demo/3d/2026-11-23T14:59:59Z"];
+        read.StartupTaskAsked = true;
+        var again = new FilePreferences(path);
+        again.ExpiryNotices.Should().Equal("sub/rg/demo/3d/2026-11-23T14:59:59Z");
+        again.StartupTaskAsked.Should().BeTrue();
+        again.Templates.Should().HaveCount(1);
     }
 }
 

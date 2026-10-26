@@ -19,13 +19,14 @@ internal sealed class Harness
     public TTDeployTool.Controller.Desktop.Core.Services.InMemoryAppPreferences Preferences { get; } = new();
     public FakeNotifications Notifications { get; } = new();
     public FakeClipboard Clipboard { get; } = new();
+    public FakeStartupTask StartupTask { get; } = new();
     public List<string> Navigations { get; } = [];
     public MainViewModel Main { get; }
 
-    public Harness(Microsoft.Extensions.Logging.ILoggerFactory? loggers = null, TimeProvider? time = null, bool withClipboard = true)
+    public Harness(Microsoft.Extensions.Logging.ILoggerFactory? loggers = null, TimeProvider? time = null, bool withClipboard = true, bool withNotifications = true)
     {
         Main = new MainViewModel(SignIn, Azure, Dialogs, Launcher, time ?? TimeProvider.System, loggers ?? NullLoggerFactory.Instance, TimeSpan.FromMilliseconds(5),
-            Preferences, Notifications, withClipboard ? Clipboard : null);
+            Preferences, withNotifications ? Notifications : null, withClipboard ? Clipboard : null, StartupTask);
         Main.NavigationRequested += Navigations.Add;
     }
 

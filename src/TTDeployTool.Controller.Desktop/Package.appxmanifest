@@ -10,6 +10,7 @@
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
   xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
   xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  xmlns:uap5="http://schemas.microsoft.com/appx/manifest/uap/windows10/5"
   IgnorableNamespaces="uap rescap">
 
   <Identity
@@ -61,6 +62,13 @@
             </com:ExeServer>
           </com:ComServer>
         </com:Extension>
+        <!--
+          Windows のサインイン時に、ウィンドウを出さずに通知領域で起動する（利用可能期限の確認と削除。docs/design/desktop-jobs.md の 6.5）。
+          既定は無効で、利用者が選んだときだけアプリから有効にする（D16）。TaskId は StartupTaskService.TaskId と同じ
+        -->
+        <uap5:Extension Category="windows.startupTask" Executable="ttdeploytool-desktop.exe" EntryPoint="Windows.FullTrustApplication">
+          <uap5:StartupTask TaskId="TTDeployToolStartup" Enabled="false" DisplayName="TTDeployTool" />
+        </uap5:Extension>
       </Extensions>
     </Application>
   </Applications>

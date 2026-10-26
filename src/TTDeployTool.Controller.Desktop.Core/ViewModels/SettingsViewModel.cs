@@ -223,7 +223,7 @@ public sealed class SettingsViewModel : ObservableObject
     public string ExpiryNotice =>
         $"既定では、新しくデプロイする場合は {DeploymentExpiry.Today(_time.GetUtcNow(), _time.LocalTimeZone).AddDays(DeploymentExpiry.DefaultDays):yyyy-MM-dd}" +
         $"（今日から {DeploymentExpiry.DefaultDays} 日後）、再デプロイは今の期限を引き継ぎます。期限は期限日の終わり（23:59:59）です。" +
-        "期限を過ぎると、このアプリが自動で削除します（次の版から。DB のデータも消えます）。";
+        "期限を過ぎると、このアプリが自動で削除します（DB のデータも消えます）。";
 
     /// <summary>Azure へのデプロイの設定の誤り（入力のたびに更新する）。</summary>
     public ObservableCollection<string> Errors { get; } = [];

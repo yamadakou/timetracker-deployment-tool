@@ -124,7 +124,7 @@ public sealed class DeploymentListViewModel : ObservableObject
         // 絞り込みの選択肢は、読んだサブスクリプション（一覧はすべてのサブスクリプションを読む）
         SubscriptionFilters.Add(AllSubscriptions);
         _target.Subscriptions.CollectionChanged += (_, _) => ResetSubscriptionFilters();
-        LoadCommand = new AsyncCommand(() => Busy.RunAsync("デプロイの一覧を読んでいます", LoadAsync));
+        LoadCommand = new AsyncCommand(() => Busy.RunAsync("デプロイの一覧を読んでいます", () => LoadAsync(resetPage: true)));
         PreviousPageCommand = new AsyncCommand(() => GoTo(_pageIndex - 1), () => _pageIndex > 0);
         NextPageCommand = new AsyncCommand(() => GoTo(_pageIndex + 1), () => _pageIndex < PageCount - 1);
         _queue = queue;
@@ -289,7 +289,23 @@ public sealed class DeploymentListViewModel : ObservableObject
         _target.Subscriptions.FirstOrDefault(c => string.Equals(c.SubscriptionId, subscriptionId, StringComparison.OrdinalIgnoreCase));
 
     // テナントごとに、そのテナントのサブスクリプションを Resource Graph で読む（読めないテナントがあっても、ほかは続ける）
-    private async Task LoadAsync()
+    /// <summary>
+    /// 期限の確認のために読み直す（ページ・フィルタ・行は保つ。docs/design/desktop-jobs.md の 6.5）。読めれば true（読めないテナントがあっても、
+    /// ほかのテナントを読めれば true）。
+    /// </summary>
+    internal async Task<bool> ReloadAsync()
+    {
+        await Busy.RunAsync("期限を確かめるため、デプロイの一覧を読み直しています", () => LoadAsync(resetPage: false));
+        return Error == null;
+    }
+
+    /// <summary>読んだすべてのデプロイ（フィルタ・ページによらない。このアプリで終えた操作を重ねた後）。</summary>
+    internal IReadOnlyList<DeploymentEntry> Entries => _entries;
+
+    /// <summary>利用可能期限日のあるデプロイを読んだか（閉じたときに常駐するか。D18）。</summary>
+    public bool HasExpiringDeployments => _entries.Any(e => e.ExpiryKind == ExpiryKind.Date);
+
+    private async Task LoadAsync(bool resetPage)
     {
         Error = null;
         Notices.Clear();
@@ -326,7 +342,7 @@ public sealed class DeploymentListViewModel : ObservableObject
         _hasLoaded = true;
         _logger.LogInformation("デプロイの一覧: {Count} 件（リソース {Records} 件）", _loaded.Count, records.Count);
         Notices.Add("Azure に反映されるまで数分かかることがあります。このアプリで直前に行ったデプロイ・削除・期限の変更は、一覧に反映済みとして表示します。");
-        Refresh(resetPage: true, keepRows: false);
+        Refresh(resetPage, keepRows: !resetPage);
     }
 
     // このアプリで終えたデプロイ・削除を、Resource Graph に反映されるまで一覧に重ねる

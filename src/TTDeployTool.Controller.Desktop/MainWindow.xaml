@@ -413,9 +413,15 @@
                     <StackPanel x:Name="JobsPanel" Spacing="12" MaxWidth="900" HorizontalAlignment="Left" Visibility="Collapsed">
                         <TextBlock AutomationProperties.AutomationId="Panel.Jobs" Style="{StaticResource SubtitleTextBlockStyle}" Text="ジョブ（このアプリを終了すると消えます）" />
                         <TextBlock TextWrapping="Wrap" Text="対象が違うジョブは同時に実行します（数は下で変えられます）。実行中のジョブは、今の手順が終わってから止まります（作りかけのリソースは、もう一度実行すると続きから処理します）。" />
-                        <TextBlock AutomationProperties.AutomationId="Jobs.Resident" TextWrapping="Wrap" Text="終わっていないジョブがあるときにウィンドウを閉じると、通知領域に残って続けます（終了は通知領域のアイコンのメニューから）。ジョブが終わると通知します。Windows のサインアウト・再起動・シャットダウンではアプリが終わり、残ったジョブは消えます。PC のスリープ中は実行せず、予定の時刻を過ぎていれば、動けるようになってからすぐ実行します。" />
+                        <TextBlock AutomationProperties.AutomationId="Jobs.Resident" TextWrapping="Wrap" Text="終わっていないジョブか、利用可能期限日のあるデプロイがあるときにウィンドウを閉じると、通知領域に残って続けます（終了は通知領域のアイコンのメニューから）。ジョブが終わると通知します。Windows のサインアウト・再起動・シャットダウンではアプリが終わり、残ったジョブは消えます。PC のスリープ中は実行せず、予定の時刻を過ぎていれば、動けるようになってからすぐ実行します。" />
                         <ComboBox AutomationProperties.AutomationId="Settings.Concurrency" Header="同時に実行するジョブの数（対象が違うもの）" ItemsSource="{x:Bind jobs:JobQueue.ConcurrencyChoices}"
                                   SelectedItem="{x:Bind ViewModel.Queue.MaxConcurrency, Mode=OneWay}" SelectionChanged="OnConcurrencyChanged" Width="240" />
+                        <StackPanel Spacing="4">
+                            <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Windows のサインイン時に、通知領域で起動する（利用可能期限の確認と削除のため）" />
+                            <TextBlock AutomationProperties.AutomationId="Jobs.StartupStatus" TextWrapping="Wrap" Text="{x:Bind ViewModel.Startup.StatusText, Mode=OneWay}" />
+                            <TextBlock TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="{x:Bind vm:StartupSettingViewModel.Explanation}" />
+                            <Button AutomationProperties.AutomationId="Jobs.StartupToggle" Content="{x:Bind ViewModel.Startup.ToggleText, Mode=OneWay}" Command="{x:Bind ViewModel.Startup.ToggleCommand}" />
+                        </StackPanel>
                         <TextBlock AutomationProperties.AutomationId="Jobs.Summary" Text="{x:Bind ViewModel.Queue.Summary, Mode=OneWay}" />
                         <Button AutomationProperties.AutomationId="Jobs.ClearFinished" Content="終わったジョブを一覧から消す" Command="{x:Bind ViewModel.ClearFinishedCommand}" />
                         <ItemsControl x:Name="JobsList" AutomationProperties.AutomationId="Jobs.List" ItemsSource="{x:Bind ViewModel.Jobs}" ItemTemplate="{StaticResource JobRowTemplate}" />

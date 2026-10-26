@@ -245,7 +245,7 @@ public sealed class DeletionViewModel : ObservableObject
         $"リソースグループ {plan.ResourceGroup} は削除しません（不要であれば「リソースグループも削除する」にチェックを入れて計画し直してください）。";
 
     // 完了のログに添える案内（メソッドのグループを何度も渡すと、そのたびに委譲の作成の確かめが入るため、1 つにする）
-    private static readonly Func<DeletionPlan, string> KeptNotice = KeptDbDataNotice;
+    internal static readonly Func<DeletionPlan, string> KeptNotice = KeptDbDataNotice;
 
     private static string KeptDbDataNotice(DeletionPlan plan) =>
         $"ストレージアカウント {plan.StorageAccountName}（DB のデータ）は残します。料金がかかり続けます。同じアプリ名で「Azure Files に永続化する」を選んで" +

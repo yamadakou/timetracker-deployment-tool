@@ -1,6 +1,7 @@
 using Azure;
 using Azure.Identity;
 using TTDeployTool.Application.Workflows;
+using TTDeployTool.Controller.Desktop.Core.Jobs;
 using TTDeployTool.Controller.Desktop.Core.Services;
 
 namespace TTDeployTool.Controller.Desktop.Core;
@@ -47,6 +48,7 @@ public static class DesktopMessages
     public static string ForAzure(Exception ex) => ex switch
     {
         WorkflowException workflow => For(workflow),
+        ExpiryDeletionSkippedException skipped => skipped.Message,
         AuthenticationRequiredException => $"サインインが必要です。{SignInAgain}",
         CredentialUnavailableException unavailable => $"サインインできませんでした。{SignInAgain}（{unavailable.Message}）",
         SignInTimeoutException timeout => $"{timeout.Message}{SignInAgain}",

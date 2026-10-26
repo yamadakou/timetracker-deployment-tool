@@ -132,7 +132,10 @@ public sealed class JobViewModel : ObservableObject
 
     public string Title => _kind == JobKind.Deploy
         ? $"デプロイ（{_target.ResourceGroup} / {_target.AppName}）"
-        : $"削除（{_target.ResourceGroup} / {_target.AppName}）";
+        : $"{(IsExpiryDeletion ? "期限での削除" : "削除")}（{_target.ResourceGroup} / {_target.AppName}）";
+
+    /// <summary>利用可能期限を過ぎたための、確認なしの削除か（docs/design/desktop-jobs.md の 6.5）。</summary>
+    public bool IsExpiryDeletion { get; init; }
 
     public ObservableCollection<string> Logs { get; } = [];
 
