@@ -113,22 +113,30 @@ public class AzureUiTests
             // 7d-2: デプロイの一覧（Resource Graph に反映される前でも、このアプリのジョブの結果で出る）。パスワードの表示と、期限の変更
             app.Invoke("Status.BackToList");
             app.Find("Panel.Deployments");
+            // No.63: 絞り込みは表の見出しの「▽」から
+            app.Invoke("Deployments.FilterResourceGroup");
             app.SetText("Deployments.ResourceGroupFilter", resourceGroup!);
+            app.Invoke("Deployments.FilterClose");
             app.Invoke("Deployments.Load");
             app.WaitForText("Deployments.Page", t => t.Contains("件目"), "一覧にデプロイが出る", LoadTimeout);
             Log($"デプロイの一覧: {app.TextOf("Deployments.Page")}、状態 {app.TextOf("Row.State")}、期限 {app.TextOf("Row.Expiry")}");
             app.TextOf("Row.AppName").Should().Be(appName);
+            // 1 行だけ選ぶと、表の下に詳細（パスワードの表示など）が出る
+            app.SelectRow("Deployments.Rows");
             app.Invoke("Row.ShowPasswords");
             app.WaitForText("Row.DbPassword", t => t == "••••••••", "パスワードは伏せ字で出る", LoadTimeout);
             app.Invoke("Row.TogglePasswords");
             app.WaitForText("Row.DbPassword", t => t == dbPassword, "表示すると、デプロイした DB のパスワードが出る");
-            app.SetChecked("Row.EditNoExpiry", true);
-            app.Invoke("Row.ChangeExpiry");
-            app.WaitForText("Row.Message", t => t.Contains("期限なし"), "期限を変えられる", LoadTimeout);
+            // 選んだ行の期限を変える（まとめての操作）
+            app.SetChecked("Deployments.BatchNoExpiry", true);
+            app.Invoke("Deployments.ChangeExpiry");
+            app.WaitForText("Deployments.BatchMessage", t => t.Contains("1 件の利用可能期限を変えました"), "期限を変えられる", LoadTimeout);
             app.TextOf("Row.Expiry").Should().Be("期限なし");
 
             // 一覧の「削除」→ 削除の画面（開くと計画を作る）。No.53: 本ツールのリソースを消した後の空のリソースグループも消す
-            app.Invoke("Row.Delete");
+            // 期限を変えると一覧を作り直すため、選び直してから削除する（1 行なら今の削除の画面）
+            app.SelectRow("Deployments.Rows");
+            app.Invoke("Deployments.Delete");
             app.Find("Panel.Delete");
             app.Find("Delete.ConfirmAppName", LoadTimeout);
             app.SetChecked("Delete.DeleteResourceGroup", true);
@@ -149,7 +157,7 @@ public class AzureUiTests
             app.Invoke("Deploy.Plan");
             app.WaitForText("Deploy.Error", t => t.Contains("この対象のジョブ"), "同じ対象のジョブがあれば計画できない", LoadTimeout);
 
-            // 7b: 別の対象を予定に追加し（ジョブの画面が開く）、上部の帯からジョブの画面に移って取り消す
+            // 7b: 別の対象を予定に追加し（ジョブの一覧が開く）、上部の帯からジョブの一覧に移って取り消す
             var second = appName + "b";
             BackTo(app, "①");
             app.SetText("Target.AppName", second);
@@ -170,10 +178,12 @@ public class AzureUiTests
                 AppSession.WaitUntil(() => app.IsWindowShown && app.Exists("Jobs.Banner"), "もう一度起動すると、隠したウィンドウが出る", TimeSpan.FromSeconds(30));
             app.Invoke("Jobs.BannerShow");
             app.Find("Panel.Jobs");
-            // 一覧は新しい順なので、先頭（最初に見つかる要素）が今登録したジョブ
+            // 一覧は新しい順なので、先頭（最初に見つかる要素）が今登録したジョブ。No.63: 行を選んで、まとめての操作で取り消す
             app.WaitForText("Job.Status", t => t.StartsWith("予定"), "予定のジョブが一覧の先頭に出る");
-            app.Invoke("Job.Cancel");
+            app.SelectRow("Jobs.List");
+            app.Invoke("Jobs.CancelSelected");
             app.WaitForText("Job.Status", t => t == "取り消し", "予定を取り消せる");
+            app.WaitForText("Jobs.Message", t => t.StartsWith("1 件の取り消し"), "取り消した数が出る");
 
             // 7b: 削除の実行中に、別の対象のデプロイを同時に実行し（既定の上限は 2）、今の手順の後で止める
             app.Show("Wizard");
@@ -185,10 +195,17 @@ public class AzureUiTests
             var concurrent = app.WaitForText("Job.Status", t => t is "実行中" or "待機中（同時に実行できる数に達しています）" or "完了" or "失敗", "2 つ目のデプロイが始まる", LoadTimeout);
             Log($"2 つ目のデプロイを始めたときのジョブ: {app.TextOf("Jobs.Summary")}");
             concurrent.Should().Be("実行中", "対象が違えば、削除の実行中でも待たずに始める");
+            // No.63: 1 行だけ選んで「詳細」で実行状況を開き、止めてからジョブの一覧に戻る
+            app.SelectRow("Jobs.List");
+            app.Invoke("Jobs.Detail");
+            app.Find("Panel.Status");
             app.Invoke("Job.Stop");
             var stopped = app.WaitForText("Job.Status", t => t is "停止" or "完了" or "失敗", "2 つ目のデプロイが止まる", JobTimeout);
             Log($"停止: {(app.Exists("Job.Error") ? app.TextOf("Job.Error") : stopped)}");
             stopped.Should().Be("停止");
+            app.TextOf("Status.BackToList").Should().Contain("ジョブの一覧に戻る");
+            app.Invoke("Status.BackToList");
+            app.Find("Panel.Jobs");
 
             // 1 つ目の対象の削除（リソースグループを含む）が終わるのを待つ
             app.WaitForText("Jobs.Summary", t => t.Length == 0, "終わっていないジョブが無くなる", JobTimeout);

@@ -55,7 +55,8 @@ public sealed class DeploymentRowViewModel : ObservableObject
         UseAsTargetCommand = new AsyncCommand(() => _owner.UseAsTargetAsync(_entry, "wizard"), () => !HasActiveJob);
         CheckStatusCommand = new AsyncCommand(() => _owner.UseAsTargetAsync(_entry, "status"));
         DeleteCommand = new AsyncCommand(() => _owner.UseAsTargetAsync(_entry, "delete"), () => !HasActiveJob);
-        ShowJobsCommand = new AsyncCommand(() => _owner.ShowJobsAsync(), () => HasActiveJob);
+        // そのジョブの実行状況を開く（「戻る」はデプロイの一覧。No.63）
+        ShowJobsCommand = new AsyncCommand(() => _owner.UseAsTargetAsync(_entry, "status"), () => HasActiveJob);
         ShowPasswordsCommand = new AsyncCommand(() => Busy.RunAsync("パスワードを読んでいます", ReadPasswordsAsync), () => _entry.Timetracker != null);
         TogglePasswordsCommand = new AsyncCommand(() =>
         {
@@ -80,7 +81,7 @@ public sealed class DeploymentRowViewModel : ObservableObject
     /// <summary>対象に入れて、削除の画面を開き、計画を作る（アプリ名の入力 → 実行は、削除の画面で行う）。</summary>
     public AsyncCommand DeleteCommand { get; }
 
-    /// <summary>ジョブの画面を開く（同じ対象の終わっていないジョブがあるとき）。</summary>
+    /// <summary>同じ対象の終わっていないジョブの実行状況を開く。</summary>
     public AsyncCommand ShowJobsCommand { get; }
 
     public AsyncCommand ShowPasswordsCommand { get; }
@@ -295,11 +296,14 @@ public sealed class DeploymentRowViewModel : ObservableObject
         return Task.CompletedTask;
     }
 
-    private async Task ChangeExpiryAsync()
+    private Task ChangeExpiryAsync() =>
+        ApplyExpiryAsync(EditNoExpiry ? DeploymentExpiry.None : EditExpiryDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+
+    /// <summary>利用可能期限を変える（<paramref name="input"/> は yyyy-MM-dd か none。一覧のまとめての変更からも呼ぶ）。誤りがあればその内容を返す。</summary>
+    internal async Task<string?> ApplyExpiryAsync(string input)
     {
         Error = null;
         Message = null;
-        var input = EditNoExpiry ? DeploymentExpiry.None : EditExpiryDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         try
         {
             var decision = await _owner.GatewayFor(_entry.SubscriptionId, Busy).Maintenance(_owner.Time)
@@ -313,5 +317,6 @@ public sealed class DeploymentRowViewModel : ObservableObject
         {
             Error = ex is ArgumentException or InvalidOperationException ? ex.Message : DesktopMessages.ForAzure(ex);
         }
+        return Error;
     }
 }

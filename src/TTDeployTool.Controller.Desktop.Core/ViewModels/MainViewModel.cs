@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using Microsoft.Extensions.Logging;
+using TTDeployTool.Application.Inventory;
 using TTDeployTool.Application.Jobs;
 using TTDeployTool.Application.Workflows;
 using TTDeployTool.Controller.Desktop.Core.Diagnostics;
@@ -35,6 +36,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private JobViewModel? _currentDeployment;
     private JobViewModel? _currentDeletion;
     private JobViewModel? _statusJob;
+    private string _returnPage = "deployments";
 
     public MainViewModel(
         ISignInService signIn, IAzureClients clients, IDialogService dialogs, ISystemLauncher launcher, TimeProvider time, ILoggerFactory loggers,
@@ -66,7 +68,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             () => Queue.ActiveFor(Target.Subscription, Target.ResourceGroup, Target.AppName.ToLowerInvariant())?.IsRunning == true, clipboard);
         // サインアウトしたときに一覧を消すため、サインインより先に作る
         Deployments = new DeploymentListViewModel(Target, Queue, logger, loggers.CreateLogger("TTDeployTool.Desktop.Deployments"), time,
-            launcher, clipboard, OpenAsync);
+            launcher, clipboard, OpenAsync, OpenBatchDeletionAsync);
         var deletions = new DeletionWorkflow(plans, jobs, caller, logger, time);
         Expiry = new ExpiryWatcher(Deployments, Queue, Target, deletions, logger, preferences, notifications, time,
             loggers.CreateLogger("TTDeployTool.Desktop.Expiry"), () => SignIn!.IsSignedIn);
@@ -83,6 +85,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             {
                 Target.Clear();
                 Deployments.Clear();
+                // デプロイの一覧・ウィザード・ジョブの一覧は、サインインするまで押せないため、サインインの画面に戻す（No.63）
+                NavigationRequested?.Invoke("target");
             }
         }, loggers.CreateLogger("TTDeployTool.Desktop.SignIn"));
         Settings = new SettingsViewModel(Target, time, preferences, dialogs, clipboard);
@@ -90,6 +94,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         Deletion = new DeletionViewModel(deletions, Target, Queue, Show, time, clipboard);
         DryRun = new DryRunViewModel(Settings, dialogs, launcher);
         Wizard = new DeployWizardViewModel(Settings, Deployment);
+        JobList = new JobListViewModel(Queue, time);
+        BatchDeletion = new BatchDeletionViewModel(deletions, Target, Queue, Deletion.StartPlannedAsync, ShowRegistered, time);
         LogDirectory = (loggers as DiagnosticLog)?.Directory;
         OpenLogFolderCommand = new AsyncCommand(() =>
         {
@@ -130,6 +136,21 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
     /// <summary>デプロイのウィザード（設定 → 確認と実行）。</summary>
     public DeployWizardViewModel Wizard { get; }
+
+    /// <summary>ジョブの一覧（docs/design/desktop-wizard.md の 7）。</summary>
+    public JobListViewModel JobList { get; }
+
+    /// <summary>デプロイの一覧で 2 件以上を選んだときの、まとめての削除。</summary>
+    public BatchDeletionViewModel BatchDeletion { get; }
+
+    /// <summary>実行状況の画面の「戻る」で開く画面（jobs はジョブの一覧、ほかはデプロイの一覧。No.63）。</summary>
+    public string ReturnPage
+    {
+        get => _returnPage;
+        private set => SetProperty(ref _returnPage, value, new Dependent(nameof(ReturnText)));
+    }
+
+    public string ReturnText => ReturnPage == "jobs" ? "ジョブの一覧に戻る" : "デプロイの一覧に戻る";
 
     /// <summary>実行状況の画面に出すジョブ（無ければ、Azure の状態だけを出す）。</summary>
     public JobViewModel? StatusJob
@@ -287,6 +308,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
                 break;
             case "status":
                 StatusJob = Jobs.FirstOrDefault(j => j.IsFor(Target.Subscription, Target.ResourceGroup, Target.AppName.ToLowerInvariant()));
+                ReturnPage = "deployments";
                 NavigationRequested?.Invoke(page);
                 await Status.RefreshCommand.ExecuteAsync();
                 break;
@@ -298,6 +320,35 @@ public sealed class MainViewModel : ObservableObject, IDisposable
                 NavigationRequested?.Invoke(page);
                 break;
         }
+    }
+
+    /// <summary>
+    /// ジョブの詳細（実行状況の画面）を開く（ジョブの一覧の「詳細」・通知から。No.63）。その対象を選べれば、Azure の状態も読む。
+    /// 「戻る」はジョブの一覧に戻る。
+    /// </summary>
+    public async Task OpenJobAsync(JobViewModel job)
+    {
+        StatusJob = job;
+        ReturnPage = "jobs";
+        var selected = Target.Select(job.Target.Subscription, job.Target.ResourceGroup, job.Target.AppName);
+        NavigationRequested?.Invoke("status");
+        if (selected)
+            await Status.RefreshCommand.ExecuteAsync();
+    }
+
+    // まとめての削除の画面を開いて、選んだデプロイを計画する
+    private async Task OpenBatchDeletionAsync(IReadOnlyList<DeploymentEntry> entries)
+    {
+        NavigationRequested?.Invoke("batchdelete");
+        await BatchDeletion.OpenAsync(entries);
+    }
+
+    // まとめて登録した削除のジョブを、ジョブの一覧で見る
+    private void ShowRegistered(IReadOnlyList<JobViewModel> jobs)
+    {
+        if (jobs.Count > 0)
+            CurrentDeletion = jobs[0];
+        NavigationRequested?.Invoke("jobs");
     }
 
     // 実行状況の画面のジョブが終わったら、Azure の状態を読み直す
@@ -314,6 +365,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         if (job.ScheduledAt == null)
         {
             StatusJob = job;
+            ReturnPage = "deployments";
             NavigationRequested?.Invoke("status");
             StatusRefresh = Status.RefreshCommand.ExecuteAsync();
         }

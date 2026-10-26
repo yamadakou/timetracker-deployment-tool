@@ -37,6 +37,7 @@ public enum DeploymentSortKey
 {
     Subscription,
     ResourceGroup,
+    AppName,
     DeployedAt,
     ExpiresAt,
 }
@@ -77,6 +78,8 @@ public sealed class DeploymentListViewModel : ObservableObject
         new(DeploymentSortKey.DeployedAt, true, "デプロイ日（新しい順）"),
         new(DeploymentSortKey.ExpiresAt, false, "利用可能期限日（近い順）"),
         new(DeploymentSortKey.ExpiresAt, true, "利用可能期限日（遠い順）"),
+        new(DeploymentSortKey.AppName, false, "アプリ名（昇順）"),
+        new(DeploymentSortKey.AppName, true, "アプリ名（降順）"),
     ];
 
     private readonly TargetViewModel _target;
@@ -86,6 +89,7 @@ public sealed class DeploymentListViewModel : ObservableObject
     private readonly ISystemLauncher _launcher;
     private readonly IClipboardService? _clipboard;
     private readonly Func<string, Task> _open;
+    private readonly Func<IReadOnlyList<DeploymentEntry>, Task> _openBatchDeletion;
     private readonly List<RecentChange> _recent = [];
     private IReadOnlyList<DeploymentEntry> _loaded = [];
     private IReadOnlyList<DeploymentEntry> _entries = [];
@@ -96,6 +100,11 @@ public sealed class DeploymentListViewModel : ObservableObject
     // 利用者が選んだサブスクリプション（読み直しで一覧が一度空になっても、また現れれば選び直す）
     private string? _wantedSubscriptionId;
     private string _resourceGroupFilter = "";
+    private string _appNameFilter = "";
+    private IReadOnlyList<DeploymentRowViewModel> _selected = [];
+    private bool _batchNoExpiry;
+    private DateTimeOffset _batchExpiryDate;
+    private string? _batchMessage;
     private DateTimeOffset? _deployedFrom;
     private DateTimeOffset? _deployedTo;
     private ExpiryFilterOption _expiryFilter = ExpiryFilters[0];
@@ -109,10 +118,11 @@ public sealed class DeploymentListViewModel : ObservableObject
     /// <summary>サブスクリプションの絞り込みの「すべて」。</summary>
     public static readonly SubscriptionFilterOption AllSubscriptions = new(null, "すべてのサブスクリプション");
 
-    /// <param name="open">画面を開く（ウィザード・実行状況・削除・ジョブの名前: wizard・status・delete・jobs。jobs 以外は対象に入れた後）</param>
+    /// <param name="open">対象に入れた後に、画面を開く（ウィザード・実行状況・削除の名前: wizard・status・delete）</param>
+    /// <param name="openBatchDeletion">2 件以上を選んで削除するときに、まとめての削除の画面を開いて計画する（docs/design/desktop-wizard.md の 7）</param>
     public DeploymentListViewModel(
         TargetViewModel target, JobQueue queue, IDeploymentLogger deploymentLogger, ILogger logger, TimeProvider time,
-        ISystemLauncher launcher, IClipboardService? clipboard, Func<string, Task> open)
+        ISystemLauncher launcher, IClipboardService? clipboard, Func<string, Task> open, Func<IReadOnlyList<DeploymentEntry>, Task> openBatchDeletion)
     {
         _target = target;
         _deploymentLogger = deploymentLogger;
@@ -121,6 +131,11 @@ public sealed class DeploymentListViewModel : ObservableObject
         _launcher = launcher;
         _clipboard = clipboard;
         _open = open;
+        _openBatchDeletion = openBatchDeletion;
+        _batchExpiryDate = DefaultExpiryDate(time);
+        ChangeSelectedExpiryCommand = new AsyncCommand(() => BatchBusy.RunAsync("選んだデプロイの利用可能期限を変えています", ChangeSelectedExpiryAsync),
+            () => _selected.Count > 0);
+        DeleteSelectedCommand = new AsyncCommand(DeleteSelectedAsync, () => _selected.Count > 0);
         // 絞り込みの選択肢は、読んだサブスクリプション（一覧はすべてのサブスクリプションを読む）
         SubscriptionFilters.Add(AllSubscriptions);
         _target.Subscriptions.CollectionChanged += (_, _) => ResetSubscriptionFilters();
@@ -195,6 +210,79 @@ public sealed class DeploymentListViewModel : ObservableObject
         }
     }
 
+    /// <summary>アプリ名（中間一致）。</summary>
+    public string AppNameFilter { get => _appNameFilter; set => SetFilter(ref _appNameFilter, value.Trim()); }
+
+    /// <summary>見出しを押したときに並べ替える。今と同じ列なら逆順、違う列なら昇順（期限日は近い順。docs/design/desktop-wizard.md の 7）。</summary>
+    public void SortBy(DeploymentSortKey key) =>
+        Sort = SortOptions.First(o => o.Key == key && o.Descending == (Sort.Key == key && !Sort.Descending));
+
+    public string SubscriptionHeader => Header("サブスクリプション", DeploymentSortKey.Subscription);
+
+    public string ResourceGroupHeader => Header("リソースグループ", DeploymentSortKey.ResourceGroup);
+
+    public string AppNameHeader => Header("アプリ名", DeploymentSortKey.AppName);
+
+    public string ExpiryHeader => Header("利用可能期限日", DeploymentSortKey.ExpiresAt);
+
+    public string DeployedHeader => Header("デプロイ日", DeploymentSortKey.DeployedAt);
+
+    private string Header(string label, DeploymentSortKey key) => Sort.Key != key ? label : label + (Sort.Descending ? " ▼" : " ▲");
+
+    /// <summary>選んだ行（表の複数の選択）。</summary>
+    public IReadOnlyList<DeploymentRowViewModel> Selected => _selected;
+
+    /// <summary>1 行だけ選んだときの行（表の下に詳細を出す）。</summary>
+    public DeploymentRowViewModel? Current => _selected.Count == 1 ? _selected[0] : null;
+
+    public bool HasCurrent => Current != null;
+
+    public string SelectionText => _selected.Count == 0 ? "行を選ぶと、まとめて操作できます。" : $"{_selected.Count} 件を選んでいます。";
+
+    /// <summary>表で選んだ行を伝える（画面の側から）。</summary>
+    public void SetSelection(IEnumerable<DeploymentRowViewModel> rows)
+    {
+        var selected = rows.ToList();
+        if (selected.SequenceEqual(_selected))
+            return;
+        _selected = selected;
+        OnPropertyChanged(nameof(Selected));
+        OnPropertyChanged(nameof(Current));
+        OnPropertyChanged(nameof(HasCurrent));
+        OnPropertyChanged(nameof(SelectionText));
+        ChangeSelectedExpiryCommand.RaiseCanExecuteChanged();
+        DeleteSelectedCommand.RaiseCanExecuteChanged();
+    }
+
+    /// <summary>選んだ行の利用可能期限を変える。</summary>
+    public AsyncCommand ChangeSelectedExpiryCommand { get; }
+
+    /// <summary>選んだ行を削除する（1 行なら削除の画面、2 行以上ならまとめての削除の画面）。</summary>
+    public AsyncCommand DeleteSelectedCommand { get; }
+
+    /// <summary>まとめての操作の処理中の表示。</summary>
+    public BusyState BatchBusy { get; } = new();
+
+    /// <summary>まとめて変える期限: 期限なしにするか（false なら <see cref="BatchExpiryDate"/>）。</summary>
+    public bool BatchNoExpiry
+    {
+        get => _batchNoExpiry;
+        set => SetProperty(ref _batchNoExpiry, value);
+    }
+
+    public DateTimeOffset BatchExpiryDate
+    {
+        get => _batchExpiryDate;
+        set => SetProperty(ref _batchExpiryDate, value);
+    }
+
+    /// <summary>まとめての操作の結果。</summary>
+    public string? BatchMessage
+    {
+        get => _batchMessage;
+        private set => SetProperty(ref _batchMessage, value);
+    }
+
     /// <summary>リソースグループ名（中間一致）。</summary>
     public string ResourceGroupFilter { get => _resourceGroupFilter; set => SetFilter(ref _resourceGroupFilter, value.Trim()); }
 
@@ -216,7 +304,16 @@ public sealed class DeploymentListViewModel : ObservableObject
 
     public DateTimeOffset? ExpiryTo { get => _expiryTo; set => SetFilter(ref _expiryTo, value); }
 
-    public DeploymentSortOption Sort { get => _sort; set => SetFilter(ref _sort, value); }
+    public DeploymentSortOption Sort
+    {
+        get => _sort;
+        set
+        {
+            SetFilter(ref _sort, value);
+            foreach (var name in new[] { nameof(SubscriptionHeader), nameof(ResourceGroupHeader), nameof(AppNameHeader), nameof(ExpiryHeader), nameof(DeployedHeader) })
+                OnPropertyChanged(name);
+        }
+    }
 
     public int PageSize { get => _pageSize; set => SetFilter(ref _pageSize, value); }
 
@@ -247,9 +344,6 @@ public sealed class DeploymentListViewModel : ObservableObject
     internal void Copy(string text) => _clipboard!.CopyText(text);
 
     /// <summary>行の操作: 対象に入れて、画面を開く（<paramref name="page"/> は wizard・status・delete）。</summary>
-    /// <summary>ジョブの画面を開く。</summary>
-    internal Task ShowJobsAsync() => _open("jobs");
-
     internal async Task UseAsTargetAsync(DeploymentEntry entry, string page)
     {
         if (!_target.Select(entry.SubscriptionId, entry.ResourceGroup, entry.AppName))
@@ -288,7 +382,6 @@ public sealed class DeploymentListViewModel : ObservableObject
     private SubscriptionChoice? FindSubscription(string subscriptionId) =>
         _target.Subscriptions.FirstOrDefault(c => string.Equals(c.SubscriptionId, subscriptionId, StringComparison.OrdinalIgnoreCase));
 
-    // テナントごとに、そのテナントのサブスクリプションを Resource Graph で読む（読めないテナントがあっても、ほかは続ける）
     /// <summary>
     /// 期限の確認のために読み直す（ページ・フィルタ・行は保つ。docs/design/desktop-jobs.md の 6.5）。読めれば true（読めないテナントがあっても、
     /// ほかのテナントを読めれば true）。
@@ -300,7 +393,7 @@ public sealed class DeploymentListViewModel : ObservableObject
     }
 
     /// <summary>読んだデプロイが変わったとき（読み直し・このアプリでのデプロイ・削除・期限の変更。期限の確認の時刻を合わせ直す）。</summary>
-    internal event Action? EntriesChanged;
+    internal event Action EntriesChanged = () => { };
 
     /// <summary>読んだすべてのデプロイ（フィルタ・ページによらない。このアプリで終えた操作を重ねた後）。</summary>
     internal IReadOnlyList<DeploymentEntry> Entries => _entries;
@@ -308,6 +401,7 @@ public sealed class DeploymentListViewModel : ObservableObject
     /// <summary>利用可能期限日のあるデプロイを読んだか（閉じたときに常駐するか。D18）。</summary>
     public bool HasExpiringDeployments => _entries.Any(e => e.ExpiryKind == ExpiryKind.Date);
 
+    // テナントごとに、そのテナントのサブスクリプションを Resource Graph で読む（読めないテナントがあっても、ほかは続ける）
     private async Task LoadAsync(bool resetPage)
     {
         Error = null;
@@ -444,6 +538,8 @@ public sealed class DeploymentListViewModel : ObservableObject
             return false;
         if (ResourceGroupFilter.Length > 0 && !e.ResourceGroup.Contains(ResourceGroupFilter, StringComparison.OrdinalIgnoreCase))
             return false;
+        if (AppNameFilter.Length > 0 && !e.AppName.Contains(AppNameFilter, StringComparison.OrdinalIgnoreCase))
+            return false;
         if (!InRange(e.DeployedAt, DeployedFrom, DeployedTo))
             return false;
         return ExpiryFilter.Mode switch
@@ -463,6 +559,7 @@ public sealed class DeploymentListViewModel : ObservableObject
         {
             DeploymentSortKey.Subscription => (object?)SubscriptionDisplay(e.SubscriptionId),
             DeploymentSortKey.ResourceGroup => e.ResourceGroup,
+            DeploymentSortKey.AppName => e.AppName,
             DeploymentSortKey.DeployedAt => e.DeployedAt,
             _ => e.ExpiryKind == ExpiryKind.Date ? e.ExpiresAt : null,
         }));
@@ -488,7 +585,7 @@ public sealed class DeploymentListViewModel : ObservableObject
     private void Refresh(bool resetPage, bool keepRows)
     {
         _entries = Apply();
-        EntriesChanged?.Invoke();
+        EntriesChanged.Invoke();
         _filtered = Sorted(_entries.Where(Matches)).ToList();
         _filteredCount = _filtered.Count;
         if (resetPage || _pageIndex >= PageCount)
@@ -510,6 +607,8 @@ public sealed class DeploymentListViewModel : ObservableObject
             Rows.Add(row);
         }
         ShowJobs();
+        // 行を作り直したら、選択もやり直す（画面の表の選択も消える）
+        SetSelection([]);
         OnPropertyChanged(nameof(TotalCount));
         OnPropertyChanged(nameof(FilteredCount));
         OnPropertyChanged(nameof(PageCount));
@@ -517,6 +616,56 @@ public sealed class DeploymentListViewModel : ObservableObject
         OnPropertyChanged(nameof(PageText));
         PreviousPageCommand.RaiseCanExecuteChanged();
         NextPageCommand.RaiseCanExecuteChanged();
+    }
+
+    // 期限の入力の初期値（今日から 32 日後）
+    private static DateTimeOffset DefaultExpiryDate(TimeProvider time)
+    {
+        var zone = time.LocalTimeZone;
+        var local = DeploymentExpiry.Today(time.GetUtcNow(), zone).AddDays(DeploymentExpiry.DefaultDays).ToDateTime(TimeOnly.MinValue);
+        return new DateTimeOffset(local, zone.GetUtcOffset(local));
+    }
+
+    // 選んだ行の期限を変える。ジョブのある行は変えない。行ごとの結果をまとめて出す
+    private async Task ChangeSelectedExpiryAsync()
+    {
+        var input = BatchNoExpiry ? DeploymentExpiry.None : BatchExpiryDate.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        var changed = new List<string>();
+        var skipped = new List<string>();
+        var failed = new List<string>();
+        foreach (var row in _selected.ToList())
+        {
+            if (row.HasActiveJob)
+            {
+                skipped.Add(row.AppName);
+                continue;
+            }
+            if (await row.ApplyExpiryAsync(input) is { } error)
+                failed.Add($"{row.AppName}（{error}）");
+            else
+                changed.Add(row.AppName);
+        }
+        BatchMessage = string.Join(" ", new[]
+        {
+            changed.Count > 0 ? $"{changed.Count} 件の利用可能期限を変えました（{string.Join("、", changed)}）。" : null,
+            skipped.Count > 0 ? $"ジョブがあるため変えなかったもの: {string.Join("、", skipped)}。" : null,
+            failed.Count > 0 ? $"変えられなかったもの: {string.Join("、", failed)}" : null,
+        }.OfType<string>());
+    }
+
+    // 1 行なら今の削除の画面、2 行以上ならまとめての削除の画面を開く
+    private async Task DeleteSelectedAsync()
+    {
+        BatchMessage = null;
+        if (_selected.Count == 1)
+        {
+            if (_selected[0].HasActiveJob)
+                BatchMessage = $"{_selected[0].AppName} にはジョブがあるため、削除できません。ジョブが終わるか、取り消してから削除してください。";
+            else
+                await UseAsTargetAsync(_selected[0].Entry, "delete");
+            return;
+        }
+        await _openBatchDeletion(_selected.Select(r => r.Entry).ToList());
     }
 
     // 今のページの行に、同じ対象の終わっていないジョブを入れる

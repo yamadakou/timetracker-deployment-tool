@@ -36,7 +36,7 @@ public class DeploymentListViewModelTests
     }
 
     /// <summary>3 つの Container App と Environment（期限とデプロイ日は Timetracker のタグ）。</summary>
-    private static IEnumerable<ManagedResourceRecord> Deployment(
+    internal static IEnumerable<ManagedResourceRecord> Deployment(
         string sub, string rg, string app, string? expires = null, string? deployed = null, string? runningStatus = "Running", string? provisioning = "Succeeded")
     {
         ManagedResourceRecord App(string suffix, IReadOnlyDictionary<string, string> tags, ContainerAppSnapshot snapshot) =>
@@ -527,8 +527,11 @@ public class DeploymentListViewModelTests
         Row("other").HasActiveJob.Should().BeFalse("ほかの対象の行は操作できる");
         Row("other").DeleteCommand.CanExecute(null).Should().BeTrue();
 
+        // そのジョブの実行状況を開き、「戻る」はデプロイの一覧（No.63）
         await row.ShowJobsCommand.ExecuteAsync();
-        h.Navigations.Should().EndWith("jobs");
+        h.Navigations.Should().EndWith("status");
+        h.Main.StatusJob.Should().BeSameAs(h.Main.Jobs.Single());
+        h.Main.ReturnText.Should().Be("デプロイの一覧に戻る");
 
         // 読み直しても表示する
         await h.Main.Deployments.LoadCommand.ExecuteAsync();

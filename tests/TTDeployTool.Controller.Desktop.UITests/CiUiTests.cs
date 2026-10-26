@@ -8,22 +8,22 @@ namespace TTDeployTool.Controller.Desktop.UITests;
 /// </summary>
 public class CiUiTests
 {
-    // 7f: 削除・実行状況はメニューに無く、デプロイの一覧はサインインするまで押せない（docs/design/desktop-wizard.md の 2）
-    private static readonly string[] Pages = ["Target", "Wizard", "DryRun", "Jobs"];
+    // 7f: 削除・実行状況はメニューに無い。No.63: デプロイの一覧・新しくデプロイ・ジョブの一覧はサインインするまで押せない（docs/design/desktop-wizard.md の 2・7）
+    private static readonly string[] Pages = ["Target", "DryRun", "AppSettings"];
 
     [Fact]
     public void Startup_Should_Open_The_Window_And_Write_The_Diagnostic_Log() => AppSession.Run(app =>
     {
         app.Window.Title.Should().Be("TTDeployTool");
 
-        app.Show("Jobs");
-        var directory = app.TextOf("Jobs.LogDirectory");
+        app.Show("AppSettings");
+        var directory = app.TextOf("Settings.LogDirectory");
         Directory.Exists(directory).Should().BeTrue($"ログのフォルダー {directory} があるはず");
         var log = Directory.GetFiles(directory, "ttdeploytool-desktop-*.log").OrderBy(f => f).Last();
         var text = ReadShared(log);
         text.Should().Contain("起動しました");
         text.Should().NotContain("[Critical]");
-        app.IsEnabled("Jobs.OpenLogFolder").Should().BeTrue();
+        app.IsEnabled("Settings.OpenLogFolder").Should().BeTrue();
     });
 
     [Fact]
@@ -38,42 +38,24 @@ public class CiUiTests
     });
 
     [Fact]
-    public void Jobs_Page_Should_Show_No_Jobs_And_No_Banner() => AppSession.Run(app =>
+    public void Pages_That_Need_Azure_Should_Wait_For_Sign_In_And_Show_No_Banner() => AppSession.Run(app =>
     {
-        app.Show("Jobs");
-        app.TextOf("Panel.Jobs").Should().StartWith("ジョブ");
-        app.TextOf("Jobs.Summary").Should().BeEmpty("終わっていないジョブが無い");
+        // No.63: サインインしていないときは、新しくデプロイ・ジョブの一覧も押せない（ウィザードの誤りの表示は Azure の UI テストで確かめる）
+        foreach (var page in new[] { "Nav.Deployments", "Nav.Wizard", "Nav.Jobs" })
+            app.IsEnabled(page).Should().BeFalse($"サインインするまで {page} は押せない");
         app.Exists("Jobs.Banner").Should().BeFalse("ジョブが無ければ上部の帯を出さない");
-        app.IsEnabled("Jobs.ClearFinished").Should().BeTrue();
         app.Exists("Job.Title").Should().BeFalse();
+        app.Exists("Job.Progress").Should().BeFalse();
     });
 
     [Fact]
-    public void Menu_Should_Have_No_Delete_Or_Status_And_The_List_Should_Need_Sign_In() => AppSession.Run(app =>
+    public void Menu_Should_Have_No_Delete_Or_Status_And_Settings_At_The_Bottom() => AppSession.Run(app =>
     {
         foreach (var removed in new[] { "Nav.Settings", "Nav.Deploy", "Nav.Status", "Nav.Delete" })
             app.Exists(removed).Should().BeFalse($"{removed} はメニューに無い");
-        app.IsEnabled("Nav.Deployments").Should().BeFalse("サインインするまでデプロイの一覧は押せない");
-    });
-
-    [Fact]
-    public void The_Wizard_Should_Not_Go_Next_With_Errors_And_Copy_From_Any_Step() => AppSession.Run(app =>
-    {
-        app.Show("Wizard");
-        app.TextOf("Wizard.Step").Should().Be("① 対象（1 / 5）");
-        app.IsEnabled("Wizard.Back").Should().BeFalse();
-        // サインインしていないため、サブスクリプションが無い
-        app.IsEnabled("Wizard.Next").Should().BeFalse("誤りがあれば次へ進めない");
-        // 誤りの一覧（ItemsControl）は UI Automation の要素にならないため、ウィンドウの中の文字列から読む
-        app.WaitForScreenText(t => t.Contains("subscription は必須です。") && t.Contains("resource-group は必須です。"), "① の誤りが出る");
-        app.TextOf("Wizard.Blocked").Should().Be("誤りが 2 件あるため、次へ進めません。");
-        app.SetText("Target.ResourceGroup", "rg-wizard");
-        app.WaitForText("Wizard.Blocked", t => t == "誤りが 1 件あるため、次へ進めません。", "直した誤りは消える");
-        app.IsEnabled("Settings.CopyMarkdown").Should().BeTrue("どの画面にも設定のコピーがある");
-        app.Exists("Settings.Reset").Should().BeTrue("どの画面にも初期値に戻すがある");
-        // ジョブが無いのに、ジョブの表示の型（「: 」と進み具合のバー）が出ていた（実機の確認、2026-10-21）
-        app.Exists("Job.Title").Should().BeFalse();
-        app.Exists("Job.Progress").Should().BeFalse();
+        app.TextOf("Nav.Jobs").Should().Contain("ジョブの一覧");
+        app.Show("AppSettings");
+        app.TextOf("Settings.StartupStatus").Should().NotBeEmpty();
     });
 
     [Fact]
@@ -81,14 +63,14 @@ public class CiUiTests
     {
         AppSession.Run(app =>
         {
-            app.Show("Jobs");
+            app.Show("AppSettings");
             app.ItemsOf("Settings.Concurrency").Should().Equal("1", "2", "3", "4");
             app.SelectedOf("Settings.Concurrency").Should().Be("2", "既定は 2");
             app.Select("Settings.Concurrency", "3");
         }, "Concurrency_Should_Be_Saved_Across_Restarts_1");
         AppSession.Run(app =>
         {
-            app.Show("Jobs");
+            app.Show("AppSettings");
             app.SelectedOf("Settings.Concurrency").Should().Be("3", "アプリのデータに保存する");
             // ほかのテストのために既定に戻す
             app.Select("Settings.Concurrency", "2");
@@ -101,11 +83,9 @@ public class CiUiTests
         app.TextOf("SignIn.Account").Should().StartWith("サインインしていません");
         app.IsEnabled("SignIn.SignIn").Should().BeTrue();
         app.IsEnabled("SignIn.SignOut").Should().BeFalse();
-        // 7f: サブスクリプションと対象の入力は、ウィザードの ① にある
+        // 7f: サブスクリプションと対象の入力は、ウィザードの ① にある（No.63: ウィザードはサインインするまで開けない）
         app.Exists("Target.Subscription").Should().BeFalse("サインインの画面には、サブスクリプションの選択を出さない");
-        app.Show("Wizard");
-        app.Exists("Target.Subscription").Should().BeTrue();
-        app.Exists("Target.ResourceGroup").Should().BeTrue();
+        app.IsEnabled("Nav.Wizard").Should().BeFalse();
     });
 
     [Fact]
@@ -161,15 +141,15 @@ public class CiUiTests
     [Fact]
     public void A_Second_Launch_Should_Bring_The_Running_App_Forward() => AppSession.Run(app =>
     {
-        app.Show("Jobs");
-        app.TextOf("Jobs.Resident").Should().Contain("通知領域に残って続けます");
+        app.Show("AppSettings");
+        app.TextOf("Settings.Resident").Should().Contain("通知領域に残って続けます");
 
         // 2 つ目の起動は 1 つ目に渡されて終わり、アプリのプロセスは 1 つのまま
         using var second = FlaUI.Core.Application.LaunchStoreApp(AppSession.AppUserModelId());
         AppSession.TryWait(() => System.Diagnostics.Process.GetProcessesByName("ttdeploytool-desktop").Length == 1, TimeSpan.FromSeconds(30))
             .Should().BeTrue("2 つ目は起動を渡して終わる");
         app.App.HasExited.Should().BeFalse();
-        app.Exists("Panel.Jobs").Should().BeTrue("1 つ目のウィンドウはそのまま");
+        app.Exists("Panel.AppSettings").Should().BeTrue("1 つ目のウィンドウはそのまま");
     });
 
     // アプリが書き込み中のログを読む

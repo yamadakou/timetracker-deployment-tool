@@ -208,6 +208,18 @@ public sealed class JobViewModel : ObservableObject
     /// <summary>ジョブの対象。</summary>
     public JobTarget Target => _target;
 
+    /// <summary>ジョブの一覧の種類（docs/design/desktop-wizard.md の 7）。</summary>
+    public string KindText => _kind == JobKind.Deploy ? "デプロイ" : IsExpiryDeletion ? "期限での削除" : "削除";
+
+    /// <summary>ジョブの一覧の対象。</summary>
+    public string TargetText => $"{_target.ResourceGroup} / {_target.AppName}";
+
+    /// <summary>ジョブの一覧の時刻（予定の時刻。すぐ実行したものは「すぐ実行」）。</summary>
+    public string TimeText => _scheduledAt is { } at ? $"{at.ToLocalTime():MM/dd HH:mm}" : "すぐ実行";
+
+    /// <summary>ジョブの一覧の結果（エラー・削除したもの・URL。まだ無ければ null）。</summary>
+    public string? ResultText => Error ?? DeletionSummary ?? Endpoint?.ToString();
+
     /// <summary>成功したジョブの結果（デプロイは <see cref="DeploymentResult"/>、削除は <see cref="DeletionOutcome"/>。終わっていなければ null）。</summary>
     public object? Result => _snapshot?.Result;
 
@@ -313,6 +325,8 @@ public sealed class JobViewModel : ObservableObject
         OnPropertyChanged(nameof(IsRunning));
         OnPropertyChanged(nameof(IsActive));
         OnPropertyChanged(nameof(ScheduledAt));
+        OnPropertyChanged(nameof(TimeText));
+        OnPropertyChanged(nameof(ResultText));
         OnPropertyChanged(nameof(StatusText));
         OnPropertyChanged(nameof(StepText));
         OnPropertyChanged(nameof(Error));

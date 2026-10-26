@@ -81,11 +81,48 @@ public sealed partial class MainWindow : Window
             ViewModel.Deployments.ExpiryFilter = option;
     }
 
-    private void OnSortChanged(object sender, SelectionChangedEventArgs e)
+    // 表の見出しを押すと並べ替える（Tag は列の名前。docs/design/desktop-wizard.md の 7）
+    private void OnSortDeployments(object sender, RoutedEventArgs e) =>
+        ViewModel.Deployments.SortBy(Enum.Parse<DeploymentSortKey>((string)((Button)sender).Tag));
+
+    private void OnSortJobs(object sender, RoutedEventArgs e) =>
+        ViewModel.JobList.SortBy(Enum.Parse<JobSortKey>((string)((Button)sender).Tag));
+
+    private void OnJobFilterChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (((ComboBox)sender).SelectedItem is DeploymentSortOption option)
-            ViewModel.Deployments.Sort = option;
+        if (((ComboBox)sender).SelectedItem is JobFilterOption option)
+            ViewModel.JobList.Filter = option;
     }
+
+    // 見出しの絞り込みの「閉じる」
+    private void OnCloseFlyout(object sender, RoutedEventArgs e)
+    {
+        foreach (var popup in Microsoft.UI.Xaml.Media.VisualTreeHelper.GetOpenPopupsForXamlRoot(Content.XamlRoot))
+            popup.IsOpen = false;
+    }
+
+    // 表で選んだ行を ViewModel に伝える（ListView の SelectedItems は結び付けられないため）
+    private void OnDeploymentsSelectionChanged(object sender, SelectionChangedEventArgs e) =>
+        ViewModel.Deployments.SetSelection(DeploymentsTable.SelectedItems.OfType<DeploymentRowViewModel>());
+
+    private void OnJobsSelectionChanged(object sender, SelectionChangedEventArgs e) =>
+        ViewModel.JobList.SetSelection(JobsList.SelectedItems.OfType<JobViewModel>());
+
+    // ジョブの一覧の「詳細」と、行のダブルクリック: 実行状況の画面で開く
+    private void OnShowJobDetail(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel.JobList.Current is { } job)
+            _ = ViewModel.OpenJobAsync(job);
+    }
+
+    private void OnJobDoubleTapped(object sender, Microsoft.UI.Xaml.Input.DoubleTappedRoutedEventArgs e)
+    {
+        if ((e.OriginalSource as FrameworkElement)?.DataContext is JobViewModel job)
+            _ = ViewModel.OpenJobAsync(job);
+    }
+
+    // 実行状況の画面の「戻る」: 開いた画面（ジョブの一覧かデプロイの一覧）に戻る
+    private void OnBackFromStatus(object sender, RoutedEventArgs e) => Navigate(ViewModel.ReturnPage);
 
     private void OnPageSizeChanged(object sender, SelectionChangedEventArgs e)
     {
@@ -100,7 +137,7 @@ public sealed partial class MainWindow : Window
     }
 
     // 上部の帯の「ジョブを見る」
-    private void OnShowJobs(object sender, RoutedEventArgs e) => Nav.SelectedItem = JobsNavItem;
+    private void OnShowJobs(object sender, RoutedEventArgs e) => Navigate("jobs");
 
     private void OnNavigationChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
     {
@@ -112,7 +149,7 @@ public sealed partial class MainWindow : Window
     /// <summary>画面を開く（メニューにある画面はメニューを選び、削除・実行状況はメニューの選択を外して開く。docs/design/desktop-wizard.md の 2）。</summary>
     private void Navigate(string tag)
     {
-        if (Nav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => (string)i.Tag == tag) is { } item)
+        if (Nav.MenuItems.Concat(Nav.FooterMenuItems).OfType<NavigationViewItem>().FirstOrDefault(i => (string)i.Tag == tag) is { } item)
         {
             Nav.SelectedItem = item;
             return;
@@ -126,7 +163,7 @@ public sealed partial class MainWindow : Window
         foreach (var (panel, name) in new (FrameworkElement, string)[]
                  {
                      (TargetPanel, "target"), (DeploymentsPanel, "deployments"), (WizardPanel, "wizard"), (StatusPanel, "status"),
-                     (DeletePanel, "delete"), (DryRunPanel, "dryrun"), (JobsPanel, "jobs"),
+                     (DeletePanel, "delete"), (DryRunPanel, "dryrun"), (JobsPanel, "jobs"), (BatchDeletePanel, "batchdelete"), (SettingsPanel, "settings"),
                  })
             panel.Visibility = name == tag ? Visibility.Visible : Visibility.Collapsed;
     }
@@ -157,13 +194,14 @@ public sealed partial class MainWindow : Window
         Navigate(page == "signin" ? "target" : page);
     }
 
-    /// <summary>通知から、ジョブの画面を開く（ジョブが一覧に残っていれば、そこまで送る）。</summary>
+    /// <summary>通知から、ジョブの詳細（実行状況）を開く（一覧から消した場合などは、ジョブの一覧を開く）。</summary>
     public void ShowJob(string? jobId)
     {
         ShowFromTray();
-        Nav.SelectedItem = JobsNavItem;
-        if (jobId != null && ViewModel.FindJob(jobId) is { } job && JobsList.ContainerFromItem(job) is UIElement container)
-            container.StartBringIntoView();
+        if (jobId != null && ViewModel.FindJob(jobId) is { } job)
+            _ = ViewModel.OpenJobAsync(job);
+        else
+            Navigate("jobs");
     }
 
     // 通知領域のアイコン（押すと開く。メニューは「開く」「終了」）。ツールチップに、終わっていないジョブの状況を出す
