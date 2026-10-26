@@ -118,7 +118,7 @@ public class AzureUiTests
             // No.63: 絞り込みは表の見出しの「▽」から
             app.Invoke("Deployments.FilterResourceGroup");
             app.SetText("Deployments.ResourceGroupFilter", resourceGroup!);
-            app.Invoke("Deployments.FilterClose");
+            app.Invoke("Deployments.ResourceGroupFilterClose");
             app.Invoke("Deployments.Load");
             app.WaitForText("Deployments.Page", t => t.Contains("件目"), "一覧にデプロイが出る", LoadTimeout);
             Log($"デプロイの一覧: {app.TextOf("Deployments.Page")}、状態 {app.TextOf("Row.State")}、期限 {app.TextOf("Row.Expiry")}");

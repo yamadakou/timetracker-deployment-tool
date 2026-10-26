@@ -291,7 +291,7 @@
                                     <Button.Flyout><Flyout><StackPanel Spacing="8">
                                         <ComboBox AutomationProperties.AutomationId="Deployments.SubscriptionFilter" Header="サブスクリプション" ItemsSource="{x:Bind ViewModel.Deployments.SubscriptionFilters}" Width="260"
                                                   DisplayMemberPath="Label" SelectedItem="{x:Bind ViewModel.Deployments.SubscriptionFilter, Mode=OneWay}" SelectionChanged="OnSubscriptionFilterChanged" />
-                                        <Button AutomationProperties.AutomationId="Deployments.FilterClose" Content="閉じる" Click="OnCloseFlyout" />
+                                        <Button AutomationProperties.AutomationId="Deployments.SubscriptionFilterClose" Content="閉じる" Click="OnCloseFlyout" />
                                     </StackPanel></Flyout></Button.Flyout>
                                 </Button>
                             </StackPanel>
@@ -301,7 +301,7 @@
                                     <Button.Flyout><Flyout><StackPanel Spacing="8">
                                         <TextBox AutomationProperties.AutomationId="Deployments.ResourceGroupFilter" Header="リソースグループ名（一部でよい）" Width="260"
                                                  Text="{x:Bind ViewModel.Deployments.ResourceGroupFilter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                        <Button Content="閉じる" Click="OnCloseFlyout" />
+                                        <Button AutomationProperties.AutomationId="Deployments.ResourceGroupFilterClose" Content="閉じる" Click="OnCloseFlyout" />
                                     </StackPanel></Flyout></Button.Flyout>
                                 </Button>
                             </StackPanel>
@@ -311,7 +311,7 @@
                                     <Button.Flyout><Flyout><StackPanel Spacing="8">
                                         <TextBox AutomationProperties.AutomationId="Deployments.AppNameFilter" Header="アプリ名（一部でよい）" Width="260"
                                                  Text="{x:Bind ViewModel.Deployments.AppNameFilter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                        <Button Content="閉じる" Click="OnCloseFlyout" />
+                                        <Button AutomationProperties.AutomationId="Deployments.AppNameFilterClose" Content="閉じる" Click="OnCloseFlyout" />
                                     </StackPanel></Flyout></Button.Flyout>
                                 </Button>
                             </StackPanel>
@@ -326,7 +326,7 @@
                                                             Visibility="{x:Bind ViewModel.Deployments.IsExpiryRange, Mode=OneWay}" />
                                         <CalendarDatePicker AutomationProperties.AutomationId="Deployments.ExpiryTo" Header="期限日（まで）" Date="{x:Bind ViewModel.Deployments.ExpiryTo, Mode=TwoWay}"
                                                             Visibility="{x:Bind ViewModel.Deployments.IsExpiryRange, Mode=OneWay}" />
-                                        <Button Content="閉じる" Click="OnCloseFlyout" />
+                                        <Button AutomationProperties.AutomationId="Deployments.ExpiryFilterClose" Content="閉じる" Click="OnCloseFlyout" />
                                     </StackPanel></Flyout></Button.Flyout>
                                 </Button>
                             </StackPanel>
@@ -336,7 +336,7 @@
                                     <Button.Flyout><Flyout><StackPanel Spacing="8">
                                         <CalendarDatePicker AutomationProperties.AutomationId="Deployments.DeployedFrom" Header="デプロイ日（から）" Date="{x:Bind ViewModel.Deployments.DeployedFrom, Mode=TwoWay}" />
                                         <CalendarDatePicker AutomationProperties.AutomationId="Deployments.DeployedTo" Header="デプロイ日（まで）" Date="{x:Bind ViewModel.Deployments.DeployedTo, Mode=TwoWay}" />
-                                        <Button Content="閉じる" Click="OnCloseFlyout" />
+                                        <Button AutomationProperties.AutomationId="Deployments.DeployedFilterClose" Content="閉じる" Click="OnCloseFlyout" />
                                     </StackPanel></Flyout></Button.Flyout>
                                 </Button>
                             </StackPanel>
@@ -518,7 +518,7 @@
                                     <Button.Flyout><Flyout><StackPanel Spacing="8">
                                         <TextBox AutomationProperties.AutomationId="Jobs.TargetFilter" Header="リソースグループ / アプリ名（一部でよい）" Width="260"
                                                  Text="{x:Bind ViewModel.JobList.TargetFilter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                        <Button Content="閉じる" Click="OnCloseFlyout" />
+                                        <Button AutomationProperties.AutomationId="Jobs.TargetFilterClose" Content="閉じる" Click="OnCloseFlyout" />
                                     </StackPanel></Flyout></Button.Flyout>
                                 </Button>
                             </StackPanel>
@@ -528,7 +528,7 @@
                                     <Button.Flyout><Flyout><StackPanel Spacing="8">
                                         <ComboBox AutomationProperties.AutomationId="Jobs.StateFilter" Header="状態" ItemsSource="{x:Bind vm:JobListViewModel.Filters}" Width="220"
                                                   SelectedItem="{x:Bind ViewModel.JobList.Filter, Mode=OneWay}" SelectionChanged="OnJobFilterChanged" />
-                                        <Button Content="閉じる" Click="OnCloseFlyout" />
+                                        <Button AutomationProperties.AutomationId="Jobs.StateFilterClose" Content="閉じる" Click="OnCloseFlyout" />
                                     </StackPanel></Flyout></Button.Flyout>
                                 </Button>
                             </StackPanel>
