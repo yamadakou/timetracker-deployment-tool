@@ -41,9 +41,19 @@ Export-PfxCertificate -Cert $cert -FilePath .\TTDeployTool-preview.pfx -Password
 [Convert]::ToBase64String([IO.File]::ReadAllBytes(".\TTDeployTool-preview.pfx")) | Set-Clipboard
 ```
 
-4. GitHub のリポジトリの **Settings → Secrets and variables → Actions → Secrets** で、次の 2 つを追加します。
-   - `DESKTOP_PREVIEW_PFX`: 3 でコピーした Base64
-   - `DESKTOP_PREVIEW_PFX_PASSWORD`: 2 のパスワード
+4. GitHub のリポジトリに、**リポジトリのシークレット**として次の 2 つを追加します。
+   1. リポジトリの上のタブの **Settings** を開き、左のメニューの「Security and quality」の下の **Secrets and variables** を開いて **Actions** を選びます（「Actions secrets and variables」の画面が開きます）。
+   2. **Secrets** のタブのまま、「**Repository secrets**」の右の緑の **New repository secret** を押します（上の「Environment secrets」の **Manage environment secrets** ではありません。このワークフローは環境〔`systemtest` など〕を使わないため、環境のシークレットは読めません）。
+   3. **Name** に `DESKTOP_PREVIEW_PFX`、**Secret** に 3 でコピーした Base64（数千文字の 1 行）を貼り付け、**Add secret** を押します。
+   4. もう一度 **New repository secret** を押し、**Name** に `DESKTOP_PREVIEW_PFX_PASSWORD`、**Secret** に 2 のパスワードを入れて **Add secret** を押します。
+   5. 「Repository secrets」の一覧に、既存の `TT_E2E_*` と並んで 2 つが出れば完了です（値は後から見られません。間違えたら鉛筆のボタンで入れ直します）。
+
+   GitHub CLI（`gh`）を使う場合は、PFX のあるフォルダーで次を実行しても同じです（パスワードは尋ねられたときに入力します）。
+
+   ```powershell
+   [Convert]::ToBase64String([IO.File]::ReadAllBytes(".\TTDeployTool-preview.pfx")) | gh secret set DESKTOP_PREVIEW_PFX -R yamadakou/timetracker-deployment-tool
+   gh secret set DESKTOP_PREVIEW_PFX_PASSWORD -R yamadakou/timetracker-deployment-tool
+   ```
 5. PFX は、パスワード管理の仕組みなど安全な場所に保管するか、削除します。証明書の秘密鍵を持つ人は、評価者の PC で信頼されるパッケージを作れるためです。PC の証明書のストアからも削除します（`Remove-Item "Cert:\CurrentUser\My\$($cert.Thumbprint)"`）。
 
 ### 期限と作り直し
