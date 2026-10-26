@@ -275,6 +275,7 @@
                                         IsEnabled="{x:Bind local:Ui.Not(ViewModel.Deployments.BatchNoExpiry), Mode=OneWay}" />
                             <Button AutomationProperties.AutomationId="Deployments.ChangeExpiry" Content="期限を変える" Command="{x:Bind ViewModel.Deployments.ChangeSelectedExpiryCommand}" />
                             <Button AutomationProperties.AutomationId="Deployments.Delete" Content="削除…" Command="{x:Bind ViewModel.Deployments.DeleteSelectedCommand}" />
+                            <Button AutomationProperties.AutomationId="Deployments.ClearSelection" Content="選択を外す" Command="{x:Bind ViewModel.Deployments.ClearSelectionCommand}" />
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="8" Visibility="{x:Bind ViewModel.Deployments.BatchBusy.IsBusy, Mode=OneWay}"><ProgressRing IsActive="{x:Bind ViewModel.Deployments.BatchBusy.IsBusy, Mode=OneWay}" Width="16" Height="16" /><TextBlock VerticalAlignment="Center" Text="{x:Bind ViewModel.Deployments.BatchBusy.Text, Mode=OneWay}" /></StackPanel>
                         <TextBlock AutomationProperties.AutomationId="Deployments.BatchMessage" Text="{x:Bind ViewModel.Deployments.BatchMessage, Mode=OneWay}" TextWrapping="Wrap" />
@@ -494,6 +495,7 @@
                             <Button AutomationProperties.AutomationId="Jobs.CancelSelected" Content="取り消し" Command="{x:Bind ViewModel.JobList.CancelSelectedCommand}" />
                             <Button AutomationProperties.AutomationId="Jobs.PauseSelected" Content="一時停止" Command="{x:Bind ViewModel.JobList.PauseSelectedCommand}" />
                             <Button AutomationProperties.AutomationId="Jobs.ResumeSelected" Content="再開" Command="{x:Bind ViewModel.JobList.ResumeSelectedCommand}" />
+                            <Button AutomationProperties.AutomationId="Jobs.ClearSelection" Content="選択を外す" Command="{x:Bind ViewModel.JobList.ClearSelectionCommand}" />
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <DatePicker AutomationProperties.AutomationId="Jobs.ScheduleDate" Header="予定の日付" Date="{x:Bind ViewModel.JobList.Schedule.Date, Mode=TwoWay}" />

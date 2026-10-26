@@ -199,7 +199,8 @@ public class AzureUiTests
             var concurrent = app.WaitForText("Job.Status", t => t is "実行中" or "待機中（同時に実行できる数に達しています）" or "完了" or "失敗", "2 つ目のデプロイが始まる", LoadTimeout);
             Log($"2 つ目のデプロイを始めたときのジョブ: {app.TextOf("Jobs.Summary")}");
             concurrent.Should().Be("実行中", "対象が違えば、削除の実行中でも待たずに始める");
-            // No.63: 1 行だけ選んで「詳細」で実行状況を開き、止めてからジョブの一覧に戻る
+            // No.63: 1 行だけ選んで「詳細」で実行状況を開き、止めてからジョブの一覧に戻る（取り消した行の選択が残っているため、先に外す）
+            app.Invoke("Jobs.ClearSelection");
             app.SelectRow("Jobs.List");
             app.Invoke("Jobs.Detail");
             app.Find("Panel.Status");

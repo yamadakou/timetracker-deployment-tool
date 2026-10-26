@@ -63,6 +63,11 @@ public sealed class JobListViewModel : ObservableObject
         PauseSelectedCommand = new AsyncCommand(() => Apply("一時停止", j => j.PauseCommand), () => _selected.Count > 0);
         ResumeSelectedCommand = new AsyncCommand(() => Apply("再開", j => j.ResumeCommand), () => _selected.Count > 0);
         RescheduleSelectedCommand = new AsyncCommand(RescheduleSelectedAsync, () => _selected.Count > 0);
+        ClearSelectionCommand = new AsyncCommand(() =>
+        {
+            SetSelection([]);
+            return Task.CompletedTask;
+        }, () => _selected.Count > 0);
         // ジョブの登録・消去と、状態の変更で並べ直す
         queue.Jobs.CollectionChanged += (_, _) => Refresh();
         queue.PropertyChanged += (_, e) =>
@@ -141,9 +146,12 @@ public sealed class JobListViewModel : ObservableObject
         OnPropertyChanged(nameof(Current));
         OnPropertyChanged(nameof(HasCurrent));
         OnPropertyChanged(nameof(SelectionText));
-        foreach (var command in new[] { CancelSelectedCommand, PauseSelectedCommand, ResumeSelectedCommand, RescheduleSelectedCommand })
+        foreach (var command in new[] { CancelSelectedCommand, PauseSelectedCommand, ResumeSelectedCommand, RescheduleSelectedCommand, ClearSelectionCommand })
             command.RaiseCanExecuteChanged();
     }
+
+    /// <summary>選択をすべて外す。</summary>
+    public AsyncCommand ClearSelectionCommand { get; }
 
     public AsyncCommand CancelSelectedCommand { get; }
 

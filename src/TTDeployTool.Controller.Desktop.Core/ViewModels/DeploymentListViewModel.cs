@@ -136,6 +136,11 @@ public sealed class DeploymentListViewModel : ObservableObject
         ChangeSelectedExpiryCommand = new AsyncCommand(() => BatchBusy.RunAsync("選んだデプロイの利用可能期限を変えています", ChangeSelectedExpiryAsync),
             () => _selected.Count > 0);
         DeleteSelectedCommand = new AsyncCommand(DeleteSelectedAsync, () => _selected.Count > 0);
+        ClearSelectionCommand = new AsyncCommand(() =>
+        {
+            SetSelection([]);
+            return Task.CompletedTask;
+        }, () => _selected.Count > 0);
         // 絞り込みの選択肢は、読んだサブスクリプション（一覧はすべてのサブスクリプションを読む）
         SubscriptionFilters.Add(AllSubscriptions);
         _target.Subscriptions.CollectionChanged += (_, _) => ResetSubscriptionFilters();
@@ -253,7 +258,11 @@ public sealed class DeploymentListViewModel : ObservableObject
         OnPropertyChanged(nameof(SelectionText));
         ChangeSelectedExpiryCommand.RaiseCanExecuteChanged();
         DeleteSelectedCommand.RaiseCanExecuteChanged();
+        ClearSelectionCommand.RaiseCanExecuteChanged();
     }
+
+    /// <summary>選択をすべて外す。</summary>
+    public AsyncCommand ClearSelectionCommand { get; }
 
     /// <summary>選んだ行の利用可能期限を変える。</summary>
     public AsyncCommand ChangeSelectedExpiryCommand { get; }

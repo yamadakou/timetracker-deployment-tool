@@ -63,6 +63,10 @@ public class DeploymentTableTests
 
         vm.SetSelection([vm.Rows[0]]);
         vm.Current.Should().BeSameAs(vm.Rows[0]);
+        await vm.ClearSelectionCommand.ExecuteAsync();
+        vm.Selected.Should().BeEmpty();
+        vm.ClearSelectionCommand.CanExecute(null).Should().BeFalse();
+        vm.SetSelection([vm.Rows[0]]);
         vm.SetSelection([vm.Rows[0]]);
         vm.SetSelection(vm.Rows);
         (vm.Current, vm.SelectionText).Should().Be((null, "2 件を選んでいます。"));
@@ -359,6 +363,9 @@ public class JobTableTests
         await list.RescheduleSelectedCommand.ExecuteAsync();
         list.Message.Should().StartWith("予定の時刻（");
 
+        list.ClearSelectionCommand.CanExecute(null).Should().BeTrue();
+        await list.ClearSelectionCommand.ExecuteAsync();
+        list.Selected.Should().BeEmpty();
         list.SetSelection([a]);
         list.Current.Should().Be(a);
         await list.CancelSelectedCommand.ExecuteAsync();
