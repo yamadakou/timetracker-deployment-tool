@@ -568,7 +568,7 @@ CLI と同じ機能を、[MCP（Model Context Protocol）](https://modelcontextp
 
 ### デスクトップアプリ（開発中）
 
-CLI や AI アシスタントを使わずに、Windows の画面の操作で同じことを行うアプリを開発しています（WinUI 3。Microsoft Store の限定公開で配布する予定です）。まだ Store では配布していません。
+CLI や AI アシスタントを使わずに、Windows の画面の操作で同じことを行うアプリを開発しています（WinUI 3。Microsoft Store の限定公開で配布する予定です）。まだ Store では配布していません。評価者には、自己署名の証明書で署名した評価版（`.msix`）を渡せます（作り方: [docs/design/desktop-preview.md](docs/design/desktop-preview.md)、評価者の導入の手順: [docs/DESKTOP_PREVIEW_INSTALL.md](docs/DESKTOP_PREVIEW_INSTALL.md)）。
 
 - できること: Azure へのサインイン（Windows のアカウント。`az login` は不要）、サブスクリプションの選択、デプロイ（計画 → 確認 → 実行）、状態の確認、削除（アプリ名の入力で確認）、ローカル検証（Dry-run）の docker-compose.yml と .env の保存
 - 安全策は CLI・MCP サーバーと同じです（実行の前に計画を示す、DB のデータが失われる更新は同意のチェックが必要、実行の直前に計画を作り直して状態が変わっていれば実行しない）
@@ -580,7 +580,7 @@ CLI や AI アシスタントを使わずに、Windows の画面の操作で同�
 - 期限での削除は、アプリが動いている間に行います。期限日のあるデプロイがあればウィンドウを閉じても通知領域に残り、メニューの下の「設定」の画面で Windows のサインイン時に通知領域で起動するようにできます（期限日のあるデプロイを初めて実行したときにも尋ねます）。どの PC でもアプリが動いていなければ、次にどれかの PC で動いたときに削除します
 - パスワードは保存しません（アプリを終了すると消えます）
 - 対象: Windows 10（1809 以降）、Windows 11（x64 / arm64）
-- 設計: [docs/design/desktop-app.md](docs/design/desktop-app.md)、Windows での確認の手順: [docs/design/desktop-app-check.md](docs/design/desktop-app-check.md)、Store への提出の手順: [docs/design/desktop-app-store.md](docs/design/desktop-app-store.md)、プライバシー ポリシー（案）: [docs/PRIVACY.md](docs/PRIVACY.md)
+- 設計: [docs/design/desktop-app.md](docs/design/desktop-app.md)、Windows での確認の手順: [docs/design/desktop-app-check.md](docs/design/desktop-app-check.md)、Store への提出の手順: [docs/design/desktop-app-store.md](docs/design/desktop-app-store.md)、評価版の配布: [docs/design/desktop-preview.md](docs/design/desktop-preview.md)、プライバシー ポリシー（案）: [docs/PRIVACY.md](docs/PRIVACY.md)
 
 ### コマンドパラメータの説明一覧
 `deploy`（サブコマンドを省略した場合も `deploy`）のオプションです。`delete` のオプションは[リソースの削除（delete）](#リソースの削除delete)を参照してください。
