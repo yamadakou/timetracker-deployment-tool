@@ -47,6 +47,7 @@ public sealed class ExpiryWatcher : IDisposable
     private readonly Func<bool> _isSignedIn;
     private readonly SynchronizationContext? _context;
     private readonly Dictionary<string, DateTimeOffset> _failedAt = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Lock _gate = new();
     private ITimer? _timer;
     private Task _checking = Task.CompletedTask;
     private DateTimeOffset _refreshAt;
@@ -83,12 +84,22 @@ public sealed class ExpiryWatcher : IDisposable
         return CheckAsync();
     }
 
-    /// <summary>確かめる（前の確認が終わっていなければ、それを待つだけ）。</summary>
+    /// <summary>
+    /// 確かめる（前の確認が終わっていなければ、それを待つだけ）。画面のスレッドが無いテストでは、タイマーとテストから同時に呼ばれるため、
+    /// 始めるかの判断を重ねない（重なると、同じ通知を 2 回出す）。
+    /// </summary>
     public Task CheckAsync()
     {
-        if (_checking.IsCompleted)
-            _checking = RunCheckAsync();
-        return _checking;
+        TaskCompletionSource started;
+        lock (_gate)
+        {
+            if (!_checking.IsCompleted)
+                return _checking;
+            started = new TaskCompletionSource();
+            _checking = started.Task;
+        }
+        _ = RunCheckAsync().ContinueWith(started.SetFromTask, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+        return started.Task;
     }
 
     public void Dispose() => _timer?.Dispose();

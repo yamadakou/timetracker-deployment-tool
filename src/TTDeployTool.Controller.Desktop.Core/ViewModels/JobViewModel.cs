@@ -280,13 +280,20 @@ public sealed class JobViewModel : ObservableObject
         }
     }
 
-    /// <summary>始める前の状態を変える（JobQueue だけが呼ぶ）。</summary>
-    internal void SetPending(DesktopJobState state, DateTimeOffset? scheduledAt)
+    /// <summary>
+    /// 始める前の状態を変える（JobQueue だけが呼ぶ）。JobQueue のロックの中では <paramref name="notify"/> を false にして、ロックの外で
+    /// <see cref="NotifyChanged"/> を呼ぶ（変更の通知の受け手が JobQueue を読むため）。
+    /// </summary>
+    internal void SetPending(DesktopJobState state, DateTimeOffset? scheduledAt, bool notify = true)
     {
         _pending = state;
         _scheduledAt = scheduledAt;
-        Changed();
+        if (notify)
+            Changed();
     }
+
+    /// <summary>状態の変更を知らせる（<see cref="SetPending"/> で知らせなかったとき）。</summary>
+    internal void NotifyChanged() => Changed();
 
     internal void Attach(Job job)
     {
@@ -323,7 +330,16 @@ public sealed class JobViewModel : ObservableObject
         Changed();
     }
 
+    // 状態の変更の通知は、ジョブをまたいで 1 つずつ流す（JobQueue.Notify。画面のスレッドが無いテストで、2 つのジョブが同時に終わっても受け手が重ならないように）
     private void Changed()
+    {
+        if (_queue == null)
+            RaiseChanged();
+        else
+            _queue.Notify(RaiseChanged);
+    }
+
+    private void RaiseChanged()
     {
         OnPropertyChanged(nameof(State));
         OnPropertyChanged(nameof(IsRunning));

@@ -129,7 +129,8 @@ public class ExpiryWatcherTests
         var job = h.Main.Jobs.Should().ContainSingle().Subject;
         job.Title.Should().Be("期限での削除（rg / demo）");
         job.IsExpiryDeletion.Should().BeTrue();
-        h.Notifications.Shown[0].Should().Be(new AppNotice(
+        // 画面のスレッドが無いテストでは、偽の Azure がすぐ返すため、削除の終わりの通知が先に出ることがある（順は問わない）
+        h.Notifications.Shown.Should().Contain(new AppNotice(
             "利用可能期限を過ぎたため削除します",
             "demo（rg）は利用可能期限を過ぎたため、DB のデータも含めて削除します。進み具合はジョブの画面で確かめられます。", job.Id));
         await h.Main.Queue.WhenIdleAsync();
@@ -138,7 +139,7 @@ public class ExpiryWatcherTests
         h.Azure.GatewayMock.Verify(g => g.DeleteContainerAppAsync("sub", "rg", "demo-tt", It.IsAny<CancellationToken>()));
         h.Azure.GatewayMock.Verify(g => g.DeleteStorageAccountAsync("sub", "rg", FakeAzure.StorageAccountName, It.IsAny<CancellationToken>()));
         h.Azure.GatewayMock.Verify(g => g.DeleteResourceGroupAsync("sub", "rg", It.IsAny<CancellationToken>()));
-        h.Notifications.Shown[^1].Title.Should().Be("期限での削除（rg / demo）: 完了");
+        h.Notifications.Shown.Should().Contain(n => n.Title == "期限での削除（rg / demo）: 完了");
     }
 
     [Fact]

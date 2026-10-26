@@ -30,6 +30,10 @@ public sealed class JobQueue : ObservableObject, IDisposable
     private readonly SynchronizationContext? _context;
     private readonly ITimer _timer;
     private readonly Lock _lock = new();
+
+    // 変更の通知（ジョブの状態・一覧の増減）を 1 つずつ流すためのロック。受け手が _lock を取る（Summary など）ため、_lock より先に取り、
+    // _lock を持ったまま取らない（状態は _lock の中で変え、通知は _lock の外で流す）。画面のアプリでは、どれも画面のスレッドで動くため重ならない
+    private readonly object _notifyGate = new();
     private long _order;
 
     /// <param name="scheduleCheckInterval">予定の時刻を確かめる間隔</param>
@@ -101,13 +105,14 @@ public sealed class JobQueue : ObservableObject, IDisposable
         JobKind kind, JobTarget target, DateTimeOffset? scheduledAt, Func<Task<Job>> starter, bool expiryDeletion = false, SavedDeletion? saved = null, bool paused = false)
     {
         JobViewModel job;
+        lock (_notifyGate)
         lock (_lock)
         {
             if (ActiveFor(target.Subscription, target.ResourceGroup, target.AppName) is { } active)
                 throw new InvalidOperationException(ActiveMessage(active));
             job = new JobViewModel(kind, target, scheduledAt, this, starter) { Order = ++_order, IsExpiryDeletion = expiryDeletion, Saved = saved };
             if (paused)
-                job.SetPending(DesktopJobState.Paused, scheduledAt);
+                job.SetPending(DesktopJobState.Paused, scheduledAt, notify: false);
             // 終わったことを、ジョブの Finished が完了する前に知らせる（状態の変更の通知は、Finished の完了より先に呼ばれる）
             var notified = false;
             job.PropertyChanged += (_, e) =>
@@ -137,6 +142,7 @@ public sealed class JobQueue : ObservableObject, IDisposable
     /// <summary>終わったジョブを一覧から消す。</summary>
     public void ClearFinished()
     {
+        lock (_notifyGate)
         lock (_lock)
         {
             foreach (var job in Jobs.Where(j => !j.IsActive).ToList())
@@ -184,10 +190,13 @@ public sealed class JobQueue : ObservableObject, IDisposable
                 .Take(Math.Max(slots, 0))
                 .ToList();
             foreach (var job in next)
-                job.SetPending(DesktopJobState.Starting, job.ScheduledAt);
+                job.SetPending(DesktopJobState.Starting, job.ScheduledAt, notify: false);
         }
         foreach (var job in next)
+        {
+            job.NotifyChanged();
             _ = RunAsync(job, now);
+        }
     }
 
     public void Dispose() => _timer.Dispose();
@@ -220,15 +229,23 @@ public sealed class JobQueue : ObservableObject, IDisposable
     private void Change(JobViewModel job, DesktopJobState state, DateTimeOffset? scheduledAt, string what)
     {
         lock (_lock)
-            job.SetPending(state, scheduledAt);
+            job.SetPending(state, scheduledAt, notify: false);
+        job.NotifyChanged();
         _logger.LogInformation("{What}: {Title}", what, job.Title);
         Pump();
     }
 
-    private void Changed()
+    private void Changed() => Notify(() =>
     {
         OnPropertyChanged(nameof(HasActive));
         OnPropertyChanged(nameof(Summary));
+    });
+
+    /// <summary>変更の通知を、ほかの通知と重ならないように流す（<see cref="_notifyGate"/>）。</summary>
+    internal void Notify(Action raise)
+    {
+        lock (_notifyGate)
+            raise();
     }
 
     private List<JobViewModel> Snapshot()
