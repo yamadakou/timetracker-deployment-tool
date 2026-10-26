@@ -220,8 +220,8 @@ public sealed class DeploymentPlanner
         var envResource = env != null ? TargetResource.Environment(envName) : null;
         requirements.Add(new PermissionRequirement(AzurePermissions.EnvironmentRead, envResource));
         requirements.Add(new PermissionRequirement(AzurePermissions.EnvironmentJoin, envResource));
-        // 作る Environment と、本ツールで作った既存の Environment には、利用可能期限のタグを書く（タグの API。リソースへの書き込みの権限で許可される）
-        if (env == null || ManagedTags.IsManaged(env.Tags, opts.AppName))
+        // Environment は無ければ作る（利用可能期限のタグは作成の要求に含め、既存のものには書かない）
+        if (env == null)
             requirements.Add(new PermissionRequirement(AzurePermissions.EnvironmentWrite, envResource));
 
         if (storage != null)

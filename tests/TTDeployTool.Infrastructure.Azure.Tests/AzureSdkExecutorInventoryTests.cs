@@ -347,9 +347,33 @@ public class AzureSdkExecutorInventoryTests
             .Callback<WaitUntil, string, ContainerAppManagedEnvironmentData, CancellationToken>((_, _, data, _) => sent = data)
             .ReturnsAsync(op.Object);
 
-        await Sut().EnsureContainerAppEnvAsync(SubscriptionId, RgName, "app", "japaneast", Ct);
+        await Sut().EnsureContainerAppEnvAsync(SubscriptionId, RgName, "app", "japaneast", null, Ct);
 
         sent!.Tags.Should().BeEquivalentTo(ManagedTags.For("app"));
+    }
+
+    [Fact]
+    public async Task EnsureContainerAppEnv_Should_Include_Lifecycle_Tags_In_The_Create_Request()
+    {
+        // Environment はタグの変更でも数分「更新中」になるため、期限のタグは作成の要求に含める（No.60）
+        ContainerAppManagedEnvironmentData? sent = null;
+        var op = new Mock<ArmOperation<ContainerAppManagedEnvironmentResource>>();
+        op.SetupGet(o => o.Value).Returns(Env().Object);
+        _envs.Setup(c => c.GetIfExistsAsync("app-env", It.IsAny<CancellationToken>())).ReturnsAsync(NotFound<ContainerAppManagedEnvironmentResource>());
+        _envs.Setup(c => c.CreateOrUpdateAsync(WaitUntil.Completed, "app-env", It.IsAny<ContainerAppManagedEnvironmentData>(), It.IsAny<CancellationToken>()))
+            .Callback<WaitUntil, string, ContainerAppManagedEnvironmentData, CancellationToken>((_, _, data, _) => sent = data)
+            .ReturnsAsync(op.Object);
+        var lifecycle = new Dictionary<string, string>
+        {
+            [DeploymentExpiry.ExpiresAtKey] = "2026-11-30T15:00:00Z",
+            [DeploymentExpiry.DeployedAtKey] = "2026-10-26T01:00:00Z",
+        };
+
+        await Sut().EnsureContainerAppEnvAsync(SubscriptionId, RgName, "app", "japaneast", lifecycle, Ct);
+
+        sent!.Tags.Should().Contain(lifecycle).And.Contain(ManagedTags.For("app"));
+        // 作ったあとにタグの API で書き換えない
+        _arm.Verify(a => a.GetTagResource(It.IsAny<ResourceIdentifier>()), Times.Never);
     }
 
     [Fact]
@@ -394,25 +418,20 @@ public class AzureSdkExecutorInventoryTests
     }
 
     [Fact]
-    public async Task Environment_And_Storage_Tags_Should_Be_Merged_Through_The_Tags_Api()
+    public async Task Storage_Tags_Should_Be_Merged_Through_The_Tags_Api()
     {
-        var ids = new List<string>();
+        ResourceIdentifier? id = null;
         var tag = new Mock<TagResource>();
-        _arm.Setup(a => a.GetTagResource(It.IsAny<ResourceIdentifier>())).Callback<ResourceIdentifier>(i => ids.Add(i.ToString())).Returns(tag.Object);
-        var waits = new List<WaitUntil>();
-        tag.Setup(t => t.UpdateAsync(It.IsAny<WaitUntil>(), It.Is<TagResourcePatch>(p => p.PatchMode == TagPatchMode.Merge && p.TagValues["tt-expires-at"] == "none"),
+        _arm.Setup(a => a.GetTagResource(It.IsAny<ResourceIdentifier>())).Callback<ResourceIdentifier>(i => id = i).Returns(tag.Object);
+        tag.Setup(t => t.UpdateAsync(WaitUntil.Completed, It.Is<TagResourcePatch>(p => p.PatchMode == TagPatchMode.Merge && p.TagValues["tt-expires-at"] == "none"),
                 It.IsAny<CancellationToken>()))
-            .Callback<WaitUntil, TagResourcePatch, CancellationToken>((w, _, _) => waits.Add(w))
             .ReturnsAsync(Mock.Of<ArmOperation<TagResource>>());
-        var tags = new Dictionary<string, string> { [DeploymentExpiry.ExpiresAtKey] = "none" };
 
-        await Sut().UpdateEnvironmentTagsAsync(SubscriptionId, RgName, "app-env", tags, Ct);
-        await Sut().UpdateStorageAccountTagsAsync(SubscriptionId, RgName, "ttapp12345678", tags, Ct);
+        await Sut().UpdateStorageAccountTagsAsync(SubscriptionId, RgName, "ttapp12345678",
+            new Dictionary<string, string> { [DeploymentExpiry.ExpiresAtKey] = "none" }, Ct);
 
-        ids.Should().Equal(
-            $"/subscriptions/{SubscriptionId}/resourceGroups/{RgName}/providers/Microsoft.App/managedEnvironments/app-env/providers/Microsoft.Resources/tags/default",
+        id!.ToString().Should().Be(
             $"/subscriptions/{SubscriptionId}/resourceGroups/{RgName}/providers/Microsoft.Storage/storageAccounts/ttapp12345678/providers/Microsoft.Resources/tags/default");
-        // Environment は受け付けられたら戻る（完了まで待つと 2 分以上かかった）。ストレージアカウントは完了を待つ
-        waits.Should().Equal(WaitUntil.Started, WaitUntil.Completed);
+        tag.VerifyAll();
     }
 }

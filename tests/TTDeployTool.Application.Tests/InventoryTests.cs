@@ -73,12 +73,12 @@ public class DeploymentCatalogTests
     [Fact]
     public void Expiry_Should_Be_Combined_Over_Every_Resource_And_Differences_Noted()
     {
-        // 期限は遅い方、デプロイ日は新しい方。Environment・ストレージアカウントのタグも見る
+        // 期限は遅い方、デプロイ日は新しい方。ストレージアカウントのタグも見る
         var entries = DeploymentCatalog.Build(
         [
             App("demo-tt", Tags("demo", (DeploymentExpiry.ExpiresAtKey, "2026-11-01T14:59:59Z"), (DeploymentExpiry.DeployedAtKey, "2026-10-01T00:00:00Z"))),
-            Env("demo-env", Tags("demo", (DeploymentExpiry.ExpiresAtKey, "2026-11-30T14:59:59Z"), (DeploymentExpiry.DeployedAtKey, "2026-10-02T00:00:00Z"))),
-            Storage("ttdemo12345678", Tags("demo", (DeploymentExpiry.DeployedAtKey, "bad"))),
+            Storage("ttdemo12345678", Tags("demo", (DeploymentExpiry.ExpiresAtKey, "2026-11-30T14:59:59Z"), (DeploymentExpiry.DeployedAtKey, "2026-10-02T00:00:00Z"))),
+            App("demo-db", Tags("demo", (DeploymentExpiry.DeployedAtKey, "bad"))),
         ]);
 
         var e = entries.Single();
@@ -88,6 +88,19 @@ public class DeploymentCatalogTests
 
         // 残ったストレージアカウントの期限なしは、期限なし
         DeploymentCatalog.Build([Storage("ttold12345678", Tags("old", (DeploymentExpiry.ExpiresAtKey, "none")))]).Single().ExpiryKind.Should().Be(ExpiryKind.None);
+    }
+
+    [Fact]
+    public void The_Environment_Tags_Should_Be_Used_Only_When_No_App_Or_Storage_Account_Is_Left()
+    {
+        // Environment のタグは作ったときの値のまま（期限を変えても書き換えない。No.60）なので、ほかと違っても食い違いとしない
+        var env = Env("demo-env", Tags("demo", (DeploymentExpiry.ExpiresAtKey, "2026-12-31T14:59:59Z"), (DeploymentExpiry.DeployedAtKey, "2026-10-02T00:00:00Z")));
+        var withApp = DeploymentCatalog.Build([App("demo-tt", Tags("demo", (DeploymentExpiry.ExpiresAtKey, "none"))), env]).Single();
+        (withApp.ExpiryKind, withApp.DeployedAt, withApp.ExpiryDiffers).Should().Be((ExpiryKind.None, (DateTimeOffset?)null, false));
+
+        var onlyEnv = DeploymentCatalog.Build([env]).Single();
+        (onlyEnv.ExpiryKind, onlyEnv.ExpiresAt).Should().Be((ExpiryKind.Date, new DateTimeOffset(2026, 12, 31, 14, 59, 59, TimeSpan.Zero)));
+        onlyEnv.DeployedAt.Should().Be(new DateTimeOffset(2026, 10, 2, 0, 0, 0, TimeSpan.Zero));
     }
 
     [Fact]
@@ -188,8 +201,9 @@ public class DeploymentMaintenanceTests
     }
 
     [Fact]
-    public async Task ChangeExpiry_Should_Also_Rewrite_The_Managed_Environment_And_Storage_Account()
+    public async Task ChangeExpiry_Should_Also_Rewrite_The_Managed_Storage_Account_But_Not_The_Environment()
     {
+        // Environment はタグの変更でも数分「更新中」になるため書き換えない（No.60）
         var account = ResourceNaming.StorageAccount("sub", "rg", "demo");
         var written = new List<string>();
         _apps.Add(new ContainerAppInfo("demo-tt", "env", ManagedTags.For("demo")));
@@ -197,9 +211,6 @@ public class DeploymentMaintenanceTests
             .ReturnsAsync(new ManagedEnvironmentInfo("id", "demo-env", "japaneast", ManagedTags.For("demo")));
         _gateway.Setup(g => g.GetStorageAccountAsync("sub", "rg", account, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new StorageAccountInfo(account, "japaneast", ManagedTags.For("demo")));
-        _gateway.Setup(g => g.UpdateEnvironmentTagsAsync("sub", "rg", "demo-env", It.IsAny<IReadOnlyDictionary<string, string>>(), It.IsAny<CancellationToken>()))
-            .Callback<string, string, string, IReadOnlyDictionary<string, string>, CancellationToken>((_, _, n, t, _) => written.Add($"{n}={t[DeploymentExpiry.ExpiresAtKey]}"))
-            .Returns(Task.CompletedTask);
         _gateway.Setup(g => g.UpdateStorageAccountTagsAsync("sub", "rg", account, It.IsAny<IReadOnlyDictionary<string, string>>(), It.IsAny<CancellationToken>()))
             .Callback<string, string, string, IReadOnlyDictionary<string, string>, CancellationToken>((_, _, n, t, _) => written.Add($"{n}={t[DeploymentExpiry.ExpiresAtKey]}"))
             .Returns(Task.CompletedTask);
@@ -207,7 +218,7 @@ public class DeploymentMaintenanceTests
         await Sut().ChangeExpiryAsync("sub", "rg", "demo", "none", Ct);
 
         _updated.Select(u => u.Name).Should().Equal("demo-tt");
-        written.Should().Equal("demo-env=none", $"{account}=none");
+        written.Should().Equal($"{account}=none");
     }
 
     [Fact]
@@ -222,7 +233,6 @@ public class DeploymentMaintenanceTests
 
         _updated.Should().BeEmpty();
         _gateway.Verify(g => g.UpdateStorageAccountTagsAsync("sub", "rg", account, It.IsAny<IReadOnlyDictionary<string, string>>(), It.IsAny<CancellationToken>()), Times.Once);
-        _gateway.Verify(g => g.UpdateEnvironmentTagsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyDictionary<string, string>>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -253,7 +263,7 @@ public class DeploymentMaintenanceTests
     {
         var act = () => Sut().ChangeExpiryAsync("sub", "rg", "demo", "2026-12-01", Ct);
 
-        (await act.Should().ThrowAsync<InvalidOperationException>()).Which.Message.Should().Contain("本ツールで作ったリソースがありません");
+        (await act.Should().ThrowAsync<InvalidOperationException>()).Which.Message.Should().Contain("本ツールで作った Container App とストレージアカウントがありません");
         _updated.Should().BeEmpty();
     }
 

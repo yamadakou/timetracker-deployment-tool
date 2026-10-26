@@ -26,7 +26,7 @@ public class DeploymentRunnerTests
         var env = new Mock<ContainerAppManagedEnvironmentResource>().Object;
         gateway.Setup(g => g.EnsureResourceGroupAsync("sub", "rg", "japaneast", It.IsAny<CancellationToken>()))
             .Callback(() => calls.Add("rg")).Returns(Task.CompletedTask);
-        gateway.Setup(g => g.EnsureContainerAppEnvAsync("sub", "rg", "demo", "japaneast", It.IsAny<CancellationToken>()))
+        gateway.Setup(g => g.EnsureContainerAppEnvAsync("sub", "rg", "demo", "japaneast", It.IsAny<IReadOnlyDictionary<string, string>?>(), It.IsAny<CancellationToken>()))
             .Callback(() => calls.Add("env")).ReturnsAsync(env);
         gateway.Setup(g => g.CreateOrUpdateContainerAppAsync("sub", "rg", "demo", "japaneast", It.IsAny<DeployOptions>(), env, It.IsAny<CancellationToken>()))
             .Callback(() => calls.Add("apps"))
@@ -147,7 +147,7 @@ public class DeploymentRunnerTests
         await new DeploymentRunner(gateway.Object).RunAsync(Options(), cancellationToken: cts.Token);
 
         gateway.Verify(g => g.EnsureResourceGroupAsync("sub", "rg", "japaneast", cts.Token));
-        gateway.Verify(g => g.EnsureContainerAppEnvAsync("sub", "rg", "demo", "japaneast", cts.Token));
+        gateway.Verify(g => g.EnsureContainerAppEnvAsync("sub", "rg", "demo", "japaneast", It.IsAny<IReadOnlyDictionary<string, string>?>(), cts.Token));
         gateway.Verify(g => g.CreateOrUpdateContainerAppAsync("sub", "rg", "demo", "japaneast", It.IsAny<DeployOptions>(),
             It.IsAny<ContainerAppManagedEnvironmentResource>(), cts.Token));
     }

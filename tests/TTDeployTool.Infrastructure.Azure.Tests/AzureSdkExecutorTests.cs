@@ -104,7 +104,7 @@ public class AzureSdkExecutorTests
         envs.Setup(c => c.GetIfExistsAsync("app-env", It.IsAny<CancellationToken>())).ReturnsAsync(Found(ExistingEnvironment("eastus").Object));
 
         var sut = new AzureSdkExecutor(new SimpleLogger(false), arm.Object);
-        var act = () => sut.EnsureContainerAppEnvAsync(SubscriptionId, RgName, "app", "japaneast", TestContext.Current.CancellationToken);
+        var act = () => sut.EnsureContainerAppEnvAsync(SubscriptionId, RgName, "app", "japaneast", null, TestContext.Current.CancellationToken);
 
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*app-env*eastus*japaneast*");
     }
@@ -117,7 +117,7 @@ public class AzureSdkExecutorTests
         envs.Setup(c => c.GetIfExistsAsync("app-env", It.IsAny<CancellationToken>())).ReturnsAsync(Found(existing.Object));
 
         var sut = new AzureSdkExecutor(new SimpleLogger(false), arm.Object);
-        var result = await sut.EnsureContainerAppEnvAsync(SubscriptionId, RgName, "app", "JapanEast", TestContext.Current.CancellationToken);
+        var result = await sut.EnsureContainerAppEnvAsync(SubscriptionId, RgName, "app", "JapanEast", null, TestContext.Current.CancellationToken);
 
         result.Should().BeSameAs(existing.Object);
         envs.Verify(c => c.CreateOrUpdateAsync(It.IsAny<WaitUntil>(), It.IsAny<string>(), It.IsAny<ContainerAppManagedEnvironmentData>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -135,7 +135,7 @@ public class AzureSdkExecutorTests
             .ReturnsAsync(op.Object);
 
         var sut = new AzureSdkExecutor(new SimpleLogger(false), arm.Object);
-        var result = await sut.EnsureContainerAppEnvAsync(SubscriptionId, RgName, "app", "japaneast", TestContext.Current.CancellationToken);
+        var result = await sut.EnsureContainerAppEnvAsync(SubscriptionId, RgName, "app", "japaneast", null, TestContext.Current.CancellationToken);
 
         result.Should().BeSameAs(created.Object);
     }

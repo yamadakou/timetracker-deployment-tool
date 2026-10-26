@@ -19,7 +19,6 @@ public class ReportingGateway : DispatchProxy
         [nameof(IAzureDeploymentGateway.ListContainerAppDetailsAsync)] = "Container Apps の状態を読んでいます",
         [nameof(IAzureDeploymentGateway.GetContainerAppSecretsAsync)] = "パスワード（Container App のシークレット）を読んでいます",
         [nameof(IAzureDeploymentGateway.UpdateContainerAppTagsAsync)] = "利用可能期限（タグ）を書き換えています",
-        [nameof(IAzureDeploymentGateway.UpdateEnvironmentTagsAsync)] = "利用可能期限（タグ）を書き換えています",
         [nameof(IAzureDeploymentGateway.UpdateStorageAccountTagsAsync)] = "利用可能期限（タグ）を書き換えています",
         [nameof(IAzureDeploymentGateway.GetStorageAccountAsync)] = "ストレージアカウントを確認しています",
         [nameof(IAzureDeploymentGateway.IsStorageAccountNameAvailableAsync)] = "ストレージアカウントの名前を確認しています",

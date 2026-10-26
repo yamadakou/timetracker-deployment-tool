@@ -167,7 +167,7 @@ public sealed class CliApplicationTests : IDisposable
     {
         var gateway = new Mock<IAzureDeploymentGateway>();
         var env = new Mock<ContainerAppManagedEnvironmentResource>().Object;
-        gateway.Setup(g => g.EnsureContainerAppEnvAsync("sub", "rg", "myapp", "japaneast", It.IsAny<CancellationToken>()))
+        gateway.Setup(g => g.EnsureContainerAppEnvAsync("sub", "rg", "myapp", "japaneast", It.IsAny<IReadOnlyDictionary<string, string>?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(env);
         gateway.Setup(g => g.CreateOrUpdateContainerAppAsync("sub", "rg", "myapp", "japaneast", It.IsAny<DeployOptions>(), env, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ContainerAppsDeployment("myapp-tt", "myapp-db", "myapp-redis", null));
@@ -212,7 +212,7 @@ public sealed class CliApplicationTests : IDisposable
         var gateway = new Mock<IAzureDeploymentGateway>();
         var env = new Mock<ContainerAppManagedEnvironmentResource>().Object;
         var deployed = new List<DeployOptions>();
-        gateway.Setup(g => g.EnsureContainerAppEnvAsync("sub", "rg", "timetracker", "japaneast", It.IsAny<CancellationToken>())).ReturnsAsync(env);
+        gateway.Setup(g => g.EnsureContainerAppEnvAsync("sub", "rg", "timetracker", "japaneast", It.IsAny<IReadOnlyDictionary<string, string>?>(), It.IsAny<CancellationToken>())).ReturnsAsync(env);
         gateway.Setup(g => g.CreateOrUpdateContainerAppAsync("sub", "rg", "timetracker", "japaneast", Capture.In(deployed), env, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ContainerAppsDeployment("timetracker-tt", "timetracker-db", "timetracker-redis", null));
         return (gateway, deployed);
@@ -281,7 +281,7 @@ public sealed class CliApplicationTests : IDisposable
     {
         var gateway = new Mock<IAzureDeploymentGateway>();
         var env = new Mock<ContainerAppManagedEnvironmentResource>().Object;
-        gateway.Setup(g => g.EnsureContainerAppEnvAsync("sub", "rg", "timetracker", "japaneast", It.IsAny<CancellationToken>())).ReturnsAsync(env);
+        gateway.Setup(g => g.EnsureContainerAppEnvAsync("sub", "rg", "timetracker", "japaneast", It.IsAny<IReadOnlyDictionary<string, string>?>(), It.IsAny<CancellationToken>())).ReturnsAsync(env);
         gateway.Setup(g => g.CreateOrUpdateContainerAppAsync("sub", "rg", "timetracker", "japaneast", It.IsAny<DeployOptions>(), env, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ContainerAppsDeployment("timetracker-tt", "timetracker-db", "timetracker-redis", null));
 

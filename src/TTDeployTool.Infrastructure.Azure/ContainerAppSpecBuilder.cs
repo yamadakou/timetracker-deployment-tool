@@ -44,7 +44,8 @@ public static class ContainerAppSpecBuilder
     };
 
     // Container Apps Environment（VNet 設定は必要に応じて追加。例: InfrastructureSubnetId）
-    public static ContainerAppManagedEnvironmentData BuildManagedEnvironment(string location, string appName)
+    public static ContainerAppManagedEnvironmentData BuildManagedEnvironment(
+        string location, string appName, IReadOnlyDictionary<string, string>? lifecycleTags = null)
     {
         var data = new ContainerAppManagedEnvironmentData(location)
         {
@@ -53,6 +54,10 @@ public static class ContainerAppSpecBuilder
             IsZoneRedundant = false,
         };
         foreach (var (key, value) in ManagedTags.For(appName))
+        {
+            data.Tags[key] = value;
+        }
+        foreach (var (key, value) in lifecycleTags ?? new Dictionary<string, string>())
         {
             data.Tags[key] = value;
         }

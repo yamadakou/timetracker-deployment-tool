@@ -95,8 +95,11 @@ public static class DeploymentCatalog
         var env = Find(ManagedResourceRecord.EnvironmentType, ResourceNaming.Environment(appName));
         var storage = Find(ManagedResourceRecord.StorageAccountType);
         var first = records[0];
-        // 期限とデプロイ日は、本ツールで作るリソースのタグ（期限は、期限なしが 1 つでもあれば期限なし、ほかは最も遅いもの。デプロイ日は最も新しいもの）
-        var resources = new[] { tt, db, redis, env, storage }.OfType<ManagedResourceRecord>().ToList();
+        // 期限とデプロイ日は、本ツールで作るリソースのタグ（期限は、期限なしが 1 つでもあれば期限なし、ほかは最も遅いもの。デプロイ日は最も新しいもの）。
+        // Environment のタグは作ったときの値のまま（docs/design/desktop-jobs.md の 6.1）なので、Container App もストレージアカウントも無いときだけ使う
+        var resources = new[] { tt, db, redis, storage }.OfType<ManagedResourceRecord>().ToList();
+        if (resources.Count == 0 && env != null)
+            resources.Add(env);
         var expiresTags = resources.Select(r => r.Tags.GetValueOrDefault(DeploymentExpiry.ExpiresAtKey)).ToList();
         var expiresTag = DeploymentExpiry.Combine(expiresTags);
         var deployedTag = resources.Select(r => DeploymentExpiry.TryParseTag(r.Tags.GetValueOrDefault(DeploymentExpiry.DeployedAtKey), out var at) ? at : (DateTimeOffset?)null)

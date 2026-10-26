@@ -13,9 +13,13 @@ public interface IAzureDeploymentGateway
     /// <summary>リソースグループが無ければ作成する（既存なら変更しない）。作成した場合は、本ツールが作ったことを示すタグを付ける。</summary>
     Task EnsureResourceGroupAsync(string subscriptionId, string rgName, string location, CancellationToken cancellationToken = default);
 
-    /// <summary>アプリ名に対応する Container Apps Environment が無ければ作成する（既存なら変更しない）。</summary>
+    /// <summary>
+    /// アプリ名に対応する Container Apps Environment が無ければ作成する（既存なら変更しない）。作成する場合は <paramref name="lifecycleTags"/>
+    /// （利用可能期限・デプロイした時刻）もタグに含める（Environment はタグの変更でも数分「更新中」になるため、作った後には書き換えない）。
+    /// </summary>
     Task<ContainerAppManagedEnvironmentResource> EnsureContainerAppEnvAsync(
-        string subscriptionId, string rgName, string appName, string location, CancellationToken cancellationToken = default);
+        string subscriptionId, string rgName, string appName, string location, IReadOnlyDictionary<string, string>? lifecycleTags,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// DB のデータを置くストレージ（ストレージアカウント・ファイル共有）が無ければ作成し、Environment にストレージとして登録する
@@ -61,10 +65,6 @@ public interface IAzureDeploymentGateway
     /// </summary>
     Task UpdateContainerAppTagsAsync(
         string subscriptionId, string rgName, string name, IReadOnlyDictionary<string, string> tags, CancellationToken cancellationToken = default);
-
-    /// <summary>Container Apps Environment のタグに <paramref name="tags"/> を加える・上書きする（タグの API の Merge。設定とほかのタグは変えない）。</summary>
-    Task UpdateEnvironmentTagsAsync(
-        string subscriptionId, string rgName, string envName, IReadOnlyDictionary<string, string> tags, CancellationToken cancellationToken = default);
 
     /// <summary>ストレージアカウントのタグに <paramref name="tags"/> を加える・上書きする（タグの API の Merge。設定とほかのタグは変えない）。</summary>
     Task UpdateStorageAccountTagsAsync(

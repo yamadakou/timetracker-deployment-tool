@@ -169,16 +169,16 @@ public class DeploymentPlannerTests
     }
 
     [Fact]
-    public async Task Should_Require_Writing_The_Expiry_Tag_On_The_Managed_Environment()
+    public async Task Should_Not_Require_Environment_Write_For_The_Managed_Environment()
     {
-        // 本ツールで作った既存の Environment には、利用可能期限のタグを書くため、書き込みの権限が要る（Environment での権限でもよい）
+        // 利用可能期限のタグは Environment を作るときだけ書き、既存のものには書かない（No.60）
         ResourceGroupExists();
         _gateway.Setup(g => g.GetEnvironmentAsync("sub", "rg", "demo-env", It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ManagedEnvironmentInfo("id", "demo-env", "japaneast", ManagedTags.For("demo")));
 
         var result = await new DeploymentPlanner(_gateway.Object).CheckPermissionsAsync(Opts, Ct);
 
-        result.MissingActions.Should().Equal(AzurePermissions.ContainerAppWrite, AzurePermissions.EnvironmentJoin, AzurePermissions.EnvironmentWrite);
+        result.MissingActions.Should().Equal(AzurePermissions.ContainerAppWrite, AzurePermissions.EnvironmentJoin);
     }
 
     [Fact]

@@ -456,7 +456,7 @@ public class DeploymentListViewModelTests
     [Fact]
     public async Task Disagreeing_Expiry_Tags_Should_Be_Warned_Until_They_Are_Aligned()
     {
-        var records = Deployment("sub", "rg", "demo", "2026-11-23T14:59:59Z").Select(r => r.Name == "demo-env"
+        var records = Deployment("sub", "rg", "demo", "2026-11-23T14:59:59Z").Select(r => r.Name == "demo-db"
             ? r with { Tags = Tags("demo", "2026-11-01T14:59:59Z") }
             : r).ToList();
         var h = await LoadedAsync(records);
@@ -491,7 +491,7 @@ public class DeploymentListViewModelTests
 
         row.EditExpiryDate = new DateTimeOffset(2026, 12, 1, 0, 0, 0, TimeSpan.FromHours(9));
         await row.ChangeExpiryCommand.ExecuteAsync();
-        row.Error.Should().Contain("本ツールで作ったリソースがありません");
+        row.Error.Should().Contain("本ツールで作った Container App とストレージアカウントがありません");
 
         h.Azure.Deployed();
         h.Azure.GatewayMock.Setup(g => g.UpdateContainerAppTagsAsync("sub", "rg", It.IsAny<string>(), It.IsAny<IReadOnlyDictionary<string, string>>(), It.IsAny<CancellationToken>()))

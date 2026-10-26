@@ -81,7 +81,7 @@ public sealed class DeploymentJobToolsTests
 
     private void DeploymentSucceeds(string? url = "https://demo-tt.example.io")
     {
-        _gateway.Setup(g => g.EnsureContainerAppEnvAsync("sub", "rg", "demo", "japaneast", It.IsAny<CancellationToken>()))
+        _gateway.Setup(g => g.EnsureContainerAppEnvAsync("sub", "rg", "demo", "japaneast", It.IsAny<IReadOnlyDictionary<string, string>?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Mock.Of<ContainerAppManagedEnvironmentResource>());
         _gateway.Setup(g => g.CreateOrUpdateContainerAppAsync("sub", "rg", "demo", "japaneast", It.IsAny<DeployOptions>(),
                 It.IsAny<ContainerAppManagedEnvironmentResource>(), It.IsAny<CancellationToken>()))
