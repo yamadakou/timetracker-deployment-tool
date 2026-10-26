@@ -56,6 +56,7 @@ Add-AppxPackage -Path .\x64\TTDeployTool-<版>-x64.msix -DependencyPath (Get-Chi
 | 「開発者モード」や「サイドロード」を求められる | 設定 → システム → 開発者向け（Windows 10 は 更新とセキュリティ → 開発者向け）で有効にしてください |
 | 会社のポリシーで禁止されている | PC の管理者に、ストア以外のアプリの導入（サイドロード）の可否を相談してください |
 | より新しい版が既に入っている | 古い版は上書きできません。下の「アンインストール」の後に導入してください |
+| 「パッケージ化されていないバージョンを既にインストールしています」（0x80073CFB） | Visual Studio などで開発用にビルドしたアプリ（同じ名前の TTDeployTool）が入っています。PowerShell で `Get-AppxPackage -Name TTDeployTool \| Remove-AppxPackage` を実行して削除してから、もう一度導入してください（開発用のアプリの設定とテンプレートも消えます。残したい場合は、先に `%LOCALAPPDATA%\Packages\TTDeployTool_tgmy1a6xvgpyy\LocalState` を別の場所にコピーし、評価版を導入して一度起動して閉じた後に、同じ場所へ戻します） |
 
 ## 3. 更新する
 
