@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.Extensions.Logging;
 using TTDeployTool.Application.Inventory;
 using TTDeployTool.Controller.Desktop.Core.Mvvm;
+using TTDeployTool.Controller.Desktop.Core.Jobs;
 using TTDeployTool.Domain.Deployment;
 
 namespace TTDeployTool.Controller.Desktop.Core.ViewModels;
@@ -23,6 +24,8 @@ public enum ExpiryLevel
 /// <summary>
 /// デプロイの一覧の 1 行。パスワードは「パスワードを表示」を押したときだけ Azure から読み、この行にだけ置く（PC には保存しない）。
 /// 一覧を読み直す・ページを変える・サインアウトすると、行ごと消える。
+/// 同じ対象の終わっていないジョブ（実行中・待機中・予定・一時停止）があれば、それを表示し、Azure を変える操作（対象に入れる・削除・期限の変更）を止める
+/// （docs/design/desktop-jobs.md の 6.4。開く・状態の確認・パスワードの表示はできる）。
 /// </summary>
 public sealed class DeploymentRowViewModel : ObservableObject
 {
@@ -36,6 +39,7 @@ public sealed class DeploymentRowViewModel : ObservableObject
     private string? _message;
     private bool _editNoExpiry;
     private DateTimeOffset _editExpiryDate;
+    private JobViewModel? _activeJob;
 
     internal DeploymentRowViewModel(DeploymentEntry entry, DeploymentListViewModel owner)
     {
@@ -48,9 +52,10 @@ public sealed class DeploymentRowViewModel : ObservableObject
             _owner.Open(Url!);
             return Task.CompletedTask;
         }, () => Url != null);
-        UseAsTargetCommand = new AsyncCommand(() => _owner.UseAsTargetAsync(_entry, "wizard"));
+        UseAsTargetCommand = new AsyncCommand(() => _owner.UseAsTargetAsync(_entry, "wizard"), () => !HasActiveJob);
         CheckStatusCommand = new AsyncCommand(() => _owner.UseAsTargetAsync(_entry, "status"));
-        DeleteCommand = new AsyncCommand(() => _owner.UseAsTargetAsync(_entry, "delete"));
+        DeleteCommand = new AsyncCommand(() => _owner.UseAsTargetAsync(_entry, "delete"), () => !HasActiveJob);
+        ShowJobsCommand = new AsyncCommand(() => _owner.ShowJobsAsync(), () => HasActiveJob);
         ShowPasswordsCommand = new AsyncCommand(() => Busy.RunAsync("パスワードを読んでいます", ReadPasswordsAsync), () => _entry.Timetracker != null);
         TogglePasswordsCommand = new AsyncCommand(() =>
         {
@@ -61,7 +66,7 @@ public sealed class DeploymentRowViewModel : ObservableObject
         CopyTrackerPasswordCommand = new AsyncCommand(
             () => CopyAsync(_passwords?.TrackerPassword, "Timetracker のパスワード"), () => _owner.CanCopy && _passwords?.TrackerPassword != null);
         ChangeExpiryCommand = new AsyncCommand(() => Busy.RunAsync("利用可能期限を変えています", ChangeExpiryAsync),
-            () => _entry.Timetracker != null || _entry.Db != null || _entry.Redis != null);
+            () => !HasActiveJob && (_entry.Timetracker != null || _entry.Db != null || _entry.Redis != null));
     }
 
     public AsyncCommand OpenCommand { get; }
@@ -74,6 +79,9 @@ public sealed class DeploymentRowViewModel : ObservableObject
 
     /// <summary>対象に入れて、削除の画面を開き、計画を作る（アプリ名の入力 → 実行は、削除の画面で行う）。</summary>
     public AsyncCommand DeleteCommand { get; }
+
+    /// <summary>ジョブの画面を開く（同じ対象の終わっていないジョブがあるとき）。</summary>
+    public AsyncCommand ShowJobsCommand { get; }
 
     public AsyncCommand ShowPasswordsCommand { get; }
 
@@ -120,6 +128,13 @@ public sealed class DeploymentRowViewModel : ObservableObject
         : null;
 
     public bool HasExpiryWarning => ExpiryWarning != null;
+
+    /// <summary>同じ対象の終わっていないジョブ（無ければ null）。</summary>
+    public string? JobText => _activeJob is { } job
+        ? $"{(job.IsDeployment ? "デプロイ" : "削除")}のジョブがあります（{job.StatusText}）。終わるまで、対象に入れる・削除・期限の変更はできません。"
+        : null;
+
+    public bool HasActiveJob => _activeJob != null;
 
     /// <summary>期限の近さ（画面の色）。</summary>
     public ExpiryLevel Level => _entry is { ExpiryKind: ExpiryKind.Date, ExpiresAt: { } at }
@@ -211,6 +226,21 @@ public sealed class DeploymentRowViewModel : ObservableObject
         OpenCommand.RaiseCanExecuteChanged();
         ShowPasswordsCommand.RaiseCanExecuteChanged();
         ChangeExpiryCommand.RaiseCanExecuteChanged();
+    }
+
+    /// <summary>同じ対象の終わっていないジョブを入れる（ジョブの状態が変わるたびに、一覧が呼ぶ）。</summary>
+    internal void SetActiveJob(JobViewModel? job)
+    {
+        var text = JobText;
+        _activeJob = job;
+        if (text == JobText)
+            return;
+        OnPropertyChanged(nameof(JobText));
+        OnPropertyChanged(nameof(HasActiveJob));
+        UseAsTargetCommand.RaiseCanExecuteChanged();
+        DeleteCommand.RaiseCanExecuteChanged();
+        ChangeExpiryCommand.RaiseCanExecuteChanged();
+        ShowJobsCommand.RaiseCanExecuteChanged();
     }
 
     private DateTimeOffset Local(DateTimeOffset value) => TimeZoneInfo.ConvertTime(value, _owner.Time.LocalTimeZone);

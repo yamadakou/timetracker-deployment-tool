@@ -30,7 +30,7 @@ public class ExpirySettingsTests
         vm.IsExpiryDate.Should().BeFalse();
         vm.ExpiryDate.Should().Be(new DateTimeOffset(2026, 11, 23, 0, 0, 0, TimeSpan.FromHours(9)));
         vm.ExpiryNotice.Should().StartWith("既定では、新しくデプロイする場合は 2026-11-23（今日から 32 日後）、再デプロイは今の期限を引き継ぎます。")
-            .And.EndWith("期限を過ぎると、このアプリが自動で削除します（DB のデータも消えます）。");
+            .And.EndWith("期限を過ぎると、このアプリが自動で削除します（次の版から。DB のデータも消えます）。");
         vm.Build(ValidationTarget.Azure).Options!.ExpiresOn.Should().BeNull();
         SettingsViewModel.ExpiryOptions.Select(o => o.Mode).Should().Equal(ExpiryMode.Default, ExpiryMode.Date, ExpiryMode.None);
     }
@@ -112,7 +112,7 @@ public class ExpiryDeploymentTests
         await vm.PlanCommand.ExecuteAsync();
 
         changes.Names.Should().Contain(nameof(DeploymentViewModel.ExpiryText));
-        vm.ExpiryText.Should().Be("利用可能期限: 2026-11-23（既定: 今日から 32 日後）。期限の後に自動で削除します（DB のデータも消えます）。");
+        vm.ExpiryText.Should().Be("利用可能期限: 2026-11-23（既定: 今日から 32 日後）。期限の後に自動で削除します（次の版から。DB のデータも消えます）。");
 
         DeployOptions? deployed = null;
         h.Azure.GatewayMock.Setup(g => g.CreateOrUpdateContainerAppAsync("sub", "rg", "demo", "japaneast", It.IsAny<DeployOptions>(),

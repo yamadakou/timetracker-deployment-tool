@@ -80,6 +80,7 @@ public sealed class DeploymentListViewModel : ObservableObject
     ];
 
     private readonly TargetViewModel _target;
+    private readonly JobQueue _queue;
     private readonly IDeploymentLogger _deploymentLogger;
     private readonly ILogger _logger;
     private readonly ISystemLauncher _launcher;
@@ -108,7 +109,7 @@ public sealed class DeploymentListViewModel : ObservableObject
     /// <summary>サブスクリプションの絞り込みの「すべて」。</summary>
     public static readonly SubscriptionFilterOption AllSubscriptions = new(null, "すべてのサブスクリプション");
 
-    /// <param name="open">対象に入れた後に、画面を開く（ウィザード・実行状況・削除の名前: wizard・status・delete）</param>
+    /// <param name="open">画面を開く（ウィザード・実行状況・削除・ジョブの名前: wizard・status・delete・jobs。jobs 以外は対象に入れた後）</param>
     public DeploymentListViewModel(
         TargetViewModel target, JobQueue queue, IDeploymentLogger deploymentLogger, ILogger logger, TimeProvider time,
         ISystemLauncher launcher, IClipboardService? clipboard, Func<string, Task> open)
@@ -126,7 +127,14 @@ public sealed class DeploymentListViewModel : ObservableObject
         LoadCommand = new AsyncCommand(() => Busy.RunAsync("デプロイの一覧を読んでいます", LoadAsync));
         PreviousPageCommand = new AsyncCommand(() => GoTo(_pageIndex - 1), () => _pageIndex > 0);
         NextPageCommand = new AsyncCommand(() => GoTo(_pageIndex + 1), () => _pageIndex < PageCount - 1);
+        _queue = queue;
         queue.Finished += OnJobFinished;
+        // ジョブの登録・状態の変更で、行のジョブの表示を変える
+        queue.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(JobQueue.Summary))
+                ShowJobs();
+        };
     }
 
     internal TimeProvider Time { get; }
@@ -239,6 +247,9 @@ public sealed class DeploymentListViewModel : ObservableObject
     internal void Copy(string text) => _clipboard!.CopyText(text);
 
     /// <summary>行の操作: 対象に入れて、画面を開く（<paramref name="page"/> は wizard・status・delete）。</summary>
+    /// <summary>ジョブの画面を開く。</summary>
+    internal Task ShowJobsAsync() => _open("jobs");
+
     internal async Task UseAsTargetAsync(DeploymentEntry entry, string page)
     {
         if (!_target.Select(entry.SubscriptionId, entry.ResourceGroup, entry.AppName))
@@ -478,6 +489,7 @@ public sealed class DeploymentListViewModel : ObservableObject
                 row.Update(entry);
             Rows.Add(row);
         }
+        ShowJobs();
         OnPropertyChanged(nameof(TotalCount));
         OnPropertyChanged(nameof(FilteredCount));
         OnPropertyChanged(nameof(PageCount));
@@ -485,6 +497,13 @@ public sealed class DeploymentListViewModel : ObservableObject
         OnPropertyChanged(nameof(PageText));
         PreviousPageCommand.RaiseCanExecuteChanged();
         NextPageCommand.RaiseCanExecuteChanged();
+    }
+
+    // 今のページの行に、同じ対象の終わっていないジョブを入れる
+    private void ShowJobs()
+    {
+        foreach (var row in Rows)
+            row.SetActiveJob(_queue.ActiveFor(row.Entry.SubscriptionId, row.Entry.ResourceGroup, row.AppName));
     }
 
     private void SetFilter<T>(ref T field, T value, [System.Runtime.CompilerServices.CallerMemberName] string propertyName = "", string? dependent = null)

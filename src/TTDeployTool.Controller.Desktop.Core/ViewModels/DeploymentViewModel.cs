@@ -95,7 +95,7 @@ public sealed class DeploymentViewModel : ObservableObject
     {
         null => null,
         { ExpiresAt: null } e => $"利用可能期限: {e.Describe(_time.LocalTimeZone)}",
-        { } e => $"利用可能期限: {e.Describe(_time.LocalTimeZone)}。期限の後に自動で削除します（DB のデータも消えます）。",
+        { } e => $"利用可能期限: {e.Describe(_time.LocalTimeZone)}。期限の後に自動で削除します（次の版から。DB のデータも消えます）。",
     };
 
     public bool RequiresDataLossAck => _ticket?.Plan.RequiresDataLossAck == true;

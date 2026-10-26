@@ -2,6 +2,7 @@ using Azure;
 using FluentAssertions;
 using Moq;
 using TTDeployTool.Application.Inventory;
+using TTDeployTool.Application.Jobs;
 using TTDeployTool.Controller.Desktop.Core.ViewModels;
 using TTDeployTool.Domain.Deployment;
 using TTDeployTool.Infrastructure.Azure;
@@ -499,6 +500,59 @@ public class DeploymentListViewModelTests
         await row.ChangeExpiryCommand.ExecuteAsync();
         row.Error.Should().StartWith("Azure がエラーを返しました（403");
         row.ExpiryText.Should().Be("期限なし");
+    }
+
+    [Fact]
+    public async Task A_Row_Should_Show_The_Unfinished_Job_Of_The_Same_Target_And_Stop_Changing_It()
+    {
+        // 「今すぐ削除」の後に一覧に戻ると、削除の途中と分からず操作できた（オーナーの実機、2026-10-26。No.61）
+        var h = await LoadedAsync(Deployment("sub", "rg", "demo", "2026-11-23T14:59:59Z"), Deployment("sub", "rg", "other"));
+        DeploymentRowViewModel Row(string app) => h.Main.Deployments.Rows.Single(r => r.AppName == app);
+        Row("demo").HasActiveJob.Should().BeFalse();
+        Row("demo").JobText.Should().BeNull();
+        Row("demo").ShowJobsCommand.CanExecute(null).Should().BeFalse();
+
+        var start = new TaskCompletionSource<Job>();
+        h.Main.Queue.Register(JobKind.Delete, new JobTarget("sub", "RG", "demo"), null, () => start.Task);
+
+        var row = Row("demo");
+        row.HasActiveJob.Should().BeTrue();
+        row.JobText.Should().Be("削除のジョブがあります（実行の準備中）。終わるまで、対象に入れる・削除・期限の変更はできません。");
+        new[] { row.UseAsTargetCommand, row.DeleteCommand, row.ChangeExpiryCommand }.Should().AllSatisfy(c => c.CanExecute(null).Should().BeFalse());
+        new[] { row.OpenCommand, row.CheckStatusCommand, row.ShowPasswordsCommand, row.ShowJobsCommand }.Should().AllSatisfy(c => c.CanExecute(null).Should().BeTrue());
+        Row("other").HasActiveJob.Should().BeFalse("ほかの対象の行は操作できる");
+        Row("other").DeleteCommand.CanExecute(null).Should().BeTrue();
+
+        await row.ShowJobsCommand.ExecuteAsync();
+        h.Navigations.Should().EndWith("jobs");
+
+        // 読み直しても表示する
+        await h.Main.Deployments.LoadCommand.ExecuteAsync();
+        Row("demo").HasActiveJob.Should().BeTrue();
+
+        // ジョブが終わると戻る
+        start.SetException(new InvalidOperationException("始められませんでした"));
+        await h.Main.Queue.WhenIdleAsync();
+        Row("demo").HasActiveJob.Should().BeFalse();
+        Row("demo").JobText.Should().BeNull();
+        Row("demo").DeleteCommand.CanExecute(null).Should().BeTrue();
+        Row("demo").ChangeExpiryCommand.CanExecute(null).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task A_Scheduled_Deployment_Should_Be_Shown_On_Its_Row_Until_Canceled()
+    {
+        var h = await LoadedAsync(Deployment("sub", "rg", "demo"));
+        var job = h.Main.Queue.Register(JobKind.Deploy, new JobTarget("sub", "rg", "demo"), _time.GetUtcNow().AddHours(1), () => new TaskCompletionSource<Job>().Task);
+
+        var row = h.Main.Deployments.Rows.Single();
+        row.JobText.Should().StartWith("デプロイのジョブがあります（予定（");
+        row.UseAsTargetCommand.CanExecute(null).Should().BeFalse();
+
+        await job.CancelCommand.ExecuteAsync();
+
+        row.HasActiveJob.Should().BeFalse();
+        row.UseAsTargetCommand.CanExecute(null).Should().BeTrue();
     }
 
     [Fact]
