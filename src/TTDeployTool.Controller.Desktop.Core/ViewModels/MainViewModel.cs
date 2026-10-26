@@ -76,7 +76,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             if (signedIn)
             {
                 await Target.LoadAsync();
-                // サインインできたら、利用可能期限を確かめ、その後 30 分ごとに確かめる（docs/design/desktop-jobs.md の 6.5）
+                // サインインできたら、利用可能期限を確かめ、その後は最も近い期限の時刻か 6 時間ごとに確かめる（docs/design/desktop-jobs.md の 6.5、D21）
                 await Expiry.StartAsync();
             }
             else

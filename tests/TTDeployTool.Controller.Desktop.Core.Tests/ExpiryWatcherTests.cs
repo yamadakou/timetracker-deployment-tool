@@ -64,9 +64,12 @@ public class ExpiryWatcherTests
         h.Azure.RecordsByTenant["t1"] = Listed("demo", DeploymentExpiry.FormatTag(_time.GetUtcNow().AddHours(-1)));
 
         await h.Main.Expiry.CheckAsync();
+        // 一覧が変わっても、始めるまでは次の確認を決めない
+        h.Main.Deployments.ResourceGroupFilter = "rg";
 
         h.Azure.DirectoryQueries.Should().BeEmpty();
         h.Main.Jobs.Should().BeEmpty();
+        h.Main.Expiry.NextCheckAt.Should().BeNull();
     }
 
     [Fact]
@@ -249,33 +252,94 @@ public class ExpiryWatcherTests
         h.Main.Jobs.Should().BeEmpty();
     }
 
-    [Fact]
-    public async Task The_Check_Should_Repeat_Every_Thirty_Minutes_On_The_Context_It_Was_Created_On()
+    // 時計を進められる環境で、サインインまで済ませる（タイマーの投稿は、作ったときの SynchronizationContext に送る）
+    private static async Task<(Harness H, FakeTimeProvider Time)> WithTimerAsync(Func<DateTimeOffset, List<ManagedResourceRecord>> listed)
     {
         var time = new FakeTimeProvider(new DateTimeOffset(2026, 10, 21, 20, 0, 0, TimeSpan.Zero));
+        var h = new Harness(time: time);
+        h.Azure.RecordsByTenant["t1"] = listed(time.GetUtcNow());
+        await h.ReadyAsync();
+        return (h, time);
+    }
+
+    [Fact]
+    public async Task The_Next_Check_Should_Be_At_The_Nearest_Expiry_And_Post_To_The_Context()
+    {
+        // 次の確認は、最も近い時刻（ここでは期限）。3 日前・前日は過ぎている（D21）
         var context = new CountingContext();
         var previous = SynchronizationContext.Current;
         SynchronizationContext.SetSynchronizationContext(context);
         try
         {
-            var h = new Harness(time: time);
-            await h.ReadyAsync();
-            // サインインしたときの 1 回
+            var (h, time) = await WithTimerAsync(now => Listed("demo", DeploymentExpiry.FormatTag(now.AddHours(2))));
+            var start = time.GetUtcNow();
             h.Azure.DirectoryQueries.Should().HaveCount(1);
+            h.Main.Expiry.NextCheckAt.Should().Be(start.AddHours(2) + ExpiryWatcher.Margin);
             await h.Main.Expiry.StartAsync();
             h.Azure.DirectoryQueries.Should().HaveCount(2, "もう一度始めても、タイマーは増やさない");
 
-            time.Advance(ExpiryWatcher.CheckInterval);
+            time.Advance(TimeSpan.FromHours(2));
+            h.Azure.DirectoryQueries.Should().HaveCount(2, "期限の時刻の少し後に確かめる");
+            time.Advance(ExpiryWatcher.Margin);
             await h.Main.Expiry.Checking;
 
             h.Azure.DirectoryQueries.Should().HaveCount(3);
             context.Posts.Should().BeGreaterThan(0);
+            h.Main.Jobs.Should().ContainSingle().Which.IsExpiryDeletion.Should().BeTrue();
+            // 期限を過ぎたものの次は、外の変化を拾う読み直し
+            h.Main.Expiry.NextCheckAt.Should().Be(time.GetUtcNow() + ExpiryWatcher.RefreshInterval);
             h.Main.Dispose();
         }
         finally
         {
             SynchronizationContext.SetSynchronizationContext(previous);
         }
+    }
+
+    [Fact]
+    public async Task The_Notices_Should_Be_Shown_At_Three_Days_And_One_Day_Before()
+    {
+        var (h, time) = await WithTimerAsync(now => Listed("demo", DeploymentExpiry.FormatTag(now.AddDays(3).AddHours(4))));
+        var expires = time.GetUtcNow().AddDays(3).AddHours(4);
+        h.Main.Expiry.NextCheckAt.Should().Be(expires - ExpiryWatcher.SoonNotice + ExpiryWatcher.Margin);
+
+        time.Advance(TimeSpan.FromHours(4) + ExpiryWatcher.Margin);
+        await h.Main.Expiry.Checking;
+
+        h.Notifications.Shown.Should().ContainSingle().Which.Title.Should().Be("利用可能期限が近づいています");
+        // 前日までは 6 時間ごとに読み直す
+        h.Main.Expiry.NextCheckAt.Should().Be(time.GetUtcNow() + ExpiryWatcher.RefreshInterval);
+    }
+
+    [Fact]
+    public async Task Without_Near_Expiries_The_List_Should_Be_Read_Again_Every_Six_Hours()
+    {
+        var (h, time) = await WithTimerAsync(now => Listed("demo", DeploymentExpiry.FormatTag(now.AddDays(10))));
+        h.Main.Expiry.NextCheckAt.Should().Be(time.GetUtcNow() + ExpiryWatcher.RefreshInterval);
+
+        time.Advance(ExpiryWatcher.RefreshInterval);
+        await h.Main.Expiry.Checking;
+
+        h.Azure.DirectoryQueries.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task Changing_The_Expiry_In_This_App_Should_Move_The_Next_Check()
+    {
+        // 一覧で期限を今日にすると、6 時間後の読み直しを待たずに、期限の時刻に確かめる
+        var (h, time) = await WithTimerAsync(now => Listed("demo", DeploymentExpiry.FormatTag(now.AddDays(10))));
+        h.Azure.Deployed();
+        h.Azure.GatewayMock.Setup(g => g.UpdateContainerAppTagsAsync("sub", "rg", It.IsAny<string>(), It.IsAny<IReadOnlyDictionary<string, string>>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        var row = h.Main.Deployments.Rows.Single();
+        row.EditNoExpiry = false;
+        row.EditExpiryDate = time.GetUtcNow();
+
+        await row.ChangeExpiryCommand.ExecuteAsync();
+
+        row.Error.Should().BeNull();
+        // 期限は今日の 23:59:59（この時計の時刻帯は UTC）
+        h.Main.Expiry.NextCheckAt.Should().Be(new DateTimeOffset(2026, 10, 21, 23, 59, 59, TimeSpan.Zero) + ExpiryWatcher.Margin);
     }
 
     [Fact]

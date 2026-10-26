@@ -299,6 +299,9 @@ public sealed class DeploymentListViewModel : ObservableObject
         return Error == null;
     }
 
+    /// <summary>読んだデプロイが変わったとき（読み直し・このアプリでのデプロイ・削除・期限の変更。期限の確認の時刻を合わせ直す）。</summary>
+    internal event Action? EntriesChanged;
+
     /// <summary>読んだすべてのデプロイ（フィルタ・ページによらない。このアプリで終えた操作を重ねた後）。</summary>
     internal IReadOnlyList<DeploymentEntry> Entries => _entries;
 
@@ -485,6 +488,7 @@ public sealed class DeploymentListViewModel : ObservableObject
     private void Refresh(bool resetPage, bool keepRows)
     {
         _entries = Apply();
+        EntriesChanged?.Invoke();
         _filtered = Sorted(_entries.Where(Matches)).ToList();
         _filteredCount = _filtered.Count;
         if (resetPage || _pageIndex >= PageCount)

@@ -13,15 +13,20 @@ namespace TTDeployTool.Controller.Desktop.Core.Jobs;
 public sealed class ExpiryDeletionSkippedException(string message) : InvalidOperationException(message);
 
 /// <summary>
-/// 利用可能期限の確認（docs/design/desktop-jobs.md の 6.2・6.5）。サインインできたときと、その後 30 分ごとにデプロイの一覧を読み直し、
-/// 期限の 3 日前と前日に通知し、期限を過ぎたものは確認なしで削除のジョブを登録する。サインインしていない間は確認しない。
+/// 利用可能期限の確認（docs/design/desktop-jobs.md の 6.2・6.5、D21）。サインインできたときにデプロイの一覧を読み、期限の 3 日前と前日に通知し、
+/// 期限を過ぎたものは確認なしで削除のジョブを登録する。次の確認は、読んだ一覧の中で最も近い時刻（期限・3 日前・前日）か、
+/// 外の変化（別の PC・CLI・MCP サーバーでのデプロイや期限の変更）を拾うための <see cref="RefreshInterval"/> ごとの読み直しの、早い方に合わせる。
+/// 一覧の中身が変わったとき（このアプリでのデプロイ・削除・期限の変更）も合わせ直す。サインインしていない間は確認しない。
 /// </summary>
 public sealed class ExpiryWatcher : IDisposable
 {
-    /// <summary>確認する間隔。</summary>
-    public static readonly TimeSpan CheckInterval = TimeSpan.FromMinutes(30);
+    /// <summary>外の変化を拾うため、一覧を読み直す間隔。</summary>
+    public static readonly TimeSpan RefreshInterval = TimeSpan.FromHours(6);
 
-    /// <summary>期限での削除に失敗した対象を、登録し直すまでの時間（30 分ごとに失敗と通知を繰り返さないため）。</summary>
+    /// <summary>期限などの時刻に合わせた確認を、その時刻より少し後にする（タイマーが早めに来ても、時刻を過ぎてから確かめるため）。</summary>
+    public static readonly TimeSpan Margin = TimeSpan.FromSeconds(1);
+
+    /// <summary>期限での削除に失敗した対象を、登録し直すまでの時間（確認のたびに失敗と通知を繰り返さないため）。</summary>
     public static readonly TimeSpan RetryAfterFailure = TimeSpan.FromHours(6);
 
     /// <summary>「3 日前」の通知を出す、期限までの時間。</summary>
@@ -44,6 +49,7 @@ public sealed class ExpiryWatcher : IDisposable
     private readonly Dictionary<string, DateTimeOffset> _failedAt = new(StringComparer.OrdinalIgnoreCase);
     private ITimer? _timer;
     private Task _checking = Task.CompletedTask;
+    private DateTimeOffset _refreshAt;
 
     public ExpiryWatcher(
         DeploymentListViewModel list, JobQueue queue, TargetViewModel target, DeletionWorkflow workflow, IDeploymentLogger deploymentLogger,
@@ -61,15 +67,19 @@ public sealed class ExpiryWatcher : IDisposable
         _isSignedIn = isSignedIn;
         _context = SynchronizationContext.Current;
         queue.Finished += OnJobFinished;
+        list.EntriesChanged += Reschedule;
     }
 
     /// <summary>今の確認（テストで待つ）。</summary>
     internal Task Checking => _checking;
 
-    /// <summary>今すぐ確かめ、その後 <see cref="CheckInterval"/> ごとに確かめる（サインインできたとき）。確かめている間は重ねない。</summary>
+    /// <summary>次の確認の時刻（決まっていなければ null。テストで確かめる）。</summary>
+    internal DateTimeOffset? NextCheckAt { get; private set; }
+
+    /// <summary>今すぐ確かめ、その後は次の確認の時刻に確かめる（サインインできたとき）。確かめている間は重ねない。</summary>
     public Task StartAsync()
     {
-        _timer ??= _time.CreateTimer(_ => Post(() => _ = CheckAsync()), null, CheckInterval, CheckInterval);
+        _timer ??= _time.CreateTimer(_ => Post(() => _ = CheckAsync()), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         return CheckAsync();
     }
 
@@ -85,7 +95,12 @@ public sealed class ExpiryWatcher : IDisposable
 
     private async Task RunCheckAsync()
     {
-        if (!_isSignedIn() || !await _list.ReloadAsync())
+        if (!_isSignedIn())
+            return;
+        var loaded = await _list.ReloadAsync();
+        _refreshAt = _time.GetUtcNow() + RefreshInterval;
+        Reschedule();
+        if (!loaded)
             return;
         var now = _time.GetUtcNow();
         var notices = _preferences.ExpiryNotices.Where(n => !IsPast(n, now)).ToList();
@@ -99,6 +114,25 @@ public sealed class ExpiryWatcher : IDisposable
         }
         if (!notices.SequenceEqual(_preferences.ExpiryNotices))
             _preferences.ExpiryNotices = notices;
+    }
+
+    // 次の確認を、読み直しの時刻か、一覧の中で最も近い時刻（期限・3 日前・前日）の早い方に合わせる
+    private void Reschedule()
+    {
+        // 始める前と、初めての読み込みの途中（読み直しの時刻がまだ無い）は合わせない
+        if (_timer == null || _refreshAt == default)
+            return;
+        var now = _time.GetUtcNow();
+        var next = _list.Entries
+            .Where(e => e.ExpiryKind == ExpiryKind.Date)
+            .SelectMany(e => new[] { e.ExpiresAt!.Value - SoonNotice, e.ExpiresAt.Value - LastDayNotice, e.ExpiresAt.Value })
+            .Where(at => at > now && at < _refreshAt)
+            .Select(at => at + Margin)
+            .DefaultIfEmpty(_refreshAt)
+            .Min();
+        NextCheckAt = next;
+        // 読み直しの時刻を過ぎていれば（サインアウトの後など）、すぐ確かめる
+        _timer.Change(TimeSpan.FromTicks(Math.Max(0, (next - now).Ticks)), Timeout.InfiniteTimeSpan);
     }
 
     // 出した通知の記録: サブスクリプション/リソースグループ/アプリ名/種類/そのときの期限（UTC）。期限が変われば別のものになる
