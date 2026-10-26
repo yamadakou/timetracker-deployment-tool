@@ -18,6 +18,7 @@ namespace TTDeployTool.Controller.Desktop;
 public sealed partial class MainWindow : Window
 {
     private bool _exiting;
+    private bool _syncingSelection;
     private TaskbarIcon? _tray;
 
     public MainWindow()
@@ -36,6 +37,16 @@ public sealed partial class MainWindow : Window
         AppWindow.Closing += OnClosing;
         // デプロイの一覧の行の操作で、画面を切り替える
         viewModel.NavigationRequested += Navigate;
+        viewModel.Deployments.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(DeploymentListViewModel.Selected))
+                SyncSelection(DeploymentsTable, viewModel.Deployments.Selected);
+        };
+        viewModel.JobList.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(JobListViewModel.Selected))
+                SyncSelection(JobsList, viewModel.JobList.Selected);
+        };
         CreateTray();
         _ = atStartup ? viewModel.InitializeAtStartupAsync() : viewModel.InitializeAsync();
         _ = CheckForUpdatesAsync(hwnd);
@@ -101,12 +112,37 @@ public sealed partial class MainWindow : Window
             popup.IsOpen = false;
     }
 
-    // 表で選んだ行を ViewModel に伝える（ListView の SelectedItems は結び付けられないため）
-    private void OnDeploymentsSelectionChanged(object sender, SelectionChangedEventArgs e) =>
-        ViewModel.Deployments.SetSelection(DeploymentsTable.SelectedItems.OfType<DeploymentRowViewModel>());
+    // 表で選んだ行を ViewModel に伝える（ListView の SelectedItems は結び付けられないため）。ViewModel が選び直したときは、表に戻す
+    private void OnDeploymentsSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_syncingSelection)
+            ViewModel.Deployments.SetSelection(DeploymentsTable.SelectedItems.OfType<DeploymentRowViewModel>());
+    }
 
-    private void OnJobsSelectionChanged(object sender, SelectionChangedEventArgs e) =>
-        ViewModel.JobList.SetSelection(JobsList.SelectedItems.OfType<JobViewModel>());
+    private void OnJobsSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_syncingSelection)
+            ViewModel.JobList.SetSelection(JobsList.SelectedItems.OfType<JobViewModel>());
+    }
+
+    // 一覧を表示し直した後に ViewModel が保った選択を、表に戻す
+    private void SyncSelection(ListView table, IEnumerable<object> selected)
+    {
+        var wanted = selected.ToList();
+        if (table.SelectedItems.SequenceEqual(wanted))
+            return;
+        _syncingSelection = true;
+        try
+        {
+            table.SelectedItems.Clear();
+            foreach (var item in wanted)
+                table.SelectedItems.Add(item);
+        }
+        finally
+        {
+            _syncingSelection = false;
+        }
+    }
 
     // ジョブの一覧の「詳細」と、行のダブルクリック: 実行状況の画面で開く
     private void OnShowJobDetail(object sender, RoutedEventArgs e)

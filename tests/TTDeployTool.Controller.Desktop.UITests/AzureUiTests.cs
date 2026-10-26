@@ -136,7 +136,7 @@ public class AzureUiTests
             app.TextOf("Row.Expiry").Should().Be("期限なし");
 
             // 一覧の「削除」→ 削除の画面（開くと計画を作る）。No.53: 本ツールのリソースを消した後の空のリソースグループも消す
-            // 期限を変えると一覧を作り直すため、選び直してから削除する（1 行なら今の削除の画面）
+            // 期限を変えて表示し直しても選択は保つ（念のため選び直す）。1 行なら今の削除の画面
             app.SelectRow("Deployments.Rows");
             app.Invoke("Deployments.Delete");
             app.Find("Panel.Delete");

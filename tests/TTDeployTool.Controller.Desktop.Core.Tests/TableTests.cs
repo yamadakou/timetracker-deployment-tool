@@ -98,6 +98,8 @@ public class DeploymentTableTests
         await vm.ChangeSelectedExpiryCommand.ExecuteAsync();
         vm.BatchMessage.Should().Be("1 件の利用可能期限を変えました（demo）。");
         h.Main.Deployments.Rows.Single(r => r.AppName == "demo").ExpiryText.Should().Be("2026-12-01");
+        // 期限を変えて表示し直しても、残っている行の選択は保つ
+        vm.Selected.Select(r => r.AppName).Should().Equal("demo");
 
         // ジョブのある行だけなら、何も変えない
         vm.SetSelection(vm.Rows.Where(r => r.AppName == "busy"));
@@ -307,8 +309,14 @@ public class JobTableTests
         list.TargetHeader.Should().Be("リソースグループ / アプリ名 ▲");
         list.SortBy(JobSortKey.Kind);
         list.Items.Select(j => j.KindText).Should().BeInAscendingOrder();
+        list.SetSelection([early]);
         list.SortBy(JobSortKey.State);
         list.StateHeader.Should().Be("状態 ▲");
+        // 並べ直しても選択は保つ
+        list.Selected.Should().Equal(early);
+        list.Filter = JobListViewModel.Filters.Single(f => f.Mode == JobFilterMode.Scheduled);
+        list.Selected.Should().BeEmpty("絞り込みで消えた行は選択から外す");
+        list.Filter = JobListViewModel.Filters[0];
         list.SortBy(JobSortKey.Registered);
         // 登録した順（昇順）
         list.Items.Should().Equal(late, early, now);

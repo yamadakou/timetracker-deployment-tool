@@ -232,11 +232,12 @@ public sealed class JobListViewModel : ObservableObject
         var matched = Sorted(_queue.Jobs.Where(Matches)).ToList();
         if (!matched.SequenceEqual(Items))
         {
+            // 並べ直しても、残っている行の選択は保つ（行を消す間に画面の表が選択を外すため、先に覚えておく）
+            var selected = _selected.ToList();
             Items.Clear();
             foreach (var job in matched)
                 Items.Add(job);
-            // 並べ直したら、選択もやり直す（画面の表の選択も消える）
-            SetSelection([]);
+            SetSelection(selected.Where(matched.Contains));
         }
         OnPropertyChanged(nameof(CountText));
     }
