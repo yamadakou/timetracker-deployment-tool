@@ -1,4 +1,6 @@
 name: Desktop Preview
+# 実行の一覧で、どの版の評価版かが分かるようにする
+run-name: Desktop Preview ${{ inputs.version || format('0.1.{0}', github.run_number) }}
 
 # デスクトップアプリを Store を通さずに評価者へ渡すための、自己署名の証明書で署名した MSIX（x64・arm64）を作る
 # （docs/design/desktop-preview.md、REVIEW_ISSUES No.65）。成果物は Actions の実行結果の Artifacts から取り出し、評価者に渡す。
