@@ -514,7 +514,7 @@ public class DeploymentListViewModelTests
         DeploymentRowViewModel Row(string app) => h.Main.Deployments.Rows.Single(r => r.AppName == app);
         Row("demo").HasActiveJob.Should().BeFalse();
         Row("demo").JobText.Should().BeNull();
-        Row("demo").ShowJobsCommand.CanExecute(null).Should().BeFalse();
+        Row("demo").CheckStatusText.Should().Be("状態を確認");
 
         var start = new TaskCompletionSource<Job>();
         h.Main.Queue.Register(JobKind.Delete, new JobTarget("sub", "RG", "demo"), null, () => start.Task);
@@ -523,12 +523,14 @@ public class DeploymentListViewModelTests
         row.HasActiveJob.Should().BeTrue();
         row.JobText.Should().Be("削除のジョブがあります（実行の準備中）。終わるまで、対象に入れる・削除・期限の変更はできません。");
         new[] { row.UseAsTargetCommand, row.DeleteCommand, row.ChangeExpiryCommand }.Should().AllSatisfy(c => c.CanExecute(null).Should().BeFalse());
-        new[] { row.OpenCommand, row.CheckStatusCommand, row.ShowPasswordsCommand, row.ShowJobsCommand }.Should().AllSatisfy(c => c.CanExecute(null).Should().BeTrue());
+        new[] { row.OpenCommand, row.CheckStatusCommand, row.ShowPasswordsCommand }.Should().AllSatisfy(c => c.CanExecute(null).Should().BeTrue());
+        // 「状態を確認」と「ジョブを見る」は同じ画面を開いていたため、1 つにまとめた（オーナーの実機、2026-10-27。No.69）
+        row.CheckStatusText.Should().Be("状態とジョブを確認");
         Row("other").HasActiveJob.Should().BeFalse("ほかの対象の行は操作できる");
         Row("other").DeleteCommand.CanExecute(null).Should().BeTrue();
 
         // そのジョブの実行状況を開き、「戻る」はデプロイの一覧（No.63）
-        await row.ShowJobsCommand.ExecuteAsync();
+        await row.CheckStatusCommand.ExecuteAsync();
         h.Navigations.Should().EndWith("status");
         h.Main.StatusJob.Should().BeSameAs(h.Main.Jobs.Single());
         h.Main.ReturnText.Should().Be("デプロイの一覧に戻る");
@@ -542,6 +544,7 @@ public class DeploymentListViewModelTests
         await h.Main.Queue.WhenIdleAsync();
         Row("demo").HasActiveJob.Should().BeFalse();
         Row("demo").JobText.Should().BeNull();
+        Row("demo").CheckStatusText.Should().Be("状態を確認");
         Row("demo").DeleteCommand.CanExecute(null).Should().BeTrue();
         Row("demo").ChangeExpiryCommand.CanExecute(null).Should().BeTrue();
     }

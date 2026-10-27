@@ -53,10 +53,9 @@ public sealed class DeploymentRowViewModel : ObservableObject
             return Task.CompletedTask;
         }, () => Url != null);
         UseAsTargetCommand = new AsyncCommand(() => _owner.UseAsTargetAsync(_entry, Pages.Wizard), () => !HasActiveJob);
+        // 実行状況の画面は、その対象のジョブがあればジョブも出す（「戻る」はデプロイの一覧。No.63・No.69）
         CheckStatusCommand = new AsyncCommand(() => _owner.UseAsTargetAsync(_entry, Pages.Status));
         DeleteCommand = new AsyncCommand(() => _owner.UseAsTargetAsync(_entry, Pages.Delete), () => !HasActiveJob);
-        // そのジョブの実行状況を開く（「戻る」はデプロイの一覧。No.63）
-        ShowJobsCommand = new AsyncCommand(() => _owner.UseAsTargetAsync(_entry, Pages.Status), () => HasActiveJob);
         ShowPasswordsCommand = new AsyncCommand(() => Busy.RunAsync("パスワードを読んでいます", ReadPasswordsAsync), () => _entry.Timetracker != null);
         TogglePasswordsCommand = new AsyncCommand(() =>
         {
@@ -75,14 +74,14 @@ public sealed class DeploymentRowViewModel : ObservableObject
     /// <summary>対象に入れて、デプロイのウィザードを開く（再デプロイのため）。</summary>
     public AsyncCommand UseAsTargetCommand { get; }
 
-    /// <summary>対象に入れて、実行状況の画面で読む。</summary>
+    /// <summary>対象に入れて、実行状況の画面で読む（同じ対象の終わっていないジョブがあれば、そのジョブも出す）。</summary>
     public AsyncCommand CheckStatusCommand { get; }
+
+    /// <summary>「状態を確認」の文言（ジョブがあるときは、ジョブも見られることが分かるようにする。No.69）。</summary>
+    public string CheckStatusText => HasActiveJob ? "状態とジョブを確認" : "状態を確認";
 
     /// <summary>対象に入れて、削除の画面を開き、計画を作る（アプリ名の入力 → 実行は、削除の画面で行う）。</summary>
     public AsyncCommand DeleteCommand { get; }
-
-    /// <summary>同じ対象の終わっていないジョブの実行状況を開く。</summary>
-    public AsyncCommand ShowJobsCommand { get; }
 
     public AsyncCommand ShowPasswordsCommand { get; }
 
@@ -238,10 +237,10 @@ public sealed class DeploymentRowViewModel : ObservableObject
             return;
         OnPropertyChanged(nameof(JobText));
         OnPropertyChanged(nameof(HasActiveJob));
+        OnPropertyChanged(nameof(CheckStatusText));
         UseAsTargetCommand.RaiseCanExecuteChanged();
         DeleteCommand.RaiseCanExecuteChanged();
         ChangeExpiryCommand.RaiseCanExecuteChanged();
-        ShowJobsCommand.RaiseCanExecuteChanged();
     }
 
     private DateTimeOffset Local(DateTimeOffset value) => TimeZoneInfo.ConvertTime(value, _owner.Time.LocalTimeZone);

@@ -2,13 +2,13 @@
 
 Microsoft Store に提出する前に、少数の**評価者**にデスクトップアプリを試してもらうため、自己署名の証明書で署名した MSIX を作って渡す手順の設計です（REVIEW_ISSUES No.65。Store 以外の配布の検討は [`desktop-app.md`](desktop-app.md) の 8.3）。
 
-- ワークフロー: [`.github/workflows/desktop-preview.yml`](../../.github/workflows/desktop-preview.yml)（手動で実行。ワークフローのファイルを変えた push でも実行して確かめる。Azure は使わない）
+- ワークフロー: [`.github/workflows/desktop-preview.yml`](../../.github/workflows/desktop-preview.yml)（手動で実行。手動の実行は既定のブランチにあるワークフローしか使えないため、作業ブランチでは、最後のコミットのメッセージに `[preview]` を入れて push すると作る。Azure は使わない）
 - 評価者の手順書: [`docs/DESKTOP_PREVIEW_INSTALL.md`](../DESKTOP_PREVIEW_INSTALL.md)（成果物にも `INSTALL.md` として入る）
 - 一次情報の確認日: 2026-10-26（出典は 6）
 
 ## 1. 流れ
 1. （初回だけ）オーナーが署名の証明書（PFX）を作り、リポジトリのシークレットに入れる……3
-2. オーナーが Actions の **Desktop Preview** → Run workflow で実行する（版は空のままでよい）
+2. オーナーが Actions の **Desktop Preview** → Run workflow で実行する（版は空のままでよい。main に入れる前は、作業ブランチに `[preview]` をメッセージに入れたコミットを push する）
 3. 実行結果の Artifacts から `ttdeploytool-desktop-preview-<版>` を取り出し、評価者に渡す（社内のファイル共有など）
 4. 評価者が `INSTALL.md` に従って、証明書を信頼してから `.msix` を導入する
 

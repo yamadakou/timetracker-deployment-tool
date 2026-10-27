@@ -391,8 +391,7 @@
                                 </StackPanel>
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <Button AutomationProperties.AutomationId="Row.UseAsTarget" Content="対象に入れる" Command="{x:Bind ViewModel.Deployments.Current.UseAsTargetCommand, Mode=OneWay}" />
-                                    <Button AutomationProperties.AutomationId="Row.CheckStatus" Content="状態を確認" Command="{x:Bind ViewModel.Deployments.Current.CheckStatusCommand, Mode=OneWay}" />
-                                    <Button AutomationProperties.AutomationId="Row.ShowJobs" Content="ジョブを見る" Command="{x:Bind ViewModel.Deployments.Current.ShowJobsCommand, Mode=OneWay}" />
+                                    <Button AutomationProperties.AutomationId="Row.CheckStatus" Content="{x:Bind ViewModel.Deployments.Current.CheckStatusText, Mode=OneWay}" Command="{x:Bind ViewModel.Deployments.Current.CheckStatusCommand, Mode=OneWay}" />
                                     <Button AutomationProperties.AutomationId="Row.ShowPasswords" Content="パスワードを表示" Command="{x:Bind ViewModel.Deployments.Current.ShowPasswordsCommand, Mode=OneWay}" />
                                 </StackPanel>
                                 <StackPanel Spacing="4" Visibility="{x:Bind ViewModel.Deployments.Current.HasPasswords, Mode=OneWay}">
