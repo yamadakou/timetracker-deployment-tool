@@ -76,6 +76,18 @@ ttdeploytool-desktop-preview-<版>/
 - 評価版は、Store の版と別のアプリとして入ります（P2）。Store の版を入れた後は、評価版をアンインストールしてもらいます。
 - サインイン時の起動（StartupTask、`desktop-jobs.md` の 6.5）は、評価版でも Store の版と同じく使えます（パッケージのマニフェストの機能のため）。
 
+## 5.1 作った評価版
+| 版 | 作った日 | 主な中身 |
+|---|---|---|
+| 0.1.1 | 2026-10-26 | 最初の評価版（No.65） |
+| 0.1.2 | 2026-10-27 | 削除の「予定に追加」（No.66）、Windows との連携・削除の予定を戻す（No.67） |
+| 0.1.3 | 2026-10-27 | 「ジョブを見る」を「状態を確認」にまとめる（No.69） |
+| 0.1.5 | 2026-10-27 | 登録した後の「新規デプロイ」「続けてデプロイ」（No.70） |
+| 0.1.7 | 2026-10-27 | ウィザードの完了の表示（No.71） |
+| 次の版 | 2026-10-27 | デプロイの予定をパスワードを暗号化して残す（No.72）、デプロイの一覧の「状態」（No.73） |
+
+（実行番号で版が決まるため、`[preview]` の無い push で飛ばした実行の分だけ版が飛ぶ）
+
 ## 6. 出典（2026-10-26 に確認）
 1. [Create a certificate for package signing - MSIX](https://learn.microsoft.com/windows/msix/package/create-certificate-package-signing): 証明書の Subject はマニフェストの Publisher と一致する必要がある。`New-SelfSignedCertificate` の KeyUsage・EKU（1.3.6.1.5.5.7.3.3）・Basic Constraints。導入する PC では「ローカル コンピューター」の Trusted People に入れる。不要になったら削除する
 2. [Sideload line of business apps](https://learn.microsoft.com/windows/application-management/sideload-apps-in-windows): ストア以外のパッケージの導入（サイドロード）。組織のポリシーで禁止されていると、利用者は有効にできない。`.msix` をエクスプローラーで開くか `Add-AppxPackage` で導入する
