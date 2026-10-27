@@ -40,6 +40,7 @@ public enum DeploymentSortKey
     AppName,
     DeployedAt,
     ExpiresAt,
+    State,
 }
 
 /// <summary>並べ替えの選択肢。</summary>
@@ -80,6 +81,8 @@ public sealed class DeploymentListViewModel : ObservableObject
         new(DeploymentSortKey.ExpiresAt, true, "利用可能期限日（遠い順）"),
         new(DeploymentSortKey.AppName, false, "アプリ名（昇順）"),
         new(DeploymentSortKey.AppName, true, "アプリ名（降順）"),
+        new(DeploymentSortKey.State, false, "状態（実行中から）"),
+        new(DeploymentSortKey.State, true, "状態（不明から）"),
     ];
 
     private readonly TargetViewModel _target;
@@ -108,6 +111,7 @@ public sealed class DeploymentListViewModel : ObservableObject
     private DateTimeOffset? _deployedFrom;
     private DateTimeOffset? _deployedTo;
     private ExpiryFilterOption _expiryFilter = ExpiryFilters[0];
+    private DeploymentStateFilterOption _stateFilter = DeploymentStates.Filters[0];
     private DateTimeOffset? _expiryFrom;
     private DateTimeOffset? _expiryTo;
     private DeploymentSortOption _sort = SortOptions[0];
@@ -233,6 +237,11 @@ public sealed class DeploymentListViewModel : ObservableObject
 
     public string DeployedHeader => Header("デプロイ日", DeploymentSortKey.DeployedAt);
 
+    public string StateHeader => Header("状態", DeploymentSortKey.State);
+
+    /// <summary>「状態」の絞り込み（既定はすべて。No.73）。</summary>
+    public DeploymentStateFilterOption StateFilter { get => _stateFilter; set => SetFilter(ref _stateFilter, value); }
+
     /// <summary>見出しの Tag（列の名前。<see cref="DeploymentSortKey"/> の名前）で並べ替える（画面の側から）。</summary>
     public void SortBy(string column) => SortBy(Enum.Parse<DeploymentSortKey>(column));
 
@@ -328,7 +337,7 @@ public sealed class DeploymentListViewModel : ObservableObject
         set
         {
             SetFilter(ref _sort, value);
-            foreach (var name in new[] { nameof(SubscriptionHeader), nameof(ResourceGroupHeader), nameof(AppNameHeader), nameof(ExpiryHeader), nameof(DeployedHeader) })
+            foreach (var name in new[] { nameof(SubscriptionHeader), nameof(ResourceGroupHeader), nameof(AppNameHeader), nameof(ExpiryHeader), nameof(DeployedHeader), nameof(StateHeader) })
                 OnPropertyChanged(name);
         }
     }
@@ -560,6 +569,8 @@ public sealed class DeploymentListViewModel : ObservableObject
             return false;
         if (!InRange(e.DeployedAt, DeployedFrom, DeployedTo))
             return false;
+        if (StateFilter.State is { } state && DeploymentStates.Of(e) != state)
+            return false;
         return ExpiryFilter.Mode switch
         {
             ExpiryFilterMode.Within7Days => e.ExpiryKind == ExpiryKind.Date && e.ExpiresAt <= Time.GetUtcNow().AddDays(SoonDays),
@@ -579,6 +590,7 @@ public sealed class DeploymentListViewModel : ObservableObject
             DeploymentSortKey.ResourceGroup => e.ResourceGroup,
             DeploymentSortKey.AppName => e.AppName,
             DeploymentSortKey.DeployedAt => e.DeployedAt,
+            DeploymentSortKey.State => DeploymentStates.Of(e),
             _ => e.ExpiryKind == ExpiryKind.Date ? e.ExpiresAt : null,
         }));
         var withValue = keyed.Where(x => x.Key != null);
@@ -590,7 +602,7 @@ public sealed class DeploymentListViewModel : ObservableObject
             .Select(x => x.Entry);
     }
 
-    private static int Compare(object? a, object? b, StringComparer comparer) => a is string s ? comparer.Compare(s, (string)b!) : ((DateTimeOffset)a!).CompareTo((DateTimeOffset)b!);
+    private static int Compare(object? a, object? b, StringComparer comparer) => a is string s ? comparer.Compare(s, (string)b!) : ((IComparable)a!).CompareTo(b);
 
     private Task GoTo(int page)
     {

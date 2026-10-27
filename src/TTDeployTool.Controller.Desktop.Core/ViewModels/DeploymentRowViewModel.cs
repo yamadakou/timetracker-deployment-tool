@@ -162,9 +162,19 @@ public sealed class DeploymentRowViewModel : ObservableObject
         .Where(x => x.Item2 != null)
         .Select(x => string.Create(CultureInfo.InvariantCulture, $"{x.Item1} {x.Item2!.Cpu?.ToString() ?? "?"} vCPU / {x.Item2.Memory ?? "?"}")));
 
-    public string StateText => _entry.IsComplete
-        ? _entry.Timetracker!.RunningStatus ?? _entry.Timetracker.ProvisioningState ?? "不明"
-        : $"一部だけ（{string.Join("・", _entry.Missing)} がありません）";
+    /// <summary>3 つの Container App の状態をまとめた「状態」（No.73）。</summary>
+    public DeploymentState State => DeploymentStates.Of(_entry);
+
+    public string StateText => State switch
+    {
+        DeploymentState.Partial => $"一部だけ（{string.Join("・", _entry.Missing)} がありません）",
+        DeploymentState.Pending => "デプロイ済み（Azure の一覧に反映待ち。「読み込む」で読み直せます）",
+        var state => DeploymentStates.Label(state),
+    };
+
+    /// <summary>「状態」にマウスを置いたときの、アプリごとの Azure の値。</summary>
+    public string StateDetail => string.Join("\n", new[] { ("Timetracker", _entry.Timetracker), ("DB", _entry.Db), ("Redis", _entry.Redis) }
+        .Select(x => $"{x.Item1}: " + (x.Item2 == null ? "ありません" : $"{x.Item2.ProvisioningState ?? "?"} / {x.Item2.RunningStatus ?? "?"}")));
 
     public bool HasPasswords => _passwords != null;
 
@@ -220,7 +230,7 @@ public sealed class DeploymentRowViewModel : ObservableObject
                  {
                      nameof(Entry), nameof(Url), nameof(HasUrl), nameof(DeployedText), nameof(ExpiryText), nameof(ExpiryWarning), nameof(HasExpiryWarning),
                      nameof(Level), nameof(IsExpired), nameof(IsExpirySoon),
-                     nameof(DbTypeText), nameof(PersistenceText), nameof(SpecText), nameof(StateText),
+                     nameof(DbTypeText), nameof(PersistenceText), nameof(SpecText), nameof(StateText), nameof(State), nameof(StateDetail),
                  })
             OnPropertyChanged(name);
         OpenCommand.RaiseCanExecuteChanged();

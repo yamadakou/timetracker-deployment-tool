@@ -134,7 +134,7 @@ public class DeploymentListViewModelTests
         row.DbTypeText.Should().Be("PostgreSQL");
         row.PersistenceText.Should().Be("永続化していない");
         row.SpecText.Should().Be("Timetracker 1.5 vCPU / 3Gi、DB 1 vCPU / 2Gi、Redis ? vCPU / ?");
-        row.StateText.Should().Be("Running");
+        row.StateText.Should().Be("実行中");
         row.Entry.Location.Should().Be("japaneast");
 
         await row.OpenCommand.ExecuteAsync();
@@ -171,11 +171,13 @@ public class DeploymentListViewModelTests
         var rows = h.Main.Deployments.Rows.ToDictionary(r => r.AppName);
 
         (rows["p"].DbTypeText, rows["p"].PersistenceText, rows["p"].StateText).Should().Be(("SQL Server", "Azure Files に永続化", "不明"));
-        (rows["q"].DbTypeText, rows["q"].StateText).Should().Be(("不明", "InProgress"));
+        rows["p"].StateDetail.Should().Be("Timetracker: ? / ?\nDB: Succeeded / Running\nRedis: Succeeded / Running");
+        (rows["q"].DbTypeText, rows["q"].StateText, rows["q"].State).Should().Be(("不明", "処理中（作成・更新・削除）", DeploymentState.Processing));
         var old = rows["old"];
         old.Subscription.Should().Be("unknown-sub");
         old.PersistenceText.Should().Be("永続化していない（以前の DB のデータが残っています）");
         old.StateText.Should().Be("一部だけ（Container Apps Environment・Timetracker・DB・Redis がありません）");
+        old.StateDetail.Should().Be("Timetracker: ありません\nDB: ありません\nRedis: ありません");
         old.SpecText.Should().BeEmpty();
         old.HasUrl.Should().BeFalse();
         old.OpenCommand.CanExecute(null).Should().BeFalse();
@@ -578,7 +580,7 @@ public class DeploymentListViewModelTests
 
         var row = h.Main.Deployments.Rows.Single();
         (row.AppName, row.Url, row.DeployedText, row.ExpiryText).Should().Be(("demo", new Uri("https://demo-tt.example.io"), "2026-10-22 05:00", "2026-11-23"));
-        row.StateText.Should().Be("不明");
+        row.StateText.Should().Be("デプロイ済み（Azure の一覧に反映待ち。「読み込む」で読み直せます）", "状態はまだ分からない（オーナーの実機で「不明」と出ていた。No.73）");
         row.PersistenceText.Should().Be("永続化していない");
     }
 
@@ -638,7 +640,7 @@ public class DeploymentListViewModelTests
         await h.Main.Queue.WhenIdleAsync();
 
         var row = h.Main.Deployments.Rows.Single();
-        (row.ExpiryText, row.Url, row.StateText).Should().Be(("2026-12-05", new Uri("https://demo-tt.example.io"), "Running"));
+        (row.ExpiryText, row.Url, row.StateText).Should().Be(("2026-12-05", new Uri("https://demo-tt.example.io"), "実行中"));
     }
 
     [Fact]
@@ -711,5 +713,82 @@ public class DeploymentListViewModelTests
 
         h.Main.Deployments.Rows.Should().BeEmpty();
         h.Main.Deployments.PageText.Should().StartWith("「読み込む」を押すと");
+    }
+}
+
+/// <summary>デプロイの一覧の「状態」（No.73。3 つの Container App の状態をまとめる・絞り込み・並べ替え）。</summary>
+public class DeploymentStateTests
+{
+    private readonly MovableTime _time = new();
+
+    private static DeploymentEntry Entry(params (string? Provisioning, string? Running)[] apps)
+    {
+        AppEntry? App(int i, string name) => i < apps.Length ? new AppEntry(name, apps[i].Provisioning, apps[i].Running, null, null, null) : null;
+        return new DeploymentEntry("sub", "rg", "demo", null, null, null, ExpiryKind.Missing, null, App(0, "demo-tt"), App(1, "demo-db"), App(2, "demo-redis"),
+            "demo-env", null, false);
+    }
+
+    [Theory]
+    [InlineData("Succeeded", "Running", "Succeeded", "Running", "Succeeded", "Running", DeploymentState.Running)]
+    [InlineData("Succeeded", "Running", "Succeeded", "Stopped", "Succeeded", "Running", DeploymentState.Stopped)]
+    [InlineData("Succeeded", "Suspended", "Succeeded", "Running", "Succeeded", "Running", DeploymentState.Stopped)]
+    [InlineData("Succeeded", "Running", "InProgress", "Running", "Succeeded", "Stopped", DeploymentState.Processing)]
+    [InlineData("Deleting", null, "Succeeded", "Running", "Succeeded", "Running", DeploymentState.Processing)]
+    [InlineData("Succeeded", "Progressing", "Succeeded", "Running", "Succeeded", "Running", DeploymentState.Processing)]
+    [InlineData("Succeeded", "Running", "Failed", "Running", "InProgress", "Running", DeploymentState.Failed)]
+    [InlineData("Canceled", null, "Succeeded", "Running", "Succeeded", "Running", DeploymentState.Failed)]
+    [InlineData(null, null, null, null, null, null, DeploymentState.Pending)]
+    [InlineData("Succeeded", "Ready", "Succeeded", "Running", "Succeeded", "Running", DeploymentState.Unknown)]
+    [InlineData("succeeded", "running", "Succeeded", "RUNNING", "Succeeded", "Running", DeploymentState.Running)]
+    public void The_State_Should_Sum_Up_The_Three_Apps(string? p1, string? r1, string? p2, string? r2, string? p3, string? r3, DeploymentState expected) =>
+        DeploymentStates.Of(Entry((p1, r1), (p2, r2), (p3, r3))).Should().Be(expected);
+
+    [Fact]
+    public void A_Partial_Deployment_Should_Be_Partial_And_Every_State_Should_Have_A_Label()
+    {
+        DeploymentStates.Of(Entry(("Succeeded", "Running"))).Should().Be(DeploymentState.Partial);
+        DeploymentStates.Filters.Select(f => f.Label).Should().Equal("すべて", "実行中", "停止中", "処理中（作成・更新・削除）", "失敗", "一部だけ", "デプロイ済み（反映待ち）", "不明");
+        DeploymentStates.Filters[0].State.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task A_Deployment_Not_Yet_In_The_List_Should_Be_Shown_As_Deployed_And_Pending()
+    {
+        // 「不明」と出ていた（オーナーの実機、2026-10-27）。このアプリでデプロイした直後で、Resource Graph に反映されていない
+        var h = await new Harness(time: _time).ReadyAsync();
+        h.Azure.ResourceGroup = null;
+        await h.Main.Deployment.PlanCommand.ExecuteAsync();
+        await h.Main.Deployment.StartCommand.ExecuteAsync();
+        await h.Main.Queue.WhenIdleAsync();
+        await h.Main.Deployments.LoadCommand.ExecuteAsync();
+
+        var row = h.Main.Deployments.Rows.Single();
+        (row.State, row.StateText).Should().Be((DeploymentState.Pending, "デプロイ済み（Azure の一覧に反映待ち。「読み込む」で読み直せます）"));
+        row.StateDetail.Should().Be("Timetracker: ? / ?\nDB: ? / ?\nRedis: ? / ?");
+    }
+
+    [Fact]
+    public async Task The_List_Should_Be_Filtered_And_Sorted_By_State()
+    {
+        var h = await new Harness(time: _time).ReadyAsync();
+        h.Azure.RecordsByTenant["t1"] =
+        [
+            .. DeploymentListViewModelTests.Deployment("sub", "rg", "a", runningStatus: "Stopped"),
+            .. DeploymentListViewModelTests.Deployment("sub", "rg", "b"),
+            .. DeploymentListViewModelTests.Deployment("sub", "rg", "c", provisioning: "Failed"),
+        ];
+        var list = h.Main.Deployments;
+        await list.LoadCommand.ExecuteAsync();
+
+        list.SortBy("State");
+        list.StateHeader.Should().Be("状態 ▲");
+        list.Rows.Select(r => r.AppName).Should().Equal("b", "a", "c");
+        list.SortBy(DeploymentSortKey.State);
+        list.Rows.Select(r => r.AppName).Should().Equal("c", "a", "b");
+
+        list.StateFilter = DeploymentStates.Filters.Single(f => f.State == DeploymentState.Stopped);
+        list.Rows.Select(r => r.AppName).Should().Equal("a");
+        list.StateFilter = DeploymentStates.Filters[0];
+        list.Rows.Should().HaveCount(3);
     }
 }

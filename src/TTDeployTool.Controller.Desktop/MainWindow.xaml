@@ -349,7 +349,16 @@
                                     </StackPanel></Flyout></Button.Flyout>
                                 </Button>
                             </StackPanel>
-                            <TextBlock Grid.Column="3" VerticalAlignment="Center" Style="{StaticResource BodyStrongTextBlockStyle}" Text="状態" />
+                            <StackPanel Grid.Column="3" Orientation="Horizontal">
+                                <Button AutomationProperties.AutomationId="Deployments.SortState" Content="{x:Bind ViewModel.Deployments.StateHeader, Mode=OneWay}" Tag="State" Click="OnSortDeployments" Style="{StaticResource HeaderButtonStyle}" />
+                                <Button AutomationProperties.AutomationId="Deployments.FilterState" Content="▽" Style="{StaticResource HeaderButtonStyle}">
+                                    <Button.Flyout><Flyout><StackPanel Spacing="8">
+                                        <ComboBox AutomationProperties.AutomationId="Deployments.StateFilter" Header="状態" ItemsSource="{x:Bind vm:DeploymentStates.Filters}" DisplayMemberPath="Label" Width="260"
+                                                  SelectedItem="{x:Bind ViewModel.Deployments.StateFilter, Mode=OneWay}" SelectionChanged="OnStateFilterChanged" />
+                                        <Button AutomationProperties.AutomationId="Deployments.StateFilterClose" Content="閉じる" Click="OnCloseFlyout" />
+                                    </StackPanel></Flyout></Button.Flyout>
+                                </Button>
+                            </StackPanel>
                             <StackPanel Grid.Column="4" Orientation="Horizontal">
                                 <Button AutomationProperties.AutomationId="Deployments.SortExpiry" Content="{x:Bind ViewModel.Deployments.ExpiryHeader, Mode=OneWay}" Tag="ExpiresAt" Click="OnSortDeployments" Style="{StaticResource HeaderButtonStyle}" />
                                 <Button AutomationProperties.AutomationId="Deployments.FilterExpiry" Content="▽" Style="{StaticResource HeaderButtonStyle}">
@@ -388,7 +397,7 @@
                                         <TextBlock Grid.Column="0" Text="{x:Bind Subscription}" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind Subscription}" />
                                         <TextBlock Grid.Column="1" Text="{x:Bind ResourceGroup}" TextTrimming="CharacterEllipsis" />
                                         <TextBlock Grid.Column="2" AutomationProperties.AutomationId="Row.AppName" Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind AppName}" TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Grid.Column="3" AutomationProperties.AutomationId="Row.State" Text="{x:Bind StateText, Mode=OneWay}" TextWrapping="Wrap" />
+                                        <TextBlock Grid.Column="3" AutomationProperties.AutomationId="Row.State" Text="{x:Bind StateText, Mode=OneWay}" TextWrapping="Wrap" ToolTipService.ToolTip="{x:Bind StateDetail, Mode=OneWay}" />
                                         <TextBlock Grid.Column="4" AutomationProperties.AutomationId="Row.Expiry" Text="{x:Bind ExpiryText, Mode=OneWay}" Foreground="{x:Bind local:Ui.ExpiryBrush(Level), Mode=OneWay}" TextWrapping="Wrap" />
                                         <TextBlock Grid.Column="5" Text="{x:Bind DeployedText, Mode=OneWay}" />
                                         <TextBlock Grid.Column="6" AutomationProperties.AutomationId="Row.Job" Text="{x:Bind JobText, Mode=OneWay}" TextWrapping="Wrap" Foreground="{ThemeResource SystemFillColorCautionBrush}" />
