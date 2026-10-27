@@ -99,8 +99,13 @@ public class AzureUiTests
             app.Invoke("Settings.SaveTemplate");
             app.WaitForText("Settings.Message", t => t.Contains($"テンプレート「{template}」を保存しました"), "テンプレートとして保存できる");
 
-            // 今すぐ実行 → 実行状況の画面。P2: 実行中は、まだ反映されていない場合がある旨が出て、環境が無ければ永続化の行は出ない
+            // 今すぐ実行 → ウィザードの完了の表示（Q4・No.70）→「実行状況（ログ）を見る」で実行状況の画面。
+            // P2: 実行中は、まだ反映されていない場合がある旨が出て、環境が無ければ永続化の行は出ない
             app.Invoke("Deploy.Start");
+            WizardStep(app, "完了");
+            app.TextOf("Wizard.CompletedText").Should().StartWith("デプロイ（");
+            app.TextOf("Wizard.ShowJob").Should().Be("実行状況（ログ）を見る");
+            app.Invoke("Wizard.ShowJob");
             app.Find("Panel.Status");
             app.WaitForText("Job.Title", t => t.StartsWith("デプロイ"), "実行状況の画面にデプロイのジョブが出る");
             app.WaitForText("Status.Note", t => t.Contains("実行中のため"), "実行中の注意が出る", LoadTimeout);
@@ -155,22 +160,33 @@ public class AzureUiTests
             app.Find("Panel.Status");
             app.WaitForText("Job.Title", t => t.StartsWith("削除"), "実行状況の画面に削除のジョブが出る");
 
-            // 7b: ジョブのある対象は計画できない（ウィザードの ⑤ で計画し直す）
+            // 7b: ジョブのある対象は計画できない。開き直したウィザードは完了の表示のまま（Q13）。「続けてデプロイ」で ① に戻ると、
+            // 同じ対象のジョブがあることを ① で知らせる（No.70）。⑤ まで進めても計画できない
             app.Show("Wizard");
-            WizardStep(app, "⑤");
-            app.Invoke("Deploy.Plan");
+            WizardStep(app, "完了");
+            app.Invoke("Wizard.Continue");
+            WizardStep(app, "①");
+            app.WaitForText("Wizard.ActiveJobNotice", t => t.Contains("削除（"), "① で同じ対象のジョブを知らせる");
+            Next(app, "②");
+            Next(app, "③");
+            Next(app, "④");
+            Next(app, "⑤");
             app.WaitForText("Deploy.Error", t => t.Contains("この対象のジョブ"), "同じ対象のジョブがあれば計画できない", LoadTimeout);
 
-            // 7b: 別の対象を予定に追加し（ジョブの一覧が開く）、上部の帯からジョブの一覧に移って取り消す
+            // 7b: 別の対象を予定に追加し（完了の表示から、ジョブの一覧を開く）、上部の帯からジョブの一覧に移って取り消す
             var second = appName + "b";
             BackTo(app, "①");
             app.SetText("Target.AppName", second);
+            app.Exists("Wizard.ActiveJobNotice").Should().BeFalse("別の対象にはジョブが無い");
             Next(app, "②");
             Next(app, "③");
             Next(app, "④");
             app.Invoke("Wizard.Next");
             AppSession.WaitUntil(() => app.Exists("Deploy.Schedule") && app.IsEnabled("Deploy.Schedule"), "2 つ目の対象の計画が表示されませんでした。", LoadTimeout);
             app.Invoke("Deploy.Schedule");
+            WizardStep(app, "完了");
+            app.TextOf("Wizard.ShowJob").Should().Be("ジョブの一覧を見る");
+            app.Invoke("Wizard.ShowJob");
             app.Find("Panel.Jobs");
             app.WaitForText("Jobs.Banner", t => t.Contains("予定 1"), "上部の帯に予定が出る");
 
@@ -189,11 +205,20 @@ public class AzureUiTests
             app.WaitForText("Job.Status", t => t == "取り消し", "予定を取り消せる");
             app.WaitForText("Jobs.Message", t => t.StartsWith("1 件の取り消し"), "取り消した数が出る");
 
-            // 7b: 削除の実行中に、別の対象のデプロイを同時に実行し（既定の上限は 2）、今の手順の後で止める
+            // 7b: 削除の実行中に、別の対象のデプロイを同時に実行し（既定の上限は 2）、今の手順の後で止める。
+            // 完了の表示の「続けてデプロイ」で、取り消した予定と同じ入力のまま ① から進める
             app.Show("Wizard");
-            app.Invoke("Deploy.Plan");
+            WizardStep(app, "完了");
+            app.Invoke("Wizard.Continue");
+            WizardStep(app, "①");
+            Next(app, "②");
+            Next(app, "③");
+            Next(app, "④");
+            app.Invoke("Wizard.Next");
             AppSession.WaitUntil(() => app.Exists("Deploy.Start") && app.IsEnabled("Deploy.Start"), "2 つ目の対象の計画が表示されませんでした。", LoadTimeout);
             app.Invoke("Deploy.Start");
+            WizardStep(app, "完了");
+            app.Invoke("Wizard.ShowJob");
             app.Find("Panel.Status");
             app.Show("Jobs");
             var concurrent = app.WaitForText("Job.Status", t => t is "実行中" or "待機中（同時に実行できる数に達しています）" or "完了" or "失敗", "2 つ目のデプロイが始まる", LoadTimeout);

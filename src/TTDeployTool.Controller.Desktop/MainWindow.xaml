@@ -42,6 +42,19 @@
                     </StackPanel>
                 </StackPanel>
             </DataTemplate>
+            <!-- ウィザードの完了の表示のジョブ（状態・進み具合・結果だけ。ログは実行状況の画面で見る。No.70） -->
+            <DataTemplate x:Key="JobSummaryTemplate" x:DataType="vm:JobViewModel">
+                <StackPanel Spacing="4">
+                    <TextBlock AutomationProperties.AutomationId="WizardJob.Status" Text="{x:Bind StatusText, Mode=OneWay}" />
+                    <ProgressBar IsIndeterminate="True" Visibility="{x:Bind IsRunning, Mode=OneWay}" />
+                    <TextBlock AutomationProperties.AutomationId="WizardJob.Step" Text="{x:Bind StepText, Mode=OneWay}" />
+                    <TextBlock Text="{x:Bind Note, Mode=OneWay}" TextWrapping="Wrap" Foreground="{ThemeResource SystemFillColorCautionBrush}" />
+                    <TextBlock AutomationProperties.AutomationId="WizardJob.Error" Text="{x:Bind Error, Mode=OneWay}" TextWrapping="Wrap" Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
+                    <TextBlock Text="{x:Bind ExpirySummary, Mode=OneWay}" TextWrapping="Wrap" />
+                    <HyperlinkButton AutomationProperties.AutomationId="WizardJob.Endpoint" Content="{x:Bind Endpoint, Mode=OneWay}" NavigateUri="{x:Bind Endpoint, Mode=OneWay}"
+                                     Visibility="{x:Bind HasEndpoint, Mode=OneWay}" />
+                </StackPanel>
+            </DataTemplate>
             <!-- ジョブの画面の 1 件（進み具合と、取り消し・一時停止・再開・停止・予定の変更。詳細設計 desktop-jobs.md の 4.1） -->
             <DataTemplate x:Key="JobRowTemplate" x:DataType="vm:JobViewModel">
                 <StackPanel Spacing="8" Padding="0,0,0,12" BorderThickness="0,0,0,1" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}">
@@ -116,16 +129,18 @@
                     <StackPanel x:Name="WizardPanel" Tag="wizard" Spacing="12" MaxWidth="900" HorizontalAlignment="Left" Visibility="Collapsed">
                         <TextBlock AutomationProperties.AutomationId="Panel.Wizard" Style="{StaticResource SubtitleTextBlockStyle}" Text="新しくデプロイ" />
                         <TextBlock AutomationProperties.AutomationId="Wizard.Step" Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind ViewModel.Wizard.StepText, Mode=OneWay}" />
-                        <!-- 登録した後（No.70）: 初期値から新しく始めるか、今の入力のまま ① から続ける -->
-                        <StackPanel AutomationProperties.AutomationId="Wizard.Registered" Spacing="8" Visibility="{x:Bind ViewModel.Wizard.HasRegistered, Mode=OneWay}">
-                            <TextBlock AutomationProperties.AutomationId="Wizard.RegisteredText" TextWrapping="Wrap" Text="{x:Bind ViewModel.Wizard.RegisteredText, Mode=OneWay}" />
+                        <!-- 完了の表示（登録した後。docs/design/desktop-wizard.md の 3、Q4・Q13・No.70）: 進み具合と結果、続けて・新規 -->
+                        <StackPanel AutomationProperties.AutomationId="Wizard.Completed" Spacing="12" Visibility="{x:Bind ViewModel.Wizard.IsCompleted, Mode=OneWay}">
+                            <TextBlock AutomationProperties.AutomationId="Wizard.CompletedText" Style="{StaticResource BodyStrongTextBlockStyle}" TextWrapping="Wrap" Text="{x:Bind ViewModel.Wizard.CompletedText, Mode=OneWay}" />
+                            <ContentControl AutomationProperties.AutomationId="Wizard.Job" Content="{x:Bind ViewModel.Wizard.RegisteredJob, Mode=OneWay}" ContentTemplate="{StaticResource JobSummaryTemplate}" HorizontalContentAlignment="Stretch" />
                             <StackPanel Orientation="Horizontal" Spacing="8">
-                                <Button AutomationProperties.AutomationId="Wizard.NewDeployment" Content="新規デプロイ（初期値から）" Command="{x:Bind ViewModel.Wizard.NewDeploymentCommand}" />
+                                <Button AutomationProperties.AutomationId="Wizard.ShowJob" Content="{x:Bind ViewModel.Wizard.ShowJobText, Mode=OneWay}" Command="{x:Bind ViewModel.Wizard.ShowJobCommand}" Style="{StaticResource AccentButtonStyle}" />
                                 <Button AutomationProperties.AutomationId="Wizard.Continue" Content="続けてデプロイ（今の設定で ① から）" Command="{x:Bind ViewModel.Wizard.ContinueCommand}" />
+                                <Button AutomationProperties.AutomationId="Wizard.NewDeployment" Content="新規デプロイ（初期値から）" Command="{x:Bind ViewModel.Wizard.NewDeploymentCommand}" />
                             </StackPanel>
                         </StackPanel>
-                        <!-- どの画面にも出す: ①〜④のすべての入力の Markdown のコピーと、初期値に戻す（docs/design/desktop-settings.md） -->
-                        <StackPanel Orientation="Horizontal" Spacing="8">
+                        <!-- どの画面にも出す（完了の表示を除く）: ①〜④のすべての入力の Markdown のコピーと、初期値に戻す（docs/design/desktop-settings.md） -->
+                        <StackPanel Orientation="Horizontal" Spacing="8" Visibility="{x:Bind ViewModel.Wizard.IsEditing, Mode=OneWay}">
                             <Button AutomationProperties.AutomationId="Settings.CopyMarkdown" Content="設定を Markdown でコピー" Command="{x:Bind ViewModel.Settings.CopyMarkdownCommand}" />
                             <CheckBox AutomationProperties.AutomationId="Settings.IncludePasswords" Content="パスワードも含める" IsChecked="{x:Bind ViewModel.Settings.IncludePasswordsInCopy, Mode=TwoWay}" />
                             <Button AutomationProperties.AutomationId="Settings.Reset" Content="初期値に戻す" Command="{x:Bind ViewModel.Settings.ResetCommand}" />
@@ -148,6 +163,8 @@
                             </StackPanel>
                             <TextBox AutomationProperties.AutomationId="Target.ResourceGroup" Header="リソースグループ名（無ければ作成します）" Text="{x:Bind ViewModel.Target.ResourceGroup, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxWidth="480" HorizontalAlignment="Left" Width="480" />
                             <TextBox AutomationProperties.AutomationId="Target.AppName" Header="アプリ名（リソース名の接頭辞）" Text="{x:Bind ViewModel.Target.AppName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="480" HorizontalAlignment="Left" />
+                            <TextBlock AutomationProperties.AutomationId="Wizard.ActiveJobNotice" TextWrapping="Wrap" Foreground="{ThemeResource SystemFillColorCautionBrush}" Text="{x:Bind ViewModel.Wizard.ActiveJobNotice, Mode=OneWay}"
+                                       Visibility="{x:Bind ViewModel.Wizard.HasActiveJobNotice, Mode=OneWay}" />
                             <TextBox AutomationProperties.AutomationId="Target.Location" Header="リージョン" Text="{x:Bind ViewModel.Target.Location, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="480" HorizontalAlignment="Left" />
                         </StackPanel>
 
@@ -225,13 +242,15 @@
                             </StackPanel>
                         </StackPanel>
 
-                        <!-- この画面の誤りと警告（⑤ ではすべて） -->
+                        <!-- この画面の誤りと警告（⑤ ではすべて）と、戻る・次へ（完了の表示では出さない） -->
+                        <StackPanel Spacing="12" Visibility="{x:Bind ViewModel.Wizard.IsEditing, Mode=OneWay}">
                         <ItemsControl AutomationProperties.AutomationId="Wizard.Errors" ItemsSource="{x:Bind ViewModel.Wizard.StepErrors}" Foreground="{ThemeResource SystemFillColorCriticalBrush}" ItemTemplate="{StaticResource LineTemplate}" />
                         <ItemsControl AutomationProperties.AutomationId="Wizard.Warnings" ItemsSource="{x:Bind ViewModel.Wizard.StepWarnings}" Foreground="{ThemeResource SystemFillColorCautionBrush}" ItemTemplate="{StaticResource LineTemplate}" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <Button AutomationProperties.AutomationId="Wizard.Back" Content="戻る" Command="{x:Bind ViewModel.Wizard.BackCommand}" />
                             <Button AutomationProperties.AutomationId="Wizard.Next" Content="次へ" Command="{x:Bind ViewModel.Wizard.NextCommand}" Style="{StaticResource AccentButtonStyle}" />
                             <TextBlock AutomationProperties.AutomationId="Wizard.Blocked" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{ThemeResource SystemFillColorCautionBrush}" Text="{x:Bind ViewModel.Wizard.BlockedText, Mode=OneWay}" />
+                        </StackPanel>
                         </StackPanel>
                     </StackPanel>
 

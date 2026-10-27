@@ -100,16 +100,20 @@ public class DeployWizardViewModelTests
         h.Navigations.Should().Equal("wizard");
     }
 
-    // 「予定に追加」の後に「新しくデプロイ」を開き直すと、⑤ のまま計画も無く、新しく始められなかった（オーナーの実機、2026-10-27。No.70）
-    private static async Task<Harness> RegisteredAsync(bool scheduled)
+    // 「予定に追加」の後に「新しくデプロイ」を開き直すと、⑤ のまま計画も無く、新しく始められなかった（オーナーの実機、2026-10-27。No.70）。
+    // 登録しても画面を移らず、完了の表示にする（Q4）。開き直しても、続けて・新規を押すまでそのまま（Q13）
+    private static async Task<Harness> RegisteredAsync(bool scheduled, Action<Harness>? arrange = null)
     {
         var h = await new Harness().ReadyAsync();
         h.Azure.ResourceGroup = null;
+        arrange?.Invoke(h);
         var vm = h.Main.Wizard;
         for (var i = 0; i < 4; i++)
             await vm.NextCommand.ExecuteAsync();
         vm.IsConfirm.Should().BeTrue();
-        vm.HasRegistered.Should().BeFalse();
+        (vm.IsCompleted, vm.IsEditing, vm.CompletedText, vm.ShowJobCommand.CanExecute(null)).Should().Be((false, true, (string?)null, false));
+        vm.ShowJobText.Should().Be("実行状況（ログ）を見る");
+        h.Navigations.Clear();
         if (scheduled)
         {
             h.Main.Deployment.Schedule.Date = DateTimeOffset.Now.AddDays(1);
@@ -123,48 +127,103 @@ public class DeployWizardViewModelTests
     }
 
     [Fact]
-    public async Task After_Registering_The_Wizard_Should_Offer_A_New_Or_Continued_Deployment()
+    public async Task A_Scheduled_Deployment_Should_Stay_On_The_Completed_View_Until_Continued()
     {
         var h = await RegisteredAsync(scheduled: true);
         var vm = h.Main.Wizard;
-        var at = h.Main.CurrentDeployment!.ScheduledAt!.Value;
+        var job = h.Main.CurrentDeployment!;
 
-        vm.HasRegistered.Should().BeTrue();
-        vm.RegisteredText.Should().Be($"デプロイ（rg / demo）を予定（{at.ToLocalTime():MM/dd HH:mm}）に追加しました。同じ設定で続けるか、初期値から新しく始められます。");
-        h.Navigations.Should().EndWith(Pages.Jobs);
+        h.Navigations.Should().BeEmpty("画面を移らない");
+        (vm.IsCompleted, vm.IsEditing, vm.StepText, vm.RegisteredJob).Should().Be((true, false, "完了", job));
+        new[] { vm.IsTarget, vm.IsDb, vm.IsPasswords, vm.IsSpec, vm.IsConfirm }.Should().AllBeEquivalentTo(false);
+        vm.CompletedText.Should().Be($"デプロイ（rg / demo）を予定に追加しました（{job.ScheduledAt!.Value.ToLocalTime():MM/dd HH:mm} に実行します）。");
+        vm.ShowJobText.Should().Be("ジョブの一覧を見る");
+        await vm.ShowJobCommand.ExecuteAsync();
+        h.Navigations.Should().Equal(Pages.Jobs);
 
-        // メニューから開き直すと、入力を残したまま ① から（登録したことの表示は残す）
+        // メニューから開き直しても、完了の表示のまま
         await h.Main.PageShownAsync(Pages.Wizard);
-        (vm.IsTarget, vm.HasRegistered, h.Main.Target.AppName).Should().Be((true, true, "demo"));
-        await h.Main.PageShownAsync(Pages.Wizard);
-        vm.IsTarget.Should().BeTrue();
+        vm.IsCompleted.Should().BeTrue();
 
-        // 続けてデプロイ: 入力はすべて残す
+        // 続けてデプロイ: 入力をすべて残して ① から。同じ対象のジョブがあることを ① で知らせる
         await vm.ContinueCommand.ExecuteAsync();
-        (vm.IsTarget, vm.HasRegistered, h.Main.Target.AppName, h.Main.Settings.DbPassword).Should().Be((true, false, "demo", "DbPassw0rd!"));
+        (vm.IsTarget, vm.IsCompleted, h.Main.Target.AppName, h.Main.Settings.DbPassword).Should().Be((true, false, "demo", "DbPassw0rd!"));
+        vm.ActiveJobNotice.Should().Be($"この対象（rg / demo）には「デプロイ（rg / demo）: {job.StatusText}」があります。終わるまでは計画できないため、アプリ名かリソースグループを変えてください。");
+        vm.HasActiveJobNotice.Should().BeTrue();
+        var raised = new List<string?>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+        h.Main.Target.AppName = "demo2";
+        (vm.ActiveJobNotice, vm.HasActiveJobNotice).Should().Be(((string?)null, false));
+        raised.Should().Contain(nameof(DeployWizardViewModel.HasActiveJobNotice));
+        h.Main.Target.AppName = "demo";
+        await job.CancelCommand.ExecuteAsync();
+        vm.HasActiveJobNotice.Should().BeFalse("ジョブが終わったら消す");
     }
 
     [Fact]
-    public async Task A_New_Deployment_Should_Reset_The_Input_Only_When_Confirmed()
+    public async Task A_Deployment_Run_Now_Should_Show_Its_Progress_And_Open_Its_Status()
     {
         var h = await RegisteredAsync(scheduled: false);
         var vm = h.Main.Wizard;
-        vm.RegisteredText.Should().StartWith("デプロイ（rg / demo）を実行しました。");
-        h.Navigations.Should().EndWith(Pages.Status);
+        var job = h.Main.CurrentDeployment!;
 
+        h.Navigations.Should().BeEmpty();
+        vm.CompletedText.Should().Be("デプロイ（rg / demo）を実行しました。");
+        vm.ShowJobText.Should().Be("実行状況（ログ）を見る");
+        await vm.ShowJobCommand.ExecuteAsync();
+        (h.Navigations.Last(), h.Main.StatusJob, h.Main.ReturnText).Should().Be((Pages.Status, job, "新しくデプロイに戻る"));
+
+        // 新規デプロイ: 確かめずに初期値に戻して ① から
         h.Dialogs.Confirm = false;
         await vm.NewDeploymentCommand.ExecuteAsync();
-        (vm.IsConfirm, vm.HasRegistered, h.Main.Settings.DbPassword).Should().Be((true, true, "DbPassw0rd!"));
+        h.Dialogs.Confirmations.Should().NotContain("初期値に戻しますか？");
+        (vm.IsTarget, vm.IsCompleted, h.Main.Target.ResourceGroup, h.Main.Settings.DbPassword).Should().Be((true, false, "", ""));
 
-        h.Dialogs.Confirm = true;
-        await vm.NewDeploymentCommand.ExecuteAsync();
-        (vm.IsTarget, vm.HasRegistered, h.Main.Target.ResourceGroup, h.Main.Settings.DbPassword).Should().Be((true, false, "", ""));
+        // 一覧の「対象に入れる」でも完了の表示をやめて ① から
+        await h.Main.Queue.WhenIdleAsync();
+        h.Main.Target.ResourceGroup = "rg";
+        h.Main.Settings.DbPassword = "DbPassw0rd!";
+        h.Main.Settings.TrackerPassword = "TrackerPass!";
+        for (var i = 0; i < 4; i++)
+            await vm.NextCommand.ExecuteAsync();
+        await h.Main.Deployment.StartCommand.ExecuteAsync();
+        vm.IsCompleted.Should().BeTrue();
+        await h.Main.OpenAsync(Pages.Wizard);
+        (vm.IsTarget, vm.IsCompleted).Should().Be((true, false));
+    }
 
-        // 登録していなければ、開き直しても今の画面のまま（入力の途中を続けられる）
-        h.Main.Target.ResourceGroup = "rg2";
-        await vm.NextCommand.ExecuteAsync();
-        await h.Main.PageShownAsync(Pages.Wizard);
-        vm.IsDb.Should().BeTrue();
+    [Fact]
+    public async Task Deletions_Should_Be_Registered_Without_A_Window_Listening()
+    {
+        var h = await new Harness().ReadyAsync();
+        h.Main.NavigationRequested -= h.Navigations.Add;
+        h.Azure.Deployed();
+        var vm = h.Main.Deletion;
+        await vm.PlanCommand.ExecuteAsync();
+        vm.ConfirmAppName = "demo";
+        await vm.StartCommand.ExecuteAsync();
+        await h.Main.Queue.WhenIdleAsync();
+        h.Azure.Deployed();
+        await vm.PlanCommand.ExecuteAsync();
+        vm.ConfirmAppName = "demo";
+        vm.Schedule.Date = DateTimeOffset.Now.AddDays(1);
+        await vm.ScheduleCommand.ExecuteAsync();
+
+        h.Main.Jobs.Select(j => j.State).Should().BeEquivalentTo([DesktopJobState.Succeeded, DesktopJobState.Scheduled]);
+        h.Navigations.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Deletions_Should_Still_Open_The_Status_Or_The_Job_List()
+    {
+        var h = await new Harness().ReadyAsync();
+        h.Azure.Deployed();
+        await h.Main.Deletion.PlanCommand.ExecuteAsync();
+        h.Main.Deletion.ConfirmAppName = "demo";
+        await h.Main.Deletion.StartCommand.ExecuteAsync();
+
+        h.Navigations.Should().EndWith(Pages.Status);
+        h.Main.Wizard.IsCompleted.Should().BeFalse("削除はウィザードと関係ない");
     }
 
     [Fact]
@@ -188,14 +247,17 @@ public class DeployWizardViewModelTests
     }
 
     [Fact]
-    public async Task Running_Now_Should_Open_The_Execution_Status_And_Read_Azure_After_The_Job()
+    public async Task Running_Now_Should_Stay_On_The_Wizard_And_The_Status_Should_Read_Azure_After_The_Job()
     {
         var h = await new Harness().ReadyAsync();
         h.Azure.ResourceGroup = null;
         h.Main.HasStatusJob.Should().BeFalse();
         await h.Main.Deployment.PlanCommand.ExecuteAsync();
 
+        // 今すぐ実行しても、ウィザードの完了の表示に留まる（Q4・No.70）。「実行状況（ログ）を見る」で開く
         await h.Main.Deployment.StartCommand.ExecuteAsync();
+        h.Navigations.Should().BeEmpty();
+        await h.Main.Wizard.ShowJobCommand.ExecuteAsync();
         await h.Main.Queue.WhenIdleAsync();
         await h.Main.StatusRefresh;
 
@@ -207,7 +269,7 @@ public class DeployWizardViewModelTests
     }
 
     [Fact]
-    public async Task Scheduling_Should_Open_The_Jobs_And_Not_Refresh_The_Status()
+    public async Task Scheduling_Should_Stay_On_The_Wizard_And_Not_Refresh_The_Status()
     {
         var h = await new Harness().ReadyAsync();
         h.Azure.ResourceGroup = null;
@@ -215,7 +277,7 @@ public class DeployWizardViewModelTests
 
         await h.Main.Deployment.ScheduleCommand.ExecuteAsync();
 
-        h.Navigations.Should().Equal("jobs");
+        h.Navigations.Should().BeEmpty("ウィザードの完了の表示に留まる（Q4・No.70）");
         h.Main.StatusJob.Should().BeNull();
         await h.Main.CurrentJob!.CancelCommand.ExecuteAsync();
         h.Main.Status.Summary.Should().BeNull();

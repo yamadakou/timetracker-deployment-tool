@@ -415,6 +415,7 @@ public class JobTableTests
         h.Main.Target.AppName = "fresh";
         await h.Main.Deployment.PlanCommand.ExecuteAsync();
         await h.Main.Deployment.ScheduleCommand.ExecuteAsync();
+        await h.Main.Wizard.ShowJobCommand.ExecuteAsync();
         h.Main.Target.AppName = "fresh2";
         await h.Main.Deployment.PlanCommand.ExecuteAsync();
         await h.Main.Deployment.StartCommand.ExecuteAsync();

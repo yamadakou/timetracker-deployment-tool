@@ -99,7 +99,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         Deployment = new DeploymentViewModel(new DeploymentWorkflow(plans, jobs, caller, logger, time), Target, Settings, Queue, Show, time);
         Deletion = new DeletionViewModel(deletions, Target, Queue, Show, time, clipboard);
         DryRun = new DryRunViewModel(Settings, dialogs, launcher);
-        Wizard = new DeployWizardViewModel(Settings, Deployment);
+        Wizard = new DeployWizardViewModel(Settings, Deployment, Target, Queue,
+            job => job.ScheduledAt == null ? OpenJobAsync(job, Pages.Wizard) : ShowJobListAsync());
         JobList = new JobListViewModel(Queue, time);
         ScheduledJobs = new ScheduledJobStore(Queue, preferences, () => SignIn.Account?.UserName, saved =>
         {
@@ -168,7 +169,12 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         private set => SetProperty(ref _returnPage, value, new Dependent(nameof(ReturnText)));
     }
 
-    public string ReturnText => ReturnPage == Pages.Jobs ? "ジョブの一覧に戻る" : "デプロイの一覧に戻る";
+    public string ReturnText => ReturnPage switch
+    {
+        Pages.Jobs => "ジョブの一覧に戻る",
+        Pages.Wizard => "新しくデプロイに戻る",
+        _ => "デプロイの一覧に戻る",
+    };
 
     /// <summary>実行状況の画面に出すジョブ（無ければ、Azure の状態だけを出す）。</summary>
     public JobViewModel? StatusJob
@@ -312,13 +318,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             : null;
 
     /// <summary>画面を開いたとき（画面の側から）。「設定」の画面なら、Windows との連携の状態を読み直す。</summary>
-    public Task PageShownAsync(string page) => page switch
-    {
-        Pages.Settings => Integration.RefreshAsync(),
-        // 登録した後に「新しくデプロイ」を開き直したら、① から（入力は残す。No.70）
-        Pages.Wizard => Wizard.ShownAsync(),
-        _ => Task.CompletedTask,
-    };
+    public Task PageShownAsync(string page) => page == Pages.Settings ? Integration.RefreshAsync() : Task.CompletedTask;
 
     /// <summary>
     /// アプリを終了してよいか（通知領域の「終了」）。終わっていないジョブがあれば確認する（終了すると実行中のジョブは止まり、予定・待機中のジョブは消える）。
@@ -379,10 +379,13 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     /// ジョブの詳細（実行状況の画面）を開く（ジョブの一覧の「詳細」・通知から。No.63）。その対象を選べれば、Azure の状態も読む。
     /// 「戻る」はジョブの一覧に戻る。
     /// </summary>
-    public async Task OpenJobAsync(JobViewModel job)
+    public Task OpenJobAsync(JobViewModel job) => OpenJobAsync(job, Pages.Jobs);
+
+    // ジョブの詳細を開く（「戻る」は returnPage。ウィザードの完了の表示からは、ウィザードに戻る）
+    private async Task OpenJobAsync(JobViewModel job, string returnPage)
     {
         StatusJob = job;
-        ReturnPage = Pages.Jobs;
+        ReturnPage = returnPage;
         var selected = Target.Select(job.Target.Subscription, job.Target.ResourceGroup, job.Target.AppName);
         NavigationRequested?.Invoke(Pages.Status);
         if (selected)
@@ -411,25 +414,32 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             StatusRefresh = Status.RefreshCommand.ExecuteAsync();
     }
 
-    // 登録したジョブを、デプロイ・削除の画面に表示する。今すぐ実行したものは実行状況の画面、予定に追加したものはジョブの画面を開く
+    private Task ShowJobListAsync()
+    {
+        NavigationRequested?.Invoke(Pages.Jobs);
+        return Task.CompletedTask;
+    }
+
+    // 登録したジョブを、デプロイ・削除の画面に表示する。デプロイはウィザードの完了の表示にし、画面を移らない（Q4・No.70）。
+    // 削除は、今すぐ実行したものは実行状況の画面、予定に追加したものはジョブの画面を開く
     private void Show(JobViewModel job)
     {
         CurrentJob = job;
-        if (job.ScheduledAt == null)
+        if (!job.IsDeployment && job.ScheduledAt == null)
         {
             StatusJob = job;
             ReturnPage = Pages.Deployments;
             NavigationRequested?.Invoke(Pages.Status);
             StatusRefresh = Status.RefreshCommand.ExecuteAsync();
         }
-        else
+        else if (!job.IsDeployment)
         {
             NavigationRequested?.Invoke(Pages.Jobs);
         }
         if (job.IsDeployment)
         {
             CurrentDeployment = job;
-            // ウィザードに「新規デプロイ」「続けてデプロイ」を出す（No.70）
+            // ウィザードを完了の表示にする（進み具合と結果、「続けてデプロイ」「新規デプロイ」。No.70）
             Wizard.Registered(job);
             // 期限日のあるデプロイを初めて登録したら、サインイン時の起動を一度だけ尋ねる（D16）
             if (Settings.Expiry.Mode != ExpiryMode.None)
