@@ -228,7 +228,7 @@ public class AzureUiTests
             app.Find("Panel.Status");
             app.Show("Jobs");
             var concurrent = app.WaitForText("Job.Status", t => t is "実行中" or "待機中（同時に実行できる数に達しています）" or "完了" or "失敗", "2 つ目のデプロイが始まる", LoadTimeout);
-            Log($"2 つ目のデプロイを始めたときのジョブ: {app.TextOf("Jobs.Summary")}");
+            Log($"2 つ目のデプロイを始めたときのジョブ: {app.TextOf("Jobs.Count")}");
             concurrent.Should().Be("実行中", "対象が違えば、削除の実行中でも待たずに始める");
             // No.63: 1 行だけ選んで「詳細」で実行状況を開き、止めてからジョブの一覧に戻る（取り消した行の選択が残っているため、先に外す）
             app.Invoke("Jobs.ClearSelection");
@@ -244,7 +244,7 @@ public class AzureUiTests
             app.Find("Panel.Jobs");
 
             // 1 つ目の対象の削除（リソースグループを含む）が終わるのを待つ
-            app.WaitForText("Jobs.Summary", t => t.Length == 0, "終わっていないジョブが無くなる", JobTimeout);
+            app.WaitForText("Jobs.Count", t => !t.Contains("終わっていないもの"), "終わっていないジョブが無くなる", JobTimeout);
             var jobs = app.ScreenText();
             Log($"ジョブ: {jobs.Replace('\n', ' ')}");
             jobs.Should().Contain($"リソースグループ {resourceGroup} も削除しました。", "1 つ目の対象の削除で、空になったリソースグループも消す");

@@ -281,7 +281,9 @@ public class JobTableTests
         now.ResultText.Should().Be("実行しませんでした: エラーが発生しました: 失敗しました");
         var list = h.Main.JobList;
         list.Items.Should().Equal(now, scheduled);
-        list.CountText.Should().Be("2 件");
+        list.CountText.Should().Be("全 2 件（終わっていないもの: 予定 1）");
+        await scheduled.CancelCommand.ExecuteAsync();
+        list.CountText.Should().Be("全 2 件", "終わっていないものが無ければ内訳は出さない");
     }
 
     [Fact]
@@ -297,7 +299,7 @@ public class JobTableTests
 
         list.Filter = JobListViewModel.Filters.Single(f => f.Mode == JobFilterMode.Scheduled);
         list.Items.Should().Equal(late);
-        list.CountText.Should().Be("1 件（全 3 件）");
+        list.CountText.Should().Be("絞り込んだ 1 件 / 全 3 件（終わっていないもの: 実行中 1・予定 1・一時停止 1）");
         list.Filter = JobListViewModel.Filters.Single(f => f.Mode == JobFilterMode.Active);
         list.Items.Should().HaveCount(3);
         list.Filter = JobListViewModel.Filters.Single(f => f.Mode == JobFilterMode.Finished);

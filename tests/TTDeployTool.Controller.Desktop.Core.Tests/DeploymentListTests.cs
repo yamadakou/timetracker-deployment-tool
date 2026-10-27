@@ -100,7 +100,7 @@ public class DeploymentListViewModelTests
         // 既定の並びは、サブスクリプションの表示（名前と ID）の順
         vm.Rows.Select(r => r.AppName).Should().Equal("other", "demo");
         vm.TotalCount.Should().Be(2);
-        vm.PageText.Should().Be("1〜2 件目 / 2 件　1 / 1 ページ");
+        vm.PageText.Should().Be("1〜2 件目を表示（全 2 件）・1 / 1 ページ");
         vm.Busy.IsBusy.Should().BeFalse();
     }
 
@@ -224,7 +224,7 @@ public class DeploymentListViewModelTests
 
         vm.ResourceGroupFilter = "RG-";
         Names().Should().Equal("a", "b", "c");
-        vm.PageText.Should().Be("1〜3 件目 / 3 件（全 4 件）　1 / 1 ページ");
+        vm.PageText.Should().Be("1〜3 件目を表示（絞り込んだ 3 件 / 全 4 件）・1 / 1 ページ");
         vm.ResourceGroupFilter = "";
 
         vm.DeployedFrom = Day(10, 10);
@@ -299,7 +299,7 @@ public class DeploymentListViewModelTests
         await vm.NextPageCommand.ExecuteAsync();
         vm.PageIndex.Should().Be(2);
         vm.Rows.Select(r => r.AppName).Should().Equal("app41", "app42", "app43", "app44", "app45");
-        vm.PageText.Should().Be("41〜45 件目 / 45 件　3 / 3 ページ");
+        vm.PageText.Should().Be("41〜45 件目を表示（全 45 件）・3 / 3 ページ");
         vm.NextPageCommand.CanExecute(null).Should().BeFalse();
         await vm.PreviousPageCommand.ExecuteAsync();
         vm.Rows[0].AppName.Should().Be("app21");

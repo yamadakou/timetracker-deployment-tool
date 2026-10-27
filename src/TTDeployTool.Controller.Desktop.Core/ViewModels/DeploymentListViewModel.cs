@@ -203,8 +203,9 @@ public sealed class DeploymentListViewModel : ObservableObject
         ? "「読み込む」を押すと、サインインしたアカウントで読めるサブスクリプションから、本ツールでデプロイした環境を読みます。"
         : FilteredCount == 0
             ? $"表示するデプロイはありません（全 {TotalCount} 件）。"
-            : $"{_pageIndex * PageSize + 1}〜{Math.Min((_pageIndex + 1) * PageSize, FilteredCount)} 件目 / {FilteredCount} 件" +
-              (FilteredCount == TotalCount ? "" : $"（全 {TotalCount} 件）") + $"　{_pageIndex + 1} / {PageCount} ページ";
+            // 「絞り込んだ件数 / 全件数」と分かるように書く（空白だけで並べると分かりにくかった。No.75）
+            : $"{_pageIndex * PageSize + 1}〜{Math.Min((_pageIndex + 1) * PageSize, FilteredCount)} 件目を表示（" +
+              (FilteredCount == TotalCount ? $"全 {TotalCount} 件" : $"絞り込んだ {FilteredCount} 件 / 全 {TotalCount} 件") + $"）・{_pageIndex + 1} / {PageCount} ページ";
 
     /// <summary>サブスクリプションの絞り込みの選択肢（「すべて」と、読んだサブスクリプション）。</summary>
     public ObservableCollection<SubscriptionFilterOption> SubscriptionFilters { get; } = [];

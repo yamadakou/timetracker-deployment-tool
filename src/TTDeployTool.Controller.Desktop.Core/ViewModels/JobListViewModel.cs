@@ -103,10 +103,11 @@ public sealed class JobListViewModel : ObservableObject
         }
     }
 
-    /// <summary>件数の表示。</summary>
+    /// <summary>件数の表示（「絞り込んだ件数 / 全件数」と、終わっていないジョブの内訳。No.75）。</summary>
     public string CountText => _queue.Jobs.Count == 0
         ? "ジョブはありません。"
-        : Items.Count == _queue.Jobs.Count ? $"{Items.Count} 件" : $"{Items.Count} 件（全 {_queue.Jobs.Count} 件）";
+        : (Items.Count == _queue.Jobs.Count ? $"全 {Items.Count} 件" : $"絞り込んだ {Items.Count} 件 / 全 {_queue.Jobs.Count} 件") +
+          (_queue.Summary is { Length: > 0 } summary ? $"（終わっていないもの: {summary}）" : "");
 
     public string KindHeader => Header("種類", JobSortKey.Kind);
 
