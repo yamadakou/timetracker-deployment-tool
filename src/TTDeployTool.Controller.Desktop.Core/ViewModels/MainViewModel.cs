@@ -312,7 +312,13 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             : null;
 
     /// <summary>画面を開いたとき（画面の側から）。「設定」の画面なら、Windows との連携の状態を読み直す。</summary>
-    public Task PageShownAsync(string page) => page == Pages.Settings ? Integration.RefreshAsync() : Task.CompletedTask;
+    public Task PageShownAsync(string page) => page switch
+    {
+        Pages.Settings => Integration.RefreshAsync(),
+        // 登録した後に「新しくデプロイ」を開き直したら、① から（入力は残す。No.70）
+        Pages.Wizard => Wizard.ShownAsync(),
+        _ => Task.CompletedTask,
+    };
 
     /// <summary>
     /// アプリを終了してよいか（通知領域の「終了」）。終わっていないジョブがあれば確認する（終了すると実行中のジョブは止まり、予定・待機中のジョブは消える）。
@@ -423,6 +429,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         if (job.IsDeployment)
         {
             CurrentDeployment = job;
+            // ウィザードに「新規デプロイ」「続けてデプロイ」を出す（No.70）
+            Wizard.Registered(job);
             // 期限日のあるデプロイを初めて登録したら、サインイン時の起動を一度だけ尋ねる（D16）
             if (Settings.Expiry.Mode != ExpiryMode.None)
                 StartupQuestion = Startup.AskOnceAsync();

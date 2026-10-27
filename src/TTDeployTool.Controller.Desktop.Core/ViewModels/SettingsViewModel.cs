@@ -96,7 +96,7 @@ public sealed class SettingsViewModel : ObservableObject
         SaveTemplateCommand = new AsyncCommand(SaveTemplateAsync, () => TemplateName.Length > 0);
         ApplyTemplateCommand = new AsyncCommand(ApplyTemplateAsync, () => SelectedTemplate != null);
         DeleteTemplateCommand = new AsyncCommand(DeleteTemplateAsync, () => SelectedTemplate != null);
-        ResetCommand = new AsyncCommand(ResetAsync);
+        ResetCommand = new AsyncCommand(ResetToDefaultsAsync);
         _target.Changed += (_, _) => Validate();
         Validate();
     }
@@ -372,11 +372,12 @@ public sealed class SettingsViewModel : ObservableObject
         Message = $"テンプレート「{t.Name}」を削除しました。";
     }
 
-    private async Task ResetAsync()
+    /// <summary>確かめてから、入力を初期値に戻す（「初期値に戻す」とウィザードの「新規デプロイ」）。戻さなかったら false。</summary>
+    internal async Task<bool> ResetToDefaultsAsync()
     {
         if (_dialogs != null && !await _dialogs.ConfirmAsync(
                 "初期値に戻しますか？", "リソースグループ・アプリ名・リージョン・パスワードを含め、入力を起動したときの値に戻します（サブスクリプションの選択は変えません）。", "初期値に戻す"))
-            return;
+            return false;
         _target.ResourceGroup = "";
         _target.AppName = Defaults.DefaultAppName;
         _target.Location = Defaults.DefaultLocation;
@@ -396,6 +397,7 @@ public sealed class SettingsViewModel : ObservableObject
         ExpiryDate = DefaultExpiryDate();
         IncludePasswordsInCopy = false;
         Message = "初期値に戻しました。";
+        return true;
     }
 
     private void Validate()

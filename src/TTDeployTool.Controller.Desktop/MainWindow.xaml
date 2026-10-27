@@ -116,6 +116,14 @@
                     <StackPanel x:Name="WizardPanel" Tag="wizard" Spacing="12" MaxWidth="900" HorizontalAlignment="Left" Visibility="Collapsed">
                         <TextBlock AutomationProperties.AutomationId="Panel.Wizard" Style="{StaticResource SubtitleTextBlockStyle}" Text="新しくデプロイ" />
                         <TextBlock AutomationProperties.AutomationId="Wizard.Step" Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind ViewModel.Wizard.StepText, Mode=OneWay}" />
+                        <!-- 登録した後（No.70）: 初期値から新しく始めるか、今の入力のまま ① から続ける -->
+                        <StackPanel AutomationProperties.AutomationId="Wizard.Registered" Spacing="8" Visibility="{x:Bind ViewModel.Wizard.HasRegistered, Mode=OneWay}">
+                            <TextBlock AutomationProperties.AutomationId="Wizard.RegisteredText" TextWrapping="Wrap" Text="{x:Bind ViewModel.Wizard.RegisteredText, Mode=OneWay}" />
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button AutomationProperties.AutomationId="Wizard.NewDeployment" Content="新規デプロイ（初期値から）" Command="{x:Bind ViewModel.Wizard.NewDeploymentCommand}" />
+                                <Button AutomationProperties.AutomationId="Wizard.Continue" Content="続けてデプロイ（今の設定で ① から）" Command="{x:Bind ViewModel.Wizard.ContinueCommand}" />
+                            </StackPanel>
+                        </StackPanel>
                         <!-- どの画面にも出す: ①〜④のすべての入力の Markdown のコピーと、初期値に戻す（docs/design/desktop-settings.md） -->
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <Button AutomationProperties.AutomationId="Settings.CopyMarkdown" Content="設定を Markdown でコピー" Command="{x:Bind ViewModel.Settings.CopyMarkdownCommand}" />

@@ -100,6 +100,73 @@ public class DeployWizardViewModelTests
         h.Navigations.Should().Equal("wizard");
     }
 
+    // 「予定に追加」の後に「新しくデプロイ」を開き直すと、⑤ のまま計画も無く、新しく始められなかった（オーナーの実機、2026-10-27。No.70）
+    private static async Task<Harness> RegisteredAsync(bool scheduled)
+    {
+        var h = await new Harness().ReadyAsync();
+        h.Azure.ResourceGroup = null;
+        var vm = h.Main.Wizard;
+        for (var i = 0; i < 4; i++)
+            await vm.NextCommand.ExecuteAsync();
+        vm.IsConfirm.Should().BeTrue();
+        vm.HasRegistered.Should().BeFalse();
+        if (scheduled)
+        {
+            h.Main.Deployment.Schedule.Date = DateTimeOffset.Now.AddDays(1);
+            await h.Main.Deployment.ScheduleCommand.ExecuteAsync();
+        }
+        else
+        {
+            await h.Main.Deployment.StartCommand.ExecuteAsync();
+        }
+        return h;
+    }
+
+    [Fact]
+    public async Task After_Registering_The_Wizard_Should_Offer_A_New_Or_Continued_Deployment()
+    {
+        var h = await RegisteredAsync(scheduled: true);
+        var vm = h.Main.Wizard;
+        var at = h.Main.CurrentDeployment!.ScheduledAt!.Value;
+
+        vm.HasRegistered.Should().BeTrue();
+        vm.RegisteredText.Should().Be($"デプロイ（rg / demo）を予定（{at.ToLocalTime():MM/dd HH:mm}）に追加しました。同じ設定で続けるか、初期値から新しく始められます。");
+        h.Navigations.Should().EndWith(Pages.Jobs);
+
+        // メニューから開き直すと、入力を残したまま ① から（登録したことの表示は残す）
+        await h.Main.PageShownAsync(Pages.Wizard);
+        (vm.IsTarget, vm.HasRegistered, h.Main.Target.AppName).Should().Be((true, true, "demo"));
+        await h.Main.PageShownAsync(Pages.Wizard);
+        vm.IsTarget.Should().BeTrue();
+
+        // 続けてデプロイ: 入力はすべて残す
+        await vm.ContinueCommand.ExecuteAsync();
+        (vm.IsTarget, vm.HasRegistered, h.Main.Target.AppName, h.Main.Settings.DbPassword).Should().Be((true, false, "demo", "DbPassw0rd!"));
+    }
+
+    [Fact]
+    public async Task A_New_Deployment_Should_Reset_The_Input_Only_When_Confirmed()
+    {
+        var h = await RegisteredAsync(scheduled: false);
+        var vm = h.Main.Wizard;
+        vm.RegisteredText.Should().StartWith("デプロイ（rg / demo）を実行しました。");
+        h.Navigations.Should().EndWith(Pages.Status);
+
+        h.Dialogs.Confirm = false;
+        await vm.NewDeploymentCommand.ExecuteAsync();
+        (vm.IsConfirm, vm.HasRegistered, h.Main.Settings.DbPassword).Should().Be((true, true, "DbPassw0rd!"));
+
+        h.Dialogs.Confirm = true;
+        await vm.NewDeploymentCommand.ExecuteAsync();
+        (vm.IsTarget, vm.HasRegistered, h.Main.Target.ResourceGroup, h.Main.Settings.DbPassword).Should().Be((true, false, "", ""));
+
+        // 登録していなければ、開き直しても今の画面のまま（入力の途中を続けられる）
+        h.Main.Target.ResourceGroup = "rg2";
+        await vm.NextCommand.ExecuteAsync();
+        await h.Main.PageShownAsync(Pages.Wizard);
+        vm.IsDb.Should().BeTrue();
+    }
+
     [Fact]
     public async Task Saving_A_Template_On_The_Last_Step_Should_Keep_The_Plan()
     {

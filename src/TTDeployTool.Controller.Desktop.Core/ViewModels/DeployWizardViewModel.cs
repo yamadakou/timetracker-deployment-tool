@@ -45,6 +45,7 @@ public sealed class DeployWizardViewModel : ObservableObject
     private readonly SettingsViewModel _settings;
     private readonly DeploymentViewModel _deployment;
     private WizardStep _step = WizardStep.Target;
+    private string? _registeredText;
 
     public DeployWizardViewModel(SettingsViewModel settings, DeploymentViewModel deployment)
     {
@@ -52,6 +53,12 @@ public sealed class DeployWizardViewModel : ObservableObject
         _deployment = deployment;
         NextCommand = new AsyncCommand(() => GoToAsync(_step + 1), () => CanGoNext);
         BackCommand = new AsyncCommand(() => GoToAsync(_step - 1), () => _step > WizardStep.Target);
+        NewDeploymentCommand = new AsyncCommand(async () =>
+        {
+            if (await _settings.ResetToDefaultsAsync())
+                await StartOverAsync();
+        });
+        ContinueCommand = new AsyncCommand(StartOverAsync);
         _settings.Errors.CollectionChanged += (_, _) => Refresh();
         _settings.Warnings.CollectionChanged += (_, _) => Refresh();
         Refresh();
@@ -60,6 +67,17 @@ public sealed class DeployWizardViewModel : ObservableObject
     public AsyncCommand NextCommand { get; }
 
     public AsyncCommand BackCommand { get; }
+
+    /// <summary>登録した後に、入力を初期値に戻して ① から始める（確かめてから。No.70）。</summary>
+    public AsyncCommand NewDeploymentCommand { get; }
+
+    /// <summary>登録した後に、今の入力のまま ① から始める（設定を変えて続けてデプロイする。No.70）。</summary>
+    public AsyncCommand ContinueCommand { get; }
+
+    /// <summary>このウィザードで登録したジョブ（「新規デプロイ」「続けてデプロイ」を出す。始め直すまで）。</summary>
+    public string? RegisteredText => _registeredText;
+
+    public bool HasRegistered => _registeredText != null;
 
     public WizardStep Step => _step;
 
@@ -96,8 +114,26 @@ public sealed class DeployWizardViewModel : ObservableObject
     public static WizardStep StepOf(string message) =>
         Prefixes.FirstOrDefault(p => message.StartsWith(p.Prefix, StringComparison.Ordinal)) is (not null, var step) ? step : WizardStep.Confirm;
 
-    /// <summary>最初の画面に戻す（一覧の「対象に入れる」・実行の後）。</summary>
-    public Task StartOverAsync() => GoToAsync(WizardStep.Target);
+    /// <summary>最初の画面に戻す（一覧の「対象に入れる」・実行の後）。登録したことの表示も消す。</summary>
+    public Task StartOverAsync()
+    {
+        SetRegistered(null);
+        return GoToAsync(WizardStep.Target);
+    }
+
+    /// <summary>このウィザードの「今すぐ実行」「予定に追加」でジョブを登録したとき。</summary>
+    internal void Registered(JobViewModel job) =>
+        SetRegistered($"{job.Title}を{(job.ScheduledAt is { } at ? $"予定（{at.ToLocalTime():MM/dd HH:mm}）に追加" : "実行")}しました。" +
+                      "同じ設定で続けるか、初期値から新しく始められます。");
+
+    /// <summary>メニューから開き直したとき。登録した後なら、入力は残したまま ① から始める（登録したことの表示は残す）。</summary>
+    internal Task ShownAsync() => HasRegistered && _step != WizardStep.Target ? GoToAsync(WizardStep.Target) : Task.CompletedTask;
+
+    private void SetRegistered(string? text)
+    {
+        if (SetProperty(ref _registeredText, text, nameof(RegisteredText)))
+            OnPropertyChanged(nameof(HasRegistered));
+    }
 
     private async Task GoToAsync(WizardStep step)
     {
