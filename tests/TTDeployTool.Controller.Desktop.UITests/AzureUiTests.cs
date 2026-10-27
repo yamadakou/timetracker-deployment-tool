@@ -117,9 +117,15 @@ public class AzureUiTests
             // ジョブが終わると、Azure の状態を読み直す
             app.WaitForText("Status.Summary", t => t.Contains("Container Apps Environment"), "デプロイした環境が表示される", LoadTimeout);
 
-            // 7d-2: デプロイの一覧（Resource Graph に反映される前でも、このアプリのジョブの結果で出る）。パスワードの表示と、期限の変更
+            // 完了の表示から開いた実行状況の「戻る」は、ウィザードに戻る（No.71）。完了の表示に URL が出ている
+            app.TextOf("Status.BackToList").Should().Be("新しくデプロイに戻る");
             app.Invoke("Status.BackToList");
-            app.Find("Panel.Deployments");
+            app.Find("Panel.Wizard");
+            WizardStep(app, "完了");
+            app.Exists("WizardJob.Endpoint").Should().BeTrue("終わったデプロイの URL が完了の表示に出る");
+
+            // 7d-2: デプロイの一覧（Resource Graph に反映される前でも、このアプリのジョブの結果で出る）。パスワードの表示と、期限の変更
+            app.Show("Deployments");
             // No.63: 絞り込みは表の見出しの「▽」から
             app.Invoke("Deployments.FilterResourceGroup");
             app.SetText("Deployments.ResourceGroupFilter", resourceGroup!);
