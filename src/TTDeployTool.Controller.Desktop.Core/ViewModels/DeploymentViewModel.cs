@@ -47,6 +47,8 @@ public sealed class DeploymentViewModel : ObservableObject
         _queue = queue;
         _registered = registered;
         Schedule = new ScheduleInput(time);
+        // 予定の日時を変えたら、押せない理由を出し直す
+        Schedule.PropertyChanged += (_, _) => RaiseBlocked();
         PlanCommand = new AsyncCommand(() => Busy.RunAsync("計画を作っています", PlanAsync));
         StartCommand = new AsyncCommand(() => RegisterAsync(null), () => CanStart);
         ScheduleCommand = new AsyncCommand(() => RegisterAsync(Schedule), () => CanStart);
@@ -137,8 +139,23 @@ public sealed class DeploymentViewModel : ObservableObject
                 return;
             StartCommand.RaiseCanExecuteChanged();
             ScheduleCommand.RaiseCanExecuteChanged();
+            RaiseBlocked();
         }
     }
+
+    /// <summary>
+    /// 「今すぐ実行」「予定に追加」が押せない理由（押せれば null。No.74）。計画に誤りがある・データ消失の同意が無い・予定の日時が過去の場合。
+    /// </summary>
+    public string? BlockedText => _ticket == null
+        ? null
+        : _ticket.Saved == null
+            ? "計画に誤りがあるため、実行できません。上の赤い行を直して「計画し直す」を押してください。"
+            : !CanStart
+                ? "「DB のデータが失われることを理解しました」にチェックを入れると、「今すぐ実行」と「予定に追加」が押せます。"
+                : Schedule.Error is { } error ? $"「予定に追加」: {error}" : null;
+
+    /// <summary>押せない理由を出すか。</summary>
+    public bool IsBlocked => BlockedText != null;
 
     public bool CanStart => _ticket?.Saved != null && (!RequiresDataLossAck || DataLossAcknowledged);
 
@@ -181,6 +198,7 @@ public sealed class DeploymentViewModel : ObservableObject
             OnPropertyChanged(nameof(CanStart));
             StartCommand.RaiseCanExecuteChanged();
             ScheduleCommand.RaiseCanExecuteChanged();
+            RaiseBlocked();
         }
     }
 
@@ -304,4 +322,10 @@ public sealed class DeploymentViewModel : ObservableObject
             _ => op.DataLoss ? "更新する（DB のデータが失われるおそれがあります）" : "更新する",
         },
         op.DataLoss);
+
+    private void RaiseBlocked()
+    {
+        OnPropertyChanged(nameof(BlockedText));
+        OnPropertyChanged(nameof(IsBlocked));
+    }
 }

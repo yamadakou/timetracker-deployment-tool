@@ -50,6 +50,8 @@ public sealed class BatchDeletionViewModel : ObservableObject
         _start = start;
         _registered = registered;
         Schedule = new ScheduleInput(time);
+        // 予定の日時を変えたら、押せない理由を出し直す
+        Schedule.PropertyChanged += (_, _) => RaiseBlocked();
         PlanCommand = new AsyncCommand(() => Busy.RunAsync("削除の計画を作っています", PlanAsync), () => _entries.Count > 0);
         StartCommand = new AsyncCommand(() => RegisterAsync(null), () => CanStart);
         ScheduleCommand = new AsyncCommand(() => RegisterAsync(Schedule), () => CanStart);
@@ -104,6 +106,7 @@ public sealed class BatchDeletionViewModel : ObservableObject
             OnPropertyChanged(nameof(CanStart));
             StartCommand.RaiseCanExecuteChanged();
             ScheduleCommand.RaiseCanExecuteChanged();
+            RaiseBlocked();
         }
     }
 
@@ -111,6 +114,16 @@ public sealed class BatchDeletionViewModel : ObservableObject
     public string? ConfirmText => RunnableCount == 0
         ? null
         : $"{RunnableCount} 件を削除します（元に戻せません）。確かめたら、削除する件数（{RunnableCount}）を入力してください。";
+
+    /// <summary>「今すぐ削除」「予定に追加」が押せない理由（押せれば null。No.74）。</summary>
+    public string? BlockedText => RunnableCount == 0
+        ? null
+        : !CanStart
+            ? $"削除する件数（{RunnableCount}）を入力すると、「今すぐ削除」と「予定に追加」が押せます。"
+            : Schedule.Error is { } error ? $"「予定に追加」: {error}" : null;
+
+    /// <summary>押せない理由を出すか。</summary>
+    public bool IsBlocked => BlockedText != null;
 
     public bool CanStart => RunnableCount > 0 && ConfirmCount.Trim() == RunnableCount.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
@@ -228,5 +241,12 @@ public sealed class BatchDeletionViewModel : ObservableObject
         OnPropertyChanged(nameof(CanStart));
         StartCommand.RaiseCanExecuteChanged();
         ScheduleCommand.RaiseCanExecuteChanged();
+        RaiseBlocked();
+    }
+
+    private void RaiseBlocked()
+    {
+        OnPropertyChanged(nameof(BlockedText));
+        OnPropertyChanged(nameof(IsBlocked));
     }
 }

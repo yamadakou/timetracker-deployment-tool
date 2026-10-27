@@ -54,6 +54,8 @@ public sealed class DeletionViewModel : ObservableObject
         _queue = queue;
         _registered = registered;
         Schedule = new ScheduleInput(time);
+        // 予定の日時を変えたら、押せない理由を出し直す
+        Schedule.PropertyChanged += (_, _) => RaiseBlocked();
         PlanCommand = new AsyncCommand(() => Busy.RunAsync("計画を作っています", PlanAsync));
         StartCommand = new AsyncCommand(() => RegisterAsync(null), () => CanStart);
         ScheduleCommand = new AsyncCommand(() => RegisterAsync(Schedule), () => CanStart);
@@ -147,6 +149,7 @@ public sealed class DeletionViewModel : ObservableObject
                 OnPropertyChanged(nameof(CanStart));
                 StartCommand.RaiseCanExecuteChanged();
                 ScheduleCommand.RaiseCanExecuteChanged();
+                RaiseBlocked();
             }
         }
     }
@@ -166,6 +169,18 @@ public sealed class DeletionViewModel : ObservableObject
         { Plan.DeletesResourceGroup: true } => null,
         { } t => KeptResourceGroup(t.Plan),
     };
+
+    /// <summary>
+    /// 「今すぐ削除」「予定に追加」が押せない理由（押せれば null。No.74）。アプリ名が入っていなければその旨を、予定の日時が過去ならその旨を出す。
+    /// </summary>
+    public string? BlockedText => AppNameToConfirm == null
+        ? null
+        : !CanStart
+            ? $"アプリ名「{AppNameToConfirm}」を入力すると、「今すぐ削除」と「予定に追加」が押せます。"
+            : Schedule.Error is { } error ? $"「予定に追加」: {error}" : null;
+
+    /// <summary>押せない理由を出すか。</summary>
+    public bool IsBlocked => BlockedText != null;
 
     public bool CanStart => AppNameToConfirm != null && ConfirmAppName == AppNameToConfirm;
 
@@ -239,6 +254,7 @@ public sealed class DeletionViewModel : ObservableObject
             OnPropertyChanged(nameof(CanStart));
             StartCommand.RaiseCanExecuteChanged();
             ScheduleCommand.RaiseCanExecuteChanged();
+            RaiseBlocked();
         }
     }
 
@@ -350,5 +366,11 @@ public sealed class DeletionViewModel : ObservableObject
         _clipboard!.CopyText(text);
         Message = message;
         return Task.CompletedTask;
+    }
+
+    private void RaiseBlocked()
+    {
+        OnPropertyChanged(nameof(BlockedText));
+        OnPropertyChanged(nameof(IsBlocked));
     }
 }

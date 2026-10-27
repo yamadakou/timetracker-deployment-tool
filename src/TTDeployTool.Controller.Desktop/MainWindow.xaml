@@ -238,6 +238,8 @@
                                 </StackPanel>
                                 <CheckBox AutomationProperties.AutomationId="Deploy.KeepSchedule" Content="予定をアプリの終了・再起動の後も残す（パスワードを暗号化してこの PC に保存）" IsChecked="{x:Bind ViewModel.Deployment.KeepScheduleAfterRestart, Mode=TwoWay}"
                                           Visibility="{x:Bind ViewModel.Deployment.CanKeepSchedule}" />
+                                <TextBlock AutomationProperties.AutomationId="Deploy.Blocked" TextWrapping="Wrap" Foreground="{ThemeResource SystemFillColorCautionBrush}" Text="{x:Bind ViewModel.Deployment.BlockedText, Mode=OneWay}"
+                                           Visibility="{x:Bind ViewModel.Deployment.IsBlocked, Mode=OneWay}" />
                                 <TextBlock AutomationProperties.AutomationId="Deploy.ScheduleNote" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="{x:Bind ViewModel.Deployment.ScheduleNote, Mode=OneWay}" />
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Spacing="8">
@@ -494,6 +496,8 @@
                                     <TimePicker AutomationProperties.AutomationId="Delete.ScheduleTime" Header="時刻" ClockIdentifier="24HourClock" Time="{x:Bind ViewModel.Deletion.Schedule.TimeOfDay, Mode=TwoWay}" />
                                     <Button AutomationProperties.AutomationId="Delete.Schedule" Content="予定に追加" VerticalAlignment="Bottom" Command="{x:Bind ViewModel.Deletion.ScheduleCommand}" />
                                 </StackPanel>
+                                <TextBlock AutomationProperties.AutomationId="Delete.Blocked" TextWrapping="Wrap" Foreground="{ThemeResource SystemFillColorCautionBrush}" Text="{x:Bind ViewModel.Deletion.BlockedText, Mode=OneWay}"
+                                           Visibility="{x:Bind ViewModel.Deletion.IsBlocked, Mode=OneWay}" />
                                 <TextBlock AutomationProperties.AutomationId="Delete.ScheduleNote" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="{x:Bind vm:SystemStatusViewModel.DeletionScheduleNote}" />
                             </StackPanel>
                         </StackPanel>
@@ -622,6 +626,8 @@
                             <TimePicker AutomationProperties.AutomationId="BatchDelete.ScheduleTime" Header="時刻" ClockIdentifier="24HourClock" Time="{x:Bind ViewModel.BatchDeletion.Schedule.TimeOfDay, Mode=TwoWay}" />
                             <Button AutomationProperties.AutomationId="BatchDelete.Schedule" Content="予定に追加" VerticalAlignment="Bottom" Command="{x:Bind ViewModel.BatchDeletion.ScheduleCommand}" />
                         </StackPanel>
+                        <TextBlock AutomationProperties.AutomationId="BatchDelete.Blocked" TextWrapping="Wrap" Foreground="{ThemeResource SystemFillColorCautionBrush}" Text="{x:Bind ViewModel.BatchDeletion.BlockedText, Mode=OneWay}"
+                                   Visibility="{x:Bind ViewModel.BatchDeletion.IsBlocked, Mode=OneWay}" />
                         <TextBlock AutomationProperties.AutomationId="BatchDelete.ScheduleNote" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="{x:Bind vm:SystemStatusViewModel.DeletionScheduleNote}" />
                     </StackPanel>
 
