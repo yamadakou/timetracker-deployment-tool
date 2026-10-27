@@ -94,14 +94,16 @@ public class SystemStatusTests
             SavedJobs = [new SavedJob(JobKind.Delete, "sub", "rg", "old", null, false, "bob@example.com", new SavedDeletion(false, false, false, "old", [], false))],
         });
         var vm = h.Main.Integration;
-        vm.ScheduledText.Should().Be("まだ始めていないジョブ（予定・待機中・一時停止）はありません。\n前回のアプリの削除の予定 1 件を、保存したアカウントでサインインしたときに戻します。");
+        vm.ScheduledText.Should().Be("まだ始めていないジョブ（予定・待機中・一時停止）はありません。\n前回のアプリの予定 1 件を、保存したアカウントでサインインしたときに戻します。");
 
         var at = _time.GetUtcNow().AddHours(1);
         h.Main.Queue.Register(JobKind.Deploy, new JobTarget("sub", "rg", "a"), at, () => new TaskCompletionSource<Job>().Task);
         h.Main.Queue.Register(JobKind.Delete, new JobTarget("sub", "rg", "b"), at, () => new TaskCompletionSource<Job>().Task,
             saved: new SavedDeletion(false, false, false, "b", [], false));
 
-        vm.ScheduledText.Should().StartWith("まだ始めていないジョブ: デプロイ 1 件はアプリの終了・Windows の再起動・サインアウトで消えます（パスワードを保存しないため）。削除 1 件は、次に");
+        vm.ScheduledText.Should().StartWith(
+            "まだ始めていないジョブ: 1 件は、次にアプリを起動してサインインしたときに戻します（予定の時刻を過ぎていたら一時停止で戻します）。" +
+            "デプロイ 1 件は残さないと選んだため、アプリの終了・Windows の再起動・サインアウトで消えます。");
     }
 
     [Fact]

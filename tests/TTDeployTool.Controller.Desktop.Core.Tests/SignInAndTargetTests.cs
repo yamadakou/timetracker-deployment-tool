@@ -20,17 +20,18 @@ internal sealed class Harness
     public FakeNotifications Notifications { get; } = new();
     public FakeClipboard Clipboard { get; } = new();
     public FakeStartupTask StartupTask { get; } = new();
+    public FakeSecrets Secrets { get; } = new();
     public List<string> Navigations { get; } = [];
     public MainViewModel Main { get; }
 
     /// <param name="preferences">前回のアプリが保存した設定（無ければ空）</param>
     public Harness(
         Microsoft.Extensions.Logging.ILoggerFactory? loggers = null, TimeProvider? time = null, bool withClipboard = true, bool withNotifications = true,
-        InMemoryAppPreferences? preferences = null)
+        InMemoryAppPreferences? preferences = null, bool withSecrets = true)
     {
         Preferences = preferences ?? new();
         Main = new MainViewModel(SignIn, Azure, Dialogs, Launcher, time ?? TimeProvider.System, loggers ?? NullLoggerFactory.Instance, TimeSpan.FromMilliseconds(5),
-            Preferences, withNotifications ? Notifications : null, withClipboard ? Clipboard : null, StartupTask);
+            Preferences, withNotifications ? Notifications : null, withClipboard ? Clipboard : null, StartupTask, withSecrets ? Secrets : null);
         Main.NavigationRequested += Navigations.Add;
     }
 

@@ -79,6 +79,20 @@ internal sealed class FakeNotifications : INotificationService
     public NotificationPermission Permission { get; set; } = NotificationPermission.Enabled;
 }
 
+/// <summary>パスワードの暗号化の代わり（「enc:」を付けて Base64 にする。<see cref="Fail"/> なら暗号化・復号に失敗する）。</summary>
+internal sealed class FakeSecrets : ISecretProtector
+{
+    public bool Fail { get; set; }
+
+    public string Protect(string value) => Fail
+        ? throw new System.Security.Cryptography.CryptographicException("暗号化できません。")
+        : "enc:" + Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(value));
+
+    public string Unprotect(string protectedValue) => Fail || !protectedValue.StartsWith("enc:", StringComparison.Ordinal)
+        ? throw new System.Security.Cryptography.CryptographicException("復号できません。")
+        : System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(protectedValue[4..]));
+}
+
 internal sealed class FakeStartupTask : IStartupTaskService
 {
     /// <summary>今の状態（既定は使えない。尋ねるダイアログをほかのテストに出さないため）。</summary>

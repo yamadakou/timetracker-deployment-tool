@@ -141,6 +141,9 @@ public sealed class JobViewModel : ObservableObject
     /// <summary>アプリを終了しても残す削除の計画（docs/design/desktop-jobs.md の 6.6。デプロイと期限での削除は null）。</summary>
     public SavedDeletion? Saved { get; init; }
 
+    /// <summary>アプリを終了しても残すデプロイの計画（パスワードは暗号化。6.7。保存しないものと削除は null）。</summary>
+    public SavedDeployment? SavedDeployment { get; init; }
+
     public ObservableCollection<string> Logs { get; } = [];
 
     public DesktopJobState State => _snapshot == null

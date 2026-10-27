@@ -43,7 +43,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public MainViewModel(
         ISignInService signIn, IAzureClients clients, IDialogService dialogs, ISystemLauncher launcher, TimeProvider time, ILoggerFactory loggers,
         TimeSpan? pollInterval = null, IAppPreferences? preferences = null, INotificationService? notifications = null, IClipboardService? clipboard = null,
-        IStartupTaskService? startupTask = null)
+        IStartupTaskService? startupTask = null, ISecretProtector? secrets = null)
     {
         _dialogs = dialogs;
         _notifications = notifications;
@@ -96,17 +96,19 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             }
         }, loggers.CreateLogger("TTDeployTool.Desktop.SignIn"));
         Settings = new SettingsViewModel(Target, time, preferences, dialogs, clipboard);
-        Deployment = new DeploymentViewModel(new DeploymentWorkflow(plans, jobs, caller, logger, time), Target, Settings, Queue, Show, time);
+        Deployment = new DeploymentViewModel(new DeploymentWorkflow(plans, jobs, caller, logger, time), Target, Settings, Queue, Show, time, secrets);
         Deletion = new DeletionViewModel(deletions, Target, Queue, Show, time, clipboard);
         DryRun = new DryRunViewModel(Settings, dialogs, launcher);
         Wizard = new DeployWizardViewModel(Settings, Deployment, Target, Queue,
             job => job.ScheduledAt == null ? OpenJobAsync(job, Pages.Wizard) : ShowJobListAsync());
         JobList = new JobListViewModel(Queue, time);
-        ScheduledJobs = new ScheduledJobStore(Queue, preferences, () => SignIn.Account?.UserName, saved =>
+        ScheduledJobs = new ScheduledJobStore(Queue, preferences, () => SignIn.Account?.UserName, (saved, options) =>
         {
             var session = Target.CreateJobSessionFor(saved.Subscription);
-            return () => Deletion.StartSavedAsync(saved.Target, saved.Deletion!, session);
-        }, notifications, loggers.CreateLogger("TTDeployTool.Desktop.Jobs"));
+            return saved.Deletion != null
+                ? () => Deletion.StartSavedAsync(saved.Target, saved.Deletion, session)
+                : () => Deployment.StartSavedAsync(saved.Deployment!, options!, session);
+        }, secrets, notifications, time, loggers.CreateLogger("TTDeployTool.Desktop.Jobs"));
         Integration = new SystemStatusViewModel(Startup, notifications, preferences, Queue, ScheduledJobs, () => CloseBehaviorText, launcher);
         BatchDeletion = new BatchDeletionViewModel(deletions, Target, Queue, Deletion.StartPlannedAsync, ShowRegistered, time);
         LogDirectory = (loggers as DiagnosticLog)?.Directory;

@@ -16,12 +16,10 @@ public sealed class SystemStatusViewModel : ObservableObject
     /// <summary>Windows の「通知」の設定。</summary>
     public static readonly Uri NotificationSettingsUri = new("ms-settings:notifications");
 
-    /// <summary>デプロイの予定を入れる画面に添える注意（D24）。</summary>
-    public const string DeployScheduleNote = "予定に追加したデプロイは、アプリを終了するか、Windows を再起動・サインアウトすると消えます（パスワードを保存しないため）。";
-
     /// <summary>削除の予定を入れる画面に添える説明（D23）。</summary>
     public const string DeletionScheduleNote =
-        "予定に追加した削除は、アプリを終了しても、次にアプリを起動してサインインしたときに戻します（始める前に計画を作り直し、変わっていれば削除しません）。";
+        "予定に追加した削除は、アプリを終了しても、次にアプリを起動してサインインしたときに戻します（始める前に計画を作り直し、変わっていれば削除しません）。" +
+        "予定の時刻を過ぎていたら、一時停止で戻すので、実行するか取り消すかを選んでください。";
 
     private readonly INotificationService? _notifications;
     private readonly IAppPreferences _preferences;
@@ -78,19 +76,19 @@ public sealed class SystemStatusViewModel : ObservableObject
     /// <summary>今ウィンドウを閉じたらどうなるか。</summary>
     public string CloseBehaviorText => _closeBehavior();
 
-    /// <summary>まだ始めていないジョブのうち、アプリの終了で消えるもの（デプロイ）と、次の起動で戻すもの（削除）。</summary>
+    /// <summary>まだ始めていないジョブのうち、次の起動で戻すもの（削除と、残すと選んだデプロイ）と、アプリの終了で消えるもの。</summary>
     public string ScheduledText
     {
         get
         {
             var waiting = _queue.Jobs.Where(j => j.State is DesktopJobState.Scheduled or DesktopJobState.Waiting or DesktopJobState.Paused).ToList();
-            var deploys = waiting.Count(j => j.IsDeployment);
-            var deletions = waiting.Count(j => j.Saved != null);
+            var kept = waiting.Count(j => j.Saved != null || j.SavedDeployment != null);
+            var lost = waiting.Count(j => j.IsDeployment && j.SavedDeployment == null);
             var text = waiting.Count == 0
                 ? "まだ始めていないジョブ（予定・待機中・一時停止）はありません。"
-                : $"まだ始めていないジョブ: デプロイ {deploys} 件はアプリの終了・Windows の再起動・サインアウトで消えます（パスワードを保存しないため）。" +
-                  $"削除 {deletions} 件は、次にアプリを起動してサインインしたときに戻します。";
-            return _store.PendingDeletions == 0 ? text : $"{text}\n前回のアプリの削除の予定 {_store.PendingDeletions} 件を、保存したアカウントでサインインしたときに戻します。";
+                : $"まだ始めていないジョブ: {kept} 件は、次にアプリを起動してサインインしたときに戻します（予定の時刻を過ぎていたら一時停止で戻します）。" +
+                  (lost > 0 ? $"デプロイ {lost} 件は残さないと選んだため、アプリの終了・Windows の再起動・サインアウトで消えます。" : "");
+            return _store.PendingJobs == 0 ? text : $"{text}\n前回のアプリの予定 {_store.PendingJobs} 件を、保存したアカウントでサインインしたときに戻します。";
         }
     }
 

@@ -1,10 +1,12 @@
 using System.Collections.ObjectModel;
+using System.Security.Cryptography;
 using TTDeployTool.Application.Deployment;
 using TTDeployTool.Application.Jobs;
 using TTDeployTool.Application.Permissions;
 using TTDeployTool.Application.Workflows;
 using TTDeployTool.Controller.Desktop.Core.Jobs;
 using TTDeployTool.Controller.Desktop.Core.Mvvm;
+using TTDeployTool.Controller.Desktop.Core.Services;
 using TTDeployTool.Domain.Deployment;
 
 namespace TTDeployTool.Controller.Desktop.Core.ViewModels;
@@ -24,15 +26,20 @@ public sealed class DeploymentViewModel : ObservableObject
     private readonly SettingsViewModel _settings;
     private readonly JobQueue _queue;
     private readonly Action<JobViewModel> _registered;
+    private readonly ISecretProtector? _secrets;
     private DeploymentPlanTicket? _ticket;
     private bool _dataLossAcknowledged;
+    private bool _keepSchedule = true;
     private string? _error;
 
     /// <param name="queue">ジョブの順番待ち（同じ対象のジョブがあれば、計画・登録しない）</param>
     /// <param name="registered">登録したジョブを画面に表示する</param>
+    /// <param name="secrets">予定を残すときのパスワードの暗号化（無ければ予定は残さない）</param>
     public DeploymentViewModel(
-        DeploymentWorkflow workflow, TargetViewModel target, SettingsViewModel settings, JobQueue queue, Action<JobViewModel> registered, TimeProvider time)
+        DeploymentWorkflow workflow, TargetViewModel target, SettingsViewModel settings, JobQueue queue, Action<JobViewModel> registered, TimeProvider time,
+        ISecretProtector? secrets = null)
     {
+        _secrets = secrets;
         _time = time;
         _workflow = workflow;
         _target = target;
@@ -61,6 +68,26 @@ public sealed class DeploymentViewModel : ObservableObject
 
     /// <summary>「予定に追加」の日時。</summary>
     public ScheduleInput Schedule { get; }
+
+    /// <summary>予定に追加したデプロイを、アプリを終了しても残すか（パスワードを暗号化してこの PC に保存する。既定はオン。6.7・D26）。</summary>
+    public bool KeepScheduleAfterRestart
+    {
+        get => _keepSchedule;
+        set
+        {
+            if (SetProperty(ref _keepSchedule, value))
+                OnPropertyChanged(nameof(ScheduleNote));
+        }
+    }
+
+    /// <summary>予定を残せるか（暗号化の仕組みが無ければ、選ぶ欄を出さない）。</summary>
+    public bool CanKeepSchedule => _secrets != null;
+
+    /// <summary>「予定に追加」の下の説明。</summary>
+    public string ScheduleNote => CanKeepSchedule && KeepScheduleAfterRestart
+        ? "予定に追加したデプロイは、アプリを終了しても、次にアプリを起動してサインインしたときに戻します（パスワードは Windows の機能で暗号化してこの PC に保存し、" +
+          "始めたとき・取り消したときに消します）。予定の時刻を過ぎていたら、一時停止で戻すので、実行するか取り消すかを選んでください。"
+        : "予定に追加したデプロイは、アプリを終了するか、Windows を再起動・サインアウトすると消えます（パスワードを保存しないため）。";
 
     public ObservableCollection<OperationRow> Operations { get; } = [];
 
@@ -196,18 +223,46 @@ public sealed class DeploymentViewModel : ObservableObject
         var acknowledged = DataLossAcknowledged;
         var session = _target.CreateJobSession();
         var options = ticket.Plan.Options;
+        string? notSaved = null;
+        SavedDeployment? saved = null;
+        if (schedule != null && CanKeepSchedule && KeepScheduleAfterRestart)
+        {
+            try
+            {
+                saved = SavedDeployment.From(ticket.Plan, acknowledged, _secrets!);
+            }
+            catch (CryptographicException ex)
+            {
+                notSaved = $"予定は登録しましたが、アプリを終了しても残すための保存ができませんでした（{ex.Message}）。アプリを終了すると、この予定は消えます。";
+            }
+        }
         try
         {
             _registered(_queue.Register(JobKind.Deploy, new JobTarget(options.Subscription, options.ResourceGroup, options.AppName), schedule?.At,
-                () => StartPlannedAsync(ticket, acknowledged, session)));
+                () => StartPlannedAsync(ticket, acknowledged, session), savedDeployment: saved));
             // 登録した計画は使ったものとして、画面から外す（次は計画からやり直す）
             Ticket = null;
+            Error = notSaved;
         }
         catch (InvalidOperationException ex)
         {
             Error = ex.Message;
         }
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// 前回のアプリで保存したデプロイの予定を始める（6.7）。復号した設定で計画を作り直し、確かめた計画と同じ操作で、データ消失の同意が
+    /// 新たに要らない場合だけ始める。
+    /// </summary>
+    internal async Task<Job> StartSavedAsync(SavedDeployment saved, DeployOptions options, IAzureSession session)
+    {
+        var fresh = await _workflow.PlanAsync(session, options);
+        if (!fresh.Plan.CanRun)
+            throw new WorkflowException(WorkflowFailure.Blocked, fresh.Plan.Blockers);
+        if (!saved.Matches(fresh.Plan) || (fresh.Plan.RequiresDataLossAck && !saved.DataLossAcknowledged))
+            throw new WorkflowException(WorkflowFailure.Changed);
+        return await _workflow.StartAsync(fresh.Saved!.PlanId, saved.DataLossAcknowledged, _ => session);
     }
 
     /// <summary>

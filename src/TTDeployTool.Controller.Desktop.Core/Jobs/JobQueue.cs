@@ -100,9 +100,11 @@ public sealed class JobQueue : ObservableObject, IDisposable
     /// <exception cref="InvalidOperationException">同じ対象の、終わっていないジョブがある</exception>
     /// <param name="expiryDeletion">利用可能期限を過ぎたための削除か（題名に出す）</param>
     /// <param name="saved">アプリを終了しても残す削除の計画（docs/design/desktop-jobs.md の 6.6。無ければ残さない）</param>
-    /// <param name="paused">一時停止にして登録する（前回の一時停止を戻すとき）</param>
+    /// <param name="paused">一時停止にして登録する（前回の一時停止と、予定の時刻を過ぎたものを戻すとき）</param>
+    /// <param name="savedDeployment">アプリを終了しても残すデプロイの計画（パスワードは暗号化。無ければ残さない）</param>
     public JobViewModel Register(
-        JobKind kind, JobTarget target, DateTimeOffset? scheduledAt, Func<Task<Job>> starter, bool expiryDeletion = false, SavedDeletion? saved = null, bool paused = false)
+        JobKind kind, JobTarget target, DateTimeOffset? scheduledAt, Func<Task<Job>> starter, bool expiryDeletion = false, SavedDeletion? saved = null, bool paused = false,
+        SavedDeployment? savedDeployment = null)
     {
         JobViewModel job;
         lock (_notifyGate)
@@ -110,7 +112,7 @@ public sealed class JobQueue : ObservableObject, IDisposable
         {
             if (ActiveFor(target.Subscription, target.ResourceGroup, target.AppName) is { } active)
                 throw new InvalidOperationException(ActiveMessage(active));
-            job = new JobViewModel(kind, target, scheduledAt, this, starter) { Order = ++_order, IsExpiryDeletion = expiryDeletion, Saved = saved };
+            job = new JobViewModel(kind, target, scheduledAt, this, starter) { Order = ++_order, IsExpiryDeletion = expiryDeletion, Saved = saved, SavedDeployment = savedDeployment };
             if (paused)
                 job.SetPending(DesktopJobState.Paused, scheduledAt, notify: false);
             // 終わったことを、ジョブの Finished が完了する前に知らせる（状態の変更の通知は、Finished の完了より先に呼ばれる）
