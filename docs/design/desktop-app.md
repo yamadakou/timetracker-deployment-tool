@@ -3,6 +3,7 @@
 - 対象ブランチ: `feature/desktop-app`
 - 全体設計: `docs/ROADMAP.md` の「2. ストア配布できるデスクトップアプリ」、`docs/MCP_TOOL_DESIGN.md`（3.2 依存関係、3.4 Application を共有する方針、4.7・4.12 計画 → 確認 → 実行、4.10 パスワードの扱い）
 - 前の段階: `docs/design/mcp-phase3b.md`（計画ストア・ジョブ）、`docs/design/mcp-phase3c.md`（削除の計画と実行）
+- 構造の図: [`desktop-architecture/`](desktop-architecture/README.md)（プロジェクトの構成と依存・Desktop.Core の中・デプロイの流れ・ドメインモデル・ジョブの状態・PC に残すデータ。2026-10-27 時点）
 - 状況: 10 の論点はオーナーの回答で決定した（WinUI 3・限定公開で始める・マルチテナントのアプリ登録・パスワードは保存しない）。一次情報の確認日は 2026-10-17
 - 中断と再開: 5a の途中で中断し（オーナーの指示）、DB データの永続化オプション（`docs/design/db-persistence.md`）のマージの後に再開した。永続化の扱いは 7.1 に反映した
 
