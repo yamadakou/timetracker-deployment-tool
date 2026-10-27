@@ -16,7 +16,7 @@ namespace TTDeployTool.Controller.Desktop.Core.Services;
 /// <param name="Account">保存したときにサインインしていたアカウントの名前（同じアカウントでサインインしたときに戻す。無ければ誰でも）</param>
 public sealed record SavedJob(
     JobKind Kind, string Subscription, string ResourceGroup, string AppName, DateTimeOffset? ScheduledAt, bool Paused, string? Account, SavedDeletion? Deletion,
-    SavedDeployment? Deployment = null)
+    SavedDeployment? Deployment = null, DateTimeOffset? RegisteredAt = null, DateTimeOffset? ChangedAt = null)
 {
     [JsonIgnore]
     public JobTarget Target => new(Subscription, ResourceGroup, AppName);

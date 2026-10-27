@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using TTDeployTool.Controller.Desktop.Core.Jobs;
 using TTDeployTool.Controller.Desktop.Core.Mvvm;
+using TTDeployTool.Controller.Desktop.Core.Services;
 
 namespace TTDeployTool.Controller.Desktop.Core.ViewModels;
 
@@ -30,12 +31,30 @@ public enum JobSortKey
     Kind,
     Target,
     State,
+
+    /// <summary>予定日時。</summary>
     Time,
+
+    /// <summary>登録日時（docs/design/desktop-jobs.md の 6.8）。</summary>
+    RegisteredAt,
+
+    /// <summary>変更日時（予定の時刻を変えた日時）。</summary>
+    ChangedAt,
+
+    /// <summary>実行開始日時。</summary>
+    StartedAt,
+
+    /// <summary>実行終了日時。</summary>
+    Finished,
+
+    /// <summary>処理時間（実行開始から実行終了まで）。</summary>
+    Duration,
 }
 
 /// <summary>
 /// ジョブの一覧（docs/design/desktop-wizard.md の 7、No.63）。このアプリのすべてのジョブ（まだ Azure に無い新しいデプロイの予定を含む）を
-/// 表に 1 行ずつ出し、見出しで並べ替え・絞り込み、選んだ行に取り消し・一時停止・再開・予定の変更をまとめて行う。詳細は実行状況の画面で見る。
+/// 表に 1 行ずつ出し、見出しで並べ替え・絞り込み、選んだ行に取り消し・一時停止・再開・予定の変更・記録から削除をまとめて行う。詳細は実行状況の画面で見る。
+/// 前回までのアプリで終わったジョブの記録も出す（docs/design/desktop-jobs.md の 6.8）。
 /// </summary>
 public sealed class JobListViewModel : ObservableObject
 {
@@ -48,6 +67,7 @@ public sealed class JobListViewModel : ObservableObject
     ];
 
     private readonly JobQueue _queue;
+    private readonly IDialogService _dialogs;
     private JobFilterOption _filter = Filters[0];
     private string _targetFilter = "";
     private JobSortKey _sortKey = JobSortKey.Registered;
@@ -55,20 +75,26 @@ public sealed class JobListViewModel : ObservableObject
     private IReadOnlyList<JobViewModel> _selected = [];
     private string? _message;
 
-    public JobListViewModel(JobQueue queue, TimeProvider time)
+    public JobListViewModel(JobQueue queue, TimeProvider time, IDialogService dialogs)
     {
         _queue = queue;
+        _dialogs = dialogs;
         Schedule = new ScheduleInput(time);
         CancelSelectedCommand = new AsyncCommand(() => Apply("取り消し", j => j.CancelCommand), () => _selected.Count > 0);
         PauseSelectedCommand = new AsyncCommand(() => Apply("一時停止", j => j.PauseCommand), () => _selected.Count > 0);
         ResumeSelectedCommand = new AsyncCommand(() => Apply("再開", j => j.ResumeCommand), () => _selected.Count > 0);
         RescheduleSelectedCommand = new AsyncCommand(RescheduleSelectedAsync, () => _selected.Count > 0);
         TableSelection = new SelectionSync<JobViewModel>(() => _selected, SetSelection);
+        DeleteSelectedRecordsCommand = new AsyncCommand(() => DeleteRecordsAsync(_selected.ToList(), "選んだジョブのうち終わったもの"), () => _selected.Any(j => !j.IsActive));
+        DeleteFinishedRecordsCommand = new AsyncCommand(() => DeleteRecordsAsync(_queue.Jobs.Where(j => !j.IsActive).ToList(), "終わったジョブすべて"),
+            () => _queue.Jobs.Any(j => !j.IsActive));
         ClearSelectionCommand = new AsyncCommand(() =>
         {
             SetSelection([]);
             return Task.CompletedTask;
         }, () => _selected.Count > 0);
+        foreach (var filter in new[] { ScheduledFilter, RegisteredFilter, ChangedFilter, StartedFilter, FinishedFilter })
+            filter.Changed += Refresh;
         // ジョブの登録・消去と、状態の変更で並べ直す
         queue.Jobs.CollectionChanged += (_, _) => Refresh();
         queue.PropertyChanged += (_, e) =>
@@ -115,14 +141,40 @@ public sealed class JobListViewModel : ObservableObject
 
     public string StateHeader => Header("状態", JobSortKey.State);
 
-    public string TimeHeader => Header("時刻", JobSortKey.Time);
+    public string TimeHeader => Header("予定日時", JobSortKey.Time);
+
+    public string RegisteredHeader => Header("登録日時", JobSortKey.RegisteredAt);
+
+    public string ChangedHeader => Header("変更日時", JobSortKey.ChangedAt);
+
+    public string StartedHeader => Header("実行開始日時", JobSortKey.StartedAt);
+
+    public string FinishedHeader => Header("実行終了日時", JobSortKey.Finished);
+
+    public string DurationHeader => Header("処理時間", JobSortKey.Duration);
+
+    /// <summary>見出しの「予定日時」の絞り込み。</summary>
+    public DateRangeFilter ScheduledFilter { get; } = new();
+
+    /// <summary>見出しの「登録日時」の絞り込み。</summary>
+    public DateRangeFilter RegisteredFilter { get; } = new();
+
+    /// <summary>見出しの「変更日時」の絞り込み。</summary>
+    public DateRangeFilter ChangedFilter { get; } = new();
+
+    /// <summary>見出しの「実行開始日時」の絞り込み。</summary>
+    public DateRangeFilter StartedFilter { get; } = new();
+
+    /// <summary>見出しの「実行終了日時」の絞り込み。</summary>
+    public DateRangeFilter FinishedFilter { get; } = new();
 
     /// <summary>見出しを押したときに並べ替える。今と同じ列なら逆順、違う列なら昇順。</summary>
     public void SortBy(JobSortKey key)
     {
         _descending = _sortKey == key && !_descending;
         _sortKey = key;
-        foreach (var name in new[] { nameof(KindHeader), nameof(TargetHeader), nameof(StateHeader), nameof(TimeHeader) })
+        foreach (var name in new[] { nameof(KindHeader), nameof(TargetHeader), nameof(StateHeader), nameof(TimeHeader), nameof(RegisteredHeader), nameof(ChangedHeader), nameof(StartedHeader),
+                     nameof(FinishedHeader), nameof(DurationHeader) })
             OnPropertyChanged(name);
         Refresh();
     }
@@ -141,6 +193,20 @@ public sealed class JobListViewModel : ObservableObject
 
     public bool HasCurrent => Current != null;
 
+    /// <summary>
+    /// 見出しの「すべて」のチェックボックス（D32）。表の行をすべて選んでいれば true、1 つも選んでいなければ false、一部だけなら null。
+    /// true にすると表の行をすべて選び、false にするとすべて外す。
+    /// </summary>
+    public bool? AllSelected
+    {
+        get => _selected.Count == 0 ? false : _selected.Count == Items.Count ? true : null;
+        set
+        {
+            if (value is { } all)
+                SetSelection(all ? Items : []);
+        }
+    }
+
     public string SelectionText => _selected.Count == 0 ? "行を選ぶと、まとめて操作できます。" : $"{_selected.Count} 件を選んでいます。";
 
     /// <summary>表で選んだ行を伝える（画面の側から）。</summary>
@@ -154,7 +220,8 @@ public sealed class JobListViewModel : ObservableObject
         OnPropertyChanged(nameof(Current));
         OnPropertyChanged(nameof(HasCurrent));
         OnPropertyChanged(nameof(SelectionText));
-        foreach (var command in new[] { CancelSelectedCommand, PauseSelectedCommand, ResumeSelectedCommand, RescheduleSelectedCommand, ClearSelectionCommand })
+        OnPropertyChanged(nameof(AllSelected));
+        foreach (var command in new[] { CancelSelectedCommand, PauseSelectedCommand, ResumeSelectedCommand, RescheduleSelectedCommand, ClearSelectionCommand, DeleteSelectedRecordsCommand })
             command.RaiseCanExecuteChanged();
         TableSelection.ViewModelChanged();
     }
@@ -163,6 +230,12 @@ public sealed class JobListViewModel : ObservableObject
     public AsyncCommand ClearSelectionCommand { get; }
 
     public AsyncCommand CancelSelectedCommand { get; }
+
+    /// <summary>選んだ行のうち、終わったジョブの記録を消す（「記録から削除」。確かめてから。Azure のリソースは消さない）。</summary>
+    public AsyncCommand DeleteSelectedRecordsCommand { get; }
+
+    /// <summary>終わったジョブの記録をすべて消す（「終わったジョブを記録から削除」。確かめてから）。</summary>
+    public AsyncCommand DeleteFinishedRecordsCommand { get; }
 
     public AsyncCommand PauseSelectedCommand { get; }
 
@@ -214,11 +287,26 @@ public sealed class JobListViewModel : ObservableObject
         await Apply($"予定の変更（{Schedule.At.ToLocalTime():MM/dd HH:mm}）", j => j.RescheduleCommand);
     }
 
+    // 終わったものの記録だけを消し、終わっていないために残したものの数を出す
+    private async Task DeleteRecordsAsync(IReadOnlyList<JobViewModel> jobs, string what)
+    {
+        var finished = jobs.Where(j => !j.IsActive).ToList();
+        if (!await _dialogs.ConfirmAsync("ジョブの記録を削除しますか？",
+                $"{what}の記録 {finished.Count} 件を、ジョブの一覧とこの PC から削除します。元に戻せません（Azure のリソースは削除しません）。", "記録から削除"))
+            return;
+        var removed = _queue.RemoveFinished(finished);
+        Message = removed == jobs.Count
+            ? $"{removed} 件の記録を削除しました。"
+            : $"{removed} 件の記録を削除しました（{jobs.Count - removed} 件は、終わっていないため、そのままです）。";
+    }
+
     private static string Result(string name, int done, int total) =>
         done == total ? $"{done} 件の{name}をしました。" : $"{done} 件の{name}をしました（{total - done} 件は、今の状態ではできないため、そのままです）。";
 
     private bool Matches(JobViewModel job) =>
         (_targetFilter.Length == 0 || job.TargetText.Contains(_targetFilter, StringComparison.OrdinalIgnoreCase))
+        && ScheduledFilter.Matches(job.ScheduledAt) && RegisteredFilter.Matches(job.RegisteredAt) && ChangedFilter.Matches(job.ChangedAt)
+        && StartedFilter.Matches(job.StartedAt) && FinishedFilter.Matches(job.FinishedAt)
         && Filter.Mode switch
         {
             JobFilterMode.Active => job.IsActive,
@@ -227,7 +315,7 @@ public sealed class JobListViewModel : ObservableObject
             _ => true,
         };
 
-    // 並べ替え（同じ値なら新しい順。予定の時刻の無いものは最後）
+    // 並べ替え（同じ値なら新しい順。値の無いもの〔予定の無いもの・まだ始めていないものなど〕は最後）
     private IEnumerable<JobViewModel> Sorted(IEnumerable<JobViewModel> jobs)
     {
         if (_sortKey == JobSortKey.Registered)
@@ -237,6 +325,11 @@ public sealed class JobListViewModel : ObservableObject
             JobSortKey.Kind => (IComparable?)j.KindText,
             JobSortKey.Target => j.TargetText,
             JobSortKey.State => j.State,
+            JobSortKey.RegisteredAt => j.RegisteredAt,
+            JobSortKey.ChangedAt => j.ChangedAt,
+            JobSortKey.StartedAt => j.StartedAt,
+            JobSortKey.Finished => j.FinishedAt,
+            JobSortKey.Duration => j.Duration,
             _ => j.ScheduledAt,
         })).ToList();
         var withValue = keyed.Where(x => x.Key != null);
@@ -255,7 +348,10 @@ public sealed class JobListViewModel : ObservableObject
             foreach (var job in matched)
                 Items.Add(job);
             SetSelection(selected.Where(matched.Contains));
+            OnPropertyChanged(nameof(AllSelected));
         }
         OnPropertyChanged(nameof(CountText));
+        DeleteSelectedRecordsCommand.RaiseCanExecuteChanged();
+        DeleteFinishedRecordsCommand.RaiseCanExecuteChanged();
     }
 }

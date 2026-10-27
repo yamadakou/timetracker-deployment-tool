@@ -312,9 +312,9 @@ public class JobTableTests
 
         list.SortBy(JobSortKey.Time);
         list.Items.Should().Equal(early, late, now);
-        (list.TimeHeader, list.KindHeader).Should().Be(("時刻 ▲", "種類"));
+        (list.TimeHeader, list.KindHeader).Should().Be(("予定日時 ▲", "種類"));
         list.SortBy(JobSortKey.Time);
-        list.TimeHeader.Should().Be("時刻 ▼");
+        list.TimeHeader.Should().Be("予定日時 ▼");
         // 予定の無いものは最後
         list.Items.Should().Equal(late, early, now);
         list.SortBy(JobSortKey.Target);

@@ -384,7 +384,7 @@ public class CopyTests
 
         await job.CopyCommand.ExecuteAsync();
 
-        h.Clipboard.Copied.Single().Should().StartWith("# TTDeployTool のジョブ: デプロイ（rg / demo）\n\n- 状態: 完了\n- 3 / 3: ")
+        h.Clipboard.Copied.Single().Should().StartWith($"# TTDeployTool のジョブ: デプロイ（rg / demo）\n\n- 状態: 完了\n- {job.TimesText}\n- 3 / 3: ")
             .And.Contain("- https://demo-tt.example.io/")
             .And.Contain("- 利用可能期限: ")
             .And.NotContain("## エラー");

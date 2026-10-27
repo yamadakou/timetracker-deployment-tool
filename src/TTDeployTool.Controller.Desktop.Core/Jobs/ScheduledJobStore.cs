@@ -84,7 +84,7 @@ public sealed class ScheduledJobStore : ObservableObject
             // 予定の時刻を過ぎたもの（待機中だったものを含む）は、勝手に始めず、一時停止で戻す（D27・D28）
             var overdue = saved.ScheduledAt is not { } at || at <= now;
             _queue.Register(saved.Kind, saved.Target, saved.ScheduledAt, _starter(saved, options), saved: saved.Deletion, paused: saved.Paused || overdue,
-                savedDeployment: saved.Deployment);
+                savedDeployment: saved.Deployment, registeredAt: saved.RegisteredAt, changedAt: saved.ChangedAt);
             restored.Add(saved with { Paused = saved.Paused || overdue });
         }
         _logger.LogInformation("前回の予定: {Restored} 件戻し（一時停止 {Paused} 件）、デプロイ {Lost} 件は戻せませんでした",
@@ -135,7 +135,7 @@ public sealed class ScheduledJobStore : ObservableObject
             .Where(j => j.State is DesktopJobState.Scheduled or DesktopJobState.Waiting or DesktopJobState.Paused && (j.IsDeployment || j.Saved != null))
             .OrderBy(j => j.Order)
             .Select(j => new SavedJob(j.IsDeployment ? JobKind.Deploy : JobKind.Delete, j.Target.Subscription, j.Target.ResourceGroup, j.Target.AppName,
-                j.ScheduledAt, j.State == DesktopJobState.Paused, account, j.Saved, j.SavedDeployment));
+                j.ScheduledAt, j.State == DesktopJobState.Paused, account, j.Saved, j.SavedDeployment, j.RegisteredAt, j.ChangedAt));
         _preferences.SavedJobs = [.. current, .. _pending];
     }
 }

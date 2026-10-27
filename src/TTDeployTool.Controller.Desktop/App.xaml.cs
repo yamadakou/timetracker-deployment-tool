@@ -56,7 +56,8 @@ public partial class App : Microsoft.UI.Xaml.Application
             notifications: new AppNotificationService(),
             clipboard: new ClipboardService(),
             startupTask: new StartupTaskService(),
-            secrets: new DpapiSecretProtector());
+            secrets: new DpapiSecretProtector(),
+            history: new FileJobHistory(Path.Combine(DesktopSettings.DataDirectory, "job-history.json")));
         // 常駐中に 2 つ目を起動したら、隠したウィンドウを出す（Program.cs）
         Program.Reactivated += (_, _) => _window.DispatcherQueue.TryEnqueue(_window.ShowFromTray);
         _window.Closed += (_, _) =>

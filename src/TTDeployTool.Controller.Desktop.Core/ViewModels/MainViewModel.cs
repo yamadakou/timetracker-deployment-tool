@@ -22,7 +22,7 @@ public enum CloseAction
 
 /// <summary>
 /// アプリの画面全体。CLI・MCP と同じアプリケーション層（計画ストア・ジョブ・ワークフロー）をプロセス内に持つ
-/// （利用者は 1 人なので呼び出し元は固定。計画とジョブはアプリを終了すると消える）。
+/// （利用者は 1 人なので呼び出し元は固定。計画とジョブはアプリを終了すると消える。予定と終わったジョブの記録はアプリのデータに残す）。
 /// </summary>
 public sealed class MainViewModel : ObservableObject, IDisposable
 {
@@ -43,7 +43,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public MainViewModel(
         ISignInService signIn, IAzureClients clients, IDialogService dialogs, ISystemLauncher launcher, TimeProvider time, ILoggerFactory loggers,
         TimeSpan? pollInterval = null, IAppPreferences? preferences = null, INotificationService? notifications = null, IClipboardService? clipboard = null,
-        IStartupTaskService? startupTask = null, ISecretProtector? secrets = null)
+        IStartupTaskService? startupTask = null, ISecretProtector? secrets = null, IJobHistoryFile? history = null)
     {
         _dialogs = dialogs;
         _notifications = notifications;
@@ -101,7 +101,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         DryRun = new DryRunViewModel(Settings, dialogs, launcher);
         Wizard = new DeployWizardViewModel(Settings, Deployment, Target, Queue,
             job => job.ScheduledAt == null ? OpenJobAsync(job, Pages.Wizard) : ShowJobListAsync());
-        JobList = new JobListViewModel(Queue, time);
+        JobList = new JobListViewModel(Queue, time, dialogs);
         ScheduledJobs = new ScheduledJobStore(Queue, preferences, () => SignIn.Account?.UserName, (saved, options) =>
         {
             var session = Target.CreateJobSessionFor(saved.Subscription);
@@ -122,11 +122,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             launcher.OpenUri(CurrentDeployment!.Endpoint!);
             return Task.CompletedTask;
         }, () => CurrentDeployment?.Endpoint != null);
-        ClearFinishedCommand = new AsyncCommand(() =>
-        {
-            Queue.ClearFinished();
-            return Task.CompletedTask;
-        });
+        // 前回までのアプリで終わったジョブの記録を、一覧ができてから入れる（docs/design/desktop-jobs.md の 6.8）
+        History = new JobHistory(Queue, history ?? new InMemoryJobHistory(), time, loggers.CreateLogger("TTDeployTool.Desktop.Jobs"));
     }
 
     public SignInViewModel SignIn { get; }
@@ -208,8 +205,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     /// <summary>デプロイが成功した後に、Timetracker を既定のブラウザーで開く。</summary>
     public AsyncCommand OpenEndpointCommand { get; }
 
-    /// <summary>終わったジョブを一覧から消す。</summary>
-    public AsyncCommand ClearFinishedCommand { get; }
+    /// <summary>終わったジョブの記録（アプリを終了しても残す）。</summary>
+    public JobHistory History { get; }
 
     /// <summary>ジョブの順番待ち・予定・同時実行の上限。</summary>
     public JobQueue Queue { get; }

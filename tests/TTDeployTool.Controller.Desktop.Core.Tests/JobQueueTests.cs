@@ -97,7 +97,7 @@ public sealed class JobQueueTests : IDisposable
         c.Release.SetResult();
         await _queue.WhenIdleAsync();
         _queue.Summary.Should().BeEmpty();
-        _queue.ClearFinished();
+        _queue.RemoveFinished(_queue.Jobs.ToList()).Should().Be(3);
         _queue.Jobs.Should().BeEmpty();
     }
 
@@ -616,21 +616,6 @@ public sealed class JobListAndPreferencesTests : IDisposable
     {
         if (Directory.Exists(_dir))
             Directory.Delete(_dir, true);
-    }
-
-    [Fact]
-    public async Task Clear_Finished_Should_Remove_Only_Finished_Jobs()
-    {
-        var h = await new Harness().ReadyAsync();
-        await h.Main.Deployment.PlanCommand.ExecuteAsync();
-        await h.Main.Deployment.StartCommand.ExecuteAsync();
-        await h.Main.Queue.WhenIdleAsync();
-        var waiting = h.Main.Queue.Register(JobKind.Delete, new JobTarget("sub", "rg", "other"), DateTimeOffset.UtcNow.AddHours(1),
-            () => new TaskCompletionSource<Job>().Task);
-
-        await h.Main.ClearFinishedCommand.ExecuteAsync();
-
-        h.Main.Jobs.Should().Equal(waiting);
     }
 
     [Fact]

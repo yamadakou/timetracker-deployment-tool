@@ -52,6 +52,7 @@ public sealed class JobViewModel : ObservableObject
     private Job? _job;
     private int _logOffset;
     private JobSnapshot? _snapshot;
+    private readonly JobRecord? _record;
     private DesktopJobState _pending;
     private DateTimeOffset? _scheduledAt;
     private string? _startError;
@@ -91,8 +92,79 @@ public sealed class JobViewModel : ObservableObject
         }, () => _queue?.Clipboard != null);
     }
 
+    /// <summary>前回までのアプリの、終わったジョブの記録を表示する（docs/design/desktop-jobs.md の 6.8。操作は Markdown のコピーだけ）。</summary>
+    internal JobViewModel(JobRecord record, JobQueue queue)
+        : this(record.Kind, record.Target, record.ScheduledAt, queue, null)
+    {
+        _record = record;
+        _note = record.Note;
+        RegisteredAt = record.RegisteredAt;
+        ChangedAt = record.ChangedAt;
+        StartedAt = record.StartedAt;
+        FinishedAt = record.FinishedAt;
+        foreach (var log in record.Logs)
+            Logs.Add(log);
+        _finished.TrySetResult();
+    }
+
     /// <summary>ジョブの内容を Markdown でコピーする。</summary>
     public AsyncCommand CopyCommand { get; }
+
+    /// <summary>前回までのアプリの記録から作ったものか。</summary>
+    public bool IsRecord => _record != null;
+
+    /// <summary>最初に登録した日時（アプリを起動し直して予定を戻しても変えない）。</summary>
+    public DateTimeOffset? RegisteredAt { get; internal set; }
+
+    /// <summary>最後に予定の時刻を変えた日時（変えていなければ null）。</summary>
+    public DateTimeOffset? ChangedAt { get; internal set; }
+
+    /// <summary>実行を始めた日時（実行の直前の確認から。始めていなければ null）。一覧の「実行開始日時」。</summary>
+    public DateTimeOffset? StartedAt { get; internal set; }
+
+    /// <summary>終わった日時（完了・失敗・取り消し・停止。まだ終わっていなければ null）。一覧の「実行終了日時」（取り消したものは取り消した日時）。</summary>
+    public DateTimeOffset? FinishedAt { get; internal set; }
+
+    /// <summary>ジョブの一覧の登録日時。</summary>
+    public string? RegisteredText => Short(RegisteredAt);
+
+    /// <summary>ジョブの一覧の変更日時。</summary>
+    public string? ChangedText => Short(ChangedAt);
+
+    /// <summary>ジョブの一覧の実行開始日時。</summary>
+    public string? StartedText => Short(StartedAt);
+
+    /// <summary>ジョブの一覧の実行終了日時。</summary>
+    public string? FinishedText => Short(FinishedAt);
+
+    /// <summary>処理時間（実行開始から実行終了まで。どちらかが無ければ null）。</summary>
+    public TimeSpan? Duration => StartedAt is { } started && FinishedAt is { } finished ? finished - started : null;
+
+    /// <summary>ジョブの一覧の処理時間。</summary>
+    public string? DurationText => Duration is { } d
+        ? d.TotalHours >= 1 ? $"{(int)d.TotalHours} 時間 {d.Minutes} 分" : $"{d.Minutes} 分 {d.Seconds} 秒"
+        : null;
+
+    /// <summary>詳細の日時（あるものだけ。前回までのアプリの記録なら、その旨を添える）。</summary>
+    public string? TimesText
+    {
+        get
+        {
+            var parts = new (string Label, DateTimeOffset? At)[] { ("登録", RegisteredAt), ("予定の変更", ChangedAt), ("実行開始", StartedAt), ("実行終了", FinishedAt) }
+                .Where(p => p.At != null)
+                .Select(p => $"{p.Label}: {p.At!.Value.ToLocalTime():yyyy-MM-dd HH:mm:ss}")
+                .ToList();
+            if (DurationText is { } duration)
+                parts.Add($"処理時間: {duration}");
+            return parts.Count == 0 ? null : string.Join("・", parts) + (IsRecord ? "（前回までのアプリの記録）" : "");
+        }
+    }
+
+    private static string? Short(DateTimeOffset? at) => at is { } value ? $"{value.ToLocalTime():MM/dd HH:mm}" : null;
+
+    /// <summary>終わったジョブの記録（<see cref="FinishedAt"/> があるときだけ呼ぶ）。</summary>
+    internal JobRecord ToRecord() => new(_kind, _target.Subscription, _target.ResourceGroup, _target.AppName, IsExpiryDeletion, _scheduledAt, FinishedAt!.Value,
+        State, Error, Note, Endpoint?.ToString(), PersistenceSummary, ExpirySummary, DeletionSummary, [.. Logs], RegisteredAt, ChangedAt, StartedAt);
 
     /// <summary>コピーの結果。</summary>
     public string? CopyMessage
@@ -103,7 +175,7 @@ public sealed class JobViewModel : ObservableObject
 
     /// <summary>ジョブの内容（題名・状態・手順・結果・エラー・注意・ログ）の Markdown。</summary>
     public string ToMarkdown() => MarkdownText.Document($"TTDeployTool のジョブ: {Title}",
-        (null, MarkdownText.Bullets([$"状態: {StatusText}", StepText, Endpoint?.ToString(), PersistenceSummary, ExpirySummary, DeletionSummary])),
+        (null, MarkdownText.Bullets([$"状態: {StatusText}", TimesText, StepText, Endpoint?.ToString(), PersistenceSummary, ExpirySummary, DeletionSummary])),
         ("エラー", Error),
         ("注意", Note),
         ("ログ", Logs.Count == 0 ? null : "```\n" + string.Join("\n", Logs) + "\n```"));
@@ -146,9 +218,9 @@ public sealed class JobViewModel : ObservableObject
 
     public ObservableCollection<string> Logs { get; } = [];
 
-    public DesktopJobState State => _snapshot == null
+    public DesktopJobState State => _record?.State ?? (_snapshot == null
         ? _pending
-        : _snapshot.Status == JobStatus.Running && _snapshot.StopRequested ? DesktopJobState.Stopping : FromJob[_snapshot.Status];
+        : _snapshot.Status == JobStatus.Running && _snapshot.StopRequested ? DesktopJobState.Stopping : FromJob[_snapshot.Status]);
 
     // 始めたジョブの状態（停止の要求は State で扱う）
     private static readonly IReadOnlyDictionary<JobStatus, DesktopJobState> FromJob = new Dictionary<JobStatus, DesktopJobState>
@@ -191,7 +263,7 @@ public sealed class JobViewModel : ObservableObject
         : _snapshot?.CurrentStep is { } step ? $"{step.Index} / {step.Total}: {step.Name}" : null;
 
     /// <summary>失敗・停止した場合のメッセージと、次の手順。</summary>
-    public string? Error => _startError is { } startError
+    public string? Error => _record != null ? _record.Error : _startError is { } startError
         ? $"実行しませんでした: {startError}"
         : _snapshot?.Error is { } error
             ? $"{error}\n途中まで作成・削除したリソースは、もう一度実行すると続きから処理します（状態は「状態の確認」で見られます）。"
@@ -205,7 +277,7 @@ public sealed class JobViewModel : ObservableObject
     }
 
     /// <summary>デプロイが成功した場合の Timetracker の URL。</summary>
-    public Uri? Endpoint => _snapshot?.Result is DeploymentResult { TimetrackerUrl: { } url } ? new Uri(url) : null;
+    public Uri? Endpoint => (_record != null ? _record.Endpoint : (_snapshot?.Result as DeploymentResult)?.TimetrackerUrl) is { } url ? new Uri(url) : null;
 
     public bool HasEndpoint => Endpoint != null;
 
@@ -257,17 +329,17 @@ public sealed class JobViewModel : ObservableObject
     private static string Key(string subscription, string resourceGroup, string appName) => $"{subscription}/{resourceGroup}/{appName}";
 
     /// <summary>デプロイが成功し、DB のデータを永続化した場合の保存先。</summary>
-    public string? PersistenceSummary => _snapshot?.Result is DeploymentResult { StorageAccountName: { } account }
+    public string? PersistenceSummary => _record != null ? _record.PersistenceSummary : _snapshot?.Result is DeploymentResult { StorageAccountName: { } account }
         ? $"DB のデータはストレージアカウント {account}（Azure Files）に保存しています。"
         : null;
 
     /// <summary>デプロイが成功した場合の、記録した利用可能期限。</summary>
-    public string? ExpirySummary => _snapshot?.Result is DeploymentResult { Expiry: { } expiry }
+    public string? ExpirySummary => _record != null ? _record.ExpirySummary : _snapshot?.Result is DeploymentResult { Expiry: { } expiry }
         ? $"利用可能期限: {expiry.Describe(TimeZoneInfo.Local)}"
         : null;
 
     /// <summary>削除が成功した場合の結果。</summary>
-    public string? DeletionSummary => _snapshot?.Result is DeletionOutcome d
+    public string? DeletionSummary => _record != null ? _record.DeletionSummary : _snapshot?.Result is DeletionOutcome d
         ? $"削除したもの: {Join(d.Deleted)}。既に無かったもの: {Join(d.AlreadyDeleted)}。" +
           (d.ResourceGroupDeleted ? $"リソースグループ {d.ResourceGroup} も削除しました。" : $"リソースグループ {d.ResourceGroup} は残しています。")
         : null;
@@ -349,6 +421,15 @@ public sealed class JobViewModel : ObservableObject
         OnPropertyChanged(nameof(IsActive));
         OnPropertyChanged(nameof(ScheduledAt));
         OnPropertyChanged(nameof(TimeText));
+        OnPropertyChanged(nameof(ChangedAt));
+        OnPropertyChanged(nameof(ChangedText));
+        OnPropertyChanged(nameof(StartedAt));
+        OnPropertyChanged(nameof(StartedText));
+        OnPropertyChanged(nameof(FinishedAt));
+        OnPropertyChanged(nameof(FinishedText));
+        OnPropertyChanged(nameof(Duration));
+        OnPropertyChanged(nameof(DurationText));
+        OnPropertyChanged(nameof(TimesText));
         OnPropertyChanged(nameof(ResultText));
         OnPropertyChanged(nameof(StatusText));
         OnPropertyChanged(nameof(StepText));

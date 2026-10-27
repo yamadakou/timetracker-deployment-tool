@@ -102,9 +102,11 @@ public sealed class JobQueue : ObservableObject, IDisposable
     /// <param name="saved">アプリを終了しても残す削除の計画（docs/design/desktop-jobs.md の 6.6。無ければ残さない）</param>
     /// <param name="paused">一時停止にして登録する（前回の一時停止と、予定の時刻を過ぎたものを戻すとき）</param>
     /// <param name="savedDeployment">アプリを終了しても残すデプロイの計画（パスワードは暗号化。無ければ残さない）</param>
+    /// <param name="registeredAt">最初に登録した日時（前回のアプリの予定を戻すとき。無ければ今）</param>
+    /// <param name="changedAt">予定の時刻を変えた日時（前回のアプリの予定を戻すとき）</param>
     public JobViewModel Register(
         JobKind kind, JobTarget target, DateTimeOffset? scheduledAt, Func<Task<Job>> starter, bool expiryDeletion = false, SavedDeletion? saved = null, bool paused = false,
-        SavedDeployment? savedDeployment = null)
+        SavedDeployment? savedDeployment = null, DateTimeOffset? registeredAt = null, DateTimeOffset? changedAt = null)
     {
         JobViewModel job;
         lock (_notifyGate)
@@ -112,7 +114,11 @@ public sealed class JobQueue : ObservableObject, IDisposable
         {
             if (ActiveFor(target.Subscription, target.ResourceGroup, target.AppName) is { } active)
                 throw new InvalidOperationException(ActiveMessage(active));
-            job = new JobViewModel(kind, target, scheduledAt, this, starter) { Order = ++_order, IsExpiryDeletion = expiryDeletion, Saved = saved, SavedDeployment = savedDeployment };
+            job = new JobViewModel(kind, target, scheduledAt, this, starter)
+            {
+                Order = ++_order, IsExpiryDeletion = expiryDeletion, Saved = saved, SavedDeployment = savedDeployment, RegisteredAt = registeredAt ?? _time.GetUtcNow(),
+                ChangedAt = changedAt,
+            };
             if (paused)
                 job.SetPending(DesktopJobState.Paused, scheduledAt, notify: false);
             // 終わったことを、ジョブの Finished が完了する前に知らせる（状態の変更の通知は、Finished の完了より先に呼ばれる）
@@ -121,6 +127,9 @@ public sealed class JobQueue : ObservableObject, IDisposable
             {
                 if (e.PropertyName != nameof(JobViewModel.State))
                     return;
+                // 終了日時を、変更の通知（記録の保存。docs/design/desktop-jobs.md の 6.8）より先に残す
+                if (!job.IsActive)
+                    job.FinishedAt ??= _time.GetUtcNow();
                 Changed();
                 if (!notified && !job.IsActive && job.State != DesktopJobState.Canceled)
                 {
@@ -141,16 +150,39 @@ public sealed class JobQueue : ObservableObject, IDisposable
     public static string ActiveMessage(JobViewModel active) =>
         $"この対象のジョブ（{active.Title}: {active.StatusText}）があるため、計画・実行できません。ジョブが終わるか、取り消してから計画してください。";
 
-    /// <summary>終わったジョブを一覧から消す。</summary>
-    public void ClearFinished()
+    /// <summary>前回までのアプリの、終わったジョブの記録を一覧に入れる（古い順に渡す。一覧は新しい順）。</summary>
+    public IReadOnlyList<JobViewModel> AddRecords(IEnumerable<JobRecord> records)
     {
+        var added = new List<JobViewModel>();
         lock (_notifyGate)
         lock (_lock)
         {
-            foreach (var job in Jobs.Where(j => !j.IsActive).ToList())
-                Jobs.Remove(job);
+            foreach (var record in records)
+            {
+                var job = new JobViewModel(record, this) { Order = ++_order, IsExpiryDeletion = record.ExpiryDeletion };
+                Jobs.Insert(0, job);
+                added.Add(job);
+            }
         }
         Changed();
+        return added;
+    }
+
+    /// <summary>渡したジョブのうち、終わったものを一覧と記録から消す（「記録から削除」。Azure のリソースは消さない）。消した数を返す。</summary>
+    public int RemoveFinished(IEnumerable<JobViewModel> jobs)
+    {
+        List<JobViewModel> finished;
+        lock (_notifyGate)
+        lock (_lock)
+        {
+            finished = [.. jobs.Where(j => !j.IsActive && Jobs.Contains(j)).Distinct()];
+            foreach (var job in finished)
+                Jobs.Remove(job);
+        }
+        var removed = finished.Count;
+        Changed();
+        _logger.LogInformation("終わったジョブの記録を {Count} 件削除しました", removed);
+        return removed;
     }
 
     /// <summary>
@@ -168,9 +200,12 @@ public sealed class JobQueue : ObservableObject, IDisposable
         Change(job, job.ScheduledAt is { } at && at > _time.GetUtcNow() ? DesktopJobState.Scheduled : DesktopJobState.Waiting, job.ScheduledAt, "再開しました");
 
     // 一時停止中なら一時停止のまま、時刻だけを変える
-    internal void Reschedule(JobViewModel job, DateTimeOffset scheduledAt) =>
+    internal void Reschedule(JobViewModel job, DateTimeOffset scheduledAt)
+    {
+        job.ChangedAt = _time.GetUtcNow();
         Change(job, job.State == DesktopJobState.Paused ? DesktopJobState.Paused : DesktopJobState.Scheduled, scheduledAt,
             $"予定を {scheduledAt.ToLocalTime():MM/dd HH:mm} に変えました");
+    }
 
     internal void Stop(JobViewModel job)
     {
@@ -192,7 +227,10 @@ public sealed class JobQueue : ObservableObject, IDisposable
                 .Take(Math.Max(slots, 0))
                 .ToList();
             foreach (var job in next)
+            {
+                job.StartedAt = now;
                 job.SetPending(DesktopJobState.Starting, job.ScheduledAt, notify: false);
+            }
         }
         foreach (var job in next)
         {
