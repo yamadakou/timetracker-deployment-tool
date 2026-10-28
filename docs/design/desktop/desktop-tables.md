@@ -2,7 +2,7 @@
 
 - 対象ブランチ: `feature/desktop-app`
 - 関連: [`desktop-wizard.md`](desktop-wizard.md) の 7（表。Q6・Q9 で WinUI 3 の ListView で作ると決めた）・[`desktop-jobs.md`](desktop-jobs.md) の 6.8（ジョブの一覧の日時の列）
-- 状況: 検討（オーナーの採用の判断待ち）。REVIEW_ISSUES No.78
+- 状況: 論点 Q1〜Q4 はオーナーの回答で決定した（2026-10-28。8 章）。Q3 は試作の結果を報告してから置き換える。REVIEW_ISSUES No.78
 - 一次情報の確認日: 2026-10-28（出典は 7）
 
 オーナーの実機の確認（2026-10-28、評価版 0.1.39）で挙がった 4 つの点について、仕様の案と、使う人から見たメリット・デメリットを並べる。採用するかは、オーナーの判断を待つ。
@@ -53,6 +53,11 @@
 | **A（推奨）** | ジョブの一覧と同じ形で、表の上に「すべて」（今のページの行をすべて選ぶ・外す。一部だけなら中間の表示） | 見えている行だけを選ぶので、見えない行を誤って「Azure から削除」の対象にしない。ジョブの一覧と同じ操作 | 絞り込んだ結果が複数ページのときは、ページごとに選ぶ（ページの大きさを 100 にすれば一度に選べる） |
 | B | 絞り込んだすべての行（ほかのページを含む）を選ぶ | 一度に全部を選べる | 見えない行まで選ばれ、まとめての削除・期限やグループの変更で、確かめにくい。ページをまたいで選択を保つ作りに変える必要がある |
 
+## 5.1 ジョブの一覧のページ（Q4 のオーナーの回答で追加）
+- ジョブの一覧にも、デプロイの一覧と同じページ（20・50・100 件ずつ。既定 20）と「前のページ」「次のページ」、件数の表示（「1〜20 件目を表示（絞り込んだ N 件 / 全 M 件）・1 / 3 ページ」）を付ける。前回までのアプリの記録（最大 500 件）が増えても、表が長くなりすぎない
+- 「すべて」のチェックボックスは、どちらの一覧も「今のページの行」を選ぶ・外す。ページを移ると選択は外れる（デプロイの一覧と同じ）。並べ替え・絞り込みを変えたら 1 ページ目に戻る
+- まとめての操作（取り消し・一時停止・再開・予定の変更・記録から削除）は、選んだ行（今のページ）にだけ行う。「終わったジョブを記録から削除」は今までどおり、ページによらず終わったものすべて
+
 ## 6. 進め方（採用されたとき）
 1. Q3 で A を選んだ場合は、先に試作（半日ほど）で、Windows App SDK 2.5.1 との組み合わせ・UI テスト・列の非表示を確かめ、結果を報告してから置き換える。試作で問題があれば、B か C に切り替えるかを改めて確かめる
 2. Q1・Q2・Q4 は、Q3 と別に先に出せる（Q3 で表を作り直す場合は、同じ変更でまとめる）
@@ -65,3 +70,11 @@
 5. [Selection](http://w-ahmad.dev/WinUI.TableView/docs/selection.html)・[Sorting](http://w-ahmad.dev/WinUI.TableView/docs/sorting.html): `SelectionMode`（`Multiple`・`Extended`）、`CornerButtonMode="SelectAll"`、行の選択は ListView と同じ。`Sorting` イベントで `e.Handled = true` にすると内蔵の並べ替えをしない。`CanSortColumns`・列ごとの `CanSort`
 6. [DataGrid（Windows Community Toolkit）](https://learn.microsoft.com/windows/communitytoolkit/controls/datagrid): "The DataGrid control is not part of the WinUI 3 controls available in the Windows Community Toolkit version 8.0 and later yet."（WinUI 3 向けの Microsoft の DataGrid は無い）
 7. 今の実装: `src/TTDeployTool.Controller.Desktop/MainWindow.xaml`（`DeploymentsPanel` の `MaxWidth="1240"`、`JobsPanel` の表の `Width="1500"`）
+
+## 8. 決定事項（オーナーの回答、2026-10-28）
+| No. | 論点 | 決定 |
+|---|---|---|
+| Q1 | 表をウィンドウの幅に合わせる | **A: 最後の列を伸ばす**（推奨どおり） |
+| Q2 | ジョブの一覧のサブスクリプション | **A: 列を足す（並べ替え・絞り込みつき）**（推奨どおり） |
+| Q3 | 列の操作の作り方 | **A: WinUI.TableView に置き換える。先に試作で確かめ、結果を報告してから置き換える**（推奨どおり） |
+| Q4 | デプロイの一覧の「すべて」 | **A: 今のページの行を選ぶ。あわせて、ジョブの一覧にもページを付ける**（オーナーの追加。5.1） |
