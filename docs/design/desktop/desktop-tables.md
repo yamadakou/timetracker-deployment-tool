@@ -70,6 +70,8 @@
 5. [Selection](http://w-ahmad.dev/WinUI.TableView/docs/selection.html)・[Sorting](http://w-ahmad.dev/WinUI.TableView/docs/sorting.html): `SelectionMode`（`Multiple`・`Extended`）、`CornerButtonMode="SelectAll"`、行の選択は ListView と同じ。`Sorting` イベントで `e.Handled = true` にすると内蔵の並べ替えをしない。`CanSortColumns`・列ごとの `CanSort`
 6. [DataGrid（Windows Community Toolkit）](https://learn.microsoft.com/windows/communitytoolkit/controls/datagrid): "The DataGrid control is not part of the WinUI 3 controls available in the Windows Community Toolkit version 8.0 and later yet."（WinUI 3 向けの Microsoft の DataGrid は無い）
 7. 今の実装: `src/TTDeployTool.Controller.Desktop/MainWindow.xaml`（`DeploymentsPanel` の `MaxWidth="1240"`、`JobsPanel` の表の `Width="1500"`）
+8. [WinUI.TableView: Accessibility](https://github.com/w-ahmad/WinUI.TableView/blob/main/docs/docs/accessibility.md)・[リリース](https://github.com/w-ahmad/WinUI.TableView/releases)（2026-10-28 に確認）: 1.5.0 で "UI Automation and accessibility support"（1.5.0-preview1: "`TableViewAutomationPeer` and peers for cells, rows, headers"）。表は Grid・Table・Selection、見出しは "`InvokePattern` when `CanSort` is `true`"、"`GetColumnHeaders()` — returns automation elements for all visible column headers"。キーボードの一覧に見出しの操作は無い。ソース（v1.5.1 の `TableViewAutomationPeer`）は `ListViewAutomationPeer` を継ぎ、見出しは子ではなく `GetColumnHeaders` で返す
+9. [TableView control for WinUI apps（Microsoft Learn）](https://learn.microsoft.com/windows/apps/develop/ui/controls/table-view)（2026-10-14 更新）: Windows App SDK 2.5.4-experimental の実験版。"Don't use them in production apps."。制限: "Users can select only one row at a time." "column headers don't support sorting from the keyboard." "Users can't reorder columns"。"The community WinUI.TableView project is a separate open-source control"。見出しは文字にする（"Use string values for column headers."）
 
 ## 8. 決定事項（オーナーの回答、2026-10-28）
 | No. | 論点 | 決定 |
@@ -80,25 +82,33 @@
 | Q4 | デプロイの一覧の「すべて」 | **A: 今のページの行を選ぶ。あわせて、ジョブの一覧にもページを付ける**（オーナーの追加。5.1） |
 
 ## 9. 試作の結果（2026-10-28。ブランチ `spike/tableview`、作業ブランチには入れない）
-「確定版を作る」画面に、WinUI.TableView 1.5.1 の表（3 列・2 行。複数選択・「すべて選ぶ」の角のボタン・左の 1 列を固定・列の幅と順序の変更）と「グループの列を隠す」ボタンを置き、CI の UI テスト（`desktop-ui`、FlaUI）で UI Automation から確かめた（CI の実行 40701028723・40702452937・40706168523）。
+「確定版を作る」画面に、WinUI.TableView 1.5.1 の表（3 列・2 行。複数選択・「すべて選ぶ」の角のボタン・左の 1 列を固定・列の幅と順序の変更・`Sorting` を `Handled` にしてアプリ側で並べ替え）と「グループの列を隠す」ボタンを置き、CI の UI テスト（`desktop-ui`、FlaUI）で UI Automation から確かめた（CI の実行 40701028723〜40733262061 の 6 回。最初の 3 回は見出しを表の子として探す誤った確かめ方で「見出しが出ない」と判断していた。オーナーの指摘で WinUI.TableView の文書（出典 8）とソースを確かめ直した）。
 
 | 確かめたこと | 結果 |
 |---|---|
 | Windows App SDK 2.5.1 との組み合わせ（復元・ビルド・MSIX の作成・インストール） | ✔ 警告・エラーなし。既存の UI テスト 10 件もすべて通る |
-| セルの読み取り | ✔ 行は `DataItem`（名前は「Row 1」）、セルは `Custom` で、名前は「グループ, Row 1, 研修」のように列の見出し・行・値がつながる（読み上げでどの列の値か分かる）。中に `Text`（値） |
-| 行の選択 | ✔ 行は SelectionItem に対応し、UI Automation から選べる |
-| 列を隠す | ✔ 列の `Visibility` を `Collapsed` にすると、その列の見出しとセルが消える |
-| 列の見出し | ✘ 見出しの行は UI Automation に出てこない。表の中にも、ウィンドウ全体にも、見出しの文字（`HeaderItem` も `Text` も）が無い。見出しに AutomationId を付けた `TextBlock` を置いても見つからない |
-| 見出しに文字以外を置く | ✘ セルの名前が「Microsoft.UI.Xaml.Controls.TextBlock, Row 1, 完了」になる。見出しは文字だけにする必要がある |
+| 表 | ✔ `DataGrid`。Table・Grid パターンに対応し、行と列の数（2 行・3 列）が正しい |
+| セル | ✔ `Custom`。名前は「グループ, Row 1, 研修」のように列の見出し・行・値がつながる（読み上げでどの列の値か分かる）。TableItem パターンで、そのセルの列の見出しを返す |
+| 列の見出し | ✔ `HeaderItem`（クラス `TableViewColumnHeader`）。名前は見出しの文字、HelpText は「昇順, フィルターをクリア」（並べ替えの状態があれば名前に足される）。Invoke パターンに対応し、Invoke で `Sorting` が起き、アプリ側の並べ替えで処理できる |
+| 見出しの見つけ方 | △ 見出しは表の子（UI Automation の木）には出ない。名前で木から探す（`FindFirstDescendant`）と見つからない。表の Table パターンの `GetColumnHeaders` は空を返す（WinUI.TableView の実装は見出しを返す作りで、空になる理由は未確認）。**セルの `GetColumnHeaderItems` からはたどれる**（行が 1 つも無いときは、この方法でもたどれない） |
+| 見出しのキーボード | △ 見出しは `IsKeyboardFocusable=False`。WinUI.TableView の文書のキーボードの一覧にも、見出しに移る・幅や順序を変える操作は無い（出典 8） |
+| 行の選択 | ✔ 行は `DataItem`（名前は「Row 1」）。SelectionItem パターンで選べる |
+| 列を隠す | ✔ 列の `Visibility` を `Collapsed` にすると、その列のセルが消える |
+| 見出しに文字以外を置く | ✘ セルの名前が「Microsoft.UI.Xaml.Controls.TextBlock, Row 1, 完了」になる。見出しは文字だけにする（Microsoft の TableView の文書も同じことを勧めている。出典 9） |
 
 ### 9.1 分かったことの意味
-- マウスでの操作（境目のドラッグでの幅・見出しのドラッグでの順序・見出しを押しての並べ替え）は使えるが、見出しの行が UI Automation に出ないため、**画面の読み上げやキーボードの操作の道具からは、見出しでの並べ替え・絞り込み（▽）・幅と順序の変更ができない**
-- 今の UI テストは、見出しのボタン（並べ替え・▽）を AutomationId で押して確かめている（`XamlContractTests` など）。見出しのまま置き換えると、この確かめ方が使えない
-- 行・セル・選択・列の表示 / 非表示は問題ない
+- 画面の読み上げは、セルごとに列の見出しを読むので、表の中身は分かる。見出しは Invoke に対応するので、UI Automation の道具からは見出しで並べ替えができる
+- ただし、見出しは木に出ず、キーボードのフォーカスも当たらないため、**キーボードだけの利用者や、木をたどる読み上げの操作からは、見出しでの並べ替え・絞り込み（▽）・幅と順序の変更に届かない**
+- UI テストは、今の「AutomationId で見出しのボタンを押す」形から、「セルからたどった見出しを Invoke する」形と、表の上の操作で確かめる形に変える。行の無い表では見出しに届かないので、空の表の確かめ方は表の上の操作にする
 
-### 9.2 論点 Q5: 置き換えるか
+### 9.2 Microsoft の TableView（実験版）との違い
+Microsoft Learn の「TableView control」（出典 9）は、Windows App SDK 2.5.4-experimental の `Microsoft.UI.Xaml.Controls.Tabular.TableView` で、WinUI.TableView（別物・API も違う）ではない。実験版で、文書には「Don't use them in production apps.」とある。2.5.4-experimental では、選べるのは 1 行だけ・列の順序は変えられない・見出しからキーボードで並べ替えられない。複数選択・列の順序の変更が要る今回の用途と、ストアで配る製品には使えない。安定版が出たら、乗り換えを改めて検討する
+
+### 9.3 論点 Q5: 置き換えるか
 | 案 | 内容 | メリット | デメリット |
 |---|---|---|---|
-| **A（推奨）** | WinUI.TableView に置き換え、見出しでしかできない操作は、どれも見出し以外からもできるようにする: 表の上の「並べ替え」（列と向きを選ぶ）と「絞り込み」（列ごとの ▽ と同じ選択肢）、「列の設定」の画面（表示 / 非表示・順序（上へ・下へ）・幅・固定する列の数・初期値に戻す）。見出しは文字だけにする。UI テストは、表の上の操作と列の設定の画面で確かめる | マウスでは表計算に近い操作（ドラッグ）ができ、読み上げ・キーボードの利用者も同じことが別の入口からできる。UI テストを保てる | 同じ操作の入口が 2 つになり、画面の部品が増える。見出しの「▽」は、マウスで押すとポップアップが出るが、読み上げからは表の上の絞り込みを使う |
-| B | 置き換えず、4.2 の C（今の表のまま、幅のつまみ・列の設定の画面・横のスクロールを自作。固定の列は見送る）に切り替える | 見出しも UI Automation で読める今の作りを保てる。新しい依存が無い | 見出しのドラッグでの順序の変更と、固定の列ができない（列の設定の画面で順序を変える）。作る量は A より多い |
-| C | 置き換え、見出しの UI Automation への対応を WinUI.TableView に提案する（直るまでは A と同じ入口を置く） | 直れば入口を 1 つにできる | 提案は外部への投稿で、採用されるか・いつかは分からない。A の作業は変わらない |
+| **A（推奨）** | WinUI.TableView に置き換える。見出しでの操作は、マウス・UI Automation の道具ではそのまま使い、キーボードだけの利用者のために、表の上に「並べ替え」（列と向き）・「絞り込み」と、「列の設定」の画面（表示 / 非表示・順序（上へ・下へ）・幅・固定する列の数・初期値に戻す）も置く。見出しは文字だけにする | マウスでは表計算に近いドラッグの操作ができ、キーボードだけの利用者も同じことが別の入口からできる。表の中身の読み上げは今より良くなる（セルごとに列の名前を読む） | 同じ操作の入口が 2 つになり、画面の部品が増える |
+| B | WinUI.TableView に置き換え、見出しの操作だけにする（表の上の操作・列の設定の画面は作らない） | 画面が簡単で、作る量が少ない | キーボードだけの利用者は、並べ替え・絞り込み・列の操作ができない |
+| C | 置き換えず、4.2 の C（今の表のまま、幅のつまみ・列の設定の画面・横のスクロールを自作。固定の列は見送る）にする | 新しい依存が無い。見出しも木に出る今の作りを保てる | 見出しのドラッグでの順序の変更と固定の列ができない。作る量は A と同じくらい |
+
+あわせて、見出しが木に出ないことと `GetColumnHeaders` が空を返すことを、WinUI.TableView に報告するか（外部への投稿）もオーナーに確かめる。
