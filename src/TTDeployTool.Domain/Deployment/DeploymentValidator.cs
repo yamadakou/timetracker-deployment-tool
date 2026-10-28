@@ -35,6 +35,9 @@ public static class DeploymentValidator
         // 利用可能期限は Azure のタグに記録するため、Azure へのデプロイだけで確かめる（今日より前かは、実行する時刻で確かめる）
         if (target == ValidationTarget.Azure && DeploymentExpiry.FormatError(o.ExpiresOn) is { } expiryError)
             errors.Add(expiryError);
+        // グループ名も Azure のタグに記録するため、Azure へのデプロイだけで確かめる
+        if (target == ValidationTarget.Azure && DeploymentGroup.FormatError(o.Group) is { } groupError)
+            errors.Add(groupError);
         AddIfNotPositive(errors, o.TimetrackerCpu, "tt-cpu");
         AddIfNotPositive(errors, o.TimetrackerMemoryGi, "tt-memory");
         AddIfNotPositive(errors, o.DbCpu, "db-cpu");

@@ -54,6 +54,52 @@ public sealed class DeploymentMaintenance
         return decision;
     }
 
+    /// <summary>
+    /// グループ名を変える・外す（<paramref name="group"/> が null・空なら外す。docs/design/common/deployment-groups.md の 5）。期限の変更と同じく、
+    /// 本ツールで作ったリソース（3 つの Container App・ストレージアカウント）のうち、あって管理タグが一致するものだけのタグを書き換える。
+    /// 外すときは、今 <see cref="DeploymentGroup.Key"/> の付いているものから、その名前と値の組を消す。Environment は書き換えない（期限と同じ）。
+    /// </summary>
+    /// <returns>書き換えた後のグループ名（外したら null）</returns>
+    /// <exception cref="ArgumentException">グループ名の誤り</exception>
+    /// <exception cref="InvalidOperationException">本ツールで作ったリソースが無い</exception>
+    public async Task<string?> ChangeGroupAsync(
+        string subscriptionId, string resourceGroup, string appName, string? group, CancellationToken cancellationToken = default)
+    {
+        if (DeploymentGroup.FormatError(group) is { } error)
+            throw new ArgumentException(error, nameof(group));
+        var name = DeploymentGroup.Normalize(group);
+        var apps = await ManagedAppInfosAsync(subscriptionId, resourceGroup, appName, cancellationToken);
+        var account = ResourceNaming.StorageAccount(subscriptionId, resourceGroup, appName);
+        var storage = await _gateway.GetStorageAccountAsync(subscriptionId, resourceGroup, account, cancellationToken) is { } info && ManagedTags.IsManaged(info.Tags, appName)
+            ? info
+            : null;
+        if (apps.Count == 0 && storage == null)
+            throw new InvalidOperationException(
+                $"リソースグループ {resourceGroup} に、アプリ名 {appName} の、本ツールで作った Container App とストレージアカウントがありません" +
+                "（削除された可能性があります）。一覧を読み直してください。");
+        if (name != null)
+        {
+            var tags = new Dictionary<string, string> { [DeploymentGroup.Key] = name };
+            foreach (var app in apps)
+                await _gateway.UpdateContainerAppTagsAsync(subscriptionId, resourceGroup, app.Name, tags, cancellationToken);
+            if (storage != null)
+                await _gateway.UpdateStorageAccountTagsAsync(subscriptionId, resourceGroup, account, tags, cancellationToken);
+            return name;
+        }
+        foreach (var app in apps)
+        {
+            if (CurrentTag(app.Tags) is { } current)
+                await _gateway.DeleteContainerAppTagsAsync(subscriptionId, resourceGroup, app.Name, current, cancellationToken);
+        }
+        if (storage != null && CurrentTag(storage.Tags) is { } storageTag)
+            await _gateway.DeleteStorageAccountTagsAsync(subscriptionId, resourceGroup, account, storageTag, cancellationToken);
+        return null;
+    }
+
+    // 今付いているグループのタグ（消すときに、名前と値の組で指定する。タグの名前の書き方はリソースのまま）
+    private static IReadOnlyDictionary<string, string>? CurrentTag(IReadOnlyDictionary<string, string> tags) =>
+        tags.Where(t => string.Equals(t.Key, DeploymentGroup.Key, StringComparison.OrdinalIgnoreCase)).ToDictionary() is { Count: > 0 } found ? found : null;
+
     /// <summary>Timetracker アプリのシークレットから、DB と Timetracker のパスワードを読む（値はログに書かない）。</summary>
     /// <exception cref="InvalidOperationException">本ツールで作った Timetracker アプリが無い</exception>
     public async Task<DeploymentPasswords> ReadPasswordsAsync(
@@ -96,11 +142,19 @@ public sealed class DeploymentMaintenance
     }
 
     // 3 つの Container App のうち、あって管理タグが一致するもの
-    private async Task<IReadOnlyList<string>> ManagedAppsAsync(string subscriptionId, string resourceGroup, string appName, CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<string>> ManagedAppsAsync(string subscriptionId, string resourceGroup, string appName, CancellationToken cancellationToken) =>
+        [.. (await ManagedAppInfosAsync(subscriptionId, resourceGroup, appName, cancellationToken)).Select(a => a.Name)];
+
+    // 3 つの Container App のうち、あって管理タグが一致するもの（Timetracker・DB・Redis の順。名前は本ツールの付け方のまま）
+    private async Task<IReadOnlyList<ContainerAppInfo>> ManagedAppInfosAsync(
+        string subscriptionId, string resourceGroup, string appName, CancellationToken cancellationToken)
     {
         var apps = await _gateway.ListContainerAppsAsync(subscriptionId, resourceGroup, cancellationToken);
         return new[] { ResourceNaming.TimetrackerApp(appName), ResourceNaming.DbApp(appName), ResourceNaming.RedisApp(appName) }
-            .Where(name => apps.Any(a => string.Equals(a.Name, name, StringComparison.OrdinalIgnoreCase) && ManagedTags.IsManaged(a.Tags, appName)))
+            .Select(name => apps.FirstOrDefault(a => string.Equals(a.Name, name, StringComparison.OrdinalIgnoreCase) && ManagedTags.IsManaged(a.Tags, appName)) is { } app
+                ? app with { Name = name }
+                : null)
+            .OfType<ContainerAppInfo>()
             .ToList();
     }
 }

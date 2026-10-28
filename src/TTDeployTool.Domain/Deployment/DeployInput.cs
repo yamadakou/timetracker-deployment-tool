@@ -32,4 +32,7 @@ public sealed record DeployInput
 
     /// <summary>利用可能期限日（yyyy-MM-dd か none。null は既定。<see cref="DeploymentExpiry"/>）。</summary>
     public string? ExpiresOn { get; init; }
+
+    /// <summary>グループ名（null・空は指定しない。既にあるデプロイでは今のグループを引き継ぐ。<see cref="DeploymentGroup"/>）。</summary>
+    public string? Group { get; init; }
 }

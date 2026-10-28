@@ -24,6 +24,7 @@ internal static class ServerInstructions
              永続化を続ける更新（persist_db が true のまま）では requires_data_loss_ack は false になり、DB アプリを停止してから更新します（その間は接続できません）。
              結果の expires_on（利用可能期限）も利用者に示す。expires_on を省略すると、新しいデプロイは今日から 32 日後、再デプロイは今の期限を引き継ぐ。
              期限を過ぎると、TTDeployTool のデスクトップアプリが自動で削除する（DB のデータも消える）。期限を変えるには expires_on に yyyy-MM-dd か none（期限なし）を指定する。
+             利用者が用途・利用者ごとに分けたい場合は group にグループ名を指定する（省略すると、再デプロイは今のグループを引き継ぐ）。結果の group.display も利用者に示す。
           3. start_deployment に plan_id を渡して始める。その後は get_job_status を 15〜30 秒の間隔で呼び、結果（Timetracker の URL）を伝える。
         - デプロイ済みの環境の状態や URL は get_deployment_info で確認できます。
         - Azure から削除する場合も、必ず次の順に行ってください。
@@ -68,6 +69,7 @@ internal static class ServerInstructions
              永続化を続ける更新（persist_db が true のまま）では requires_data_loss_ack は false になり、DB アプリを停止してから更新します（その間は接続できません）。
              結果の expires_on（利用可能期限）も利用者に示す。expires_on を省略すると、新しいデプロイは今日から 32 日後、再デプロイは今の期限を引き継ぐ。
              期限を過ぎると、TTDeployTool のデスクトップアプリが自動で削除する（DB のデータも消える）。期限を変えるには expires_on に yyyy-MM-dd か none（期限なし）を指定する。
+             利用者が用途・利用者ごとに分けたい場合は group にグループ名を指定する（省略すると、再デプロイは今のグループを引き継ぐ）。結果の group.display も利用者に示す。
           3. start_deployment に plan_id を渡して始める。その後は get_job_status を 15〜30 秒の間隔で呼び、結果（Timetracker の URL）を伝える。
         - デプロイ済みの環境の状態や URL は get_deployment_info で確認できます。
         - Azure から削除する場合も、必ず次の順に行ってください。

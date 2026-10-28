@@ -116,6 +116,16 @@ public sealed class DeploymentToolsTests : IDisposable
     }
 
     [Fact]
+    public void ValidateDeployment_Should_Check_The_Group()
+    {
+        var settings = new McpServerSettings { DbPassword = DbPassword, TrackerPassword = TrackerPassword };
+
+        Tools(settings).ValidateDeployment(subscription: "sub", resource_group: "rg", group: " 営業 ").Resolved.Group.Should().Be("営業");
+        Tools(settings).ValidateDeployment(subscription: "sub", resource_group: "rg", group: new string('x', 65)).Errors
+            .Should().Equal("group（グループ名）は 64 文字までにしてください（65 文字）。");
+    }
+
+    [Fact]
     public void ValidateDeployment_Should_List_All_Errors_Warnings_And_Password_Hints()
     {
         var result = Tools().ValidateDeployment(db_type: "sqlserver", tt_memory_gi: 2, tt_cpu: 0);

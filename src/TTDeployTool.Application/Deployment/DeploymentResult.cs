@@ -15,4 +15,5 @@ public sealed record DeploymentResult(
     string RedisAppName,
     string? TimetrackerUrl,
     string? StorageAccountName = null,
-    ExpiryDecision? Expiry = null);
+    ExpiryDecision? Expiry = null,
+    GroupDecision? Group = null);

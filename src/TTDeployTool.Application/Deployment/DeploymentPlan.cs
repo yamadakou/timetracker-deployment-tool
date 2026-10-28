@@ -35,7 +35,8 @@ public sealed record DeploymentPlan(
     IReadOnlyList<string> Blockers,
     IReadOnlyList<string> Warnings,
     PermissionCheckResult PermissionCheck,
-    ExpiryDecision? Expiry = null)
+    ExpiryDecision? Expiry = null,
+    GroupDecision? Group = null)
 {
     public bool CanRun => Blockers.Count == 0;
 

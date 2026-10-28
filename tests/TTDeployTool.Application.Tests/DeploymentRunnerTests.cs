@@ -43,7 +43,8 @@ public class DeploymentRunnerTests
         var result = await new DeploymentRunner(gateway.Object).RunAsync(Options(), cancellationToken: TestContext.Current.CancellationToken);
 
         calls.Should().Equal("rg", "env", "apps");
-        (result with { Expiry = null }).Should().Be(new DeploymentResult("rg", "demo-env", "demo-tt", "demo-db", "demo-redis", "https://demo-tt.example.io"));
+        (result with { Expiry = null, Group = null }).Should().Be(new DeploymentResult("rg", "demo-env", "demo-tt", "demo-db", "demo-redis", "https://demo-tt.example.io"));
+        result.Group.Should().Be(new GroupDecision(null, null), "グループを指定しない新しいデプロイ");
         result.Expiry!.Source.Should().Be(ExpirySource.Default);
     }
 

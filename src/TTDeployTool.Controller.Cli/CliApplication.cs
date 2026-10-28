@@ -104,6 +104,7 @@ public static class CliApplication
                 Verbose             = cli.GetBool("--verbose"),
                 PersistDb           = cli.GetBoolOrNull("--persist-db"),
                 ExpiresOn           = cli.Get("--expires-on"),
+                Group               = cli.Get("--group"),
             };
         }
         catch (ArgumentException ex)
@@ -147,6 +148,7 @@ public static class CliApplication
             if (result.StorageAccountName != null)
                 log.Info(DbPersistence.StorageNotice(result.StorageAccountName));
             log.Info(ExpiryNotice(result.Expiry!, ctx.Time));
+            log.Info(result.Group!.Describe());
             log.Success("Container Apps デプロイ完了");
             return 0;
         }

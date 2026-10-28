@@ -20,7 +20,14 @@ public sealed record DeploymentPlanResult(
     ResourceNames ResourceNames,
     bool PersistDb = false,
     string? StorageAccount = null,
-    ExpiryInfo? ExpiresOn = null);
+    ExpiryInfo? ExpiresOn = null,
+    GroupInfo? Group = null);
+
+/// <summary>
+/// デプロイで付けるグループ（docs/design/common/deployment-groups.md）。<see cref="Name"/> は付けるグループ名（付けなければ null）、
+/// <see cref="Current"/> は今のデプロイのグループ、<see cref="Display"/> は利用者に示す文（引き継ぐ・変えるの別）。
+/// </summary>
+public sealed record GroupInfo(string? Name, string? Current, string Display);
 
 /// <summary>
 /// 利用可能期限。<see cref="ExpiresAt"/> は UTC の ISO 8601（期限なしは null）、<see cref="Display"/> はサーバーの時刻帯の期限日と決まり方、
@@ -87,7 +94,8 @@ public sealed record DeploymentInfoResult(
     ContainerAppState? Db,
     ContainerAppState? Redis,
     string? Endpoint,
-    PersistenceState? Persistence = null);
+    PersistenceState? Persistence = null,
+    string? Group = null);
 
 /// <summary>
 /// DB のデータの永続化の状態。<see cref="DbPersisted"/> は DB アプリが Azure Files を使っているか、

@@ -30,6 +30,11 @@ public sealed class DeploymentPlanner
             ? new Dictionary<string, string> { [DeploymentExpiry.ExpiresAtKey] = value }
             : null;
 
+    /// <summary>今のデプロイのグループ（Timetracker・DB・Redis の Container App の順に、最初に見つかったもの。無ければ null）。</summary>
+    public static string? CurrentGroup(IReadOnlyList<ContainerAppInfo> apps, string appName) =>
+        DeploymentGroup.Combine(new[] { ResourceNaming.TimetrackerApp(appName), ResourceNaming.DbApp(appName), ResourceNaming.RedisApp(appName) }
+            .Select(name => DeploymentGroup.Read(apps.FirstOrDefault(a => string.Equals(a.Name, name, StringComparison.OrdinalIgnoreCase))?.Tags)));
+
     /// <summary>利用可能期限を決める（今日より前の日付を指定した場合は、その誤りも返す）。</summary>
     public (ExpiryDecision Decision, string? Error) ResolveExpiry(DeployOptions opts, IReadOnlyList<ContainerAppInfo> existingApps)
     {
@@ -92,7 +97,7 @@ public sealed class DeploymentPlanner
             var notChecked = ResourceGroupMissing(opts);
             warnings.Add(notChecked.Note!);
             var newExpiry = AddExpiryBlocker(opts, [], blockers, warnings);
-            return new DeploymentPlan(opts.WithPersistDb(persistNew), operations, blockers, warnings, notChecked, newExpiry);
+            return new DeploymentPlan(opts.WithPersistDb(persistNew), operations, blockers, warnings, notChecked, newExpiry, DeploymentGroup.Resolve(opts.Group, null));
         }
 
         operations.Add(new PlannedOperation(PlannedResourceKind.ResourceGroup, rg.Name, PlannedAction.UseExisting));
@@ -145,7 +150,8 @@ public sealed class DeploymentPlanner
             warnings.Add($"権限を事前に確認できませんでした: {permissions.Note}");
 
         var expiry = AddExpiryBlocker(opts, existingApps, blockers, warnings);
-        return new DeploymentPlan(opts.WithPersistDb(persist), operations, blockers, warnings, permissions, expiry);
+        return new DeploymentPlan(opts.WithPersistDb(persist), operations, blockers, warnings, permissions, expiry,
+            DeploymentGroup.Resolve(opts.Group, CurrentGroup(existingApps, opts.AppName)));
     }
 
     // 今日より前の日付は実行できない。引き継ぐ期限が既に過ぎていれば警告する

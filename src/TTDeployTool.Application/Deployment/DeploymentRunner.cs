@@ -43,6 +43,10 @@ public sealed class DeploymentRunner
             [DeploymentExpiry.ExpiresAtKey] = expiry.TagValue,
             [DeploymentExpiry.DeployedAtKey] = DeploymentExpiry.FormatTag(_time.GetUtcNow()),
         };
+        var group = DeploymentGroup.Resolve(opts.Group, DeploymentPlanner.CurrentGroup(existingApps, opts.AppName));
+        // グループは、指定したときだけ書く（指定しなければ、今のタグをそのまま残して引き継ぐ。docs/design/common/deployment-groups.md の 4）
+        if (opts.Group != null)
+            lifecycleTags[DeploymentGroup.Key] = opts.Group;
         opts = opts.WithLifecycleTags(lifecycleTags);
         var total = persist ? 4 : 3;
         var index = 0;
@@ -69,6 +73,6 @@ public sealed class DeploymentRunner
             opts.Subscription, opts.ResourceGroup, opts.AppName, opts.Location, opts, env, cancellationToken);
 
         return new DeploymentResult(
-            opts.ResourceGroup, envName, apps.TimetrackerAppName, apps.DbAppName, apps.RedisAppName, apps.TimetrackerUrl, storageAccount, expiry);
+            opts.ResourceGroup, envName, apps.TimetrackerAppName, apps.DbAppName, apps.RedisAppName, apps.TimetrackerUrl, storageAccount, expiry, group);
     }
 }

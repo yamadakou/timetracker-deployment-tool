@@ -33,6 +33,10 @@ public sealed class DeploymentTools
         "利用可能期限日（yyyy-MM-dd）、または none（期限なし）。期限は期限日の終わり（サーバーの時刻帯の 23:59:59）。" +
         "省略時は、既存のデプロイの今の期限を引き継ぎ、無ければ今日から 32 日後。" + ExpiryNote;
 
+    public const string GroupDescription =
+        "グループ名（任意。用途・利用者ごとにデプロイを分ける。Azure のタグ tt-group に記録する。64 文字まで）。" +
+        "省略すると、既存のデプロイは今のグループを引き継ぎ、新しいデプロイはグループなし。タグは平文で見えるため、秘密の情報を入れない";
+
     /// <summary>期限での削除の案内（計画・結果・説明で同じ文にする）。</summary>
     public const string ExpiryNote = "期限を過ぎると、TTDeployTool のデスクトップアプリが自動で削除します（DB のデータも消えます。CLI・MCP サーバーは期限での削除をしません）。";
 
@@ -116,14 +120,15 @@ public sealed class DeploymentTools
         [Description("Redis の CPU（vCPU、既定 0.5）")] double? redis_cpu = null,
         [Description("Redis のメモリ（Gi、既定 1.0）")] double? redis_memory_gi = null,
         [Description(PersistDbDescription)] bool? persist_db = null,
-        [Description(ExpiresOnDescription)] string? expires_on = null)
+        [Description(ExpiresOnDescription)] string? expires_on = null,
+        [Description(GroupDescription)] string? group = null)
     {
         var parameters = new DeploymentParameters
         {
             Subscription = subscription, ResourceGroup = resource_group, Location = location, AppName = app_name, DbType = db_type,
             DbName = db_name, TtTag = tt_tag, DbPassword = db_password, TrackerPassword = tracker_password,
             TtCpu = tt_cpu, TtMemoryGi = tt_memory_gi, DbCpu = db_cpu, DbMemoryGi = db_memory_gi, RedisCpu = redis_cpu, RedisMemoryGi = redis_memory_gi,
-            PersistDb = persist_db, ExpiresOn = expires_on,
+            PersistDb = persist_db, ExpiresOn = expires_on, Group = group,
         };
         var resolved = parameters.Resolve(_settings);
         var (validationTarget, targetError) = ParseTarget(target);

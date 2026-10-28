@@ -76,6 +76,7 @@ public sealed class DeploymentJobTools
         [Description("Redis のメモリ（Gi、既定 1.0）")] double? redis_memory_gi = null,
         [Description(DeploymentTools.PersistDbDescription)] bool? persist_db = null,
         [Description(DeploymentTools.ExpiresOnDescription)] string? expires_on = null,
+        [Description(DeploymentTools.GroupDescription)] string? group = null,
         [Description(DeploymentTools.AzureIdentityDescription)] string? azure_identity = null,
         CancellationToken cancellationToken = default)
     {
@@ -85,7 +86,7 @@ public sealed class DeploymentJobTools
             Subscription = subscription, ResourceGroup = resource_group, Location = location, AppName = app_name, DbType = db_type,
             DbName = db_name, TtTag = tt_tag, DbPassword = db_password, TrackerPassword = tracker_password,
             TtCpu = tt_cpu, TtMemoryGi = tt_memory_gi, DbCpu = db_cpu, DbMemoryGi = db_memory_gi, RedisCpu = redis_cpu, RedisMemoryGi = redis_memory_gi,
-            PersistDb = persist_db, ExpiresOn = expires_on,
+            PersistDb = persist_db, ExpiresOn = expires_on, Group = group,
         }.Resolve(_settings);
         var o = resolved.Options;
         var advice = DeploymentAdvisor.GetWarnings(o, ValidationTarget.Azure);
@@ -116,7 +117,8 @@ public sealed class DeploymentJobTools
             ResourceNames: ToolSupport.ToResourceNames(o.AppName),
             PersistDb: plan.PersistDb,
             StorageAccount: plan.PersistDb ? ResourceNaming.StorageAccount(o.Subscription, o.ResourceGroup, o.AppName) : null,
-            ExpiresOn: plan.Expiry is { } expiry ? ToExpiryInfo(expiry) : null);
+            ExpiresOn: plan.Expiry is { } expiry ? ToExpiryInfo(expiry) : null,
+            Group: plan.Group is { } decision ? new GroupInfo(decision.Planned, decision.Current, decision.Describe()) : null);
     }
 
     [McpServerTool(Name = "start_deployment", Title = "Azure へのデプロイの開始",
@@ -200,7 +202,7 @@ public sealed class DeploymentJobTools
     [McpServerTool(Name = "get_deployment_info", Title = "デプロイ済みの環境の状態",
         ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = true, UseStructuredContent = true)]
     [Description("Azure 上のデプロイ済みの環境（Environment と DB / Redis / Timetracker の Container App）の状態、イメージ、" +
-                 "CPU とメモリ、最新のリビジョン、管理タグの有無、Timetracker の URL、DB のデータの永続化の状態（persistence）を返す（Azure は変更しない）。")]
+                 "CPU とメモリ、最新のリビジョン、管理タグの有無、Timetracker の URL、DB のデータの永続化の状態（persistence）、グループ（group）を返す（Azure は変更しない）。")]
     public async Task<DeploymentInfoResult> GetDeploymentInfo(
         [Description("サブスクリプション ID（省略時はサーバーの既定値 TT_MCP_DEFAULT_SUBSCRIPTION）")] string? subscription = null,
         [Description("リソースグループ名（省略時はサーバーの既定値 TT_MCP_DEFAULT_RESOURCE_GROUP）")] string? resource_group = null,
@@ -222,7 +224,8 @@ public sealed class DeploymentJobTools
                 info.Environment.Name, info.Environment.Location, info.Environment.ProvisioningState, ManagedTags.IsManaged(info.Environment.Tags, o.AppName)),
             App(info.Timetracker), App(info.Db), App(info.Redis),
             info.Endpoint,
-            new PersistenceState(info.DbPersisted, info.StorageAccount?.Name, info.StorageAccount == null ? null : ManagedTags.IsManaged(info.StorageAccount.Tags, o.AppName)));
+            new PersistenceState(info.DbPersisted, info.StorageAccount?.Name, info.StorageAccount == null ? null : ManagedTags.IsManaged(info.StorageAccount.Tags, o.AppName)),
+            info.Group);
     }
 
     // 計画 → 確認 → 実行の安全策（計画で Azure を読むときは、ツールのログに書く）

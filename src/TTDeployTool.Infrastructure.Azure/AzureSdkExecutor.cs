@@ -357,11 +357,23 @@ public class AzureSdkExecutor : IAzureDeploymentGateway
         string subscriptionId, string rgName, string accountName, IReadOnlyDictionary<string, string> tags, CancellationToken cancellationToken = default) =>
         MergeTagsAsync(StorageAccountResource.CreateResourceIdentifier(subscriptionId, rgName, accountName), tags, cancellationToken);
 
+    public Task DeleteContainerAppTagsAsync(
+        string subscriptionId, string rgName, string name, IReadOnlyDictionary<string, string> tags, CancellationToken cancellationToken = default) =>
+        PatchTagsAsync(ContainerAppResource.CreateResourceIdentifier(subscriptionId, rgName, name), TagPatchMode.Delete, tags, cancellationToken);
+
+    public Task DeleteStorageAccountTagsAsync(
+        string subscriptionId, string rgName, string accountName, IReadOnlyDictionary<string, string> tags, CancellationToken cancellationToken = default) =>
+        PatchTagsAsync(StorageAccountResource.CreateResourceIdentifier(subscriptionId, rgName, accountName), TagPatchMode.Delete, tags, cancellationToken);
+
     // タグの API の Merge（指定したタグだけを加える・上書きする。リソースの設定は変えず、新しいリビジョンも作らない）
-    private async Task MergeTagsAsync(
-        ResourceIdentifier resource, IReadOnlyDictionary<string, string> tags, CancellationToken cancellationToken)
+    private Task MergeTagsAsync(ResourceIdentifier resource, IReadOnlyDictionary<string, string> tags, CancellationToken cancellationToken) =>
+        PatchTagsAsync(resource, TagPatchMode.Merge, tags, cancellationToken);
+
+    // タグの API（Merge は指定したタグを加える・上書きする。Delete は指定した名前と値の組のタグを消す）
+    private async Task PatchTagsAsync(
+        ResourceIdentifier resource, TagPatchMode mode, IReadOnlyDictionary<string, string> tags, CancellationToken cancellationToken)
     {
-        var patch = new TagResourcePatch { PatchMode = TagPatchMode.Merge };
+        var patch = new TagResourcePatch { PatchMode = mode };
         foreach (var (key, value) in tags)
             patch.TagValues[key] = value;
         await _arm.GetTagResource(TagResource.CreateResourceIdentifier(resource)).UpdateAsync(WaitUntil.Completed, patch, cancellationToken);

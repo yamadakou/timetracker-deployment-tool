@@ -70,6 +70,17 @@ public interface IAzureDeploymentGateway
     Task UpdateStorageAccountTagsAsync(
         string subscriptionId, string rgName, string accountName, IReadOnlyDictionary<string, string> tags, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Container App のタグのうち、<paramref name="tags"/> の名前と値の組のものを消す（タグの API の Delete。ほかのタグとアプリの設定は変えず、
+    /// 新しいリビジョンも作らない）。
+    /// </summary>
+    Task DeleteContainerAppTagsAsync(
+        string subscriptionId, string rgName, string name, IReadOnlyDictionary<string, string> tags, CancellationToken cancellationToken = default);
+
+    /// <summary>ストレージアカウントのタグのうち、<paramref name="tags"/> の名前と値の組のものを消す（タグの API の Delete）。</summary>
+    Task DeleteStorageAccountTagsAsync(
+        string subscriptionId, string rgName, string accountName, IReadOnlyDictionary<string, string> tags, CancellationToken cancellationToken = default);
+
     /// <summary>ストレージアカウントの情報（存在しなければ null）。</summary>
     Task<StorageAccountInfo?> GetStorageAccountAsync(string subscriptionId, string rgName, string name, CancellationToken cancellationToken = default);
 

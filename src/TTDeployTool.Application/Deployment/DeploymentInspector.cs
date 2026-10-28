@@ -24,6 +24,9 @@ public sealed record DeploymentInfo(
     /// <summary>DB アプリが DB のデータを Azure Files に置いているか。</summary>
     public bool DbPersisted => Db?.UsesDbStorage == true;
 
+    /// <summary>グループ名（Timetracker・DB・Redis の Container App・ストレージアカウントの順に、最初に見つかったもの。無ければ null）。</summary>
+    public string? Group => DeploymentGroup.Combine(new[] { Timetracker?.Tags, Db?.Tags, Redis?.Tags, StorageAccount?.Tags }.Select(DeploymentGroup.Read));
+
     /// <summary>Timetracker の URL（Ingress の FQDN が無ければ null）。</summary>
     public string? Endpoint => Timetracker?.Fqdn is { } fqdn ? $"https://{fqdn}" : null;
 }

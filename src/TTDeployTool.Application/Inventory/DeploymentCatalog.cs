@@ -22,6 +22,7 @@ public sealed record AppEntry(string Name, string? ProvisioningState, string? Ru
 /// <summary>
 /// デプロイの一覧の 1 行（サブスクリプション・リソースグループ・アプリ名の組。docs/design/desktop/desktop-jobs.md の 6.3・6.4）。
 /// 無いリソースは null（作りかけ・消しかけ）。<see cref="ExpiryDiffers"/> は、リソースごとの期限のタグが食い違っているか。
+/// <see cref="Group"/> はグループ名（docs/design/common/deployment-groups.md）、<see cref="GroupDiffers"/> はリソースごとのグループのタグが食い違っているか。
 /// </summary>
 public sealed record DeploymentEntry(
     string SubscriptionId,
@@ -38,7 +39,9 @@ public sealed record DeploymentEntry(
     string? EnvironmentName,
     string? StorageAccountName,
     bool DbPersisted,
-    bool ExpiryDiffers = false)
+    bool ExpiryDiffers = false,
+    string? Group = null,
+    bool GroupDiffers = false)
 {
     /// <summary>DB 種別（DB アプリのイメージから。分からなければ null）。</summary>
     public string? DbType => Db?.Image switch
@@ -102,6 +105,8 @@ public static class DeploymentCatalog
             resources.Add(env);
         var expiresTags = resources.Select(r => r.Tags.GetValueOrDefault(DeploymentExpiry.ExpiresAtKey)).ToList();
         var expiresTag = DeploymentExpiry.Combine(expiresTags);
+        // グループも同じリソースのタグから読む（Timetracker の Container App を優先。docs/design/common/deployment-groups.md の 3）
+        var groupTags = resources.Select(r => DeploymentGroup.Read(r.Tags)).ToList();
         var deployedTag = resources.Select(r => DeploymentExpiry.TryParseTag(r.Tags.GetValueOrDefault(DeploymentExpiry.DeployedAtKey), out var at) ? at : (DateTimeOffset?)null)
             .Max();
         // Combine は、期限なし（none）・読める期限・null（読めるものが無い）のどれかを返す
@@ -116,7 +121,9 @@ public static class DeploymentCatalog
             App(tt), App(db), App(redis),
             env?.Name, storage?.Name,
             db?.App?.UsesDbStorage == true,
-            DeploymentExpiry.Differ(expiresTags));
+            DeploymentExpiry.Differ(expiresTags),
+            DeploymentGroup.Combine(groupTags),
+            DeploymentGroup.Differ(groupTags));
     }
 
     private static AppEntry? App(ManagedResourceRecord? record) => record == null

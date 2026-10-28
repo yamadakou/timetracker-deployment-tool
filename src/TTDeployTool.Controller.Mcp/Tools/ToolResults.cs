@@ -42,11 +42,13 @@ public sealed record ValidationResult(
 /// <summary>
 /// 既定値を適用した設定。パスワードはマスクし、取得元だけを示す。
 /// <see cref="PersistDb"/> は指定した値（null は今の状態を引き継ぐ。実際に永続化するかは plan_deployment の persist_db）。
+/// <see cref="Group"/> は指定したグループ名（null は指定しない。実際に付けるグループは plan_deployment の group）。
 /// </summary>
 public sealed record ResolvedSettings(
     string Subscription, string ResourceGroup, string Location, string AppName, string DbType, string DbName, string TtTag,
     string DbPassword, string TrackerPassword,
-    double TtCpu, double TtMemoryGi, double DbCpu, double DbMemoryGi, double RedisCpu, double RedisMemoryGi, bool? PersistDb = null);
+    double TtCpu, double TtMemoryGi, double DbCpu, double DbMemoryGi, double RedisCpu, double RedisMemoryGi, bool? PersistDb = null,
+    string? Group = null);
 
 public sealed record ResourceNames(string Environment, string Tt, string Db, string Redis);
 

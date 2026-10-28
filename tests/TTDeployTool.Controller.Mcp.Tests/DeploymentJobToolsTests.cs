@@ -173,6 +173,26 @@ public sealed class DeploymentJobToolsTests
     }
 
     [Fact]
+    public async Task PlanDeployment_Should_Show_The_Group_To_Record()
+    {
+        // docs/design/common/deployment-groups.md の 6
+        var added = await Tools().PlanDeployment(app_name: "demo", group: " 研修 ", cancellationToken: Ct);
+        added.Group.Should().Be(new GroupInfo("研修", null, "グループ: 研修"));
+        added.Resolved.Group.Should().Be("研修");
+        Json(added).Should().Contain("\"group\":{\"name\":\"研修\",\"current\":null,\"display\":\"グループ: 研修\"}");
+
+        ExistingResourceGroup();
+        ExistingEnvironment();
+        _apps.Add(new ContainerAppInfo("demo-tt", EnvId, new Dictionary<string, string>(ManagedTags.For("demo")) { [DeploymentGroup.Key] = "営業" }));
+        var inherited = await Plan();
+        inherited.Group.Should().Be(new GroupInfo("営業", "営業", "グループ: 営業（今のグループを引き継ぎます）"));
+
+        var wrong = await Tools().PlanDeployment(app_name: "demo", group: "a\nb", cancellationToken: Ct);
+        wrong.Blockers.Should().ContainSingle().Which.Should().Contain("制御文字");
+        wrong.Group.Should().BeNull();
+    }
+
+    [Fact]
     public async Task PlanDeployment_Should_Block_A_Past_Expiry_Date()
     {
         var result = await Tools().PlanDeployment(app_name: "demo", expires_on: "2026-10-14", cancellationToken: Ct);
@@ -418,6 +438,7 @@ public sealed class DeploymentJobToolsTests
         info.Tt.Should().Be(new ContainerAppState("demo-tt", "Succeeded", "Running", "densocreate/timetracker:11.0.1-linux-postgres", 1.5, "3Gi",
             "demo-tt--r1", "demo-tt.example.io", true));
         info.Db!.Managed.Should().BeFalse();
+        info.Group.Should().BeNull("グループのタグが無い");
         info.Redis.Should().BeNull();
         info.Endpoint.Should().Be("https://demo-tt.example.io");
     }
@@ -505,11 +526,12 @@ public sealed class DeploymentJobToolsTests
                 [DbPersistence.StorageName]),
         ]);
         _gateway.Setup(g => g.GetStorageAccountAsync("sub", "rg", Account, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new StorageAccountInfo(Account, "japaneast", ManagedTags.For("demo")));
+            .ReturnsAsync(new StorageAccountInfo(Account, "japaneast", new Dictionary<string, string>(ManagedTags.For("demo")) { [DeploymentGroup.Key] = "研修" }));
 
         var info = await Tools().GetDeploymentInfo(app_name: "demo", cancellationToken: Ct);
 
         info.Persistence.Should().Be(new PersistenceState(true, Account, true));
+        info.Group.Should().Be("研修", "Container App に無ければストレージアカウントのものを読む");
     }
 
     [Fact]

@@ -19,6 +19,9 @@ public class DeployOptions
     // 利用可能期限日（yyyy-MM-dd | none）。null は既定（今の期限を引き継ぎ、無ければ今日から 32 日後。DeploymentExpiry）
     public string? ExpiresOn { get; set; }
 
+    // グループ名（前後の空白を除いたもの）。null は指定しない（既にあるデプロイでは今のグループを引き継ぐ。DeploymentGroup）
+    public string? Group { get; set; }
+
     // デプロイで Container App に付けるタグ（利用可能期限・デプロイした時刻）。実行するときに決める（DeploymentRunner）
     public IReadOnlyDictionary<string, string>? LifecycleTags { get; set; }
 

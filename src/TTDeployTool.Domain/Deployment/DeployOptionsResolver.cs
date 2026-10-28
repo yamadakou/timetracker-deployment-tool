@@ -37,6 +37,7 @@ public static class DeployOptionsResolver
             Verbose             = input.Verbose,
             PersistDb           = input.PersistDb,
             ExpiresOn           = string.IsNullOrWhiteSpace(input.ExpiresOn) ? null : input.ExpiresOn.Trim(),
+            Group               = DeploymentGroup.Normalize(input.Group),
             AuthMode            = OrDefault(input.AuthMode, DefaultAuthMode),
         };
     }

@@ -233,6 +233,40 @@ public sealed class CliApplicationTests : IDisposable
     }
 
     [Fact]
+    public async Task Deploy_Should_Record_The_Group_And_Show_It()
+    {
+        // docs/design/common/deployment-groups.md の 6
+        var (gateway, deployed) = SucceedingGateway();
+
+        var code = await RunAt(With("--group", " 研修 "), (_, _) => gateway.Object);
+
+        code.Should().Be(0);
+        deployed.Single().LifecycleTags.Should().Contain(DeploymentGroup.Key, "研修");
+        _out.ToString().Should().Contain("グループ: 研修");
+        TTDeployTool.Controller.Cli.CliArgs.HelpText.Should().Contain("--group <名前>");
+    }
+
+    [Fact]
+    public async Task Deploy_Should_Not_Write_A_Group_When_Omitted()
+    {
+        var (gateway, deployed) = SucceedingGateway();
+
+        await RunAt(Required, (_, _) => gateway.Object);
+
+        deployed.Single().LifecycleTags.Should().NotContainKey(DeploymentGroup.Key);
+        _out.ToString().Should().Contain("グループ: なし");
+    }
+
+    [Fact]
+    public async Task Deploy_Should_Reject_A_Too_Long_Group_Without_Calling_Azure()
+    {
+        var code = await RunAt(With("--group", new string('x', 65)), NotCalled);
+
+        code.Should().Be(1);
+        (_out.ToString() + _err.ToString()).Should().Contain("group（グループ名）は 64 文字までにしてください（65 文字）。");
+    }
+
+    [Fact]
     public async Task Deploy_Should_Default_To_32_Days_Later()
     {
         var (gateway, deployed) = SucceedingGateway();

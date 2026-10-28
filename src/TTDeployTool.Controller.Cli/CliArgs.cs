@@ -18,7 +18,7 @@ public sealed class CliArgs
     private static readonly IReadOnlySet<string> DeployValueOptions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
         "--subscription", "--resource-group", "--location", "--app-name", "--db-type", "--db-password", "--db-name",
-        "--tracker-password", "--tt-tag", "--auth-mode", "--expires-on",
+        "--tracker-password", "--tt-tag", "--auth-mode", "--expires-on", "--group",
         "--tt-cpu", "--tt-memory", "--db-cpu", "--db-memory", "--redis-cpu", "--redis-memory",
     };
 
@@ -77,6 +77,8 @@ public sealed class CliArgs
           --expires-on <yyyy-MM-dd|none> 利用可能期限日（期限日の終わり＝この PC の時刻帯の 23:59:59）。none は期限なし。
                                       省略時は既存のデプロイの今の期限を引き継ぎ、無ければ今日から 32 日後。期限を過ぎると、
                                       TTDeployTool のデスクトップアプリが自動で削除する（DB のデータも消える。CLI は削除しない）
+          --group <名前>              グループ名（任意。用途・利用者ごとに分ける。Azure のタグ tt-group に記録。64 文字まで）。
+                                      省略時は既存のデプロイの今のグループを引き継ぐ（新規はグループなし）
           --dry-run [true|false]      Azure へ反映せず docker-compose.yml と .env を生成
           --verbose [true|false]      詳細ログを出力
           -h, --help                  このヘルプを表示
