@@ -74,7 +74,7 @@ public class SpikeTableViewTests
         app.Invoke("Spike.HideGroup");
         Thread.Sleep(1000);
         var after = Names();
-        var afterHeaders = tablePattern ? table.Patterns.Table.Pattern.ColumnHeaders.Value.Select(h => h.Properties.Name.ValueOrDefault).ToList() : new List<string?>();
+        var afterHeaders = tablePattern ? table.Patterns.Table.Pattern.ColumnHeaders.Value.Select(h => h.Properties.Name.ValueOrDefault).ToList() : new List<string>();
         Check(!after.Contains("研修") && afterHeaders.SequenceEqual(["アプリ名", "結果"]), $"列を隠すと、その列の見出しとセルが消える（見出し: {string.Join(", ", afterHeaders)}）");
 
         Console.WriteLine(string.Join("\n", report));
