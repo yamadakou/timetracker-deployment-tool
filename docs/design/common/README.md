@@ -218,6 +218,7 @@ flowchart LR
 | `tt-app-name` | アプリ名 | 作ったリソースすべて（リソースグループには付けない。複数のアプリ名で共有できるため） | どのデプロイのリソースかの判断（デプロイの一覧で束ねる） |
 | `tt-deployed-at` | デプロイした日時（UTC） | 3 つの Container App・Environment・ストレージアカウント | デプロイの一覧の表示 |
 | `tt-expires-at` | 利用可能期限（UTC）か `none` | 3 つの Container App・Environment・ストレージアカウント | 期限の前の通知と、期限での削除（デスクトップアプリ） |
+| `tt-group` | グループ名（指定したときだけ） | `tt-expires-at` と同じ（Environment は作ったときだけ） | 用途・利用者ごとの管理。デスクトップアプリのデプロイの一覧での絞り込み・並べ替え・まとめての変更（[`deployment-groups.md`](deployment-groups.md)） |
 
 削除は、本ツールで作ったもの（管理タグのあるもの）だけを消し、リソースグループは既定では残します。リソースグループも消すのは、利用者が選び、本ツールが作ったもので、消した後に空になる場合だけです（[`resource-group-deletion.md`](resource-group-deletion.md)）。
 

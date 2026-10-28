@@ -127,6 +127,9 @@ public sealed class DeploymentViewModel : ObservableObject
         { } e => $"利用可能期限: {e.Describe(_time.LocalTimeZone)}。期限の後に自動で削除します（DB のデータも消えます）。",
     };
 
+    /// <summary>記録するグループ（付けない・引き継ぐ・変えるの別。docs/design/common/deployment-groups.md の 4。計画は必ずグループを決める）。</summary>
+    public string? GroupText => _ticket == null ? null : _ticket.Plan.Group!.Describe();
+
     public bool RequiresDataLossAck => _ticket?.Plan.RequiresDataLossAck == true;
 
     /// <summary>「DB のデータが失われることを理解しました」のチェック。</summary>
@@ -194,6 +197,7 @@ public sealed class DeploymentViewModel : ObservableObject
             OnPropertyChanged(nameof(PersistDbText));
             OnPropertyChanged(nameof(ExpiresAt));
             OnPropertyChanged(nameof(ExpiryText));
+            OnPropertyChanged(nameof(GroupText));
             OnPropertyChanged(nameof(RequiresDataLossAck));
             OnPropertyChanged(nameof(CanStart));
             StartCommand.RaiseCanExecuteChanged();

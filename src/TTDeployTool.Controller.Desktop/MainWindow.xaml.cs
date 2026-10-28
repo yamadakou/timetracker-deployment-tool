@@ -90,6 +90,12 @@ public sealed partial class MainWindow : Window
             ViewModel.Deployments.StateFilter = option;
     }
 
+    private void OnGroupFilterChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (((ComboBox)sender).SelectedItem is GroupFilterOption option)
+            ViewModel.Deployments.GroupFilter = option;
+    }
+
     // 表の見出しを押すと並べ替える（Tag は列の名前。docs/design/desktop/desktop-wizard.md の 7）
     private void OnSortDeployments(object sender, RoutedEventArgs e) => ViewModel.Deployments.SortBy((string)((Button)sender).Tag);
 

@@ -122,6 +122,14 @@ public sealed class DeploymentRowViewModel : ObservableObject
         _ => "記録なし",
     };
 
+    /// <summary>グループ名（無ければ空。食い違っていれば、その旨を添える。docs/design/common/deployment-groups.md の 5）。</summary>
+    public string GroupText => (_entry.Group ?? "") + (_entry.GroupDiffers ? "（食い違い）" : "");
+
+    /// <summary>リソースごとのグループのタグが食い違っている場合の注意（揃っていれば null）。</summary>
+    public string? GroupWarning => _entry.GroupDiffers
+        ? "リソースごとにグループのタグ（tt-group）が違うか、付いていないリソースがあります（Timetracker の Container App の値を出しています）。「グループを変える」で揃えてください。"
+        : null;
+
     /// <summary>リソースごとの期限のタグが食い違っている場合の注意（揃っていれば null）。</summary>
     public string? ExpiryWarning => _entry.ExpiryDiffers
         ? "リソースごとに利用可能期限のタグが違います（遅い方の期限で判断します。期限なしが 1 つでもあれば期限なし）。「期限を変える」で揃えてください。"
@@ -229,6 +237,7 @@ public sealed class DeploymentRowViewModel : ObservableObject
         foreach (var name in new[]
                  {
                      nameof(Entry), nameof(Url), nameof(HasUrl), nameof(DeployedText), nameof(ExpiryText), nameof(ExpiryWarning), nameof(HasExpiryWarning),
+                     nameof(GroupText), nameof(GroupWarning),
                      nameof(Level), nameof(IsExpired), nameof(IsExpirySoon),
                      nameof(DbTypeText), nameof(PersistenceText), nameof(SpecText), nameof(StateText), nameof(State), nameof(StateDetail),
                  })
@@ -307,6 +316,27 @@ public sealed class DeploymentRowViewModel : ObservableObject
 
     private Task ChangeExpiryAsync() =>
         ApplyExpiryAsync(EditNoExpiry ? DeploymentExpiry.None : EditExpiryDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+
+    /// <summary>グループを変える・外す（<paramref name="group"/> が null なら外す。一覧のまとめての変更から呼ぶ）。誤りがあればその内容を返す。</summary>
+    internal async Task<string?> ApplyGroupAsync(string? group)
+    {
+        Error = null;
+        Message = null;
+        try
+        {
+            var applied = await _owner.GatewayFor(_entry.SubscriptionId, Busy).Maintenance(_owner.Time)
+                .ChangeGroupAsync(_entry.SubscriptionId, _entry.ResourceGroup, _entry.AppName, group);
+            _owner.Logger.LogInformation("グループを変えました: {Subscription} / {ResourceGroup} / {AppName} → {Group}",
+                _entry.SubscriptionId, _entry.ResourceGroup, _entry.AppName, applied ?? "（なし）");
+            Message = applied == null ? "グループを外しました。" : $"グループを「{applied}」にしました。";
+            _owner.GroupChanged(_entry, applied);
+        }
+        catch (Exception ex)
+        {
+            Error = ex is ArgumentException or InvalidOperationException ? ex.Message : DesktopMessages.ForAzure(ex);
+        }
+        return Error;
+    }
 
     /// <summary>利用可能期限を変える（<paramref name="input"/> は yyyy-MM-dd か none。一覧のまとめての変更からも呼ぶ）。誤りがあればその内容を返す。</summary>
     internal async Task<string?> ApplyExpiryAsync(string input)

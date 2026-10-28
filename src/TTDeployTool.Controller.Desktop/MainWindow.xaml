@@ -205,6 +205,10 @@
                             <DatePicker AutomationProperties.AutomationId="Settings.ExpiryDate" Header="期限日" Date="{x:Bind ViewModel.Settings.ExpiryDate, Mode=TwoWay}"
                                       Visibility="{x:Bind ViewModel.Settings.IsExpiryDate, Mode=OneWay}" />
                             <TextBlock AutomationProperties.AutomationId="Settings.ExpiryNotice" TextWrapping="Wrap" Text="{x:Bind ViewModel.Settings.ExpiryNotice}" />
+                            <!-- グループ（任意。デプロイの一覧のグループを候補に出す。docs/design/common/deployment-groups.md の 4） -->
+                            <AutoSuggestBox AutomationProperties.AutomationId="Settings.Group" Header="グループ（任意）" PlaceholderText="例: 研修・営業部向け" MinWidth="480" HorizontalAlignment="Left"
+                                            Text="{x:Bind ViewModel.Settings.Group, Mode=TwoWay}" ItemsSource="{x:Bind ViewModel.Settings.GroupSuggestions, Mode=OneWay}" />
+                            <TextBlock AutomationProperties.AutomationId="Settings.GroupNotice" TextWrapping="Wrap" Text="{x:Bind vm:SettingsViewModel.GroupNotice}" />
                         </StackPanel>
 
                         <!-- ⑤ 確認と実行（開くと計画を作る） -->
@@ -224,6 +228,7 @@
                                 </ItemsControl>
                                 <TextBlock Text="{x:Bind ViewModel.Deployment.PersistDbText, Mode=OneWay}" />
                                 <TextBlock AutomationProperties.AutomationId="Deploy.Expiry" Text="{x:Bind ViewModel.Deployment.ExpiryText, Mode=OneWay}" TextWrapping="Wrap" />
+                                <TextBlock AutomationProperties.AutomationId="Deploy.Group" Text="{x:Bind ViewModel.Deployment.GroupText, Mode=OneWay}" TextWrapping="Wrap" />
                                 <TextBlock Text="{x:Bind ViewModel.Deployment.PermissionText, Mode=OneWay}" TextWrapping="Wrap" />
                                 <TextBlock Text="{x:Bind ViewModel.Deployment.EstimatedDuration, Mode=OneWay}" />
                                 <TextBlock Text="{x:Bind local:Ui.Time(ViewModel.Deployment.ExpiresAt), Mode=OneWay}" />
@@ -295,7 +300,7 @@
                     </StackPanel>
 
                     <!-- デプロイの一覧（Azure から集める。docs/design/desktop/desktop-jobs.md の 6.3・6.4） -->
-                    <StackPanel x:Name="DeploymentsPanel" Tag="deployments" Spacing="12" MaxWidth="1100" HorizontalAlignment="Left" Visibility="Collapsed">
+                    <StackPanel x:Name="DeploymentsPanel" Tag="deployments" Spacing="12" MaxWidth="1240" HorizontalAlignment="Left" Visibility="Collapsed">
                         <TextBlock AutomationProperties.AutomationId="Panel.Deployments" Style="{StaticResource SubtitleTextBlockStyle}" Text="デプロイの一覧" />
                         <TextBlock TextWrapping="Wrap" Text="サインインしたアカウントで読めるサブスクリプションから、本ツールでデプロイした環境（別の PC・CLI・MCP サーバーでデプロイしたものを含む）を読みます。パスワードは「パスワードを表示」を押したときだけ Azure から読み、PC には保存しません。" />
                         <Button AutomationProperties.AutomationId="Deployments.Load" Content="読み込む" Command="{x:Bind ViewModel.Deployments.LoadCommand}" />
@@ -313,13 +318,20 @@
                             <Button AutomationProperties.AutomationId="Deployments.Delete" Content="Azure から削除…" Command="{x:Bind ViewModel.Deployments.DeleteSelectedCommand}" />
                             <Button AutomationProperties.AutomationId="Deployments.ClearSelection" Content="選択を外す" Command="{x:Bind ViewModel.Deployments.ClearSelectionCommand}" />
                         </StackPanel>
+                        <!-- 選んだ行のグループをまとめて変える・外す（docs/design/common/deployment-groups.md の 5） -->
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <AutoSuggestBox AutomationProperties.AutomationId="Deployments.BatchGroup" PlaceholderText="グループ名" Width="200" VerticalAlignment="Center"
+                                            Text="{x:Bind ViewModel.Deployments.BatchGroup, Mode=TwoWay}" ItemsSource="{x:Bind ViewModel.Deployments.BatchGroupSuggestions, Mode=OneWay}" />
+                            <Button AutomationProperties.AutomationId="Deployments.ChangeGroup" Content="グループを変える" Command="{x:Bind ViewModel.Deployments.ChangeSelectedGroupCommand}" />
+                            <Button AutomationProperties.AutomationId="Deployments.RemoveGroup" Content="グループを外す" Command="{x:Bind ViewModel.Deployments.RemoveSelectedGroupCommand}" />
+                        </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="8" Visibility="{x:Bind ViewModel.Deployments.BatchBusy.IsBusy, Mode=OneWay}"><ProgressRing IsActive="{x:Bind ViewModel.Deployments.BatchBusy.IsBusy, Mode=OneWay}" Width="16" Height="16" /><TextBlock VerticalAlignment="Center" Text="{x:Bind ViewModel.Deployments.BatchBusy.Text, Mode=OneWay}" /></StackPanel>
                         <TextBlock AutomationProperties.AutomationId="Deployments.BatchMessage" Text="{x:Bind ViewModel.Deployments.BatchMessage, Mode=OneWay}" TextWrapping="Wrap" />
 
                         <!-- 表: 見出しを押すと並べ替え、「▽」で絞り込み。複数の行を選べる -->
                         <Grid ColumnSpacing="4" Margin="40,0,0,0">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="200" /><ColumnDefinition Width="150" /><ColumnDefinition Width="130" /><ColumnDefinition Width="140" />
+                                <ColumnDefinition Width="200" /><ColumnDefinition Width="150" /><ColumnDefinition Width="130" /><ColumnDefinition Width="130" /><ColumnDefinition Width="140" />
                                 <ColumnDefinition Width="140" /><ColumnDefinition Width="130" /><ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0" Orientation="Horizontal">
@@ -353,6 +365,16 @@
                                 </Button>
                             </StackPanel>
                             <StackPanel Grid.Column="3" Orientation="Horizontal">
+                                <Button AutomationProperties.AutomationId="Deployments.SortGroup" Content="{x:Bind ViewModel.Deployments.GroupHeader, Mode=OneWay}" Tag="Group" Click="OnSortDeployments" Style="{StaticResource HeaderButtonStyle}" />
+                                <Button AutomationProperties.AutomationId="Deployments.FilterGroup" Content="▽" Style="{StaticResource HeaderButtonStyle}">
+                                    <Button.Flyout><Flyout><StackPanel Spacing="8">
+                                        <ComboBox AutomationProperties.AutomationId="Deployments.GroupFilter" Header="グループ" ItemsSource="{x:Bind ViewModel.Deployments.GroupFilters}" DisplayMemberPath="Label" Width="260"
+                                                  SelectedItem="{x:Bind ViewModel.Deployments.GroupFilter, Mode=OneWay}" SelectionChanged="OnGroupFilterChanged" />
+                                        <Button AutomationProperties.AutomationId="Deployments.GroupFilterClose" Content="閉じる" Click="OnCloseFlyout" />
+                                    </StackPanel></Flyout></Button.Flyout>
+                                </Button>
+                            </StackPanel>
+                            <StackPanel Grid.Column="4" Orientation="Horizontal">
                                 <Button AutomationProperties.AutomationId="Deployments.SortState" Content="{x:Bind ViewModel.Deployments.StateHeader, Mode=OneWay}" Tag="State" Click="OnSortDeployments" Style="{StaticResource HeaderButtonStyle}" />
                                 <Button AutomationProperties.AutomationId="Deployments.FilterState" Content="▽" Style="{StaticResource HeaderButtonStyle}">
                                     <Button.Flyout><Flyout><StackPanel Spacing="8">
@@ -362,7 +384,7 @@
                                     </StackPanel></Flyout></Button.Flyout>
                                 </Button>
                             </StackPanel>
-                            <StackPanel Grid.Column="4" Orientation="Horizontal">
+                            <StackPanel Grid.Column="5" Orientation="Horizontal">
                                 <Button AutomationProperties.AutomationId="Deployments.SortExpiry" Content="{x:Bind ViewModel.Deployments.ExpiryHeader, Mode=OneWay}" Tag="ExpiresAt" Click="OnSortDeployments" Style="{StaticResource HeaderButtonStyle}" />
                                 <Button AutomationProperties.AutomationId="Deployments.FilterExpiry" Content="▽" Style="{StaticResource HeaderButtonStyle}">
                                     <Button.Flyout><Flyout><StackPanel Spacing="8">
@@ -376,7 +398,7 @@
                                     </StackPanel></Flyout></Button.Flyout>
                                 </Button>
                             </StackPanel>
-                            <StackPanel Grid.Column="5" Orientation="Horizontal">
+                            <StackPanel Grid.Column="6" Orientation="Horizontal">
                                 <Button AutomationProperties.AutomationId="Deployments.SortDeployed" Content="{x:Bind ViewModel.Deployments.DeployedHeader, Mode=OneWay}" Tag="DeployedAt" Click="OnSortDeployments" Style="{StaticResource HeaderButtonStyle}" />
                                 <Button AutomationProperties.AutomationId="Deployments.FilterDeployed" Content="▽" Style="{StaticResource HeaderButtonStyle}">
                                     <Button.Flyout><Flyout><StackPanel Spacing="8">
@@ -386,7 +408,7 @@
                                     </StackPanel></Flyout></Button.Flyout>
                                 </Button>
                             </StackPanel>
-                            <TextBlock Grid.Column="6" VerticalAlignment="Center" Style="{StaticResource BodyStrongTextBlockStyle}" Text="ジョブ" />
+                            <TextBlock Grid.Column="7" VerticalAlignment="Center" Style="{StaticResource BodyStrongTextBlockStyle}" Text="ジョブ" />
                         </Grid>
                         <ListView x:Name="DeploymentsTable" AutomationProperties.AutomationId="Deployments.Rows" ItemsSource="{x:Bind ViewModel.Deployments.Rows}" SelectionMode="Multiple"
                                   SelectionChanged="OnDeploymentsSelectionChanged">
@@ -394,16 +416,17 @@
                                 <DataTemplate x:DataType="vm:DeploymentRowViewModel">
                                     <Grid ColumnSpacing="4" Padding="0,6">
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="200" /><ColumnDefinition Width="150" /><ColumnDefinition Width="130" /><ColumnDefinition Width="140" />
+                                            <ColumnDefinition Width="200" /><ColumnDefinition Width="150" /><ColumnDefinition Width="130" /><ColumnDefinition Width="130" /><ColumnDefinition Width="140" />
                                             <ColumnDefinition Width="140" /><ColumnDefinition Width="130" /><ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Grid.Column="0" Text="{x:Bind Subscription}" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind Subscription}" />
                                         <TextBlock Grid.Column="1" Text="{x:Bind ResourceGroup}" TextTrimming="CharacterEllipsis" />
                                         <TextBlock Grid.Column="2" AutomationProperties.AutomationId="Row.AppName" Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind AppName}" TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Grid.Column="3" AutomationProperties.AutomationId="Row.State" Text="{x:Bind StateText, Mode=OneWay}" TextWrapping="Wrap" ToolTipService.ToolTip="{x:Bind StateDetail, Mode=OneWay}" />
-                                        <TextBlock Grid.Column="4" AutomationProperties.AutomationId="Row.Expiry" Text="{x:Bind ExpiryText, Mode=OneWay}" Foreground="{x:Bind local:Ui.ExpiryBrush(Level), Mode=OneWay}" TextWrapping="Wrap" />
-                                        <TextBlock Grid.Column="5" Text="{x:Bind DeployedText, Mode=OneWay}" />
-                                        <TextBlock Grid.Column="6" AutomationProperties.AutomationId="Row.Job" Text="{x:Bind JobText, Mode=OneWay}" TextWrapping="Wrap" Foreground="{ThemeResource SystemFillColorCautionBrush}" />
+                                        <TextBlock Grid.Column="3" AutomationProperties.AutomationId="Row.Group" Text="{x:Bind GroupText, Mode=OneWay}" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind GroupWarning, Mode=OneWay}" />
+                                        <TextBlock Grid.Column="4" AutomationProperties.AutomationId="Row.State" Text="{x:Bind StateText, Mode=OneWay}" TextWrapping="Wrap" ToolTipService.ToolTip="{x:Bind StateDetail, Mode=OneWay}" />
+                                        <TextBlock Grid.Column="5" AutomationProperties.AutomationId="Row.Expiry" Text="{x:Bind ExpiryText, Mode=OneWay}" Foreground="{x:Bind local:Ui.ExpiryBrush(Level), Mode=OneWay}" TextWrapping="Wrap" />
+                                        <TextBlock Grid.Column="6" Text="{x:Bind DeployedText, Mode=OneWay}" />
+                                        <TextBlock Grid.Column="7" AutomationProperties.AutomationId="Row.Job" Text="{x:Bind JobText, Mode=OneWay}" TextWrapping="Wrap" Foreground="{ThemeResource SystemFillColorCautionBrush}" />
                                     </Grid>
                                 </DataTemplate>
                             </ListView.ItemTemplate>
@@ -426,6 +449,7 @@
                                     <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="（" /><TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind ViewModel.Deployments.Current.ResourceGroup, Mode=OneWay}" /><TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="）" />
                                 </StackPanel>
                                 <HyperlinkButton Content="{x:Bind ViewModel.Deployments.Current.Url, Mode=OneWay}" Command="{x:Bind ViewModel.Deployments.Current.OpenCommand, Mode=OneWay}" Visibility="{x:Bind ViewModel.Deployments.Current.HasUrl, Mode=OneWay}" Padding="0" />
+                                <TextBlock AutomationProperties.AutomationId="Row.GroupWarning" Text="{x:Bind ViewModel.Deployments.Current.GroupWarning, Mode=OneWay}" TextWrapping="Wrap" Foreground="{ThemeResource SystemFillColorCautionBrush}" />
                                 <TextBlock AutomationProperties.AutomationId="Row.ExpiryWarning" Text="{x:Bind ViewModel.Deployments.Current.ExpiryWarning, Mode=OneWay}" TextWrapping="Wrap" Foreground="{ThemeResource SystemFillColorCautionBrush}"
                                            Visibility="{x:Bind ViewModel.Deployments.Current.HasExpiryWarning, Mode=OneWay}" />
                                 <StackPanel Orientation="Horizontal" Spacing="4">

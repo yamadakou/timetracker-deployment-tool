@@ -29,6 +29,12 @@ public enum ExpiryFilterMode
 /// <summary>利用可能期限日のフィルタの選択肢。</summary>
 public sealed record ExpiryFilterOption(ExpiryFilterMode Mode, string Label);
 
+/// <summary>グループの絞り込みの選択肢（<see cref="Group"/> が null なら、<see cref="NoGroup"/> でグループなし、そうでなければすべて）。</summary>
+public sealed record GroupFilterOption(string? Group, bool NoGroup, string Label)
+{
+    public override string ToString() => Label;
+}
+
 /// <summary>サブスクリプションの絞り込みの選択肢（<see cref="SubscriptionId"/> が null なら、すべて）。</summary>
 public sealed record SubscriptionFilterOption(string? SubscriptionId, string Label);
 
@@ -41,6 +47,9 @@ public enum DeploymentSortKey
     DeployedAt,
     ExpiresAt,
     State,
+
+    /// <summary>グループ名（docs/design/common/deployment-groups.md の 5）。</summary>
+    Group,
 }
 
 /// <summary>並べ替えの選択肢。</summary>
@@ -83,7 +92,15 @@ public sealed class DeploymentListViewModel : ObservableObject
         new(DeploymentSortKey.AppName, true, "アプリ名（降順）"),
         new(DeploymentSortKey.State, false, "状態（実行中から）"),
         new(DeploymentSortKey.State, true, "状態（不明から）"),
+        new(DeploymentSortKey.Group, false, "グループ（昇順）"),
+        new(DeploymentSortKey.Group, true, "グループ（降順）"),
     ];
+
+    /// <summary>グループの絞り込みの「すべて」。</summary>
+    public static readonly GroupFilterOption AllGroups = new(null, false, "すべて");
+
+    /// <summary>グループの絞り込みの「グループなし」。</summary>
+    public static readonly GroupFilterOption NoGroup = new(null, true, "グループなし");
 
     private readonly TargetViewModel _target;
     private readonly JobQueue _queue;
@@ -91,6 +108,7 @@ public sealed class DeploymentListViewModel : ObservableObject
     private readonly ILogger _logger;
     private readonly ISystemLauncher _launcher;
     private readonly IClipboardService? _clipboard;
+    private readonly IDialogService? _dialogs;
     private readonly Func<string, Task> _open;
     private readonly Func<IReadOnlyList<DeploymentEntry>, Task> _openBatchDeletion;
     private readonly List<RecentChange> _recent = [];
@@ -112,6 +130,8 @@ public sealed class DeploymentListViewModel : ObservableObject
     private DateTimeOffset? _deployedTo;
     private ExpiryFilterOption _expiryFilter = ExpiryFilters[0];
     private DeploymentStateFilterOption _stateFilter = DeploymentStates.Filters[0];
+    private GroupFilterOption _groupFilter = AllGroups;
+    private string _batchGroup = "";
     private DateTimeOffset? _expiryFrom;
     private DateTimeOffset? _expiryTo;
     private DeploymentSortOption _sort = SortOptions[0];
@@ -126,8 +146,10 @@ public sealed class DeploymentListViewModel : ObservableObject
     /// <param name="openBatchDeletion">2 件以上を選んで削除するときに、まとめての削除の画面を開いて計画する（docs/design/desktop/desktop-wizard.md の 7）</param>
     public DeploymentListViewModel(
         TargetViewModel target, JobQueue queue, IDeploymentLogger deploymentLogger, ILogger logger, TimeProvider time,
-        ISystemLauncher launcher, IClipboardService? clipboard, Func<string, Task> open, Func<IReadOnlyList<DeploymentEntry>, Task> openBatchDeletion)
+        ISystemLauncher launcher, IClipboardService? clipboard, Func<string, Task> open, Func<IReadOnlyList<DeploymentEntry>, Task> openBatchDeletion,
+        IDialogService? dialogs = null)
     {
+        _dialogs = dialogs;
         _target = target;
         _deploymentLogger = deploymentLogger;
         _logger = logger;
@@ -140,6 +162,10 @@ public sealed class DeploymentListViewModel : ObservableObject
         ChangeSelectedExpiryCommand = new AsyncCommand(() => BatchBusy.RunAsync("選んだデプロイの利用可能期限を変えています", ChangeSelectedExpiryAsync),
             () => _selected.Count > 0);
         DeleteSelectedCommand = new AsyncCommand(DeleteSelectedAsync, () => _selected.Count > 0);
+        ChangeSelectedGroupCommand = new AsyncCommand(() => ChangeSelectedGroupAsync(remove: false), () => _selected.Count > 0 && DeploymentGroup.Normalize(BatchGroup) != null);
+        RemoveSelectedGroupCommand = new AsyncCommand(() => ChangeSelectedGroupAsync(remove: true), () => _selected.Count > 0);
+        GroupFilters.Add(AllGroups);
+        GroupFilters.Add(NoGroup);
         TableSelection = new SelectionSync<DeploymentRowViewModel>(() => _selected, SetSelection);
         ClearSelectionCommand = new AsyncCommand(() =>
         {
@@ -240,6 +266,18 @@ public sealed class DeploymentListViewModel : ObservableObject
 
     public string StateHeader => Header("状態", DeploymentSortKey.State);
 
+    public string GroupHeader => Header("グループ", DeploymentSortKey.Group);
+
+    /// <summary>「グループ」の絞り込みの選択肢（「すべて」「グループなし」と、読んだデプロイのグループ。大文字と小文字は区別せずに束ねる）。</summary>
+    public ObservableCollection<GroupFilterOption> GroupFilters { get; } = [];
+
+    /// <summary>「グループ」の絞り込み（既定はすべて）。</summary>
+    public GroupFilterOption GroupFilter { get => _groupFilter; set => SetFilter(ref _groupFilter, value); }
+
+    /// <summary>読んだデプロイのグループ名（名前の順。大文字と小文字は区別せずに束ね、最初に見つかった書き方を出す。入力の候補にも使う）。</summary>
+    public IReadOnlyList<string> GroupNames =>
+        [.. _entries.Select(e => e.Group).OfType<string>().Distinct(DeploymentGroup.Comparer).Order(DeploymentGroup.Comparer)];
+
     /// <summary>「状態」の絞り込み（既定はすべて。No.73）。</summary>
     public DeploymentStateFilterOption StateFilter { get => _stateFilter; set => SetFilter(ref _stateFilter, value); }
 
@@ -275,6 +313,8 @@ public sealed class DeploymentListViewModel : ObservableObject
         OnPropertyChanged(nameof(SelectionText));
         ChangeSelectedExpiryCommand.RaiseCanExecuteChanged();
         DeleteSelectedCommand.RaiseCanExecuteChanged();
+        ChangeSelectedGroupCommand.RaiseCanExecuteChanged();
+        RemoveSelectedGroupCommand.RaiseCanExecuteChanged();
         ClearSelectionCommand.RaiseCanExecuteChanged();
         TableSelection.ViewModelChanged();
     }
@@ -287,6 +327,32 @@ public sealed class DeploymentListViewModel : ObservableObject
 
     /// <summary>選んだ行を削除する（1 行なら削除の画面、2 行以上ならまとめての削除の画面）。</summary>
     public AsyncCommand DeleteSelectedCommand { get; }
+
+    /// <summary>選んだ行のグループ名を <see cref="BatchGroup"/> に変える（確かめてから。docs/design/common/deployment-groups.md の 5）。</summary>
+    public AsyncCommand ChangeSelectedGroupCommand { get; }
+
+    /// <summary>選んだ行のグループを外す（確かめてから）。</summary>
+    public AsyncCommand RemoveSelectedGroupCommand { get; }
+
+    /// <summary>まとめて変えるグループ名（入力のまま。変えるときに前後の空白を除く）。</summary>
+    public string BatchGroup
+    {
+        get => _batchGroup;
+        set
+        {
+            if (!SetProperty(ref _batchGroup, value))
+                return;
+            OnPropertyChanged(nameof(BatchGroupSuggestions));
+            ChangeSelectedGroupCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    /// <summary>まとめて変えるグループ名の候補（読んだグループのうち、入力を含むもの）。</summary>
+    public IReadOnlyList<string> BatchGroupSuggestions => Suggestions(BatchGroup);
+
+    /// <summary>グループ名の入力の候補（読んだグループのうち、入力を含み、入力と同じでないもの。大文字と小文字は区別しない）。</summary>
+    internal IReadOnlyList<string> Suggestions(string input) =>
+        [.. GroupNames.Where(g => g.Contains(input.Trim(), StringComparison.OrdinalIgnoreCase) && !DeploymentGroup.Comparer.Equals(g, input.Trim()))];
 
     /// <summary>まとめての操作の処理中の表示。</summary>
     public BusyState BatchBusy { get; } = new();
@@ -338,7 +404,8 @@ public sealed class DeploymentListViewModel : ObservableObject
         set
         {
             SetFilter(ref _sort, value);
-            foreach (var name in new[] { nameof(SubscriptionHeader), nameof(ResourceGroupHeader), nameof(AppNameHeader), nameof(ExpiryHeader), nameof(DeployedHeader), nameof(StateHeader) })
+            foreach (var name in new[] { nameof(SubscriptionHeader), nameof(ResourceGroupHeader), nameof(AppNameHeader), nameof(ExpiryHeader), nameof(DeployedHeader), nameof(StateHeader),
+                     nameof(GroupHeader) })
                 OnPropertyChanged(name);
         }
     }
@@ -392,6 +459,29 @@ public sealed class DeploymentListViewModel : ObservableObject
             ExpiresAt = decision.ExpiresAt,
             ExpiryDiffers = false,
         });
+    }
+
+    /// <summary>行でグループを変えたとき（Resource Graph に反映されるまで、読んだ結果に重ねる）。</summary>
+    internal void GroupChanged(DeploymentEntry entry, string? group) =>
+        Remember(entry.SubscriptionId, entry.ResourceGroup, entry.AppName, e => e == null ? null : e with { Group = group, GroupDiffers = false });
+
+    // 読んだグループが変わったら、絞り込みの選択肢を作り直す（選んでいたグループが無くなれば、すべてに戻す）
+    private void ResetGroupFilters()
+    {
+        var options = new[] { AllGroups, NoGroup }.Concat(GroupNames.Select(g => new GroupFilterOption(g, false, g))).ToList();
+        if (!options.SequenceEqual(GroupFilters))
+        {
+            GroupFilters.Clear();
+            foreach (var option in options)
+                GroupFilters.Add(option);
+        }
+        _groupFilter = _groupFilter.Group == null
+            ? _groupFilter
+            : options.FirstOrDefault(o => o.Group != null && DeploymentGroup.Comparer.Equals(o.Group, _groupFilter.Group)) ?? AllGroups;
+        // 選択肢を作り直すと画面の選択が外れるため、いつも知らせて選び直させる
+        OnPropertyChanged(nameof(GroupFilter));
+        OnPropertyChanged(nameof(GroupNames));
+        OnPropertyChanged(nameof(BatchGroupSuggestions));
     }
 
     // サブスクリプションを読み直したら、絞り込みの選択肢を作り直す（選んでいたものが無くなれば、すべてに戻す）
@@ -572,6 +662,8 @@ public sealed class DeploymentListViewModel : ObservableObject
             return false;
         if (StateFilter.State is { } state && DeploymentStates.Of(e) != state)
             return false;
+        if (GroupFilter.NoGroup ? e.Group != null : GroupFilter.Group is { } group && !DeploymentGroup.Comparer.Equals(e.Group, group))
+            return false;
         return ExpiryFilter.Mode switch
         {
             ExpiryFilterMode.Within7Days => e.ExpiryKind == ExpiryKind.Date && e.ExpiresAt <= Time.GetUtcNow().AddDays(SoonDays),
@@ -592,6 +684,7 @@ public sealed class DeploymentListViewModel : ObservableObject
             DeploymentSortKey.AppName => e.AppName,
             DeploymentSortKey.DeployedAt => e.DeployedAt,
             DeploymentSortKey.State => DeploymentStates.Of(e),
+            DeploymentSortKey.Group => e.Group,
             _ => e.ExpiryKind == ExpiryKind.Date ? e.ExpiresAt : null,
         }));
         var withValue = keyed.Where(x => x.Key != null);
@@ -616,6 +709,7 @@ public sealed class DeploymentListViewModel : ObservableObject
     private void Refresh(bool resetPage, bool keepRows)
     {
         _entries = Apply();
+        ResetGroupFilters();
         EntriesChanged.Invoke();
         _filtered = Sorted(_entries.Where(Matches)).ToList();
         _filteredCount = _filtered.Count;
@@ -682,6 +776,45 @@ public sealed class DeploymentListViewModel : ObservableObject
         BatchMessage = string.Join(" ", new[]
         {
             changed.Count > 0 ? $"{changed.Count} 件の利用可能期限を変えました（{string.Join("、", changed)}）。" : null,
+            skipped.Count > 0 ? $"ジョブがあるため変えなかったもの: {string.Join("、", skipped)}。" : null,
+            failed.Count > 0 ? $"変えられなかったもの: {string.Join("、", failed)}" : null,
+        }.OfType<string>());
+    }
+
+    // 選んだ行のグループを変える・外す。件数と新しいグループ名を示して確かめ（Q6）、ジョブのある行は変えない。行ごとの結果をまとめて出す
+    private async Task ChangeSelectedGroupAsync(bool remove)
+    {
+        var group = remove ? null : DeploymentGroup.Normalize(BatchGroup);
+        if (DeploymentGroup.FormatError(group) is { } error)
+        {
+            BatchMessage = error;
+            return;
+        }
+        var rows = _selected.ToList();
+        var what = group == null ? "グループを外します" : $"グループを「{group}」にします";
+        if (_dialogs != null && !await _dialogs.ConfirmAsync(
+                group == null ? "グループを外しますか？" : "グループを変えますか？",
+                $"選んだ {rows.Count} 件のデプロイの{what}（Azure のタグ tt-group を書き換えます。ジョブがあるデプロイは変えません）。",
+                group == null ? "グループを外す" : "グループを変える"))
+            return;
+        var changed = new List<string>();
+        var skipped = new List<string>();
+        var failed = new List<string>();
+        await BatchBusy.RunAsync(group == null ? "選んだデプロイのグループを外しています" : "選んだデプロイのグループを変えています", async () =>
+        {
+            foreach (var row in rows)
+            {
+                if (row.HasActiveJob)
+                    skipped.Add(row.AppName);
+                else if (await row.ApplyGroupAsync(group) is { } rowError)
+                    failed.Add($"{row.AppName}（{rowError}）");
+                else
+                    changed.Add(row.AppName);
+            }
+        });
+        BatchMessage = string.Join(" ", new[]
+        {
+            changed.Count > 0 ? $"{changed.Count} 件の{(group == null ? "グループを外しました" : $"グループを「{group}」にしました")}（{string.Join("、", changed)}）。" : null,
             skipped.Count > 0 ? $"ジョブがあるため変えなかったもの: {string.Join("、", skipped)}。" : null,
             failed.Count > 0 ? $"変えられなかったもの: {string.Join("、", failed)}" : null,
         }.OfType<string>());

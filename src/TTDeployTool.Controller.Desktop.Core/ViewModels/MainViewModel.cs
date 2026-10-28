@@ -72,7 +72,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             () => Queue.ActiveFor(Target.Subscription, Target.ResourceGroup, Target.AppName.ToLowerInvariant())?.IsRunning == true, clipboard);
         // サインアウトしたときに一覧を消すため、サインインより先に作る
         Deployments = new DeploymentListViewModel(Target, Queue, logger, loggers.CreateLogger("TTDeployTool.Desktop.Deployments"), time,
-            launcher, clipboard, OpenAsync, OpenBatchDeletionAsync);
+            launcher, clipboard, OpenAsync, OpenBatchDeletionAsync, dialogs);
         var deletions = new DeletionWorkflow(plans, jobs, caller, logger, time);
         Expiry = new ExpiryWatcher(Deployments, Queue, Target, deletions, logger, preferences, notifications, time,
             loggers.CreateLogger("TTDeployTool.Desktop.Expiry"), () => SignIn!.IsSignedIn);
@@ -96,6 +96,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             }
         }, loggers.CreateLogger("TTDeployTool.Desktop.SignIn"));
         Settings = new SettingsViewModel(Target, time, preferences, dialogs, clipboard);
+        // グループ名の入力の候補は、デプロイの一覧のグループ（docs/design/common/deployment-groups.md の 4）
+        Settings.UseGroups(() => Deployments.GroupNames);
         Deployment = new DeploymentViewModel(new DeploymentWorkflow(plans, jobs, caller, logger, time), Target, Settings, Queue, Show, time, secrets);
         Deletion = new DeletionViewModel(deletions, Target, Queue, Show, time, clipboard);
         DryRun = new DryRunViewModel(Settings, dialogs, launcher);

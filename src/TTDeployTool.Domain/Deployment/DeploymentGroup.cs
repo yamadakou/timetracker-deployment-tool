@@ -55,5 +55,5 @@ public static class DeploymentGroup
     public static string? Combine(IEnumerable<string?> values) => values.Select(Normalize).FirstOrDefault(v => v != null);
 
     /// <summary>リソースごとのグループ名が食い違っているか（付いていないリソースがあるものを含む。変更の途中の失敗、ポータルでの書き換えなど）。</summary>
-    public static bool Differ(IEnumerable<string?> values) => values.Select(Normalize).Distinct(StringComparer.Ordinal).Count() > 1;
+    public static bool Differ(IEnumerable<string?> values) => values.Select(v => Normalize(v)).Distinct(StringComparer.Ordinal).Count() > 1;
 }

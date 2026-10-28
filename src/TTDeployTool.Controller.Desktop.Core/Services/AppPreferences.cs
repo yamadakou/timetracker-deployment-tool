@@ -5,6 +5,7 @@ namespace TTDeployTool.Controller.Desktop.Core.Services;
 /// <summary>
 /// 名前を付けて保存した「デプロイの設定」（docs/design/desktop/desktop-settings.md の 2.3）。パスワードは含めない。
 /// 数値は画面の入力のまま（文字列）。<see cref="ExpiryDate"/> は yyyy-MM-dd（<see cref="Expiry"/> が Date のときだけ）。
+/// <see cref="Group"/> はグループ名（無ければ null。docs/design/common/deployment-groups.md）。
 /// </summary>
 public sealed record DeploymentTemplate(
     string Name,
@@ -23,7 +24,8 @@ public sealed record DeploymentTemplate(
     string RedisMemoryGi,
     bool? PersistDb,
     ExpiryMode Expiry,
-    string? ExpiryDate);
+    string? ExpiryDate,
+    string? Group = null);
 
 /// <summary>アプリの設定のうち、保存するもの（秘密の情報は置かない）。画面の側でアプリのデータに保存する。</summary>
 public interface IAppPreferences

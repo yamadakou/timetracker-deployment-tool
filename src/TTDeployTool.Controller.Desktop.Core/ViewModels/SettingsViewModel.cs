@@ -67,6 +67,8 @@ public sealed class SettingsViewModel : ObservableObject
     private string _dbType = DeployOptionsResolver.DefaultDbType;
     private string _dbName = Defaults.DbName;
     private string _ttTag = "";
+    private string _group = "";
+    private Func<IReadOnlyList<string>>? _groups;
     private string _dbPassword = "";
     private string _trackerPassword = "";
     private string _ttCpu = Format(Defaults.TimetrackerCpu);
@@ -219,6 +221,32 @@ public sealed class SettingsViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// グループ名（任意。docs/design/common/deployment-groups.md）。入力のまま持ち、計画するときに前後の空白を除く（途中の空白を入れられるように）。
+    /// 空なら付けない（再デプロイでは今のグループを引き継ぐ）。
+    /// </summary>
+    public string Group
+    {
+        get => _group;
+        set
+        {
+            Set(ref _group, value);
+            OnPropertyChanged(nameof(GroupSuggestions));
+        }
+    }
+
+    /// <summary>グループ名の入力の候補（デプロイの一覧にあるグループのうち、入力を含むもの。大文字と小文字は区別しない）。</summary>
+    public IReadOnlyList<string> GroupSuggestions =>
+        [.. (_groups?.Invoke() ?? []).Where(g => g.Contains(Group.Trim(), StringComparison.OrdinalIgnoreCase) && !DeploymentGroup.Comparer.Equals(g, Group.Trim()))];
+
+    /// <summary>グループの候補を読む処理（デプロイの一覧のグループ。画面全体を組み立てるときに渡す）。</summary>
+    internal void UseGroups(Func<IReadOnlyList<string>> groups) => _groups = groups;
+
+    /// <summary>グループの入力の説明。</summary>
+    public static string GroupNotice =>
+        $"用途や利用者ごとにデプロイを分ける名前です（任意。{DeploymentGroup.MaxLength} 文字まで）。デプロイの一覧で絞り込み・並べ替えできます。" +
+        "Azure のタグ（tt-group）に平文で記録するため、秘密の情報は入れないでください。空のまま再デプロイすると、今のグループを引き継ぎます。";
+
     /// <summary>既定で決まる期限と、期限を過ぎたときの動き。</summary>
     public string ExpiryNotice =>
         $"既定では、新しくデプロイする場合は {DeploymentExpiry.Today(_time.GetUtcNow(), _time.LocalTimeZone).AddDays(DeploymentExpiry.DefaultDays):yyyy-MM-dd}" +
@@ -259,6 +287,7 @@ public sealed class SettingsViewModel : ObservableObject
                 ExpiryMode.None => DeploymentExpiry.None,
                 _ => null,
             },
+            Group               = Group,
         });
         errors.AddRange(DeploymentValidator.GetErrors(options, target));
         if (target == ValidationTarget.Azure && DeploymentExpiry.PastDateError(options.ExpiresOn, _time.GetUtcNow(), _time.LocalTimeZone) is { } pastDate)
@@ -294,6 +323,7 @@ public sealed class SettingsViewModel : ObservableObject
             new[] { "Redis の CPU / メモリ", $"{RedisCpu} vCPU / {RedisMemoryGi} Gi" },
             new[] { "DB のデータの永続化", PersistDb.Label },
             new[] { "利用可能期限日", expiry },
+            new[] { "グループ", DeploymentGroup.Normalize(Group) ?? "（なし。再デプロイでは今のグループを引き継ぐ）" },
             new[] { "作るリソース", string.Join("、", ResourceNaming.Environment(appName), ResourceNaming.TimetrackerApp(appName), ResourceNaming.DbApp(appName), ResourceNaming.RedisApp(appName)) },
         };
         return MarkdownText.Document("TTDeployTool のデプロイの設定",
@@ -306,7 +336,7 @@ public sealed class SettingsViewModel : ObservableObject
     private DeploymentTemplate Snapshot(string name) => new(
         name, _target.SelectedSubscription?.SubscriptionId, _target.ResourceGroup, _target.AppName, _target.Location,
         DbType, DbName, TtTag, TtCpu, TtMemoryGi, DbCpu, DbMemoryGi, RedisCpu, RedisMemoryGi, PersistDb.Value, Expiry.Mode,
-        Expiry.Mode == ExpiryMode.Date ? ExpiryDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : null);
+        Expiry.Mode == ExpiryMode.Date ? ExpiryDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : null, DeploymentGroup.Normalize(Group));
 
     private Task CopyMarkdownAsync()
     {
@@ -357,6 +387,7 @@ public sealed class SettingsViewModel : ObservableObject
         Expiry = ExpiryOptions.First(o => o.Mode == t.Expiry);
         if (t.ExpiryDate != null && DateOnly.TryParseExact(t.ExpiryDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
             ExpiryDate = Midnight(date);
+        Group = t.Group ?? "";
         Message = string.Join(" ", new[] { $"テンプレート「{t.Name}」を入力しました（パスワードはそのままです）。" }.Concat(notes));
         return Task.CompletedTask;
     }
@@ -395,6 +426,7 @@ public sealed class SettingsViewModel : ObservableObject
         PersistDb = PersistDbOptions[0];
         Expiry = ExpiryOptions[0];
         ExpiryDate = DefaultExpiryDate();
+        Group = "";
         IncludePasswordsInCopy = false;
         Message = "初期値に戻しました。";
     }
