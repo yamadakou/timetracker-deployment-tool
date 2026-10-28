@@ -105,6 +105,23 @@ explorer "$env:LOCALAPPDATA\Packages\$((Get-AppxPackage -Name TTDeployTool).Pack
 ## 5. Azure で確かめる
 確認用のリソースグループ名を決めます（例: `rg-tt-desktop-check`。無ければアプリが作ります）。アプリ名は `ttdesk` などにします。
 
+### 5.0 単体テストで確かめていること（実機では確かめなくてよい）
+次の判断は Desktop.Core にあり、単体テスト（CI で毎回）で確かめています（No.64。[UI テストの詳細設計](desktop-ui-tests.md)の 9.1）。実機では、5.1〜5.4 で、Azure と OS・画面に頼る部分だけを確かめます。
+
+| 判断 | 単体テスト |
+|---|---|
+| 閉じたときに終了するか、通知領域に残るか（ジョブ・期限日のあるデプロイの有無）と、初めて隠したときだけの通知 | `MainViewModel.RequestClose` |
+| 通知を押したときに開く画面（デプロイの一覧・サインイン・ジョブの詳細、ジョブが消えていればジョブの一覧） | `MainViewModel.OpenFromNotificationAsync` |
+| サインイン時の起動か通常の起動か、復元できないときの「サインインが必要です」の通知 | `MainViewModel.StartAsync`・`InitializeAtStartupAsync` |
+| 期限の 3 日前・前日の通知の時期、同じ通知を出さないこと（アプリを起動し直しても）、期限を変えたら通知し直すこと | `ExpiryWatcher`・`FilePreferences` |
+| 期限を過ぎたものの削除のジョブの登録、削除の直前の期限の読み直し（延ばされていれば削除しない）、削除の範囲（DB のデータ・本ツールが作ったリソースグループ）、失敗したら 6 時間登録し直さないこと、確認の時刻（最も近い期限と 6 時間ごと） | `ExpiryWatcher`・`DeploymentMaintenance.ReadExpiryAsync` |
+| サインイン時の起動を一度だけ尋ねること、状態の表示とボタン、Windows の状態（無効・有効・ユーザーが無効・ポリシーで無効）の読み替え | `StartupSettingViewModel`・`StartupTaskStates` |
+| 表の並べ替え・絞り込み・選択（読み直しても保つ・「選択を外す」）・選んだ行へのまとめての操作・まとめての削除の確認 | `DeploymentListViewModel`・`JobListViewModel`・`BatchDeletionViewModel`・`SelectionSync` |
+| まだ始めていない削除の予定の保存（一時停止・予定の変更・取り消しの反映）、次にサインインしたときに戻すこと（同じアカウントだけ・同じ対象のジョブがあれば戻さない・計画が変わっていれば削除しない）、デプロイの予定が消えたことの通知（No.67） | `ScheduledJobStore`・`DeletionViewModel.StartSavedAsync` |
+| 「設定」の「Windows との連携」の表示（前回のサインイン時の起動・通知の許可の読み替え・閉じたときの動き・消える予定と戻す予定）と、Windows の設定を開くボタン（No.67） | `SystemStatusViewModel`・`NotificationPermissions` |
+| XAML の AutomationId・x:Bind の名前・画面の名前・イベントの処理が ViewModel と UI テストに合っていること | `XamlContractTests` |
+
+### 5.1 計画・デプロイ・状態の確認・削除
 | # | 操作 | 確かめること |
 |---|---|---|
 | 1 | 「サインインと対象」でサブスクリプションを選び、「設定」でリソースグループ・アプリ名・パスワードを入れて、「デプロイ」で「計画」を押す | 操作の一覧（リソースグループ・Environment・3 つの Container App の「作成する」）、DB のデータの永続化（「永続化しない」）、権限（リソースグループが無い場合は「確認できませんでした」）、所要時間、計画の有効期限が表示される |
@@ -125,22 +142,6 @@ explorer "$env:LOCALAPPDATA\Packages\$((Get-AppxPackage -Name TTDeployTool).Pack
 | 12 | 「今の状態を引き継ぐ」に戻して、もう一度計画する | 「DB のデータ: Azure Files に永続化する」になり、同意のチェックは出ない（停止して更新する旨の警告が出る） |
 | 13 | 「削除」で「DB のデータを残す」にチェックを入れて計画 → 削除する | ストレージアカウントが「削除しない」（「DB のデータを残す」の指定により残します）になり、残すもの・料金がかかり続けることが表示される。完了のログにも同じ案内が出る |
 | 14 | もう一度、チェックを外して計画 → 削除する | ストレージアカウントも削除する旨の警告が出て、削除される |
-
-### 5.0 単体テストで確かめていること（実機では確かめなくてよい）
-次の判断は Desktop.Core にあり、単体テスト（CI で毎回）で確かめています（No.64。[UI テストの詳細設計](desktop-ui-tests.md)の 9.1）。実機では、5.2〜5.4 の OS・画面に頼る部分だけを確かめます。
-
-| 判断 | 単体テスト |
-|---|---|
-| 閉じたときに終了するか、通知領域に残るか（ジョブ・期限日のあるデプロイの有無）と、初めて隠したときだけの通知 | `MainViewModel.RequestClose` |
-| 通知を押したときに開く画面（デプロイの一覧・サインイン・ジョブの詳細、ジョブが消えていればジョブの一覧） | `MainViewModel.OpenFromNotificationAsync` |
-| サインイン時の起動か通常の起動か、復元できないときの「サインインが必要です」の通知 | `MainViewModel.StartAsync`・`InitializeAtStartupAsync` |
-| 期限の 3 日前・前日の通知の時期、同じ通知を出さないこと（アプリを起動し直しても）、期限を変えたら通知し直すこと | `ExpiryWatcher`・`FilePreferences` |
-| 期限を過ぎたものの削除のジョブの登録、削除の直前の期限の読み直し（延ばされていれば削除しない）、削除の範囲（DB のデータ・本ツールが作ったリソースグループ）、失敗したら 6 時間登録し直さないこと、確認の時刻（最も近い期限と 6 時間ごと） | `ExpiryWatcher`・`DeploymentMaintenance.ReadExpiryAsync` |
-| サインイン時の起動を一度だけ尋ねること、状態の表示とボタン、Windows の状態（無効・有効・ユーザーが無効・ポリシーで無効）の読み替え | `StartupSettingViewModel`・`StartupTaskStates` |
-| 表の並べ替え・絞り込み・選択（読み直しても保つ・「選択を外す」）・選んだ行へのまとめての操作・まとめての削除の確認 | `DeploymentListViewModel`・`JobListViewModel`・`BatchDeletionViewModel`・`SelectionSync` |
-| まだ始めていない削除の予定の保存（一時停止・予定の変更・取り消しの反映）、次にサインインしたときに戻すこと（同じアカウントだけ・同じ対象のジョブがあれば戻さない・計画が変わっていれば削除しない）、デプロイの予定が消えたことの通知（No.67） | `ScheduledJobStore`・`DeletionViewModel.StartSavedAsync` |
-| 「設定」の「Windows との連携」の表示（前回のサインイン時の起動・通知の許可の読み替え・閉じたときの動き・消える予定と戻す予定）と、Windows の設定を開くボタン（No.67） | `SystemStatusViewModel`・`NotificationPermissions` |
-| XAML の AutomationId・x:Bind の名前・画面の名前・イベントの処理が ViewModel と UI テストに合っていること | `XamlContractTests` |
 
 ### 5.2 通知領域への常駐と通知（Phase 7c。[ジョブの詳細設計](desktop-jobs.md)の 5）
 | # | 操作 | 確かめること |
@@ -183,8 +184,8 @@ explorer "$env:LOCALAPPDATA\Packages\$((Get-AppxPackage -Name TTDeployTool).Pack
 | 6 | （No.76）ジョブの一覧の「すべて」をチェックする・外す・行を 1 つだけ外す | すべての行にチェックが付く・外れる。一部だけのときは「すべて」が中間の表示になる |
 | 7 | （No.76）日時の列（予定・登録・変更・実行開始・実行終了）の「▽」で「この日から」「この日まで」を選び、「絞り込みを外す」を押す | カレンダーで日付を選べ、行が絞られ、外すと戻る。列が多いので、ウィンドウが狭いと表だけが横にスクロールする |
 
-### 5.1 UI テストで確かめる（半自動。任意）
-5 の 1〜4・8〜10 と同じ流れ（サブスクリプションの読み込み → 状態の確認 → 計画 → デプロイ → 状態の確認 → 削除）を、UI テスト（[UI テストの詳細設計](desktop-ui-tests.md)の 6）で自動で操作できます。サインインだけ、WAM の画面で行います。
+### 5.5 UI テストで確かめる（半自動。任意）
+5.1 の 1〜4・8〜10 と同じ流れ（サブスクリプションの読み込み → 状態の確認 → 計画 → デプロイ → 状態の確認 → 削除）を、UI テスト（[UI テストの詳細設計](desktop-ui-tests.md)の 6）で自動で操作できます。サインインだけ、WAM の画面で行います。
 1. Visual Studio でアプリを配置する（「ビルド」→「ソリューションの配置」）
 2. PowerShell 7 でリポジトリのフォルダーに移り、`./scripts/run-desktop-ui-tests.ps1 -SubscriptionId <サブスクリプション ID>` を実行する（リソースグループは既定で `rg-ttui-<日時>`。`-ResourceGroup` で変えられる）
 3. 表示された内容（作るもの・料金・所要時間 20〜30 分）を確かめて `yes` と入力する。サインインしていなければ、アプリのサインインの画面でサインインする（最大 5 分待つ）
