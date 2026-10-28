@@ -190,6 +190,17 @@ Windows の実機で、サインインの後にサブスクリプションを読
 
 実装は `TTDeployTool.Controller.Desktop.Core` の `DiagnosticLog`（`ILoggerFactory`。Linux でもテストできる）で、`App` が起動時に作って `MainViewModel` に渡す。
 
+### 7.3 アプリのデータのフォルダー
+アプリが PC に置くものは、すべてアプリのデータのフォルダー（`DesktopSettings.DataDirectory`）に置く。パスワードは、利用者が「予定を残す」を選んだデプロイの予定だけ、DPAPI で暗号化して置く（`desktop-jobs.md` の 6.7）。
+
+| 項目 | 内容 |
+|---|---|
+| 置き場所 | MSIX では `ApplicationData.Current.LocalFolder`（`%LOCALAPPDATA%\Packages\<パッケージ ファミリ名>\LocalState`。アンインストールで消える）。パッケージにしないで動かした場合（`ApplicationData` が使えず `InvalidOperationException`）は `%LOCALAPPDATA%\TTDeployTool` |
+| ファイル | `preferences.json`（同時に実行する数・テンプレート・期限の通知・予定・前回のサインイン時の起動。`FilePreferences`）、`job-history.json`（終わったジョブの記録。`FileJobHistory`。`desktop-jobs.md` の 6.8）、`authentication-record.json`（前回のアカウント。`WamSignInService`）、`logs`（診断用のログ。7.2） |
+| 読めない・書けない | 設定と記録は既定の値・空で動く（保存されないだけで、ジョブは実行できる） |
+| トークンのキャッシュ | このフォルダーには置かない（Azure.Identity の `TokenCachePersistenceOptions`。保存先は 11 の 2 で確かめる） |
+| 確かめ方 | Windows での確認手順（[`desktop-app-check.md`](desktop-app-check.md)）の 2.4 |
+
 ## 8. Microsoft Store での配布
 ### 8.1 パッケージ
 | 項目 | 内容 |

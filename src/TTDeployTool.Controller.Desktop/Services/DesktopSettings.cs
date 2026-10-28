@@ -12,8 +12,10 @@ internal static class DesktopSettings
         .FirstOrDefault(a => a.Key == "DesktopClientId")?.Value is { Length: > 0 } id ? id : null;
 
     /// <summary>
-    /// アプリのデータ（サインインの情報。パスワードは置かない）の置き場所。MSIX ではパッケージごとのフォルダー
-    /// （アンインストールで消える）、パッケージにしないで動かした場合は %LOCALAPPDATA% の下。
+    /// アプリのデータ（設定と予定の preferences.json・終わったジョブの記録の job-history.json・サインインの情報・診断用のログ。
+    /// パスワードは、残すと選んだデプロイの予定だけ DPAPI で暗号化して置く）の置き場所。MSIX ではパッケージごとのフォルダー
+    /// （LocalState。アンインストールで消える）、パッケージにしないで動かした場合は %LOCALAPPDATA%\TTDeployTool
+    /// （docs/design/desktop/desktop-app.md の 7.3）。
     /// </summary>
     public static string DataDirectory
     {

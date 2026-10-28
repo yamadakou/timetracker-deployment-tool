@@ -18,6 +18,7 @@
 | [サイドロード](https://learn.microsoft.com/ja-jp/windows/application-management/sideload-apps-in-windows) | Store を通さずに、パッケージのファイルからアプリを導入すること。署名されたパッケージが必要 |
 | [WAM](https://learn.microsoft.com/ja-jp/entra/msal/dotnet/acquiring-tokens/desktop-mobile/wam) | Windows の Web アカウント マネージャー。Windows にサインインしているアカウントで、Azure にサインインできる |
 | 計画 | アプリは、Azure を変更する前に、読み取りだけで計画を作り、利用者が確かめてから実行する（CLI の `--dry-run`、MCP の `plan_*` と同じ） |
+| アプリのデータのフォルダー | アプリが設定・予定・終わったジョブの記録・診断用のログ・サインインの情報を置くフォルダー（2.4） |
 
 ## 2. 準備
 ### 2.1 使うもの
@@ -36,6 +37,32 @@ Store の限定公開で導入できる場合は、Store から導入します�
 
 - **開発者モード + Visual Studio**: リポジトリを取得し、`TTDeployTool.Desktop.slnx` を Visual Studio で開き、`TTDeployTool.Controller.Desktop` をスタートアップ プロジェクトにして、プラットフォーム `x64`（Arm の PC は `ARM64`）・起動プロファイル「TTDeployTool.Controller.Desktop (Package)」で実行する（[WinUI 3 の開発環境](https://learn.microsoft.com/ja-jp/windows/apps/get-started/start-here)。Windows の「設定」→「システム」→「開発者向け」で開発者モードを有効にする）
 - **自己署名の証明書で署名して導入**: [自己署名の証明書を作り](https://learn.microsoft.com/ja-jp/windows/msix/package/create-certificate-package-signing)、`.msix`（x64 または arm64）に [SignTool で署名](https://learn.microsoft.com/ja-jp/windows/msix/package/sign-app-package-using-signtool)し、証明書を「信頼されたユーザー」に入れてから、`.msix` を開いて導入する。証明書の発行者（`CN=...`）は、マニフェストの `Publisher`（CI のパッケージは `CN=TTDeployTool`）と同じにする
+
+### 2.4 アプリのデータのフォルダー
+アプリは、設定・予定・終わったジョブの記録・診断用のログを、Windows のユーザーごと・アプリごとのフォルダーに置きます（コードは `src/TTDeployTool.Controller.Desktop/Services/DesktopSettings.cs` の `DataDirectory`）。確認の中で中身を見るとき（5.3 の 9・11 など）と、うまくいかないとき（7 章）に使います。
+
+| 導入の方法 | フォルダー |
+|---|---|
+| パッケージ版（Store・評価版・Visual Studio の「(Package)」の起動プロファイル） | `%LOCALAPPDATA%\Packages\TTDeployTool_<発行元のハッシュ>\LocalState`（[ApplicationData.LocalFolder](https://learn.microsoft.com/ja-jp/uwp/api/windows.storage.applicationdata.localfolder)） |
+| パッケージにしないで起動した場合 | `%LOCALAPPDATA%\TTDeployTool` |
+
+`<発行元のハッシュ>` は署名した発行元から決まる文字列です。PowerShell で次を実行すると、パッケージ版のフォルダーを開けます（アプリの「設定」の画面の「ログのフォルダーを開く」で開く `logs` の、1 つ上のフォルダーでもあります）。
+
+```powershell
+explorer "$env:LOCALAPPDATA\Packages\$((Get-AppxPackage -Name TTDeployTool).PackageFamilyName)\LocalState"
+```
+
+| ファイル | 中身 | 消えるとき |
+|---|---|---|
+| `preferences.json` | 同時に実行する数・テンプレート（パスワードなし）・出した期限の通知・まだ始めていない予定（「予定を残す」を選んだデプロイは、パスワードを DPAPI で暗号化して含む）・前回のサインイン時の起動 | 予定は、始めたとき・取り消したとき |
+| `job-history.json` | 終わったジョブの記録（結果・ログ・日時。パスワードなし） | 180 日・500 件を超えたとき、「記録から削除」 |
+| `authentication-record.json` | 前回サインインしたアカウントとテナントの識別子（秘密の情報なし） | サインアウト |
+| `logs\ttdeploytool-desktop-yyyyMMdd.log` | 診断用のログ（パスワード・トークン・アカウント名なし） | 7 日 |
+
+- ファイルを見たり消したりするときは、先に通知領域のメニューの「終了」でアプリを終えます（ウィンドウを閉じても、ジョブや期限があると通知領域に残って動いているため）。動いている間に消しても、アプリが次に保存するときに書き戻します
+- 設定・予定・記録を最初の状態に戻したいときは、アプリを終えてから `preferences.json`・`job-history.json` を消します（サインインもやり直すときは `authentication-record.json` も）
+- アプリをアンインストールすると、`LocalState` のフォルダーは中身ごと消えます。評価版と、Visual Studio で配置した開発用のアプリは、同じ名前と発行元のため同じフォルダーを使います
+- Azure へのサインインのトークンのキャッシュ（Azure.Identity の `TokenCachePersistenceOptions`、名前は `ttdeploytool-desktop`、DPAPI で保護）は、このフォルダーには置きません。Azure.Identity の既定では `%LOCALAPPDATA%\.IdentityService` の下で、パッケージ版では Windows がパッケージの `LocalCache\Local` の下に振り替える見込みです（[パッケージ化したデスクトップアプリの AppData の扱い](https://learn.microsoft.com/ja-jp/windows/msix/desktop/desktop-to-uwp-behind-the-scenes)）。実際の場所とアンインストールで消えるかは、詳細設計の 11 の 2 として、6 章で記録します（`Get-ChildItem -Recurse -Force "$env:LOCALAPPDATA\Packages\<パッケージ ファミリ名>\LocalCache", "$env:LOCALAPPDATA\.IdentityService" -Filter "ttdeploytool-desktop*"` で探せます）
 
 ## 3. サインインせずに確かめる
 > [!NOTE]
@@ -138,9 +165,9 @@ Store の限定公開で導入できる場合は、Store から導入します�
 | 6 | タスク マネージャーでスタートアップを無効にし、「設定」の画面を開き直す | 「タスク マネージャーの…で無効にされています」と出て、ボタンが押せない（Windows が無効を正しく返すことの確認） |
 | 7 | （No.67）5 の後に「設定」の画面を開く | 「Windows との連携」に「前回のサインイン時の起動: （日時）」が出る。出ず「まだありません」のままなら、Windows がアプリを起動していない（「Windows のスタートアップ アプリの設定を開く」で TTDeployTool がオンかを確かめる） |
 | 8 | （No.67）Windows の設定で TTDeployTool の通知をオフにし、「状態を読み直す」を押す | 「このアプリの通知が、Windows の設定で止められています」と出る（Windows が通知の許可を正しく返すことの確認）。オンに戻す |
-| 9 | （No.67・No.72）削除の予定と、「予定を残す」をオンにしたデプロイの予定・オフにしたデプロイの予定を 1 件ずつ入れ、通知領域の「終了」でアプリを終え、起動し直してサインインする | 「前回の予定を戻しました」「前回のデプロイの予定は消えました」の通知が出て、ジョブの一覧に削除の予定とオンにしたデプロイの予定がある（アプリのデータに保存し、DPAPI で復号できることの確認）。`preferences.json`（アプリのデータのフォルダー）にパスワードが平文で無いこと |
+| 9 | （No.67・No.72。フォルダーは 2.4）削除の予定と、「予定を残す」をオンにしたデプロイの予定・オフにしたデプロイの予定を 1 件ずつ入れ、通知領域の「終了」でアプリを終え、起動し直してサインインする | 「前回の予定を戻しました」「前回のデプロイの予定は消えました」の通知が出て、ジョブの一覧に削除の予定とオンにしたデプロイの予定がある（アプリのデータに保存し、DPAPI で復号できることの確認）。`preferences.json`（アプリのデータのフォルダー）にパスワードが平文で無いこと |
 | 10 | （No.72）9 で予定の時刻を過ぎてから起動し直す | 過ぎた予定が「一時停止」で戻る。「再開」でデプロイが実行され、完了する（復号したパスワードで Timetracker にログインできる） |
-| 11 | （No.76）デプロイを 1 件完了させ、予定を 1 件取り消してから、通知領域の「終了」でアプリを終え、起動し直してサインインする | ジョブの一覧に 2 件が「完了」「取り消し」で残り、登録・実行開始・実行終了の日時と処理時間が出る。「詳細」でログと結果（URL）が見られ、「（前回までのアプリの記録）」と出る。`job-history.json`（アプリのデータのフォルダー）にパスワードが無いこと |
+| 11 | （No.76。フォルダーは 2.4）デプロイを 1 件完了させ、予定を 1 件取り消してから、通知領域の「終了」でアプリを終え、起動し直してサインインする | ジョブの一覧に 2 件が「完了」「取り消し」で残り、登録・実行開始・実行終了の日時と処理時間が出る。「詳細」でログと結果（URL）が見られ、「（前回までのアプリの記録）」と出る。`job-history.json`（アプリのデータのフォルダー）にパスワードが無いこと |
 | 12 | （No.76）11 の 1 件を選んで「記録から削除」、もう一度起動し直す | 確認のダイアログが出て、「記録から削除」で一覧から消え、起動し直しても戻らない。Azure のデプロイは消えていない（デプロイの一覧に残る） |
 
 ### 5.4 デプロイの一覧・ジョブの一覧の表（No.63。[画面の流れの詳細設計](desktop-wizard.md)の 7）
@@ -169,6 +196,7 @@ Store の限定公開で導入できる場合は、Store から導入します�
 - [ ] 「状態の確認」で、デプロイされた環境が無いことを確かめる
 - [ ] 確認用に作ったリソースグループを削除する（`az group delete --name <リソースグループ名>`）
 - [ ] 2.3 で自己署名の証明書を入れた場合は、「信頼されたユーザー」から削除する
+- [ ] 確認のために残した予定・記録が要らなければ、アプリを終えてから、アプリのデータのフォルダー（2.4）の `preferences.json`・`job-history.json` を消す（アンインストールする場合は不要）
 - [ ] 結果（確かめたこと、見つかった問題）を `docs/REVIEW_ISSUES.md` の No.49 と、詳細設計の 12 に記入する。詳細設計の「11. 確認事項」のうち確かめられたもの（2 のトークンのキャッシュの保存先、3 のジョブの途中の MFA、4 の複数のテナント、5 の Store の更新の確認）も記入する
 
 ## 7. うまくいかないとき
@@ -179,5 +207,7 @@ Store の限定公開で導入できる場合は、Store から導入します�
 | 実行で「多要素認証（MFA）が必要です」と表示される | MFA を行わずにサインインした。サインインし直し、MFA を行う（詳細設計 5.3） |
 | 計画で権限が不足している | アカウントに Contributor 以上のロールが無い（README の必要な RBAC ロールと権限） |
 | サブスクリプションが一覧に出ない | そのテナントで MFA などのため読めない（一覧の下の注意を確かめる）。サインインし直すと読める場合がある |
+| 起動し直しても、予定や終わったジョブの記録が戻らない | アプリのデータのフォルダー（2.4）に `preferences.json`・`job-history.json` があるかを確かめる。無ければ保存できていない（ログに理由がある）。予定は、保存したときと同じアカウントでサインインしたときに戻る。暗号化したパスワードは、同じ PC の同じ Windows ユーザーでしか復号できない |
+| 設定・予定・記録を初めからやり直したい | アプリを終えてから、アプリのデータのフォルダー（2.4）の `preferences.json`・`job-history.json` を消す |
 
-原因が分からない場合は、「設定」の画面の「ログのフォルダーを開く」で診断用のログ（`ttdeploytool-desktop-yyyyMMdd.log`。詳細設計 7.2）を開き、起きた時刻の前後を確かめる（Issue に添付する場合も、パスワード・トークン・アカウント名は含まれない）。
+原因が分からない場合は、「設定」の画面の「ログのフォルダーを開く」（アプリのデータのフォルダーの `logs`。2.4）で診断用のログ（`ttdeploytool-desktop-yyyyMMdd.log`。詳細設計 7.2）を開き、起きた時刻の前後を確かめる（Issue に添付する場合も、パスワード・トークン・アカウント名は含まれない）。

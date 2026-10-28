@@ -71,6 +71,17 @@ Add-AppxPackage -Path .\x64\TTDeployTool-<版>-x64.msix -DependencyPath (Get-Chi
    Get-ChildItem Cert:\LocalMachine\TrustedPeople | Where-Object Subject -eq "CN=TTDeployTool" | Remove-Item
    ```
 
+## 5. アプリのデータ（設定・予定・記録・ログ）
+アプリは、設定・予定・終わったジョブの記録・診断用のログを、次のフォルダーに置きます。問い合わせのときにログを添付する場合や、設定を初めからやり直したい場合に使います。
+
+```powershell
+explorer "$env:LOCALAPPDATA\Packages\$((Get-AppxPackage -Name TTDeployTool).PackageFamilyName)\LocalState"
+```
+
+- `logs` のフォルダーは、アプリの「設定」の画面の「ログのフォルダーを開く」でも開けます。ログにパスワード・トークン・アカウント名は含まれません
+- 設定・予定・記録を初めからやり直すときは、通知領域のアイコンのメニューの「終了」でアプリを終えてから、`preferences.json`（設定と予定）・`job-history.json`（終わったジョブの記録）を消します
+- アンインストール（4）すると、このフォルダーは中身ごと消えます。まだ始めていない予定も消えるため、要る予定はアンインストールの前に確かめてください
+
 ## 注意
 
 - この証明書を信頼すると、同じ証明書で署名されたパッケージは導入できるようになります。評価の目的以外で受け取った `.msix` は導入しないでください。

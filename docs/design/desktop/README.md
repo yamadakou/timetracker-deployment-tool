@@ -227,7 +227,8 @@ classDiagram
 
 | ファイル | 中身 | 消えるとき |
 |---|---|---|
+| （フォルダー） | パッケージ版は `%LOCALAPPDATA%\Packages\TTDeployTool_<発行元のハッシュ>\LocalState`、パッケージにしない場合は `%LOCALAPPDATA%\TTDeployTool`（[Windows での確認手順](desktop-app-check.md)の 2.4） | アンインストール |
 | `preferences.json` | 同時に実行する数・テンプレート（パスワードなし）・出した期限の通知・まだ始めていない予定・前回のサインイン時の起動 | 予定は始めたとき・取り消したとき |
 | `job-history.json` | 終わったジョブの記録（結果・ログ・日時。パスワードなし） | 180 日・500 件を超えたとき、「記録から削除」 |
 | `logs/` | 診断用のログ（パスワード・トークン・アカウント名なし） | 7 日 |
-| サインインの情報 | AuthenticationRecord と、DPAPI で守ったトークンのキャッシュ | サインアウト |
+| `authentication-record.json` | 前回サインインしたアカウントとテナントの識別子（AuthenticationRecord。秘密の情報なし）。トークンのキャッシュは、このフォルダーの外に DPAPI で守って置く（`desktop-app.md` の 11 の 2） | サインアウト（トークンのキャッシュは有効期限まで残る） |

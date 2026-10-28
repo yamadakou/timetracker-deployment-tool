@@ -582,6 +582,7 @@ CLI や AI アシスタントを使わずに、Windows の画面の操作で同�
 - ジョブの記録（No.76）: 終わったジョブ（完了・失敗・取り消し・停止）は、アプリを終了しても `job-history.json`（この PC のアプリのデータ）に残し、ジョブの一覧と「詳細」で結果とログを見られます（180 日・500 件まで。パスワードは含みません）。一覧の「記録から削除」は記録を消すだけで、Azure のリソースは消しません（Azure から消すのは、デプロイの一覧の「Azure から削除…」です）。一覧には予定・登録・変更（予定の時刻を変えた日時）・実行開始・実行終了の日時と処理時間を出し、どの日時でも並べ替えと期間での絞り込みができます
 - 「設定」の画面の「Windows との連携」で、サインイン時の起動の状態と前回の起動の日時、通知の許可、今ウィンドウを閉じたらどうなるか、消える予定と戻す予定を確かめられます（Windows のスタートアップ アプリ・通知の設定も開けます）
 - パスワードは、上の予定を残す場合を除いて保存しません（アプリを終了すると消えます）
+- アプリのデータ（設定・予定・終わったジョブの記録・診断用のログ）は、`%LOCALAPPDATA%\Packages\TTDeployTool_<発行元のハッシュ>\LocalState` に置きます（アンインストールで消えます。中身と開き方は [Windows での確認手順](docs/design/desktop/desktop-app-check.md) の 2.4）
 - 対象: Windows 10（1809 以降）、Windows 11（x64 / arm64）
 - 設計: [docs/design/desktop/desktop-app.md](docs/design/desktop/desktop-app.md)、構造の図: [docs/design/desktop/README.md](docs/design/desktop/README.md)、Windows での確認の手順: [docs/design/desktop/desktop-app-check.md](docs/design/desktop/desktop-app-check.md)、Store への提出の手順: [docs/design/desktop/desktop-app-store.md](docs/design/desktop/desktop-app-store.md)、評価版の配布: [docs/design/desktop/desktop-preview.md](docs/design/desktop/desktop-preview.md)、プライバシー ポリシー（案）: [docs/PRIVACY.md](docs/PRIVACY.md)
 
