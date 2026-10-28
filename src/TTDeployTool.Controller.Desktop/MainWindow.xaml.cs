@@ -23,6 +23,7 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        FillSpike();
         ExtendsContentIntoTitleBar = false;
     }
 
@@ -265,4 +266,20 @@ public sealed partial class MainWindow : Window
             UpdateBar.IsOpen = false;
         }
     }
+
+    // 試作（No.78）
+    private void OnSpikeHideGroup(object sender, RoutedEventArgs e) => SpikeGroupColumn.Visibility = Visibility.Collapsed;
+
+    internal void FillSpike() => SpikeTable.ItemsSource = new List<SpikeRow> { new("demo", "研修", "完了"), new("other", "営業", "失敗") };
+}
+
+/// <summary>試作（No.78）の行。</summary>
+[Microsoft.UI.Xaml.Data.Bindable]
+public sealed partial class SpikeRow(string name, string group, string result)
+{
+    public string Name { get; } = name;
+
+    public string Group { get; } = group;
+
+    public string Result { get; } = result;
 }

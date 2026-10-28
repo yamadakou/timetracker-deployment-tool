@@ -6,6 +6,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:TTDeployTool.Controller.Desktop"
     xmlns:vm="using:TTDeployTool.Controller.Desktop.Core.ViewModels"
+    xmlns:tv="using:WinUI.TableView"
     xmlns:jobs="using:TTDeployTool.Controller.Desktop.Core.Jobs"
     Title="TTDeployTool">
 
@@ -530,6 +531,16 @@
 
                     <!-- ローカル検証（Dry-run） -->
                     <StackPanel x:Name="DryRunPanel" Tag="dryrun" Spacing="12" MaxWidth="900" HorizontalAlignment="Left" Visibility="Collapsed">
+                        <!-- 試作（No.78）: WinUI.TableView を UI テストで読めるか・列を隠せるか -->
+                        <tv:TableView x:Name="SpikeTable" AutomationProperties.AutomationId="Spike.Table" AutoGenerateColumns="False" SelectionMode="Multiple"
+                                      CornerButtonMode="SelectAll" FrozenColumnCount="1" CanReorderColumns="True" CanResizeColumns="True" CanFilterColumns="False" Height="200">
+                            <tv:TableView.Columns>
+                                <tv:TableViewTextColumn Header="アプリ名" Binding="{Binding Name}" Width="150" CanReorder="False" />
+                                <tv:TableViewTextColumn x:Name="SpikeGroupColumn" Header="グループ" Binding="{Binding Group}" Width="150" />
+                                <tv:TableViewTextColumn Header="結果" Binding="{Binding Result}" Width="*" />
+                            </tv:TableView.Columns>
+                        </tv:TableView>
+                        <Button AutomationProperties.AutomationId="Spike.HideGroup" Content="グループの列を隠す" Click="OnSpikeHideGroup" />
                         <TextBlock AutomationProperties.AutomationId="Panel.DryRun" Style="{StaticResource SubtitleTextBlockStyle}" Text="ローカル検証（Dry-run）" />
                         <TextBlock TextWrapping="Wrap" Text="次の内容で docker-compose.yml と .env を保存します（「新しくデプロイ」と同じ入力です）。Azure には接続しません（サインインは不要です）。" />
                         <ComboBox AutomationProperties.AutomationId="DryRun.DbType" Header="DB 種別" ItemsSource="{x:Bind vm:SettingsViewModel.DbTypes}"
