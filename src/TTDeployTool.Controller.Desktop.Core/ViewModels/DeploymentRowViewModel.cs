@@ -25,7 +25,7 @@ public enum ExpiryLevel
 /// デプロイの一覧の 1 行。パスワードは「パスワードを表示」を押したときだけ Azure から読み、この行にだけ置く（PC には保存しない）。
 /// 一覧を読み直す・ページを変える・サインアウトすると、行ごと消える。
 /// 同じ対象の終わっていないジョブ（実行中・待機中・予定・一時停止）があれば、それを表示し、Azure を変える操作（対象に入れる・削除・期限の変更）を止める
-/// （docs/design/desktop-jobs.md の 6.4。開く・状態の確認・パスワードの表示はできる）。
+/// （docs/design/desktop/desktop-jobs.md の 6.4。開く・状態の確認・パスワードの表示はできる）。
 /// </summary>
 public sealed class DeploymentRowViewModel : ObservableObject
 {

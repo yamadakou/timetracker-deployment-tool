@@ -92,7 +92,7 @@ public sealed class JobViewModel : ObservableObject
         }, () => _queue?.Clipboard != null);
     }
 
-    /// <summary>前回までのアプリの、終わったジョブの記録を表示する（docs/design/desktop-jobs.md の 6.8。操作は Markdown のコピーだけ）。</summary>
+    /// <summary>前回までのアプリの、終わったジョブの記録を表示する（docs/design/desktop/desktop-jobs.md の 6.8。操作は Markdown のコピーだけ）。</summary>
     internal JobViewModel(JobRecord record, JobQueue queue)
         : this(record.Kind, record.Target, record.ScheduledAt, queue, null)
     {
@@ -207,10 +207,10 @@ public sealed class JobViewModel : ObservableObject
         ? $"デプロイ（{_target.ResourceGroup} / {_target.AppName}）"
         : $"{(IsExpiryDeletion ? "期限での削除" : "削除")}（{_target.ResourceGroup} / {_target.AppName}）";
 
-    /// <summary>利用可能期限を過ぎたための、確認なしの削除か（docs/design/desktop-jobs.md の 6.5）。</summary>
+    /// <summary>利用可能期限を過ぎたための、確認なしの削除か（docs/design/desktop/desktop-jobs.md の 6.5）。</summary>
     public bool IsExpiryDeletion { get; init; }
 
-    /// <summary>アプリを終了しても残す削除の計画（docs/design/desktop-jobs.md の 6.6。デプロイと期限での削除は null）。</summary>
+    /// <summary>アプリを終了しても残す削除の計画（docs/design/desktop/desktop-jobs.md の 6.6。デプロイと期限での削除は null）。</summary>
     public SavedDeletion? Saved { get; init; }
 
     /// <summary>アプリを終了しても残すデプロイの計画（パスワードは暗号化。6.7。保存しないものと削除は null）。</summary>
@@ -287,7 +287,7 @@ public sealed class JobViewModel : ObservableObject
     /// <summary>ジョブの対象。</summary>
     public JobTarget Target => _target;
 
-    /// <summary>ジョブの一覧の種類（docs/design/desktop-wizard.md の 7）。</summary>
+    /// <summary>ジョブの一覧の種類（docs/design/desktop/desktop-wizard.md の 7）。</summary>
     public string KindText => _kind == JobKind.Deploy ? "デプロイ" : IsExpiryDeletion ? "期限での削除" : "削除";
 
     /// <summary>ジョブの一覧の対象。</summary>

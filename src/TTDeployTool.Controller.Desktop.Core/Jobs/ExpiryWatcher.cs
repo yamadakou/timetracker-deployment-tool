@@ -13,7 +13,7 @@ namespace TTDeployTool.Controller.Desktop.Core.Jobs;
 public sealed class DeletionSkippedException(string message) : InvalidOperationException(message);
 
 /// <summary>
-/// 利用可能期限の確認（docs/design/desktop-jobs.md の 6.2・6.5、D21）。サインインできたときにデプロイの一覧を読み、期限の 3 日前と前日に通知し、
+/// 利用可能期限の確認（docs/design/desktop/desktop-jobs.md の 6.2・6.5、D21）。サインインできたときにデプロイの一覧を読み、期限の 3 日前と前日に通知し、
 /// 期限を過ぎたものは確認なしで削除のジョブを登録する。次の確認は、読んだ一覧の中で最も近い時刻（期限・3 日前・前日）か、
 /// 外の変化（別の PC・CLI・MCP サーバーでのデプロイや期限の変更）を拾うための <see cref="RefreshInterval"/> ごとの読み直しの、早い方に合わせる。
 /// 一覧の中身が変わったとき（このアプリでのデプロイ・削除・期限の変更）も合わせ直す。サインインしていない間は確認しない。

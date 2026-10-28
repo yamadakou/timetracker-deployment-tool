@@ -6,7 +6,7 @@ using Xunit;
 
 namespace TTDeployTool.Controller.Desktop.Core.Tests;
 
-/// <summary>ジョブの一覧の日時の列（予定・登録・変更・実行開始・実行終了・処理時間）と、その並べ替え・絞り込み（docs/design/desktop-jobs.md の 6.8）。</summary>
+/// <summary>ジョブの一覧の日時の列（予定・登録・変更・実行開始・実行終了・処理時間）と、その並べ替え・絞り込み（docs/design/desktop/desktop-jobs.md の 6.8）。</summary>
 public class JobTimesTests
 {
     private readonly MovableTime _time = new();

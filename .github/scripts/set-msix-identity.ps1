@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
   デスクトップアプリのパッケージのマニフェスト（Package.appxmanifest）に、リリースの版と Store の ID を設定する
-  （docs/design/desktop-app.md の 8.1・9.2）。
+  （docs/design/desktop/desktop-app.md の 8.1・9.2）。
 
 .DESCRIPTION
   - Version: タグの版 X.Y.Z から X.Y.Z.0 にする（Store では 4 つ目を 0 にする必要がある）

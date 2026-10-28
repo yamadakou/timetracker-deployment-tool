@@ -1,5 +1,5 @@
 <#
-  scripts/deploy-mcp-http.ps1 と scripts/assign-mcp-role.ps1 のテスト（Pester 5 以上。詳細設計 docs/design/mcp-phase4c.md）。
+  scripts/deploy-mcp-http.ps1 と scripts/assign-mcp-role.ps1 のテスト（Pester 5 以上。詳細設計 docs/design/mcp/mcp-phase4c.md）。
   az は模擬に置き換え、Azure と Entra ID の状態（作成済みのもの、アプリ登録の内容、割り当て）を $global:FakeAzState で表す（Pester のブロックとスクリプトの両方から見えるよう、グローバルに置く）。
   呼び出しの引数と Microsoft Graph に送る本文を記録し、作るもの・作らないもの・送る内容を確かめる。
 

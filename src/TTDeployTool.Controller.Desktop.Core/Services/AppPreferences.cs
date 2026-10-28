@@ -3,7 +3,7 @@ using TTDeployTool.Controller.Desktop.Core.ViewModels;
 namespace TTDeployTool.Controller.Desktop.Core.Services;
 
 /// <summary>
-/// 名前を付けて保存した「デプロイの設定」（docs/design/desktop-settings.md の 2.3）。パスワードは含めない。
+/// 名前を付けて保存した「デプロイの設定」（docs/design/desktop/desktop-settings.md の 2.3）。パスワードは含めない。
 /// 数値は画面の入力のまま（文字列）。<see cref="ExpiryDate"/> は yyyy-MM-dd（<see cref="Expiry"/> が Date のときだけ）。
 /// </summary>
 public sealed record DeploymentTemplate(
@@ -34,13 +34,13 @@ public interface IAppPreferences
     /// <summary>デプロイの設定のテンプレート（名前の順）。</summary>
     IReadOnlyList<DeploymentTemplate> Templates { get; set; }
 
-    /// <summary>出した期限の前の通知（同じ通知を出さないため。docs/design/desktop-jobs.md の 6.5）。</summary>
+    /// <summary>出した期限の前の通知（同じ通知を出さないため。docs/design/desktop/desktop-jobs.md の 6.5）。</summary>
     IReadOnlyList<string> ExpiryNotices { get; set; }
 
     /// <summary>Windows のサインイン時の起動を尋ねたか（一度だけ尋ねる。D16）。</summary>
     bool StartupTaskAsked { get; set; }
 
-    /// <summary>アプリを終了しても残す予定のジョブ（docs/design/desktop-jobs.md の 6.6）。</summary>
+    /// <summary>アプリを終了しても残す予定のジョブ（docs/design/desktop/desktop-jobs.md の 6.6）。</summary>
     IReadOnlyList<SavedJob> SavedJobs { get; set; }
 
     /// <summary>前回の Windows のサインイン時の起動（まだ無ければ null）。</summary>

@@ -1,7 +1,7 @@
-# TTDeployTool デスクトップアプリの構造とドメインモデル
+# TTDeployTool デスクトップの構造
 
 - 対象: `feature/desktop-app` の 2026-10-27 時点のコード（REVIEW_ISSUES No.76 まで）
-- 関連: [`desktop-app.md`](../desktop-app.md)（詳細設計）・[`desktop-jobs.md`](../desktop-jobs.md)（ジョブ・予定・記録）・[`desktop-wizard.md`](../desktop-wizard.md)（画面の流れ）
+- 関連: [共通部分の構造](../common/README.md)（層・ドメインモデル・Azure に作るもの）・[`desktop-app.md`](desktop-app.md)（詳細設計）・[`desktop-jobs.md`](desktop-jobs.md)（ジョブ・予定・記録）・[`desktop-wizard.md`](desktop-wizard.md)（画面の流れ）
 - 図は Mermaid で書いています（GitHub と、Mermaid に対応したエディターで図として表示されます）。コードの構成を変えたら、この図も直します
 
 WinUI 3 の画面は薄く保ち、画面の動きは画面に依らない `Desktop.Core` に置いて単体テストで確かめます。デプロイと削除の計画・実行は、CLI と MCP サーバーと同じ `Application` 層を使います。
@@ -145,108 +145,9 @@ sequenceDiagram
   Q-->>U: 通知（完了・失敗）
 ```
 
-## 4. ドメインモデル（Domain と Application）
+## 4. ドメインモデル
 
-利用者の入力 `DeployInput` は、既定値と検証を経て `DeployOptions` になります。計画（`DeploymentPlan`・`DeletionPlan`）は実行の前に利用者が確かめる単位で、ジョブ（`Job`）はその実行です。リソースの名前は `ResourceNaming`（`{app}-env`・`-db`・`-redis`・`-tt`）、本ツールで作ったものかは管理タグ `managed-by=ttdeploytool` で決めます。
-
-```mermaid
-classDiagram
-  direction LR
-  class DeployInput {
-    Subscription・ResourceGroup・AppName
-    DbType・パスワード・CPU とメモリ
-    PersistDb・ExpiresOn
-  }
-  class DeployOptions {
-    Subscription・ResourceGroup・Location
-    AppName・DbType・DbName
-    TimetrackerTag・CPU とメモリ
-    PersistDb・ExpiresOn
-  }
-  class DeploymentPlan {
-    Operations
-    Blockers・Warnings
-    CanRun
-    データ消失の同意が要るか
-  }
-  class PlannedOperation {
-    Kind（リソースの種類）
-    Name
-    Action（Create・UseExisting・Update）
-    DataLoss
-  }
-  class PermissionCheckResult {
-    Status
-    MissingActions
-  }
-  class ExpiryDecision {
-    ExpiresAt
-    Source（指定・既定・なし）
-  }
-  class DeploymentResult {
-    EnvironmentName
-    3 つの Container App の名前
-    TimetrackerUrl
-    StorageAccountName
-  }
-  class DeletionPlan {
-    Subscription・ResourceGroup・AppName
-    IncludeUntagged・KeepDbData
-    HasDeletions
-  }
-  class DeletionTarget {
-    Name・Kind
-    Exists・Managed・WillDelete
-  }
-  class ResourceGroupDeletion {
-    WillDelete
-    Remaining
-  }
-  class DeletionOutcome {
-    Deleted・AlreadyDeleted
-    ResourceGroupDeleted
-  }
-  class DeploymentEntry {
-    デプロイの一覧の 1 件
-    Url・DeployedAt
-    ExpiryKind・ExpiresAt
-    DbPersisted
-  }
-  class AppEntry {
-    Name
-    ProvisioningState・RunningStatus
-    Image・Cpu・Memory
-  }
-  class Job {
-    RequestStop()
-    Snapshot()
-  }
-  class JobSnapshot {
-    Kind（Deploy・Delete）
-    Status（Running・Succeeded・Failed・Stopped）
-    CurrentStep・Logs
-    Result・Error
-  }
-  class JobTarget {
-    Subscription
-    ResourceGroup
-    AppName
-  }
-  DeployInput ..> DeployOptions : DeployOptionsResolver
-  DeploymentPlan *-- DeployOptions
-  DeploymentPlan *-- "1..*" PlannedOperation
-  DeploymentPlan *-- PermissionCheckResult
-  DeploymentPlan o-- ExpiryDecision
-  DeploymentResult o-- ExpiryDecision
-  DeletionPlan *-- "1..*" DeletionTarget
-  DeletionPlan o-- ResourceGroupDeletion
-  DeletionPlan *-- PermissionCheckResult
-  DeploymentEntry *-- "0..3" AppEntry : tt・db・redis
-  Job --> JobSnapshot : Snapshot()
-  JobSnapshot *-- JobTarget
-  JobSnapshot ..> DeploymentResult : Result
-  JobSnapshot ..> DeletionOutcome : Result
-```
+デプロイ・削除の計画と結果、ジョブ、デプロイの一覧の型は、CLI・MCP サーバーと共通です。[共通部分の構造](../common/README.md)の 3 にあります。この文書では、デスクトップに固有のジョブの状態（5）と PC に残すデータ（6）を示します。
 
 ## 5. デスクトップのジョブの状態
 

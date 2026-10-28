@@ -33,7 +33,7 @@ internal sealed class CountingJobHistory : IJobHistoryFile
     }
 }
 
-/// <summary>終わったジョブの記録（docs/design/desktop-jobs.md の 6.8、D29〜D32）。</summary>
+/// <summary>終わったジョブの記録（docs/design/desktop/desktop-jobs.md の 6.8、D29〜D32）。</summary>
 public sealed class JobHistoryTests : IDisposable
 {
     private readonly MovableTime _time = new();

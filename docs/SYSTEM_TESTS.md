@@ -97,7 +97,7 @@ GitHub の Actions → **System Test** → Run workflow で実行します（`wo
 - `main` にマージされた後は、Run workflow の「Use workflow from」で、テストするブランチを選べます
 
 ### デスクトップアプリの UI テスト（Desktop System Test）
-GitHub の Actions → **Desktop System Test** → Run workflow で実行します（`.github/workflows/desktop-system-test.yml`）。Windows のランナーでデスクトップアプリを導入し、UI テスト（`tests/TTDeployTool.Controller.Desktop.UITests` の `AzureUiTests`）で、サブスクリプションの読み込み → 状態の確認 → 計画 → デプロイ → 削除を画面の操作で行います。アプリはテスト用のビルドで、WAM の代わりに Azure CLI のサインイン（上の OIDC）を使います。準備（アプリ登録・フェデレーション資格情報・変数・環境 `systemtest`）は System Test と同じです。リソースグループ `rg-ttui-<実行の ID>` を作り、最後に削除します。20〜30 分かかり、料金が発生します。結果（trx・失敗したときのスクリーンショット・アプリの診断用のログ）は成果物（`desktop-system-test-results`）に保存されます。詳細は [UI テストの詳細設計](design/desktop-ui-tests.md)の 6.1 を参照してください。
+GitHub の Actions → **Desktop System Test** → Run workflow で実行します（`.github/workflows/desktop-system-test.yml`）。Windows のランナーでデスクトップアプリを導入し、UI テスト（`tests/TTDeployTool.Controller.Desktop.UITests` の `AzureUiTests`）で、サブスクリプションの読み込み → 状態の確認 → 計画 → デプロイ → 削除を画面の操作で行います。アプリはテスト用のビルドで、WAM の代わりに Azure CLI のサインイン（上の OIDC）を使います。準備（アプリ登録・フェデレーション資格情報・変数・環境 `systemtest`）は System Test と同じです。リソースグループ `rg-ttui-<実行の ID>` を作り、最後に削除します。20〜30 分かかり、料金が発生します。結果（trx・失敗したときのスクリーンショット・アプリの診断用のログ）は成果物（`desktop-system-test-results`）に保存されます。詳細は [UI テストの詳細設計](design/desktop/desktop-ui-tests.md)の 6.1 を参照してください。
 
 ## 設定（環境変数）
 | 環境変数 | 必須 | 既定 | 説明 |

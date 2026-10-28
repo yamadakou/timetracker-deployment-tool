@@ -20,7 +20,7 @@ public enum ExpiryKind
 public sealed record AppEntry(string Name, string? ProvisioningState, string? RunningStatus, string? Image, double? Cpu, string? Memory);
 
 /// <summary>
-/// デプロイの一覧の 1 行（サブスクリプション・リソースグループ・アプリ名の組。docs/design/desktop-jobs.md の 6.3・6.4）。
+/// デプロイの一覧の 1 行（サブスクリプション・リソースグループ・アプリ名の組。docs/design/desktop/desktop-jobs.md の 6.3・6.4）。
 /// 無いリソースは null（作りかけ・消しかけ）。<see cref="ExpiryDiffers"/> は、リソースごとの期限のタグが食い違っているか。
 /// </summary>
 public sealed record DeploymentEntry(
@@ -96,7 +96,7 @@ public static class DeploymentCatalog
         var storage = Find(ManagedResourceRecord.StorageAccountType);
         var first = records[0];
         // 期限とデプロイ日は、本ツールで作るリソースのタグ（期限は、期限なしが 1 つでもあれば期限なし、ほかは最も遅いもの。デプロイ日は最も新しいもの）。
-        // Environment のタグは作ったときの値のまま（docs/design/desktop-jobs.md の 6.1）なので、Container App もストレージアカウントも無いときだけ使う
+        // Environment のタグは作ったときの値のまま（docs/design/desktop/desktop-jobs.md の 6.1）なので、Container App もストレージアカウントも無いときだけ使う
         var resources = new[] { tt, db, redis, storage }.OfType<ManagedResourceRecord>().ToList();
         if (resources.Count == 0 && env != null)
             resources.Add(env);

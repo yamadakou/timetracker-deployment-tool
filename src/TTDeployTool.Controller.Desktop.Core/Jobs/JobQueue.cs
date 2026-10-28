@@ -99,7 +99,7 @@ public sealed class JobQueue : ObservableObject, IDisposable
     /// <param name="starter">ジョブを始める処理（実行の直前の確認を含む。失敗すると、ジョブは始めずに失敗にする）</param>
     /// <exception cref="InvalidOperationException">同じ対象の、終わっていないジョブがある</exception>
     /// <param name="expiryDeletion">利用可能期限を過ぎたための削除か（題名に出す）</param>
-    /// <param name="saved">アプリを終了しても残す削除の計画（docs/design/desktop-jobs.md の 6.6。無ければ残さない）</param>
+    /// <param name="saved">アプリを終了しても残す削除の計画（docs/design/desktop/desktop-jobs.md の 6.6。無ければ残さない）</param>
     /// <param name="paused">一時停止にして登録する（前回の一時停止と、予定の時刻を過ぎたものを戻すとき）</param>
     /// <param name="savedDeployment">アプリを終了しても残すデプロイの計画（パスワードは暗号化。無ければ残さない）</param>
     /// <param name="registeredAt">最初に登録した日時（前回のアプリの予定を戻すとき。無ければ今）</param>
@@ -127,7 +127,7 @@ public sealed class JobQueue : ObservableObject, IDisposable
             {
                 if (e.PropertyName != nameof(JobViewModel.State))
                     return;
-                // 終了日時を、変更の通知（記録の保存。docs/design/desktop-jobs.md の 6.8）より先に残す
+                // 終了日時を、変更の通知（記録の保存。docs/design/desktop/desktop-jobs.md の 6.8）より先に残す
                 if (!job.IsActive)
                     job.FinishedAt ??= _time.GetUtcNow();
                 Changed();

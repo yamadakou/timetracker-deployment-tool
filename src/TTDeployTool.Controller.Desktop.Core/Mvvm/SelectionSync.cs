@@ -1,7 +1,7 @@
 namespace TTDeployTool.Controller.Desktop.Core.Mvvm;
 
 /// <summary>
-/// 表（ListView）の選択と ViewModel の選択を互いに合わせる（ListView の SelectedItems は結び付けられないため。docs/design/desktop-wizard.md の 7）。
+/// 表（ListView）の選択と ViewModel の選択を互いに合わせる（ListView の SelectedItems は結び付けられないため。docs/design/desktop/desktop-wizard.md の 7）。
 /// 画面の側は、表の選択の一覧を <see cref="Attach"/> で渡し、選択が変わったら <see cref="ViewChanged"/> を呼ぶだけにする。
 /// ViewModel が選び直したとき（一覧を表示し直した後に保った選択・「選択を外す」）は、<see cref="ViewModelChanged"/> で表に戻す。
 /// 戻している間の表の選択の変更は、ViewModel に返さない。

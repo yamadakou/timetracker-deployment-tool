@@ -90,7 +90,7 @@ public sealed partial class MainWindow : Window
             ViewModel.Deployments.StateFilter = option;
     }
 
-    // 表の見出しを押すと並べ替える（Tag は列の名前。docs/design/desktop-wizard.md の 7）
+    // 表の見出しを押すと並べ替える（Tag は列の名前。docs/design/desktop/desktop-wizard.md の 7）
     private void OnSortDeployments(object sender, RoutedEventArgs e) => ViewModel.Deployments.SortBy((string)((Button)sender).Tag);
 
     private void OnSortJobs(object sender, RoutedEventArgs e) => ViewModel.JobList.SortBy((string)((Button)sender).Tag);
@@ -151,7 +151,7 @@ public sealed partial class MainWindow : Window
             ShowPanel(tag);
     }
 
-    /// <summary>画面を開く（メニューにある画面はメニューを選び、削除・実行状況はメニューの選択を外して開く。docs/design/desktop-wizard.md の 2）。</summary>
+    /// <summary>画面を開く（メニューにある画面はメニューを選び、削除・実行状況はメニューの選択を外して開く。docs/design/desktop/desktop-wizard.md の 2）。</summary>
     private void Navigate(string tag)
     {
         if (Nav.MenuItems.Concat(Nav.FooterMenuItems).OfType<NavigationViewItem>().FirstOrDefault(i => (string)i.Tag == tag) is { } item)

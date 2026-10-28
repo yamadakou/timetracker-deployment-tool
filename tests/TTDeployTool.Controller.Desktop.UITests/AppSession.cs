@@ -69,7 +69,7 @@ public sealed class AppSession : IDisposable
         var name = Environment.GetEnvironmentVariable("TT_UITEST_PACKAGE_NAME") is { Length: > 0 } n ? n : "TTDeployTool";
         var package = new PackageManager().FindPackagesForUser(string.Empty).FirstOrDefault(p => p.Id.Name == name)
                       ?? throw new InvalidOperationException(
-                          $"パッケージ {name} が導入されていません。Visual Studio で配置するか、署名した MSIX を導入してください（docs/design/desktop-ui-tests.md）。");
+                          $"パッケージ {name} が導入されていません。Visual Studio で配置するか、署名した MSIX を導入してください（docs/design/desktop/desktop-ui-tests.md）。");
         return $"{package.Id.FamilyName}!App";
     }
 

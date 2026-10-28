@@ -461,7 +461,7 @@ ttdeploytool-cli.exe deploy --subscription "<サブスクリプション ID>" --
 - **料金**: Azure Files（Standard、LRS）の保存容量とトランザクションの料金がかかります。DB は読み書きが多いため、主にトランザクションの料金になります。金額は [Azure Files の料金](https://azure.microsoft.com/ja-jp/pricing/details/storage/files/) を確認してください
 - **前提**: リソースプロバイダー `Microsoft.Storage` の登録（[Azure リソースプロバイダーの登録](#azure-リソースプロバイダーの登録)）と、ストレージの権限（[必要な RBAC ロールと権限](#必要な-rbac-ロールと権限)。Contributor には含まれます）が必要です。ファイル共有のマウントにはストレージアカウントのアカウントキーを使い、Container Apps 環境は仮想ネットワーク（VNet）を使いません。そのため、Azure Policy で[アカウントキーによるアクセス（共有キー）](https://learn.microsoft.com/ja-jp/azure/storage/common/shared-key-authorization-prevent)やパブリック ネットワーク アクセスを禁止している環境では、DB コンテナへのマウントが失敗します
 - **制約**: 検証環境のための補助です。バックアップはなく、冗長化は [LRS](https://learn.microsoft.com/ja-jp/azure/storage/common/storage-redundancy)（1 つのデータセンターの中の 3 つのコピー）だけです。Azure 基盤のメンテナンスによる再起動は本ツールでは制御できず、まれにデータが壊れるおそれがあります。重要なデータは、Timetracker の機能でエクスポートしておいてください。Azure 上の SQL Server でサンプル DB を作れない制約は、`--persist-db` を付けても変わりません
-- **設計の詳細**: [docs/design/db-persistence.md](docs/design/db-persistence.md)
+- **設計の詳細**: [docs/design/common/db-persistence.md](docs/design/common/db-persistence.md)
 
 ### ローカル検証（Dry-run）
 
@@ -568,7 +568,7 @@ CLI と同じ機能を、[MCP（Model Context Protocol）](https://modelcontextp
 
 ### デスクトップアプリ（開発中）
 
-CLI や AI アシスタントを使わずに、Windows の画面の操作で同じことを行うアプリを開発しています（WinUI 3。Microsoft Store の限定公開で配布する予定です）。まだ Store では配布していません。評価者には、自己署名の証明書で署名した評価版（`.msix`）を渡せます（作り方: [docs/design/desktop-preview.md](docs/design/desktop-preview.md)、評価者の導入の手順: [docs/DESKTOP_PREVIEW_INSTALL.md](docs/DESKTOP_PREVIEW_INSTALL.md)）。
+CLI や AI アシスタントを使わずに、Windows の画面の操作で同じことを行うアプリを開発しています（WinUI 3。Microsoft Store の限定公開で配布する予定です）。まだ Store では配布していません。評価者には、自己署名の証明書で署名した評価版（`.msix`）を渡せます（作り方: [docs/design/desktop/desktop-preview.md](docs/design/desktop/desktop-preview.md)、評価者の導入の手順: [docs/DESKTOP_PREVIEW_INSTALL.md](docs/DESKTOP_PREVIEW_INSTALL.md)）。
 
 - できること: Azure へのサインイン（Windows のアカウント。`az login` は不要）、サブスクリプションの選択、デプロイ（計画 → 確認 → 実行）、状態の確認、削除（アプリ名の入力で確認）、ローカル検証（Dry-run）の docker-compose.yml と .env の保存
 - 安全策は CLI・MCP サーバーと同じです（実行の前に計画を示す、DB のデータが失われる更新は同意のチェックが必要、実行の直前に計画を作り直して状態が変わっていれば実行しない）
@@ -583,7 +583,7 @@ CLI や AI アシスタントを使わずに、Windows の画面の操作で同�
 - 「設定」の画面の「Windows との連携」で、サインイン時の起動の状態と前回の起動の日時、通知の許可、今ウィンドウを閉じたらどうなるか、消える予定と戻す予定を確かめられます（Windows のスタートアップ アプリ・通知の設定も開けます）
 - パスワードは、上の予定を残す場合を除いて保存しません（アプリを終了すると消えます）
 - 対象: Windows 10（1809 以降）、Windows 11（x64 / arm64）
-- 設計: [docs/design/desktop-app.md](docs/design/desktop-app.md)、Windows での確認の手順: [docs/design/desktop-app-check.md](docs/design/desktop-app-check.md)、Store への提出の手順: [docs/design/desktop-app-store.md](docs/design/desktop-app-store.md)、評価版の配布: [docs/design/desktop-preview.md](docs/design/desktop-preview.md)、プライバシー ポリシー（案）: [docs/PRIVACY.md](docs/PRIVACY.md)
+- 設計: [docs/design/desktop/desktop-app.md](docs/design/desktop/desktop-app.md)、構造の図: [docs/design/desktop/README.md](docs/design/desktop/README.md)、Windows での確認の手順: [docs/design/desktop/desktop-app-check.md](docs/design/desktop/desktop-app-check.md)、Store への提出の手順: [docs/design/desktop/desktop-app-store.md](docs/design/desktop/desktop-app-store.md)、評価版の配布: [docs/design/desktop/desktop-preview.md](docs/design/desktop/desktop-preview.md)、プライバシー ポリシー（案）: [docs/PRIVACY.md](docs/PRIVACY.md)
 
 ### コマンドパラメータの説明一覧
 `deploy`（サブコマンドを省略した場合も `deploy`）のオプションです。`delete` のオプションは[リソースの削除（delete）](#リソースの削除delete)を参照してください。
@@ -748,9 +748,9 @@ dotnet publish .\src\TTDeployTool.Controller.Cli\TTDeployTool.Controller.Cli.csp
 - コントローラー層（TTDeployTool.Controller.Cli）
   - CLI の入出力、オプションの解析（CliArgs）
 - コントローラー層（TTDeployTool.Controller.Mcp）
-  - MCP サーバー（`ttdeploytool-mcp`。stdio と HTTP）。ツール・Resources・Prompts と、計画 → 確認 → 実行の流れは [MCP サーバーの利用者向けマニュアル](docs/MCP_SERVER.md) を参照してください（設計は [docs/MCP_TOOL_DESIGN.md](docs/MCP_TOOL_DESIGN.md) と [docs/design/](docs/design/) の mcp-phase*.md）
+  - MCP サーバー（`ttdeploytool-mcp`。stdio と HTTP）。ツール・Resources・Prompts と、計画 → 確認 → 実行の流れは [MCP サーバーの利用者向けマニュアル](docs/MCP_SERVER.md) を参照してください（設計は [docs/MCP_TOOL_DESIGN.md](docs/MCP_TOOL_DESIGN.md) と [docs/design/mcp/](docs/design/mcp/README.md)）
 - コントローラー層（TTDeployTool.Controller.Desktop.Core）
-  - デスクトップアプリ（開発中）の画面の状態と操作（ViewModel）。UI のフレームワークに依存しないため、Linux でもテストできる（設計は [docs/design/desktop-app.md](docs/design/desktop-app.md)）
+  - デスクトップアプリ（開発中）の画面の状態と操作（ViewModel）。UI のフレームワークに依存しないため、Linux でもテストできる（設計は [docs/design/desktop/desktop-app.md](docs/design/desktop/desktop-app.md)）
 - 共通（TTDeployTool.Common）
   - ロガー（IDeploymentLogger / SimpleLogger）などのユーティリティ
 
@@ -769,7 +769,7 @@ dotnet publish .\src\TTDeployTool.Controller.Cli\TTDeployTool.Controller.Cli.csp
 今後の機能の候補（ストア配布できるデスクトップアプリなど）と優先度は、[docs/ROADMAP.md](docs/ROADMAP.md) にまとめています。
 
 ### 注意点
-- 検証環境の構築が目的のため、Azure Container Apps の DB と Redis には、既定では永続ボリュームを付けていません（Dry-run の docker-compose は名前付きボリュームを使います）。DB だけは、`--persist-db` で Azure Files をマウントできます（設計は [docs/design/db-persistence.md](docs/design/db-persistence.md)）
+- 検証環境の構築が目的のため、Azure Container Apps の DB と Redis には、既定では永続ボリュームを付けていません（Dry-run の docker-compose は名前付きボリュームを使います）。DB だけは、`--persist-db` で Azure Files をマウントできます（設計は [docs/design/common/db-persistence.md](docs/design/common/db-persistence.md)）
 - DB のパスワードと Timetracker のパスワードは、Container Apps のシークレット（`db-password` / `app-password`）として登録し、環境変数からは `secretRef` で参照します（ポータルの環境変数の一覧に平文で表示されません）
 - 認証には、マネージド ID かサービスプリンシパルをおすすめします（DefaultAzureCredential で使えます）
 - [Docker Hub の TimeTracker のページ](https://hub.docker.com/r/densocreate/timetracker)の「クイックスタート」に書かれた固定の DB ユーザー名は、ドメイン層の Defaults にまとめています

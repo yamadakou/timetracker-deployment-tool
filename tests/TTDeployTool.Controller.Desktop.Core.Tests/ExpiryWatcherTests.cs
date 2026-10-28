@@ -12,7 +12,7 @@ using Xunit;
 
 namespace TTDeployTool.Controller.Desktop.Core.Tests;
 
-/// <summary>期限の前の通知と、期限での削除（docs/design/desktop-jobs.md の 6.2・6.5）。</summary>
+/// <summary>期限の前の通知と、期限での削除（docs/design/desktop/desktop-jobs.md の 6.2・6.5）。</summary>
 public class ExpiryWatcherTests
 {
     // 2026-10-22 05:00（日本時間）

@@ -4,7 +4,7 @@ using TTDeployTool.Controller.Desktop.Core.Mvvm;
 
 namespace TTDeployTool.Controller.Desktop.Core.ViewModels;
 
-/// <summary>デプロイのウィザードの画面（docs/design/desktop-wizard.md の 3）。</summary>
+/// <summary>デプロイのウィザードの画面（docs/design/desktop/desktop-wizard.md の 3）。</summary>
 public enum WizardStep
 {
     /// <summary>① 対象（テンプレート・サブスクリプション・リソースグループ・アプリ名・リージョン）。</summary>
@@ -28,7 +28,7 @@ public enum WizardStep
 /// <see cref="DeploymentViewModel"/> のまま使い、画面の切り替えと「次へ」の条件だけを持つ。誤りは、その項目のある画面に出し、
 /// その画面と前の画面に誤りがあれば次へ進めない。⑤ を開いたときに計画を作る。
 /// 「今すぐ実行」「予定に追加」で登録すると、画面を移らずに完了の表示にし（進み具合と結果を出す）、「続けてデプロイ」か「新規デプロイ」を押すまで
-/// そのままにする（docs/design/desktop-wizard.md の 3、Q4・Q13・No.70）。
+/// そのままにする（docs/design/desktop/desktop-wizard.md の 3、Q4・Q13・No.70）。
 /// </summary>
 public sealed class DeployWizardViewModel : ObservableObject
 {

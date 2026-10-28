@@ -9,7 +9,7 @@ using Xunit;
 
 namespace TTDeployTool.Application.Tests;
 
-/// <summary>DB のデータの永続化（--persist-db）の計画・権限の事前確認（詳細設計 docs/design/db-persistence.md の 6・7）。</summary>
+/// <summary>DB のデータの永続化（--persist-db）の計画・権限の事前確認（詳細設計 docs/design/common/db-persistence.md の 6・7）。</summary>
 public class DbPersistencePlanTests
 {
     private const string EnvId = "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.App/managedEnvironments/demo-env";

@@ -35,7 +35,7 @@ public enum JobSortKey
     /// <summary>予定日時。</summary>
     Time,
 
-    /// <summary>登録日時（docs/design/desktop-jobs.md の 6.8）。</summary>
+    /// <summary>登録日時（docs/design/desktop/desktop-jobs.md の 6.8）。</summary>
     RegisteredAt,
 
     /// <summary>変更日時（予定の時刻を変えた日時）。</summary>
@@ -52,9 +52,9 @@ public enum JobSortKey
 }
 
 /// <summary>
-/// ジョブの一覧（docs/design/desktop-wizard.md の 7、No.63）。このアプリのすべてのジョブ（まだ Azure に無い新しいデプロイの予定を含む）を
+/// ジョブの一覧（docs/design/desktop/desktop-wizard.md の 7、No.63）。このアプリのすべてのジョブ（まだ Azure に無い新しいデプロイの予定を含む）を
 /// 表に 1 行ずつ出し、見出しで並べ替え・絞り込み、選んだ行に取り消し・一時停止・再開・予定の変更・記録から削除をまとめて行う。詳細は実行状況の画面で見る。
-/// 前回までのアプリで終わったジョブの記録も出す（docs/design/desktop-jobs.md の 6.8）。
+/// 前回までのアプリで終わったジョブの記録も出す（docs/design/desktop/desktop-jobs.md の 6.8）。
 /// </summary>
 public sealed class JobListViewModel : ObservableObject
 {

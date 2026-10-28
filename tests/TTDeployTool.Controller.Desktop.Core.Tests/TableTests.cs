@@ -9,7 +9,7 @@ using static TTDeployTool.Controller.Desktop.Core.Tests.DeploymentListViewModelT
 
 namespace TTDeployTool.Controller.Desktop.Core.Tests;
 
-/// <summary>デプロイの一覧の表（見出しでの並べ替え・絞り込み・複数の選択とまとめての操作。docs/design/desktop-wizard.md の 7、No.63）。</summary>
+/// <summary>デプロイの一覧の表（見出しでの並べ替え・絞り込み・複数の選択とまとめての操作。docs/design/desktop/desktop-wizard.md の 7、No.63）。</summary>
 public class DeploymentTableTests
 {
     private readonly MovableTime _time = new();

@@ -31,7 +31,7 @@ public sealed record DeploymentInput(DeployOptions? Options, IReadOnlyList<strin
 /// <summary>
 /// デプロイの設定（DB 種別・タグ・パスワード・スペック）。誤りと警告は、入力のたびに CLI・MCP と同じ規則
 /// （<see cref="DeploymentValidator"/> / <see cref="DeploymentAdvisor"/>）で表示する。パスワードは保存しない（詳細設計 6）。
-/// 利用可能期限日は、CLI の --expires-on と同じ規則（<see cref="DeploymentExpiry"/>。docs/design/desktop-jobs.md の 6.1）。
+/// 利用可能期限日は、CLI の --expires-on と同じ規則（<see cref="DeploymentExpiry"/>。docs/design/desktop/desktop-jobs.md の 6.1）。
 /// </summary>
 public sealed class SettingsViewModel : ObservableObject
 {
@@ -182,7 +182,7 @@ public sealed class SettingsViewModel : ObservableObject
 
     public string RedisMemoryGi { get => _redisMemory; set => Set(ref _redisMemory, value); }
 
-    /// <summary>DB のデータを Azure Files に置くか（詳細設計 docs/design/db-persistence.md）。</summary>
+    /// <summary>DB のデータを Azure Files に置くか（詳細設計 docs/design/common/db-persistence.md）。</summary>
     public PersistDbOption PersistDb
     {
         get => _persistDb;

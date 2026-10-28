@@ -7,7 +7,7 @@ namespace TTDeployTool.Controller.Desktop;
 
 /// <summary>
 /// アプリの入口。1 つだけ起動し、2 つ目の起動は 1 つ目に渡す（常駐中にスタート メニューから起動すると、ジョブを持たない別のアプリが
-/// 動いてしまうため。手順は Microsoft Learn「How to create a single-instanced WinUI app with C#」のとおり。docs/design/desktop-jobs.md の 5.1）。
+/// 動いてしまうため。手順は Microsoft Learn「How to create a single-instanced WinUI app with C#」のとおり。docs/design/desktop/desktop-jobs.md の 5.1）。
 /// </summary>
 public static class Program
 {

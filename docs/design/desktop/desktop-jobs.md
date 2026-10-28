@@ -1,7 +1,7 @@
 # 詳細設計: デスクトップアプリの実機の確認で見つかった問題と、ジョブの同時実行・予定・常駐、利用可能期限とデプロイの一覧（Phase 7）
 
 - 対象ブランチ: `feature/desktop-app`
-- 前の段階: `docs/design/desktop-app.md`（Phase 5）、`docs/design/desktop-ui-tests.md`（Phase 6）
+- 前の段階: `docs/design/desktop/desktop-app.md`（Phase 5）、`docs/design/desktop/desktop-ui-tests.md`（Phase 6）
 - 状況: 論点はすべてオーナーの回答で決めた（8）。一次情報の確認日は 2026-10-20
 - 記録: `docs/REVIEW_ISSUES.md` の No.52（予定）
 

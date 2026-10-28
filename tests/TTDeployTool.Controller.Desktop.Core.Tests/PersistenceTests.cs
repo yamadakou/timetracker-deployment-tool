@@ -6,7 +6,7 @@ using Xunit;
 
 namespace TTDeployTool.Controller.Desktop.Core.Tests;
 
-/// <summary>DB のデータの永続化オプション（docs/design/db-persistence.md）の画面での扱い。</summary>
+/// <summary>DB のデータの永続化オプション（docs/design/common/db-persistence.md）の画面での扱い。</summary>
 public class PersistenceTests
 {
     [Fact]

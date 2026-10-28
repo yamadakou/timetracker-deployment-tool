@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 namespace TTDeployTool.Controller.Desktop.Core.Diagnostics;
 
 /// <summary>
-/// 診断用のログ（詳細設計 docs/design/desktop-app.md の 7.2）。アプリのデータの置き場所の logs に、日ごとのファイルで書く。
+/// 診断用のログ（詳細設計 docs/design/desktop/desktop-app.md の 7.2）。アプリのデータの置き場所の logs に、日ごとのファイルで書く。
 /// サインインやサブスクリプションの読み込みで何が失敗したかを、利用者の PC で後から確かめるため。
 /// ファイルはこの PC にだけ置き、送信しない。パスワードとトークンは書かない（Azure SDK も既定でトークンと PII を出さない）。
 /// </summary>

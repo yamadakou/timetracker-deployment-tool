@@ -33,7 +33,7 @@ public enum DeploymentState
 public sealed record DeploymentStateFilterOption(DeploymentState? State, string Label);
 
 /// <summary>
-/// 3 つの Container App の状態から、一覧の「状態」を決める（docs/design/desktop-jobs.md の 6.3、No.73）。値は Container Apps の REST API の
+/// 3 つの Container App の状態から、一覧の「状態」を決める（docs/design/desktop/desktop-jobs.md の 6.3、No.73）。値は Container Apps の REST API の
 /// provisioningState（InProgress・Succeeded・Failed・Canceled・Deleting）と runningStatus（Progressing・Running・Stopped・Suspended・Ready）。
 /// 悪いほうを優先する（失敗 → 処理中 → 停止中 → 実行中）。
 /// </summary>

@@ -9,7 +9,7 @@ using Xunit;
 
 namespace TTDeployTool.Controller.Desktop.Core.Tests;
 
-/// <summary>アプリを終了しても残す予定（docs/design/desktop-jobs.md の 6.6、D23・D24）。</summary>
+/// <summary>アプリを終了しても残す予定（docs/design/desktop/desktop-jobs.md の 6.6、D23・D24）。</summary>
 public class ScheduledJobTests
 {
     private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 10, 26, 9, 0, 0, TimeSpan.Zero));

@@ -124,7 +124,7 @@ public static class ContainerAppSpecBuilder
         },
     };
 
-    // DB のデータのディレクトリに Azure Files をマウントする（詳細設計 docs/design/db-persistence.md の 4）
+    // DB のデータのディレクトリに Azure Files をマウントする（詳細設計 docs/design/common/db-persistence.md の 4）
     private static void AddDbStorage(ContainerAppTemplate template, ContainerAppContainer container, string dbType)
     {
         template.Volumes.Add(new ContainerAppVolume

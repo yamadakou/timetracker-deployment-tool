@@ -47,7 +47,7 @@ public enum DeploymentSortKey
 public sealed record DeploymentSortOption(DeploymentSortKey Key, bool Descending, string Label);
 
 /// <summary>
-/// デプロイの一覧（docs/design/desktop-jobs.md の 6.3・6.4）。サインインしたアカウントが読めるサブスクリプションから、本ツールで作った
+/// デプロイの一覧（docs/design/desktop/desktop-jobs.md の 6.3・6.4）。サインインしたアカウントが読めるサブスクリプションから、本ツールで作った
 /// リソースを Resource Graph で読み、デプロイごとにまとめる。フィルタ・並べ替え・ページングは、読んだ結果に対してアプリの中で行う。
 /// Resource Graph の反映が遅れるため、このアプリで直前に終えたデプロイ・削除と、変えた期限は、読んだ結果に重ねて表示する。
 /// </summary>
@@ -123,7 +123,7 @@ public sealed class DeploymentListViewModel : ObservableObject
     public static readonly SubscriptionFilterOption AllSubscriptions = new(null, "すべてのサブスクリプション");
 
     /// <param name="open">対象に入れた後に、画面を開く（ウィザード・実行状況・削除の名前: wizard・status・delete）</param>
-    /// <param name="openBatchDeletion">2 件以上を選んで削除するときに、まとめての削除の画面を開いて計画する（docs/design/desktop-wizard.md の 7）</param>
+    /// <param name="openBatchDeletion">2 件以上を選んで削除するときに、まとめての削除の画面を開いて計画する（docs/design/desktop/desktop-wizard.md の 7）</param>
     public DeploymentListViewModel(
         TargetViewModel target, JobQueue queue, IDeploymentLogger deploymentLogger, ILogger logger, TimeProvider time,
         ISystemLauncher launcher, IClipboardService? clipboard, Func<string, Task> open, Func<IReadOnlyList<DeploymentEntry>, Task> openBatchDeletion)
@@ -224,7 +224,7 @@ public sealed class DeploymentListViewModel : ObservableObject
     /// <summary>アプリ名（中間一致）。</summary>
     public string AppNameFilter { get => _appNameFilter; set => SetFilter(ref _appNameFilter, value.Trim()); }
 
-    /// <summary>見出しを押したときに並べ替える。今と同じ列なら逆順、違う列なら昇順（期限日は近い順。docs/design/desktop-wizard.md の 7）。</summary>
+    /// <summary>見出しを押したときに並べ替える。今と同じ列なら逆順、違う列なら昇順（期限日は近い順。docs/design/desktop/desktop-wizard.md の 7）。</summary>
     public void SortBy(DeploymentSortKey key) =>
         Sort = SortOptions.First(o => o.Key == key && o.Descending == (Sort.Key == key && !Sort.Descending));
 
@@ -411,7 +411,7 @@ public sealed class DeploymentListViewModel : ObservableObject
         _target.Subscriptions.FirstOrDefault(c => string.Equals(c.SubscriptionId, subscriptionId, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
-    /// 期限の確認のために読み直す（ページ・フィルタ・行は保つ。docs/design/desktop-jobs.md の 6.5）。読めれば true（読めないテナントがあっても、
+    /// 期限の確認のために読み直す（ページ・フィルタ・行は保つ。docs/design/desktop/desktop-jobs.md の 6.5）。読めれば true（読めないテナントがあっても、
     /// ほかのテナントを読めれば true）。
     /// </summary>
     internal async Task<bool> ReloadAsync()

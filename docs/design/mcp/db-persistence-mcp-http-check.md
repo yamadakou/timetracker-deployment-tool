@@ -11,14 +11,14 @@ Azure にも Entra ID にも何もない状態から、次の順に進めます�
 
 - **所要時間**: 1 時間半ほど（MCP サーバーの配置に 10 分、Environment の削除に 1 回 10〜15 分かかります）
 - **料金**: Container Apps とストレージアカウントの料金が少しかかります。最後にすべて削除します
-- **結果の記録先**: `docs/REVIEW_ISSUES.md` の No.46 と、[`docs/design/db-persistence.md`](db-persistence.md) の「14. 実施状況」
-- MCP サーバーの配置の仕組みの詳細は、[`docs/design/mcp-phase4c.md`](mcp-phase4c.md) にあります（この手順を進めるだけなら、読まなくてかまいません）
+- **結果の記録先**: `docs/REVIEW_ISSUES.md` の No.46 と、[`docs/design/common/db-persistence.md`](../common/db-persistence.md) の「14. 実施状況」
+- MCP サーバーの配置の仕組みの詳細は、[`docs/design/mcp/mcp-phase4c.md`](mcp-phase4c.md) にあります（この手順を進めるだけなら、読まなくてかまいません）
 
 ## 1. この手順で使う言葉
 
 | 言葉 | 意味 |
 |---|---|
-| MCP サーバー（HTTP 版） | AI アシスタントから URL で接続して使う、本ツールのサーバー（[MCP_SERVER.md の HTTP 版](../MCP_SERVER.md#http-版開発中)）。Azure Container Apps の [Container App](https://learn.microsoft.com/ja-jp/azure/container-apps/overview) として動かす |
+| MCP サーバー（HTTP 版） | AI アシスタントから URL で接続して使う、本ツールのサーバー（[MCP_SERVER.md の HTTP 版](../../MCP_SERVER.md#http-版開発中)）。Azure Container Apps の [Container App](https://learn.microsoft.com/ja-jp/azure/container-apps/overview) として動かす |
 | [Environment](https://learn.microsoft.com/ja-jp/azure/container-apps/environment) | Container App を入れる箱（Container Apps 環境）。MCP サーバー用と、確認で作る Timetracker 用の 2 つが出てくる |
 | [マネージド ID](https://learn.microsoft.com/ja-jp/entra/identity/managed-identities-azure-resources/overview) | MCP サーバーが Azure を操作するときに使う ID。パスワードを持たない |
 | [アプリ登録](https://learn.microsoft.com/ja-jp/entra/identity-platform/quickstart-register-app) | Entra ID に登録するアプリの情報。MCP サーバー用（サインインした人を確かめる）と、クライアント用（Claude Code がサインインに使う）の 2 つを作る |
@@ -194,7 +194,7 @@ $UserRg = "rg-tt-mcp-user"   # user 方式の確認に使うリソースグル�
 | U2 | 既定の削除の計画 → 実行 | ストレージアカウントまで削除される |
 | U3 | アクティビティログ（4 の「アクティビティログの確認」の 2） | ストレージアカウントの作成・削除の `caller` が、自分のユーザー名 |
 
-`user` 方式では、MCP サーバーへのサインインで MFA を行っている必要があります。「多要素認証（MFA）が必要です」というエラーになった場合は、`/mcp` から `timetracker` にサインインし直し、MFA を行ってください（詳細は [`docs/design/mcp-phase4c.md`](mcp-phase4c.md) の「10. 確認結果」の 3）。
+`user` 方式では、MCP サーバーへのサインインで MFA を行っている必要があります。「多要素認証（MFA）が必要です」というエラーになった場合は、`/mcp` から `timetracker` にサインインし直し、MFA を行ってください（詳細は [`docs/design/mcp/mcp-phase4c.md`](mcp-phase4c.md) の「10. 確認結果」の 3）。
 
 ## 6. 後片付けと記録
 ### 6.1 確認で作った Timetracker の環境
@@ -223,7 +223,7 @@ $UserRg = "rg-tt-mcp-user"   # user 方式の確認に使うリソースグル�
    ```
 
 ### 6.3 記録
-- [ ] 結果を `docs/REVIEW_ISSUES.md` の No.46（未確認の「HTTP 版の MCP サーバーでの確認」）と、[`docs/design/db-persistence.md`](db-persistence.md) の「14. 実施状況」に記入する
+- [ ] 結果を `docs/REVIEW_ISSUES.md` の No.46（未確認の「HTTP 版の MCP サーバーでの確認」）と、[`docs/design/common/db-persistence.md`](../common/db-persistence.md) の「14. 実施状況」に記入する
 
 ## 7. うまくいかないとき
 | 症状 | 考えられる原因と対処 |

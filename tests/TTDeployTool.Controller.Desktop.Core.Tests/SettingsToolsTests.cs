@@ -9,7 +9,7 @@ using Xunit;
 
 namespace TTDeployTool.Controller.Desktop.Core.Tests;
 
-/// <summary>設定の Markdown のコピー・テンプレート・初期値に戻す（docs/design/desktop-settings.md）。</summary>
+/// <summary>設定の Markdown のコピー・テンプレート・初期値に戻す（docs/design/desktop/desktop-settings.md）。</summary>
 public sealed class SettingsToolsTests : IDisposable
 {
     private readonly string _dir = Path.Combine(Path.GetTempPath(), "tt-settings-" + Guid.NewGuid().ToString("N"));
@@ -286,7 +286,7 @@ public sealed class SettingsToolsTests : IDisposable
     }
 }
 
-/// <summary>状態・削除の計画・ジョブのコピーと、アプリ名のコピー（docs/design/desktop-settings.md の 2.2）。</summary>
+/// <summary>状態・削除の計画・ジョブのコピーと、アプリ名のコピー（docs/design/desktop/desktop-settings.md の 2.2）。</summary>
 public class CopyTests
 {
     [Fact]

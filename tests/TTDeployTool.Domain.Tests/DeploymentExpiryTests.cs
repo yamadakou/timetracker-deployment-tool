@@ -4,7 +4,7 @@ using Xunit;
 
 namespace TTDeployTool.Domain.Tests;
 
-/// <summary>利用可能期限（docs/design/desktop-jobs.md の 6.1）。</summary>
+/// <summary>利用可能期限（docs/design/desktop/desktop-jobs.md の 6.1）。</summary>
 public class DeploymentExpiryTests
 {
     private static readonly TimeZoneInfo Tokyo = TimeZoneInfo.CreateCustomTimeZone("JST", TimeSpan.FromHours(9), "JST", "JST");

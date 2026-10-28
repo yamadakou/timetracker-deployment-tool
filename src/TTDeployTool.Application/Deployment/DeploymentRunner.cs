@@ -31,7 +31,7 @@ public sealed class DeploymentRunner
         opts = opts.WithPersistDb(persist);
 
         // 利用可能期限を、実行する時刻と今のデプロイのタグで決め、本ツールで作るリソース（ストレージアカウント・3 つの Container App。Environment は作るときだけ）に記録する
-        // （docs/design/desktop-jobs.md の 6.1）
+        // （docs/design/desktop/desktop-jobs.md の 6.1）
         var existingApps = await _gateway.GetResourceGroupAsync(opts.Subscription, opts.ResourceGroup, cancellationToken) == null
             ? []
             : await _gateway.ListContainerAppsAsync(opts.Subscription, opts.ResourceGroup, cancellationToken);

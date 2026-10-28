@@ -8,7 +8,7 @@ namespace TTDeployTool.Controller.Desktop.UITests;
 /// </summary>
 public class CiUiTests
 {
-    // 7f: 削除・実行状況はメニューに無い。No.63: デプロイの一覧・新しくデプロイ・ジョブの一覧はサインインするまで押せない（docs/design/desktop-wizard.md の 2・7）
+    // 7f: 削除・実行状況はメニューに無い。No.63: デプロイの一覧・新しくデプロイ・ジョブの一覧はサインインするまで押せない（docs/design/desktop/desktop-wizard.md の 2・7）
     private static readonly string[] Pages = ["Target", "DryRun", "AppSettings"];
 
     [Fact]

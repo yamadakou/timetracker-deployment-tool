@@ -2,7 +2,7 @@
 
 - 対象ブランチ: `MCP-Tool`
 - 全体設計: `docs/MCP_TOOL_DESIGN.md`（3.4 状態の扱い、4.7 `plan_deployment` / `start_deployment`、4.8 `get_job_status` / `list_jobs`、4.9 `get_deployment_info`、5.4 ログ、5.6 同時実行）
-- 前の段階: `docs/design/mcp-phase3a.md`（サーバーの基盤と読み取り系ツール）
+- 前の段階: `docs/design/mcp/mcp-phase3a.md`（サーバーの基盤と読み取り系ツール）
 
 ## 1. スコープ
 | 項目 | Phase 3b |

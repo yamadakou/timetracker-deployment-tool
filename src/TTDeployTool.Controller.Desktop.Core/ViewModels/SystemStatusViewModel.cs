@@ -5,7 +5,7 @@ using TTDeployTool.Controller.Desktop.Core.Services;
 namespace TTDeployTool.Controller.Desktop.Core.ViewModels;
 
 /// <summary>
-/// 「設定」の画面の「Windows との連携」（docs/design/desktop-jobs.md の 6.6、D22）。サインイン時の起動の状態と前回の起動・通知の許可・
+/// 「設定」の画面の「Windows との連携」（docs/design/desktop/desktop-jobs.md の 6.6、D22）。サインイン時の起動の状態と前回の起動・通知の許可・
 /// 今ウィンドウを閉じたらどうなるか・アプリの終了で消える予定と戻す予定を示し、Windows の設定を開く。画面を開いたときと「読み直す」で読み直す。
 /// </summary>
 public sealed class SystemStatusViewModel : ObservableObject

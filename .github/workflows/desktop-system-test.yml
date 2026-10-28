@@ -1,6 +1,6 @@
 name: Desktop System Test
 
-# デスクトップアプリの UI テストを、本物の Azure に対して実行する（docs/design/desktop-ui-tests.md の 7）。
+# デスクトップアプリの UI テストを、本物の Azure に対して実行する（docs/design/desktop/desktop-ui-tests.md の 7）。
 # アプリはテスト用のビルド（/p:UiTestSignIn=true）で、WAM の対話の代わりに Azure CLI のサインイン（下の azure/login の OIDC）を使う。
 # 20〜30 分かかり料金が発生するため、PR ごとには実行せず、手動で実行する。OIDC の準備は System Test（docs/SYSTEM_TESTS.md）と同じ
 on:

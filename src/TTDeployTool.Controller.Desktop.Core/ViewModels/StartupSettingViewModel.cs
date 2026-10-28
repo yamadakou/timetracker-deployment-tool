@@ -5,7 +5,7 @@ using TTDeployTool.Controller.Desktop.Core.Services;
 namespace TTDeployTool.Controller.Desktop.Core.ViewModels;
 
 /// <summary>
-/// Windows のサインイン時に、通知領域で起動するか（「ジョブ」の画面。docs/design/desktop-jobs.md の 6.5、D16）。
+/// Windows のサインイン時に、通知領域で起動するか（「ジョブ」の画面。docs/design/desktop/desktop-jobs.md の 6.5、D16）。
 /// 期限日のあるデプロイのジョブを初めて登録したときに、まだ有効でなければ一度だけ尋ねる。
 /// </summary>
 public sealed class StartupSettingViewModel : ObservableObject

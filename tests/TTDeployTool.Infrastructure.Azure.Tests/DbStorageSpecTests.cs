@@ -9,7 +9,7 @@ using Xunit;
 
 namespace TTDeployTool.Infrastructure.Azure.Tests;
 
-/// <summary>DB のデータの永続化（Azure Files）の定義（詳細設計 docs/design/db-persistence.md の 4）。</summary>
+/// <summary>DB のデータの永続化（Azure Files）の定義（詳細設計 docs/design/common/db-persistence.md の 4）。</summary>
 public class DbStorageSpecTests
 {
     private static readonly ResourceIdentifier EnvId =

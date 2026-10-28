@@ -4,7 +4,7 @@ using Xunit;
 
 namespace TTDeployTool.Controller.Desktop.Core.Tests;
 
-/// <summary>デプロイのウィザード（docs/design/desktop-wizard.md の 3）。</summary>
+/// <summary>デプロイのウィザード（docs/design/desktop/desktop-wizard.md の 3）。</summary>
 public class DeployWizardViewModelTests
 {
     [Theory]

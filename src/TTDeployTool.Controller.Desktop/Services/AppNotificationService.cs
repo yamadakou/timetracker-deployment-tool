@@ -5,7 +5,7 @@ using TTDeployTool.Controller.Desktop.Core.Services;
 namespace TTDeployTool.Controller.Desktop.Services;
 
 /// <summary>
-/// Windows の通知（Windows App SDK の AppNotificationManager。docs/design/desktop-jobs.md の 5.1・6.5）。押すとジョブか画面を開けるよう、
+/// Windows の通知（Windows App SDK の AppNotificationManager。docs/design/desktop/desktop-jobs.md の 5.1・6.5）。押すとジョブか画面を開けるよう、
 /// ジョブの ID か画面の名前を引数に入れる。
 /// </summary>
 internal sealed class AppNotificationService : INotificationService

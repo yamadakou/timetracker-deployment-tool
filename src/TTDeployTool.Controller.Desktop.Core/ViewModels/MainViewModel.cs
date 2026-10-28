@@ -82,9 +82,9 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             if (signedIn)
             {
                 await Target.LoadAsync();
-                // 前回のアプリで保存した削除の予定を、期限の確認より先に戻す（docs/design/desktop-jobs.md の 6.6）
+                // 前回のアプリで保存した削除の予定を、期限の確認より先に戻す（docs/design/desktop/desktop-jobs.md の 6.6）
                 ScheduledJobs!.Restore();
-                // サインインできたら、利用可能期限を確かめ、その後は最も近い期限の時刻か 6 時間ごとに確かめる（docs/design/desktop-jobs.md の 6.5、D21）
+                // サインインできたら、利用可能期限を確かめ、その後は最も近い期限の時刻か 6 時間ごとに確かめる（docs/design/desktop/desktop-jobs.md の 6.5、D21）
                 await Expiry.StartAsync();
             }
             else
@@ -122,7 +122,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             launcher.OpenUri(CurrentDeployment!.Endpoint!);
             return Task.CompletedTask;
         }, () => CurrentDeployment?.Endpoint != null);
-        // 前回までのアプリで終わったジョブの記録を、一覧ができてから入れる（docs/design/desktop-jobs.md の 6.8）
+        // 前回までのアプリで終わったジョブの記録を、一覧ができてから入れる（docs/design/desktop/desktop-jobs.md の 6.8）
         History = new JobHistory(Queue, history ?? new InMemoryJobHistory(), time, loggers.CreateLogger("TTDeployTool.Desktop.Jobs"));
     }
 
@@ -137,7 +137,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     /// <summary>アプリを終了しても残す予定（削除は次にサインインしたときに戻す）。</summary>
     public ScheduledJobStore ScheduledJobs { get; }
 
-    /// <summary>「設定」の画面の「Windows との連携」（docs/design/desktop-jobs.md の 6.6、D22）。</summary>
+    /// <summary>「設定」の画面の「Windows との連携」（docs/design/desktop/desktop-jobs.md の 6.6、D22）。</summary>
     public SystemStatusViewModel Integration { get; }
 
     public TargetViewModel Target { get; }
@@ -155,7 +155,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     /// <summary>デプロイのウィザード（設定 → 確認と実行）。</summary>
     public DeployWizardViewModel Wizard { get; }
 
-    /// <summary>ジョブの一覧（docs/design/desktop-wizard.md の 7）。</summary>
+    /// <summary>ジョブの一覧（docs/design/desktop/desktop-wizard.md の 7）。</summary>
     public JobListViewModel JobList { get; }
 
     /// <summary>デプロイの一覧で 2 件以上を選んだときの、まとめての削除。</summary>
@@ -347,7 +347,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// 画面を開く（docs/design/desktop-wizard.md の 2）。wizard はウィザードの最初の画面、status は対象の最も新しいジョブと Azure の状態、
+    /// 画面を開く（docs/design/desktop/desktop-wizard.md の 2）。wizard はウィザードの最初の画面、status は対象の最も新しいジョブと Azure の状態、
     /// delete は削除の画面（計画を作る）。そのほかは画面を切り替えるだけ。
     /// </summary>
     public async Task OpenAsync(string page)

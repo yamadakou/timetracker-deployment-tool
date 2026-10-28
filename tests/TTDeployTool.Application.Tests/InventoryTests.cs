@@ -8,7 +8,7 @@ using Xunit;
 
 namespace TTDeployTool.Application.Tests;
 
-/// <summary>デプロイの一覧のまとめ方（docs/design/desktop-jobs.md の 6.4）。</summary>
+/// <summary>デプロイの一覧のまとめ方（docs/design/desktop/desktop-jobs.md の 6.4）。</summary>
 public class DeploymentCatalogTests
 {
     private static Dictionary<string, string> Tags(string appName, params (string Key, string Value)[] extra)
@@ -161,7 +161,7 @@ public class DeploymentCatalogTests
     }
 }
 
-/// <summary>一覧の行からの期限の変更とパスワードの読み取り（docs/design/desktop-jobs.md の 6.4）。</summary>
+/// <summary>一覧の行からの期限の変更とパスワードの読み取り（docs/design/desktop/desktop-jobs.md の 6.4）。</summary>
 public class DeploymentMaintenanceTests
 {
     private static readonly TimeZoneInfo Tokyo = TimeZoneInfo.CreateCustomTimeZone("JST", TimeSpan.FromHours(9), "JST", "JST");
@@ -195,7 +195,7 @@ public class DeploymentMaintenanceTests
     [Fact]
     public async Task ReadExpiry_Should_Combine_The_Managed_Apps_And_Storage_Account()
     {
-        // 期限での削除の直前に読み直す（docs/design/desktop-jobs.md の 6.5）。管理タグの無い・別のアプリのものは見ない
+        // 期限での削除の直前に読み直す（docs/design/desktop/desktop-jobs.md の 6.5）。管理タグの無い・別のアプリのものは見ない
         var account = ResourceNaming.StorageAccount("sub", "rg", "demo");
         _apps.Add(new ContainerAppInfo("demo-tt", "env", Expiring("demo", "2026-10-20T14:59:59Z")));
         _apps.Add(new ContainerAppInfo("demo-db", "env", new Dictionary<string, string> { [DeploymentExpiry.ExpiresAtKey] = "none" }));

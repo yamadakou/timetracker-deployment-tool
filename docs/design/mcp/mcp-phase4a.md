@@ -2,7 +2,7 @@
 
 - 対象ブランチ: `feature/mcp-http`
 - 全体設計: `docs/MCP_TOOL_DESIGN.md`（3.3 実行形態、3.4 HTTP 公開の方針、4.5 HTTP の `generate_compose`、4.10 パスワード、4.11 HTTP の Azure 資格情報、4.13 権限）
-- 前の段階: `docs/design/mcp-phase3c.md`（stdio のサーバーの完成）
+- 前の段階: `docs/design/mcp/mcp-phase3c.md`（stdio のサーバーの完成）
 
 ## 1. Phase 4 の分け方
 | 段階 | 内容 | 確認 |

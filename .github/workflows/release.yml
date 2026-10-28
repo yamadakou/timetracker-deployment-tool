@@ -71,7 +71,7 @@ jobs:
         docker push $image:$version
         docker push $image:latest
 
-  # デスクトップアプリの Store 用のパッケージ（.msixupload。署名なし）を作り、Release に載せる（docs/design/desktop-app.md の 9.2）。
+  # デスクトップアプリの Store 用のパッケージ（.msixupload。署名なし）を作り、Release に載せる（docs/design/desktop/desktop-app.md の 9.2）。
   # Store への提出は、このファイルを Partner Center にアップロードして行う（初回の提出は手作業が必要）
   desktop:
     # テスト（release ジョブ）が成功し、Release ができてから載せる
@@ -96,7 +96,7 @@ jobs:
 
     # パッケージの版をタグから X.Y.Z.0 にし、Partner Center でアプリ名を予約したときの ID と発行元を設定する。
     # ID はリポジトリの変数（Settings → Secrets and variables → Actions → Variables）で渡す。未設定なら仮の値のまま
-    # （Store には出せないが、ビルドと確認はできる）。手順は docs/design/desktop-app-store.md
+    # （Store には出せないが、ビルドと確認はできる）。手順は docs/design/desktop/desktop-app-store.md
     - name: Set package identity
       shell: pwsh
       run: >

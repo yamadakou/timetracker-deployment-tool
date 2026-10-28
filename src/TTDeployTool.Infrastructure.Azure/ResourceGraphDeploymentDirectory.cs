@@ -31,7 +31,7 @@ public sealed record ContainerAppSnapshot(
     public bool UsesDbStorage => DbStorage.IsUsed(StorageNames);
 }
 
-/// <summary>本ツールで作ったリソースを、複数のサブスクリプションからまとめて読む（デプロイの一覧。docs/design/desktop-jobs.md の 6.3・6.4）。</summary>
+/// <summary>本ツールで作ったリソースを、複数のサブスクリプションからまとめて読む（デプロイの一覧。docs/design/desktop/desktop-jobs.md の 6.3・6.4）。</summary>
 public interface IDeploymentDirectory
 {
     /// <summary>指定したサブスクリプション（同じテナントのもの）の、管理タグの付いた Container App・Environment・ストレージアカウント。</summary>

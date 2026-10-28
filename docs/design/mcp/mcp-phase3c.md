@@ -2,7 +2,7 @@
 
 - 対象ブランチ: `MCP-Tool`
 - 全体設計: `docs/MCP_TOOL_DESIGN.md`（4.12 `plan_deletion` / `start_deletion`、5.1 instructions、5.2 Resources、5.3 Prompts、6.1 動作確認のクライアント、6.2 配布形態）
-- 前の段階: `docs/design/mcp-phase3b.md`（計画ストア・ジョブ管理・デプロイのツール）
+- 前の段階: `docs/design/mcp/mcp-phase3b.md`（計画ストア・ジョブ管理・デプロイのツール）
 
 ## 1. スコープ
 | 項目 | Phase 3c |

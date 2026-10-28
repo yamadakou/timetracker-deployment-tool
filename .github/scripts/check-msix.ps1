@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  デスクトップアプリの Store 用のパッケージ（.msixupload）の中のマニフェストを確かめる（docs/design/desktop-app.md の 8.1・9.1）。
+  デスクトップアプリの Store 用のパッケージ（.msixupload）の中のマニフェストを確かめる（docs/design/desktop/desktop-app.md の 8.1・9.1）。
 
 .DESCRIPTION
   .msixupload → .msixbundle → 各アーキテクチャの .msix の順に展開し、それぞれの AppxManifest.xml で次を確かめる。

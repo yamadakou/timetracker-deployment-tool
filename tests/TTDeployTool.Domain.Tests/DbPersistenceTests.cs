@@ -4,7 +4,7 @@ using Xunit;
 
 namespace TTDeployTool.Domain.Tests;
 
-/// <summary>DB のデータの永続化の規則（詳細設計 docs/design/db-persistence.md）。</summary>
+/// <summary>DB のデータの永続化の規則（詳細設計 docs/design/common/db-persistence.md）。</summary>
 public class DbPersistenceTests
 {
     [Fact]

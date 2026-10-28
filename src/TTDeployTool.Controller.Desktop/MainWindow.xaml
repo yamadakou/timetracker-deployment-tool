@@ -15,7 +15,7 @@
             <DataTemplate x:Key="LineTemplate" x:DataType="x:String">
                 <TextBlock Text="{x:Bind}" TextWrapping="Wrap" />
             </DataTemplate>
-            <!-- 表の見出し（押すと並べ替え。「▽」で絞り込みを開く。docs/design/desktop-wizard.md の 7） -->
+            <!-- 表の見出し（押すと並べ替え。「▽」で絞り込みを開く。docs/design/desktop/desktop-wizard.md の 7） -->
             <Style x:Key="HeaderButtonStyle" TargetType="Button">
                 <Setter Property="Background" Value="Transparent" />
                 <Setter Property="BorderThickness" Value="0" />
@@ -108,7 +108,7 @@
             <ScrollViewer Padding="24">
                 <!-- 画面（Tag が画面の名前。Core の Pages と同じ） -->
                 <Grid x:Name="PagesHost">
-                    <!-- サインイン（サブスクリプションの一覧は、ウィザードの ① で選ぶ。docs/design/desktop-wizard.md の 2） -->
+                    <!-- サインイン（サブスクリプションの一覧は、ウィザードの ① で選ぶ。docs/design/desktop/desktop-wizard.md の 2） -->
                     <StackPanel x:Name="TargetPanel" Tag="target" Spacing="12" MaxWidth="900" HorizontalAlignment="Left">
                         <TextBlock AutomationProperties.AutomationId="Panel.Target" Style="{StaticResource SubtitleTextBlockStyle}" Text="Azure へのサインイン" />
                         <TextBlock AutomationProperties.AutomationId="SignIn.Account" Text="{x:Bind ViewModel.SignIn.AccountDisplay, Mode=OneWay}" />
@@ -126,11 +126,11 @@
                                  Visibility="{x:Bind ViewModel.Target.HasError, Mode=OneWay}" />
                     </StackPanel>
 
-                    <!-- デプロイのウィザード（docs/design/desktop-wizard.md の 3。入力は「設定」の ViewModel、計画と実行はデプロイの ViewModel） -->
+                    <!-- デプロイのウィザード（docs/design/desktop/desktop-wizard.md の 3。入力は「設定」の ViewModel、計画と実行はデプロイの ViewModel） -->
                     <StackPanel x:Name="WizardPanel" Tag="wizard" Spacing="12" MaxWidth="900" HorizontalAlignment="Left" Visibility="Collapsed">
                         <TextBlock AutomationProperties.AutomationId="Panel.Wizard" Style="{StaticResource SubtitleTextBlockStyle}" Text="新しくデプロイ" />
                         <TextBlock AutomationProperties.AutomationId="Wizard.Step" Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind ViewModel.Wizard.StepText, Mode=OneWay}" />
-                        <!-- 完了の表示（登録した後。docs/design/desktop-wizard.md の 3、Q4・Q13・No.70）: 進み具合と結果、続けて・新規 -->
+                        <!-- 完了の表示（登録した後。docs/design/desktop/desktop-wizard.md の 3、Q4・Q13・No.70）: 進み具合と結果、続けて・新規 -->
                         <StackPanel AutomationProperties.AutomationId="Wizard.Completed" Spacing="12" Visibility="{x:Bind ViewModel.Wizard.IsCompleted, Mode=OneWay}">
                             <TextBlock AutomationProperties.AutomationId="Wizard.CompletedText" Style="{StaticResource BodyStrongTextBlockStyle}" TextWrapping="Wrap" Text="{x:Bind ViewModel.Wizard.CompletedText, Mode=OneWay}" />
                             <TextBlock AutomationProperties.AutomationId="Wizard.Error" TextWrapping="Wrap" Foreground="{ThemeResource SystemFillColorCautionBrush}" Text="{x:Bind ViewModel.Deployment.Error, Mode=OneWay}"
@@ -142,7 +142,7 @@
                                 <Button AutomationProperties.AutomationId="Wizard.NewDeployment" Content="新規デプロイ（初期値から）" Command="{x:Bind ViewModel.Wizard.NewDeploymentCommand}" />
                             </StackPanel>
                         </StackPanel>
-                        <!-- どの画面にも出す（完了の表示を除く）: ①〜④のすべての入力の Markdown のコピーと、初期値に戻す（docs/design/desktop-settings.md） -->
+                        <!-- どの画面にも出す（完了の表示を除く）: ①〜④のすべての入力の Markdown のコピーと、初期値に戻す（docs/design/desktop/desktop-settings.md） -->
                         <StackPanel Orientation="Horizontal" Spacing="8" Visibility="{x:Bind ViewModel.Wizard.IsEditing, Mode=OneWay}">
                             <Button AutomationProperties.AutomationId="Settings.CopyMarkdown" Content="設定を Markdown でコピー" Command="{x:Bind ViewModel.Settings.CopyMarkdownCommand}" />
                             <CheckBox AutomationProperties.AutomationId="Settings.IncludePasswords" Content="パスワードも含める" IsChecked="{x:Bind ViewModel.Settings.IncludePasswordsInCopy, Mode=TwoWay}" />
@@ -261,7 +261,7 @@
                         </StackPanel>
                     </StackPanel>
 
-                    <!-- 実行状況（今すぐ実行・今すぐ削除の後と、一覧の「状態を確認」から開く。docs/design/desktop-wizard.md の 2） -->
+                    <!-- 実行状況（今すぐ実行・今すぐ削除の後と、一覧の「状態を確認」から開く。docs/design/desktop/desktop-wizard.md の 2） -->
                     <StackPanel x:Name="StatusPanel" Tag="status" Spacing="12" MaxWidth="900" HorizontalAlignment="Left" Visibility="Collapsed">
                         <TextBlock AutomationProperties.AutomationId="Panel.Status" Style="{StaticResource SubtitleTextBlockStyle}" Text="実行状況" />
                         <Button AutomationProperties.AutomationId="Status.BackToList" Content="{x:Bind ViewModel.ReturnText, Mode=OneWay}" Click="OnBackFromStatus" />
@@ -294,7 +294,7 @@
                         </ItemsControl>
                     </StackPanel>
 
-                    <!-- デプロイの一覧（Azure から集める。docs/design/desktop-jobs.md の 6.3・6.4） -->
+                    <!-- デプロイの一覧（Azure から集める。docs/design/desktop/desktop-jobs.md の 6.3・6.4） -->
                     <StackPanel x:Name="DeploymentsPanel" Tag="deployments" Spacing="12" MaxWidth="1100" HorizontalAlignment="Left" Visibility="Collapsed">
                         <TextBlock AutomationProperties.AutomationId="Panel.Deployments" Style="{StaticResource SubtitleTextBlockStyle}" Text="デプロイの一覧" />
                         <TextBlock TextWrapping="Wrap" Text="サインインしたアカウントで読めるサブスクリプションから、本ツールでデプロイした環境（別の PC・CLI・MCP サーバーでデプロイしたものを含む）を読みます。パスワードは「パスワードを表示」を押したときだけ Azure から読み、PC には保存しません。" />
@@ -303,7 +303,7 @@
                         <InfoBar AutomationProperties.AutomationId="Deployments.Error" AutomationProperties.Name="{x:Bind ViewModel.Deployments.Error, Mode=OneWay}" Severity="Error" IsOpen="True" IsClosable="False" Message="{x:Bind ViewModel.Deployments.Error, Mode=OneWay}"
                                  Visibility="{x:Bind ViewModel.Deployments.HasError, Mode=OneWay}" />
                         <ItemsControl AutomationProperties.AutomationId="Deployments.Notices" ItemsSource="{x:Bind ViewModel.Deployments.Notices}" ItemTemplate="{StaticResource LineTemplate}" />
-                        <!-- 選んだ行への操作（docs/design/desktop-wizard.md の 7） -->
+                        <!-- 選んだ行への操作（docs/design/desktop/desktop-wizard.md の 7） -->
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <TextBlock AutomationProperties.AutomationId="Deployments.Selection" VerticalAlignment="Center" Text="{x:Bind ViewModel.Deployments.SelectionText, Mode=OneWay}" />
                             <CheckBox AutomationProperties.AutomationId="Deployments.BatchNoExpiry" Content="期限なし" IsChecked="{x:Bind ViewModel.Deployments.BatchNoExpiry, Mode=TwoWay}" VerticalAlignment="Center" />
@@ -526,7 +526,7 @@
                                  FontFamily="Consolas" MinHeight="200" Visibility="{x:Bind ViewModel.DryRun.HasComposeContent, Mode=OneWay}" />
                     </StackPanel>
 
-                    <!-- ジョブの一覧（表。docs/design/desktop-wizard.md の 7） -->
+                    <!-- ジョブの一覧（表。docs/design/desktop/desktop-wizard.md の 7） -->
                     <StackPanel x:Name="JobsPanel" Tag="jobs" Spacing="12" MaxWidth="1600" HorizontalAlignment="Left" Visibility="Collapsed">
                         <TextBlock AutomationProperties.AutomationId="Panel.Jobs" Style="{StaticResource SubtitleTextBlockStyle}" Text="ジョブの一覧" />
                         <TextBlock TextWrapping="Wrap" Text="このアプリで登録したデプロイ・削除です（予定・実行中・終わったもの）。終わったジョブは、アプリを終了しても記録として残します（180 日・500 件まで）。行を選ぶと、まとめて取り消し・一時停止・再開・予定の変更・記録から削除ができます。1 行だけ選んで「詳細」（または行をダブルクリック）で、進み具合・結果・ログを見られます。「記録から削除」は、この一覧と PC の記録を消すだけで、Azure のリソースは消しません（Azure から消すときは、デプロイの一覧の「Azure から削除…」）。" />
@@ -675,7 +675,7 @@
                         </ScrollViewer>
                     </StackPanel>
 
-                    <!-- まとめての削除（計画を並べ、件数を入力して確認。docs/design/desktop-wizard.md の 7、Q10） -->
+                    <!-- まとめての削除（計画を並べ、件数を入力して確認。docs/design/desktop/desktop-wizard.md の 7、Q10） -->
                     <StackPanel x:Name="BatchDeletePanel" Tag="batchdelete" Spacing="12" MaxWidth="900" HorizontalAlignment="Left" Visibility="Collapsed">
                         <TextBlock AutomationProperties.AutomationId="Panel.BatchDelete" Style="{StaticResource SubtitleTextBlockStyle}" Text="まとめて Azure から削除" />
                         <Button AutomationProperties.AutomationId="BatchDelete.BackToList" Content="デプロイの一覧に戻る" Click="OnBackToList" />
@@ -718,7 +718,7 @@
                                   SelectedItem="{x:Bind ViewModel.Queue.MaxConcurrency, Mode=OneWay}" SelectionChanged="OnConcurrencyChanged" Width="240" />
                         <TextBlock AutomationProperties.AutomationId="Settings.Resident" TextWrapping="Wrap" Text="終わっていないジョブか、利用可能期限日のあるデプロイがあるときにウィンドウを閉じると、通知領域に残って続けます（終了は通知領域のアイコンのメニューから）。ジョブが終わると通知します。Windows のサインアウト・再起動・シャットダウンではアプリが終わります（削除の予定は、次にアプリを起動してサインインしたときに戻します。デプロイの予定は消えます）。PC のスリープ中は実行せず、予定の時刻を過ぎていれば、動けるようになってからすぐ実行します。" />
 
-                        <!-- Windows との連携（docs/design/desktop-jobs.md の 6.6、No.67。画面を開いたときに読み直す） -->
+                        <!-- Windows との連携（docs/design/desktop/desktop-jobs.md の 6.6、No.67。画面を開いたときに読み直す） -->
                         <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,16,0,0">
                             <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="Windows との連携" />
                             <Button AutomationProperties.AutomationId="Settings.RefreshSystem" Content="状態を読み直す" Command="{x:Bind ViewModel.Integration.RefreshCommand}" />

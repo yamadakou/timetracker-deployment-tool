@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
-    デスクトップアプリの UI テスト（詳細設計 docs/design/desktop-ui-tests.md）。導入したアプリを起動し、UI Automation（FlaUI）で操作する。
+    デスクトップアプリの UI テスト（詳細設計 docs/design/desktop/desktop-ui-tests.md）。導入したアプリを起動し、UI Automation（FlaUI）で操作する。
     Windows でしか動かないため TTDeployTool.sln には入れず、TTDeployTool.Desktop.slnx と CI の desktop-ui ジョブで実行する
   -->
   <PropertyGroup>

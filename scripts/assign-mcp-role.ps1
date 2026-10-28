@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  MCP サーバー（HTTP 版）のアプリロールを、利用者またはグループに割り当てる（詳細設計 docs/design/mcp-phase4c.md）。
+  MCP サーバー（HTTP 版）のアプリロールを、利用者またはグループに割り当てる（詳細設計 docs/design/mcp/mcp-phase4c.md）。
 
 .DESCRIPTION
   scripts/deploy-mcp-http.ps1 で作ったアプリ登録「TTDeployTool MCP (<Name>)」のアプリロールを割り当てる。

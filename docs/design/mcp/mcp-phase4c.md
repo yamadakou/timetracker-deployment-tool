@@ -2,7 +2,7 @@
 
 - 対象ブランチ: `feature/mcp-http`
 - 全体設計: `docs/MCP_TOOL_DESIGN.md`（3.3 実行形態、4.11 HTTP 公開時の Azure 資格情報、6.1 動作確認のクライアント）
-- 前の段階: `docs/design/mcp-phase4a.md`（HTTP と `server` 方式）、`docs/design/mcp-phase4b.md`（`user` 方式）
+- 前の段階: `docs/design/mcp/mcp-phase4a.md`（HTTP と `server` 方式）、`docs/design/mcp/mcp-phase4b.md`（`user` 方式）
 - 状況: **手順書とスクリプトの準備まで**。Azure と Entra ID での確認は未実施（9 の確認事項を、確認しながら直す）
 
 ## 1. 目的
@@ -165,4 +165,4 @@ flowchart LR
 
 ### 残っている確認と後片付け
 - 当面行わない確認: VS Code からのサインイン（9 の 2）、権限の無い利用者・別の利用者でのシナリオ（6 の 9・10）。行うときは、4.1 の手順で配置し直す
-- 確認用の環境は 2026-10-19 に削除した（リソースグループ `rg-tt-mcp`（Container App・Environment・マネージド ID）と `rg-tt-mcp-demo`、アプリ登録 `TTDeployTool MCP (tt-mcp)` と `TTDeployTool MCP client (tt-mcp)`。アプリ登録の削除で、本人の分の同意とアプリロールの割り当ても消える）。HTTP 版での DB の永続化の確認（`docs/design/db-persistence-mcp-http-check.md`）も、配置し直してから行う
+- 確認用の環境は 2026-10-19 に削除した（リソースグループ `rg-tt-mcp`（Container App・Environment・マネージド ID）と `rg-tt-mcp-demo`、アプリ登録 `TTDeployTool MCP (tt-mcp)` と `TTDeployTool MCP client (tt-mcp)`。アプリ登録の削除で、本人の分の同意とアプリロールの割り当ても消える）。HTTP 版での DB の永続化の確認（`docs/design/mcp/db-persistence-mcp-http-check.md`）も、配置し直してから行う

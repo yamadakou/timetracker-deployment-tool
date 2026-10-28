@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  デスクトップアプリの、本物のサインインと Azure を使う UI テスト（半自動）を実行する。手順は docs/design/desktop-ui-tests.md の 6。
+  デスクトップアプリの、本物のサインインと Azure を使う UI テスト（半自動）を実行する。手順は docs/design/desktop/desktop-ui-tests.md の 6。
 
 .DESCRIPTION
   導入したデスクトップアプリ（Visual Studio で配置したもの、または導入したパッケージ）を起動し、サブスクリプションの読み込み、

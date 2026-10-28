@@ -51,7 +51,7 @@ public interface INotificationService
 {
     void Show(AppNotice notice);
 
-    /// <summary>Windows の設定で、このアプリの通知が許可されているか（docs/design/desktop-jobs.md の 6.6）。</summary>
+    /// <summary>Windows の設定で、このアプリの通知が許可されているか（docs/design/desktop/desktop-jobs.md の 6.6）。</summary>
     NotificationPermission Permission { get; }
 }
 
@@ -84,7 +84,7 @@ public static class StartupTaskStates
     };
 }
 
-/// <summary>Windows のサインイン時の起動（MSIX の StartupTask。画面の側で実装する。docs/design/desktop-jobs.md の 6.5）。</summary>
+/// <summary>Windows のサインイン時の起動（MSIX の StartupTask。画面の側で実装する。docs/design/desktop/desktop-jobs.md の 6.5）。</summary>
 public interface IStartupTaskService
 {
     Task<StartupTaskStatus> GetStatusAsync();

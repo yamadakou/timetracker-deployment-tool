@@ -2,7 +2,7 @@ namespace TTDeployTool.Domain.Deployment;
 
 /// <summary>
 /// DB のデータの永続化（Azure Files の SMB 共有を DB コンテナにマウントする）の規則。
-/// 詳細設計: docs/design/db-persistence.md
+/// 詳細設計: docs/design/common/db-persistence.md
 /// </summary>
 public static class DbPersistence
 {

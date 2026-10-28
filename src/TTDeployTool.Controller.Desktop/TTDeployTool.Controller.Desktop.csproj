@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
-    デスクトップアプリ（WinUI 3、単一プロジェクト MSIX。詳細設計 docs/design/desktop-app.md）。
+    デスクトップアプリ（WinUI 3、単一プロジェクト MSIX。詳細設計 docs/design/desktop/desktop-app.md）。
     Windows でしかビルドできないため TTDeployTool.sln には入れず、TTDeployTool.Desktop.slnx と CI の desktop ジョブでビルドする。
     画面の状態と操作は TTDeployTool.Controller.Desktop.Core（Linux でもテストできる）に置き、ここは画面と OS の機能だけにする。
   -->
@@ -35,9 +35,9 @@
   </ItemGroup>
   <!--
     UI テストの System Test（.github/workflows/desktop-system-test.yml）のビルドだけ、/p:UiTestSignIn=true で Azure CLI のサインインを使う
-    （Services/AzureCliSignInService.cs。docs/design/desktop-ui-tests.md の 7）。CI の desktop ジョブとリリースでは指定しない
+    （Services/AzureCliSignInService.cs。docs/design/desktop/desktop-ui-tests.md の 7）。CI の desktop ジョブとリリースでは指定しない
   -->
-  <!-- 1 つだけ起動するため、XAML が生成する Main を使わず、Program.cs の Main で起動する（docs/design/desktop-jobs.md の 5.1） -->
+  <!-- 1 つだけ起動するため、XAML が生成する Main を使わず、Program.cs の Main で起動する（docs/design/desktop/desktop-jobs.md の 5.1） -->
   <PropertyGroup>
     <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
   </PropertyGroup>
@@ -62,7 +62,7 @@
     <PackageReference Include="H.NotifyIcon.WinUI" Version="2.4.1" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2705" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.5.1" />
-    <!-- 予定のデプロイのパスワードの暗号化（DPAPI。docs/design/desktop-jobs.md の 6.7） -->
+    <!-- 予定のデプロイのパスワードの暗号化（DPAPI。docs/design/desktop/desktop-jobs.md の 6.7） -->
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.12" />
   </ItemGroup>
   <ItemGroup>

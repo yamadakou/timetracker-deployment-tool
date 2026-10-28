@@ -237,7 +237,7 @@ claude mcp add ttdeploytool `
 ### 導入
 
 > [!NOTE]
-> Azure と Entra ID で、配置・アプリ登録・ツール（`server` 方式と `user` 方式のデプロイと削除）を確認しました。Claude Code からのサインインと接続も確認しました。VS Code からのサインインは、まだ確認していません。確認の結果は [Phase 4c の詳細設計](design/mcp-phase4c.md)の「確認結果」にまとめています。
+> Azure と Entra ID で、配置・アプリ登録・ツール（`server` 方式と `user` 方式のデプロイと削除）を確認しました。Claude Code からのサインインと接続も確認しました。VS Code からのサインインは、まだ確認していません。確認の結果は [Phase 4c の詳細設計](design/mcp/mcp-phase4c.md)の「確認結果」にまとめています。
 
 1. **サーバーを置く**（管理者）: [PowerShell 7](https://learn.microsoft.com/ja-jp/powershell/scripting/install/install-powershell-on-windows) と Azure CLI で、次を実行します。MCP サーバーを置くリソースグループ、マネージド ID、Entra ID のアプリ登録（サーバー用とクライアント用）、Container Apps の環境と Container App を作ります。`server` 方式なら、許可するリソースグループに、マネージド ID の Contributor を割り当てます
    ```powershell
@@ -253,4 +253,4 @@ claude mcp add ttdeploytool `
    ```
    追加した後、Claude Code で `/mcp` を開いてサインインします。VS Code の設定例は、詳細設計を参照してください
 
-詳しい設計は、[HTTP 版の詳細設計（Phase 4a）](design/mcp-phase4a.md)、[`user` 方式の詳細設計（Phase 4b）](design/mcp-phase4b.md)、[配置とアプリ登録の詳細設計（Phase 4c）](design/mcp-phase4c.md)と、[MCP ツール設計書](MCP_TOOL_DESIGN.md)の「3.3 MCP サーバーの実行形態」「4.10 秘密情報（パスワード）の扱い」「4.11 HTTP 公開時の Azure 資格情報」を参照してください。
+詳しい設計は、[HTTP 版の詳細設計（Phase 4a）](design/mcp/mcp-phase4a.md)、[`user` 方式の詳細設計（Phase 4b）](design/mcp/mcp-phase4b.md)、[配置とアプリ登録の詳細設計（Phase 4c）](design/mcp/mcp-phase4c.md)と、[MCP ツール設計書](MCP_TOOL_DESIGN.md)の「3.3 MCP サーバーの実行形態」「4.10 秘密情報（パスワード）の扱い」「4.11 HTTP 公開時の Azure 資格情報」を参照してください。

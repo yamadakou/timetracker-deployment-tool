@@ -8,7 +8,7 @@ using TTDeployTool.Domain.Deployment;
 namespace TTDeployTool.Controller.Desktop.Core.Services;
 
 /// <summary>
-/// アプリを終了しても残す予定のジョブ（docs/design/desktop-jobs.md の 6.6・6.7、D23〜D28）。削除は <see cref="Deletion"/>、
+/// アプリを終了しても残す予定のジョブ（docs/design/desktop/desktop-jobs.md の 6.6・6.7、D23〜D28）。削除は <see cref="Deletion"/>、
 /// デプロイは <see cref="Deployment"/>（パスワードは暗号化）を持ち、次の起動で戻す。どちらも無いデプロイ（保存しないと選んだもの）は、
 /// 対象と時刻だけを記録して、消えたことを次の起動で知らせる。
 /// </summary>
@@ -42,7 +42,7 @@ public sealed record SavedDeletion(
 public sealed record SavedDeletionTarget(string Name, bool WillDelete);
 
 /// <summary>
-/// 確かめたデプロイの計画（docs/design/desktop-jobs.md の 6.7、D25）。<see cref="Options"/> のパスワードは空にし、
+/// 確かめたデプロイの計画（docs/design/desktop/desktop-jobs.md の 6.7、D25）。<see cref="Options"/> のパスワードは空にし、
 /// <see cref="ISecretProtector"/> で暗号化したものを別に持つ。<see cref="Operations"/> は確かめた計画の操作（始める前に作り直した計画と比べる）。
 /// </summary>
 public sealed record SavedDeployment(

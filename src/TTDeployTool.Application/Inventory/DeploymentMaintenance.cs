@@ -7,7 +7,7 @@ namespace TTDeployTool.Application.Inventory;
 public sealed record DeploymentPasswords(string? DbPassword, string? TrackerPassword);
 
 /// <summary>
-/// デプロイの一覧の行の操作のうち、Azure を直接変える・読むもの（docs/design/desktop-jobs.md の 6.4）。
+/// デプロイの一覧の行の操作のうち、Azure を直接変える・読むもの（docs/design/desktop/desktop-jobs.md の 6.4）。
 /// どちらも、本ツールで作った（管理タグが一致する）Container App だけを対象にする。
 /// </summary>
 public sealed class DeploymentMaintenance
@@ -25,7 +25,7 @@ public sealed class DeploymentMaintenance
     /// <summary>
     /// 利用可能期限を変える（<paramref name="expiresOn"/> は yyyy-MM-dd か none）。本ツールで作ったリソース（3 つの Container App・
     /// ストレージアカウント）のうち、あって管理タグが一致するものの <see cref="DeploymentExpiry.ExpiresAtKey"/> を書き換える。1 つも無ければ変えない。
-    /// Container Apps Environment は、タグの変更でも数分「更新中」になるため書き換えない（期限は作ったときの値のまま。docs/design/desktop-jobs.md の 6.1）。
+    /// Container Apps Environment は、タグの変更でも数分「更新中」になるため書き換えない（期限は作ったときの値のまま。docs/design/desktop/desktop-jobs.md の 6.1）。
     /// </summary>
     /// <exception cref="ArgumentException">入力の誤り・今日より前の日付</exception>
     /// <exception cref="InvalidOperationException">本ツールで作ったリソースが無い</exception>
@@ -72,7 +72,7 @@ public sealed class DeploymentMaintenance
     }
 
     /// <summary>
-    /// 今の利用可能期限のタグを Azure から読み直す（期限での削除の直前の確認。docs/design/desktop-jobs.md の 6.5）。
+    /// 今の利用可能期限のタグを Azure から読み直す（期限での削除の直前の確認。docs/design/desktop/desktop-jobs.md の 6.5）。
     /// 本ツールで作った 3 つの Container App とストレージアカウントの値を <see cref="DeploymentExpiry.Combine"/> でまとめ、どちらも無ければ
     /// Environment の値を使う（Environment のタグは作ったときの値のまま。6.1）。読める値が無ければ null。
     /// </summary>

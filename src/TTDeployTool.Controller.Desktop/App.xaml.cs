@@ -32,7 +32,7 @@ public partial class App : Microsoft.UI.Xaml.Application
         UnhandledException += (_, e) => appLogger.LogCritical(e.Exception, "処理されなかった例外");
         appLogger.LogInformation("起動しました（版 {Version}）", typeof(App).Assembly.GetName().Version);
 
-        // 通知を押したときに、そのジョブを開く（Register の前に NotificationInvoked を登録する。docs/design/desktop-jobs.md の 5.1）
+        // 通知を押したときに、そのジョブを開く（Register の前に NotificationInvoked を登録する。docs/design/desktop/desktop-jobs.md の 5.1）
         AppNotificationManager.Default.NotificationInvoked += OnNotificationInvoked;
         AppNotificationManager.Default.Register();
 
@@ -66,7 +66,7 @@ public partial class App : Microsoft.UI.Xaml.Application
             AppNotificationManager.Default.Unregister();
             _azureEvents?.Dispose();
         };
-        // Windows のサインイン時に起動されたら、ウィンドウを出さずに通知領域だけで動く（docs/design/desktop-jobs.md の 6.5。Register の後に読む）
+        // Windows のサインイン時に起動されたら、ウィンドウを出さずに通知領域だけで動く（docs/design/desktop/desktop-jobs.md の 6.5。Register の後に読む）
         var atStartup = AppInstance.GetCurrent().GetActivatedEventArgs().Kind == ExtendedActivationKind.StartupTask;
         appLogger.LogInformation("起動の種類: {Kind}", atStartup ? "サインイン時の起動" : "通常");
         _window.Initialize(viewModel, hwnd, atStartup);

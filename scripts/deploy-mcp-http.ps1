@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  MCP サーバー（HTTP 版）を Azure Container Apps に配置し、Entra ID のアプリ登録を作る（詳細設計 docs/design/mcp-phase4c.md）。
+  MCP サーバー（HTTP 版）を Azure Container Apps に配置し、Entra ID のアプリ登録を作る（詳細設計 docs/design/mcp/mcp-phase4c.md）。
 
 .DESCRIPTION
   次のものを作成・更新する（同じ引数で再実行すると、作成済みのものは作り直さずに設定だけを合わせる）。
@@ -207,7 +207,7 @@ $clientApp = Invoke-AzJson ad app show --id $clientAppId
 Graph PATCH "/applications/$($clientApp.id)" @{
     displayName = $clientName
     isFallbackPublicClient = $true
-    # Claude Code（--callback-port）と VS Code のループバック。VS Code の URI は docs/design/mcp-phase4c.md の確認事項を参照
+    # Claude Code（--callback-port）と VS Code のループバック。VS Code の URI は docs/design/mcp/mcp-phase4c.md の確認事項を参照
     # 管理者が後から加えたリダイレクト URI は残す
     publicClient = @{ redirectUris = @(@($clientApp.publicClient.redirectUris) + @("http://localhost:$ClaudeCodeCallbackPort/callback", "http://127.0.0.1:33418") |
         Where-Object { $_ } | Select-Object -Unique) }
@@ -276,7 +276,7 @@ if ($serverMode) {
         }
     }
     if ($CanCreateResourceGroup) {
-        Write-Warning "-CanCreateResourceGroup を指定しました。許可したリソースグループが無いときに作成できるよう、マネージド ID にサブスクリプションのスコープで Contributor が必要です（docs/design/mcp-phase4c.md）。"
+        Write-Warning "-CanCreateResourceGroup を指定しました。許可したリソースグループが無いときに作成できるよう、マネージド ID にサブスクリプションのスコープで Contributor が必要です（docs/design/mcp/mcp-phase4c.md）。"
     }
 }
 
@@ -291,4 +291,4 @@ Write-Host "次の手順:"
 Write-Host "  1. 利用者にアプリロールを割り当てる: ./scripts/assign-mcp-role.ps1 -Name $Name -Role Server -UserPrincipalName <UPN>"
 Write-Host "  2. Claude Code: claude mcp add --transport http --client-id $clientAppId --callback-port $ClaudeCodeCallbackPort timetracker $publicUrl"
 Write-Host "     その後 Claude Code で /mcp を開き、timetracker でサインインする"
-Write-Host "  3. 動作確認: docs/design/mcp-phase4c.md の「確認のシナリオ」"
+Write-Host "  3. 動作確認: docs/design/mcp/mcp-phase4c.md の「確認のシナリオ」"

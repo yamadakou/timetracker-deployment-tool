@@ -9,7 +9,7 @@ using static TTDeployTool.Controller.Desktop.Core.Tests.DeploymentListViewModelT
 
 namespace TTDeployTool.Controller.Desktop.Core.Tests;
 
-/// <summary>「設定」の画面の「Windows との連携」（docs/design/desktop-jobs.md の 6.6、D22）。</summary>
+/// <summary>「設定」の画面の「Windows との連携」（docs/design/desktop/desktop-jobs.md の 6.6、D22）。</summary>
 public class SystemStatusTests
 {
     private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 10, 26, 9, 0, 0, TimeSpan.Zero));

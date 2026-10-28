@@ -20,7 +20,7 @@ internal sealed class MovableTime : TimeProvider
     public override TimeZoneInfo LocalTimeZone => TokyoTime.Zone;
 }
 
-/// <summary>デプロイの一覧（docs/design/desktop-jobs.md の 6.3・6.4）。</summary>
+/// <summary>デプロイの一覧（docs/design/desktop/desktop-jobs.md の 6.3・6.4）。</summary>
 public class DeploymentListViewModelTests
 {
     private readonly MovableTime _time = new();

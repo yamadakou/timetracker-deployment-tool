@@ -12,10 +12,10 @@
 | 3 | オーナー回答を反映。ブランチをフェーズごとに分ける（1.3）。管理タグの説明と運用イメージを追加（4.12）。HTTP 公開時はサーバーの ID と利用者本人の権限の両方に対応する（4.11）。配布形態は stdio を単一ファイル EXE、HTTP をコンテナイメージに決定 |
 | 4 | README の RBAC 記載との整合を確認した結果を反映。必要な Azure 権限の章（4.13）を追加。計画ツールで権限を事前に確認する（4.7・4.12・4.13）。`server` 方式は RG 単位の権限・RG の事前作成を前提に変更（4.11）。Entra ID のアプリロールと Azure RBAC の区別を明記。stdio の既定の認証モードを `azure-cli` に変更。README の誤り（Container Apps Contributor）は `docs/fix-rbac-requirements` ブランチで先に修正（1.3） |
 | 4.1 | Phase 0（`refactor/shared-layer`）の実施結果を 8.3 に追記。R5 は `feature/cli-delete` に移した |
-| 4.2 | Phase 1（PR #22）・Phase 2（PR #23）のマージを反映。Phase 3a の実施結果を 8.2 に追記（詳細設計は `docs/design/mcp-phase3a.md`） |
-| 4.3 | Phase 3b の実施結果を 8.2 に追記（詳細設計は `docs/design/mcp-phase3b.md`）。進捗の通知（`notifications/progress`）は送らず、`get_job_status` のポーリングで完結させることにした |
-| 4.4 | Phase 3c の実施結果を 8.2 に追記（詳細設計は `docs/design/mcp-phase3c.md`）。Prompts に `delete-timetracker` を追加（5.3）。削除の結果は `get_job_status` の `deletion_result` で返す |
-| 4.5 | DB データの永続化（`persist_db` / `keep_db_data`）を 4.2・4.7・4.12・4.13 に追記（詳細設計は `docs/design/db-persistence.md`） |
+| 4.2 | Phase 1（PR #22）・Phase 2（PR #23）のマージを反映。Phase 3a の実施結果を 8.2 に追記（詳細設計は `docs/design/mcp/mcp-phase3a.md`） |
+| 4.3 | Phase 3b の実施結果を 8.2 に追記（詳細設計は `docs/design/mcp/mcp-phase3b.md`）。進捗の通知（`notifications/progress`）は送らず、`get_job_status` のポーリングで完結させることにした |
+| 4.4 | Phase 3c の実施結果を 8.2 に追記（詳細設計は `docs/design/mcp/mcp-phase3c.md`）。Prompts に `delete-timetracker` を追加（5.3）。削除の結果は `get_job_status` の `deletion_result` で返す |
+| 4.5 | DB データの永続化（`persist_db` / `keep_db_data`）を 4.2・4.7・4.12・4.13 に追記（詳細設計は `docs/design/common/db-persistence.md`） |
 
 ---
 
@@ -40,7 +40,7 @@ README の「将来の GUI 化に備えドメイン層とコントローラー�
 | WebAPI フロントエンド | 本設計の対象外。ただしアプリケーション層を共有できる構成にする（3.4） |
 | 削除機能 | 対象。**CLI に先に実装**し、MCP は同じアプリケーション層を使う |
 | 本番環境構築 | 対象外（ツールの目的「検証環境の構築支援」は変えない） |
-| スケール設定・永続ボリューム等の新機能 | 対象外（DB データの永続化は、後から `docs/design/db-persistence.md` で追加した） |
+| スケール設定・永続ボリューム等の新機能 | 対象外（DB データの永続化は、後から `docs/design/common/db-persistence.md` で追加した） |
 
 ### 1.3 ブランチと実施順【決定: フェーズごとにブランチを分ける】
 オーナー方針に従い、フェーズごとにブランチを分ける。まず共有層を切り出し（挙動は変えない）、その後に挙動を変える変更（Dry-run の緩和、削除機能、MCP、HTTP 公開）をそれぞれ別ブランチで行う。各ブランチは PR で main にマージしてから、次のブランチを main から作る。
@@ -322,7 +322,7 @@ DB を再デプロイするとデータが消えるため、**計画（読み取
   2. リソースグループ: 存在の有無とリージョン（不一致なら警告。現行の `EnsureResourceGroupAsync` と同じ判定）
   3. Environment: 存在の有無とリージョン（不一致なら **ブロッカー**。現行の `EnsureContainerAppEnvAsync` と同じ判定）
   4. `-db` / `-redis` / `-tt` の各 Container App: 作成か更新か
-  5. `-db` が既にある場合はデータ消失の警告（`WarnIfDbAppExistsAsync` と同じ内容）。`persist_db` で永続化を続ける場合は、データが失われないため `data_loss` を false にし、停止 → 更新 → 開始の案内を警告に出す（`docs/design/db-persistence.md` の 6）。永続化する場合は、ストレージアカウント・ファイル共有・Environment のストレージの操作も `actions` に加え、結果に `persist_db`（実際に永続化するか）と `storage_account` を返す
+  5. `-db` が既にある場合はデータ消失の警告（`WarnIfDbAppExistsAsync` と同じ内容）。`persist_db` で永続化を続ける場合は、データが失われないため `data_loss` を false にし、停止 → 更新 → 開始の案内を警告に出す（`docs/design/common/db-persistence.md` の 6）。永続化する場合は、ストレージアカウント・ファイル共有・Environment のストレージの操作も `actions` に加え、結果に `persist_db`（実際に永続化するか）と `storage_account` を返す
   6. **権限の事前確認**（4.13）: 上の 2〜5 で決まった操作（RG の作成、Environment の作成、Container App の作成・更新）に必要な権限が、実行する ID にあるかを確認する。足りなければ、足りない権限と対処（「リソースグループを事前に作成してください」「Contributor をこのスコープに割り当ててください」など）を**ブロッカー**として返す
 - 出力:
   ```json
@@ -356,7 +356,7 @@ DB を再デプロイするとデータが消えるため、**計画（読み取
   4. `JobManager` がバックグラウンドで `DeploymentRunner.RunAsync` を開始し、すぐに `job_id` を返す
 - 出力: `{ "job_id": "job_...", "kind": "deploy", "status": "running", "poll_hint": "get_job_status を 15〜30 秒間隔で呼んでください" }`
 - 計画は一度実行したら無効にする（同じ計画で 2 回実行できない）
-- 進捗の通知（`notifications/progress`）は送らない。`get_job_status` のポーリングで完結させる（第 4.3 版で決定。理由は `docs/design/mcp-phase3b.md` の 6.2）
+- 進捗の通知（`notifications/progress`）は送らない。`get_job_status` のポーリングで完結させる（第 4.3 版で決定。理由は `docs/design/mcp/mcp-phase3b.md` の 6.2）
 
 > 将来: MCP 仕様の Tasks（長時間処理の標準化。2025-11-25 版では実験的な機能）が C# SDK と主要クライアントで安定したら、`start_*` + `get_job_status` から移行するか検討する。ジョブ管理は Application に閉じているので、MCP 側の変更だけで済む。
 
@@ -783,7 +783,7 @@ README の「必要な RBAC ロールと権限」（`docs/fix-rbac-requirements`
 | Phase 3c（`MCP-Tool`） | `plan_deletion` / `start_deletion`、instructions、Resources / Prompts、配布（release.yml）、README の MCP の章 | Release に MCP の配布物が出る。リリース前確認（6.1）を完了 |
 | Phase 4（`feature/mcp-http`） | HTTP トランスポート、呼び出し元の認証（Entra ID・アプリロール）、`server` / `user` の両方式の資格情報プロバイダー（4.11）、Dockerfile とコンテナイメージ | Container Apps 上の MCP サーバーに OAuth 対応のクライアントから接続し、両方式でそれぞれ一連のシナリオが成功する。範囲外のリソースグループへの `server` 方式の操作が拒否される |
 
-**実施結果（Phase 3a）**: 詳細設計は `docs/design/mcp-phase3a.md`。
+**実施結果（Phase 3a）**: 詳細設計は `docs/design/mcp/mcp-phase3a.md`。
 - `TTDeployTool.Controller.Mcp`（`ttdeploytool-mcp`）を新設した。SDK は `ModelContextProtocol` 2.2.0。ログはすべて stderr に出し、stdout は JSON-RPC だけにした
 - 4 つのツールの結果は `structuredContent`（snake_case）と同じ内容のテキストで返す。入力の誤りは、`validate_deployment` では `valid: false`、`generate_compose` / `list_subscriptions` では `isError: true` で返す
 - Domain に `DeploymentValidator`（全エラーの列挙）と `DeploymentAdvisor`（警告）を追加した。`ComposeGenerator.Validate` は `DeploymentValidator` の最初のエラーを投げるようにし、CLI の挙動とメッセージは変えていない
@@ -791,7 +791,7 @@ README の「必要な RBAC ロールと権限」（`docs/fix-rbac-requirements`
 - MCP は Application をまだ参照しない（Phase 3a のツールでは使わないため。Phase 3b で参照する）
 - 確認: 単体テストとプロトコル結合テスト（ビルドした `ttdeploytool-mcp` を SDK のクライアントで stdio 接続）、MCP Inspector（CLI モード）での `tools/list` と `tools/call`、Claude Code（`claude mcp list` で接続を確認）。`generate_compose` で生成したファイルで `docker compose up` し、Timetracker のセットアップ画面が表示されることを確認した
 
-**実施結果（Phase 3b）**: 詳細設計は `docs/design/mcp-phase3b.md`。
+**実施結果（Phase 3b）**: 詳細設計は `docs/design/mcp/mcp-phase3b.md`。
 - `plan_deployment` / `start_deployment` / `get_job_status` / `list_jobs` / `get_deployment_info` を追加した（ツールは 9 つ）。MCP は Application を参照するようにした
 - Application に、計画（`DeploymentPlanner.PlanAsync`。作成・既存の利用・更新（DB はデータ消失）、ブロッカー、警告、権限の事前確認）、計画ストア（`IPlanStore`。15 分で期限切れ、一度だけ使える、呼び出し元ごと）、ジョブ管理（`JobManager`。同じ対象（サブスクリプション・リソースグループ・アプリ名）の同時実行を拒否する）、状態の読み取り（`DeploymentInspector`）を追加した。CLI の挙動は変えていない
 - `start_deployment` は、実行の直前に計画を作り直し、実行できない・操作が変わった場合は始めずにエラーを返す。DB を更新する計画では `acknowledge_data_loss=true` が必要
@@ -799,7 +799,7 @@ README の「必要な RBAC ロールと権限」（`docs/fix-rbac-requirements`
 - 確認: 単体テスト（計画の各規則・再確認・計画ストア・ジョブ・各ツールの分岐）とプロトコル結合テスト。分岐網羅率は Program.cs を除き 100%
 - Azure（japaneast、`azure-cli` 認証）での確認: SDK のクライアントから stdio で接続し、ツールだけで次を行った。`list_subscriptions` の成功（Phase 3a で残した確認）、`get_deployment_info`（デプロイ前は `exists: false`）、`plan_deployment`（新規。すべて create、リソースグループが無いため権限は not_checked）→ `start_deployment` → `get_job_status`（約 2 分 20 秒で succeeded、URL が返り、アクセスするとセットアップ画面に転送される）、`get_deployment_info`（3 つのアプリが Running、管理タグあり）、`plan_deployment`（再デプロイ。DB は update・data_loss、`requires_data_loss_ack: true`、権限は ok）→ 同意なしの `start_deployment` が拒否される → 同意ありで succeeded（約 50 秒）→ 使用済みの plan_id が拒否される、`list_jobs`（2 件）。結果・ログにパスワードが含まれないことも確認した。後片付けは CLI の `delete` で行った
 
-**実施結果（Phase 3c）**: 詳細設計は `docs/design/mcp-phase3c.md`。
+**実施結果（Phase 3c）**: 詳細設計は `docs/design/mcp/mcp-phase3c.md`。
 - `plan_deletion` / `start_deletion` を追加した（ツールは 11）。削除の規則は CLI の `delete` と同じ `DeletionPlanner` / `DeletionRunner` を使う。`start_deletion` は計画と同じアプリ名（`confirm_app_name`）が無ければ実行しない（一致しない場合は計画を使用済みにしない）。実行の直前に計画を作り直し、権限の不足や対象の変化があれば始めない
 - Resources（`ttdeploytool://docs/constraints`、`ttdeploytool://docs/rbac`、`ttdeploytool://deployments/{subscription}/{resource_group}/{app_name}`）と Prompts（`deploy-timetracker`、`local-dry-run`、`delete-timetracker`）を追加した。文書はサーバーに埋め込み、README の主な記述が含まれることをテストで確かめる
 - release.yml で `ttdeploytool-mcp-vX.Y.Z.zip`（win-x64 の単一ファイル EXE）を CLI の zip と並べて Release に載せる。同じ `dotnet publish` で EXE ができることを確認した（約 86MB）。実際の Release は次のリリースで確認する

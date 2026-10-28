@@ -5,7 +5,7 @@ using Xunit;
 namespace TTDeployTool.SystemTests;
 
 /// <summary>
-/// DB データの永続化（--persist-db）の一連の流れを、本物の Azure で確認する（詳細設計 docs/design/db-persistence.md の 10・14）。
+/// DB データの永続化（--persist-db）の一連の流れを、本物の Azure で確認する（詳細設計 docs/design/common/db-persistence.md の 10・14）。
 /// デプロイ → 再デプロイ（停止 → 更新 → 開始）→ 削除（--keep-db-data）→ 削除（既定）。DB は PostgreSQL。
 /// DB のデータが残っていることは、ファイル共有の上の PostgreSQL のファイルで確かめる: PG_VERSION は初期化（initdb）のときにだけ書かれ、
 /// postmaster.pid は起動のたびに作られる（正常に停止すると消える）。再デプロイの開始より後に作られた postmaster.pid があり、

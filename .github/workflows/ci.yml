@@ -179,7 +179,7 @@ jobs:
         docker logs ttmcp
 
   # デスクトップアプリ（WinUI 3）の Store 用のパッケージ（.msixupload。x64 と arm64 のバンドル。署名なし: Store が認定の後に署名する）を作り、
-  # パッケージのマニフェストの版・対象 OS・機能を確かめる（docs/design/desktop-app.md の 9.1）。
+  # パッケージのマニフェストの版・対象 OS・機能を確かめる（docs/design/desktop/desktop-app.md の 9.1）。
   # Microsoft Learn の WinUI 3 の CI の例に合わせて msbuild を使う。画面の状態と操作のテストは build ジョブ（TTDeployTool.sln）で行う
   desktop:
     needs: changes
@@ -218,7 +218,7 @@ jobs:
         path: AppPackages/**/*.msixupload
         retention-days: 7
 
-  # デスクトップアプリの UI テスト（docs/design/desktop-ui-tests.md）。x64 の MSIX を一時的な自己署名の証明書で署名して導入し、
+  # デスクトップアプリの UI テスト（docs/design/desktop/desktop-ui-tests.md）。x64 の MSIX を一時的な自己署名の証明書で署名して導入し、
   # UI Automation（FlaUI）で操作する。Azure は使わない。証明書はこのジョブの中だけで使い、保存しない
   desktop-ui:
     needs: changes

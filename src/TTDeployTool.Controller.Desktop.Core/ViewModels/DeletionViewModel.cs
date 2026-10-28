@@ -346,7 +346,7 @@ public sealed class DeletionViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 前回のアプリで保存した削除の予定を始める（docs/design/desktop-jobs.md の 6.6）。計画を作り直し、確かめた計画と同じものを削除する場合だけ始める。
+    /// 前回のアプリで保存した削除の予定を始める（docs/design/desktop/desktop-jobs.md の 6.6）。計画を作り直し、確かめた計画と同じものを削除する場合だけ始める。
     /// </summary>
     internal async Task<Job> StartSavedAsync(JobTarget target, SavedDeletion saved, IAzureSession session)
     {

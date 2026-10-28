@@ -2,7 +2,7 @@
 
 - 対象ブランチ: `feature/mcp-http`
 - 全体設計: `docs/MCP_TOOL_DESIGN.md`（4.11 HTTP 公開時の Azure 資格情報）
-- 前の段階: `docs/design/mcp-phase4a.md`（HTTP トランスポートと `server` 方式）
+- 前の段階: `docs/design/mcp/mcp-phase4a.md`（HTTP トランスポートと `server` 方式）
 
 ## 1. 目的
 HTTP のサーバーで、サーバーの ID（`server` 方式）のほかに、**サインインした利用者本人の Azure の権限**（`user` 方式）でも操作できるようにする。利用者は自分のロールの範囲でだけ操作でき、Azure のアクティビティログにも本人の操作として残る。
@@ -66,4 +66,4 @@ HTTP のサーバーで、サーバーの ID（`server` 方式）のほかに、
 - 単体: 設定（既定は server だけ、user だけなら許可するリソースグループは不要、両方と既定、無効な方式・既定、client-secret のシークレットの要否、`ToString` にシークレットを出さない）、ロールと有効な方式の組み合わせごとに使える方式、省略時の方式（既定を使えなければ使えるほう）、方式の指定（大文字小文字、無効、サーバーで無効、ロールなし）、stdio での指定の拒否、user 方式の範囲・表示・OBO の資格情報（マネージド ID とクライアントシークレット）、トークンが無い要求の拒否、Authorization ヘッダーの読み取り（空白なしの `Bearer`、間の空白が 2 つ、ヘッダーが複数ある場合は使わない）、server 方式の範囲外のメッセージで user 方式を案内すること、instructions と Prompts の方式ごとの説明
 - ツール: user 方式で許可したリソースグループの外を計画できること、`start_deployment` / `start_deletion` が計画の方式の資格情報で実行の直前の確認とジョブを行うこと、計画の後にロールが外れた場合に計画を使用済みにせずエラーにすること、`start_*` が計画のときではなく実行の要求のトークンを交換すること（計画と実行でトークンを変え、実行の直前の確認とジョブで実行のトークンだけが使われること。計画のトークンを使うように変えるとテストが失敗することも確認）、トークン交換の失敗で再サインインと同意の確認を案内すること、`get_deployment_info` と `list_subscriptions` の `azure_identity`、`get_deployment_options` の方式の表示
 - 結合（TestServer。server と user の両方を有効にしたサーバー）: `TTDeployTool.Deploy.User` だけを持つ利用者が、`azure_identity` を省略して user 方式で計画できること（OBO の資格情報が使われる）、`azure_identity=server` を指定するとロールのエラーになること、instructions に方式の説明があること。既存の server 方式のテストも、両方を有効にしたサーバーで成功
-- 4c で確認: Container Apps 上で、マネージド ID のフェデレーション資格情報でのトークン交換（OBO）が成功し、利用者本人の権限でデプロイ・削除できた。交換には MFA 済みのサインインと同意が必要（`docs/design/mcp-phase4c.md` の 10）
+- 4c で確認: Container Apps 上で、マネージド ID のフェデレーション資格情報でのトークン交換（OBO）が成功し、利用者本人の権限でデプロイ・削除できた。交換には MFA 済みのサインインと同意が必要（`docs/design/mcp/mcp-phase4c.md` の 10）

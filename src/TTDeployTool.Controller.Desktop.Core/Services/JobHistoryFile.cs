@@ -6,7 +6,7 @@ using TTDeployTool.Controller.Desktop.Core.ViewModels;
 namespace TTDeployTool.Controller.Desktop.Core.Services;
 
 /// <summary>
-/// 終わったジョブの記録（docs/design/desktop-jobs.md の 6.8、D30）。「詳細」と「Markdown でコピー」で見られるものと、一覧の日時（登録・変更・実行）を残す。
+/// 終わったジョブの記録（docs/design/desktop/desktop-jobs.md の 6.8、D30）。「詳細」と「Markdown でコピー」で見られるものと、一覧の日時（登録・変更・実行）を残す。
 /// パスワード・トークン・計画の中身は持たない。
 /// </summary>
 public sealed record JobRecord(

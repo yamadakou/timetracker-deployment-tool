@@ -1,6 +1,6 @@
 namespace TTDeployTool.Controller.Desktop.Core;
 
-/// <summary>クリップボードにコピーする Markdown（docs/design/desktop-settings.md の 2.2）。</summary>
+/// <summary>クリップボードにコピーする Markdown（docs/design/desktop/desktop-settings.md の 2.2）。</summary>
 internal static class MarkdownText
 {
     /// <summary>表（1 行目が見出し）。セルの「|」と改行は、表が崩れないように置き換える。</summary>

@@ -4,7 +4,7 @@ using TTDeployTool.Controller.Desktop.Core.Services;
 namespace TTDeployTool.Controller.Desktop.Core.Jobs;
 
 /// <summary>
-/// 終わったジョブの記録（docs/design/desktop-jobs.md の 6.8、D29〜D32）。起動したときに、前回までのアプリで終わったジョブを一覧に入れ、
+/// 終わったジョブの記録（docs/design/desktop/desktop-jobs.md の 6.8、D29〜D32）。起動したときに、前回までのアプリで終わったジョブを一覧に入れ、
 /// ジョブが終わったとき・記録から削除したときに保存する。終わった時刻から 180 日を過ぎたものと、新しい順に 500 件を超えた分は、保存しない。
 /// </summary>
 public sealed class JobHistory

@@ -37,7 +37,7 @@ public sealed record ExpiryDecision(DateTimeOffset? ExpiresAt, ExpirySource Sour
 }
 
 /// <summary>
-/// デプロイの利用可能期限（docs/design/desktop-jobs.md の 6.1。D9・D11・D12・D17）。
+/// デプロイの利用可能期限（docs/design/desktop/desktop-jobs.md の 6.1。D9・D11・D12・D17）。
 /// 入力は「省略（既定）」「yyyy-MM-dd」「none（期限なし）」。期限は期限日の終わり（その日の 23:59:59、実行する PC・サーバーの時刻帯）で、
 /// タグには UTC で記録する。省略した場合は、今の期限（タグ）を引き継ぎ、無ければ今日から 32 日後にする。
 /// </summary>

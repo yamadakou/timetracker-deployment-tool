@@ -3,7 +3,7 @@ using TTDeployTool.Controller.Desktop.Core.Mvvm;
 namespace TTDeployTool.Controller.Desktop.Core.ViewModels;
 
 /// <summary>
-/// 表の日時の列の絞り込み（いつから・いつまで。どちらも日付で、その日を含む。docs/design/desktop-jobs.md の 6.8）。
+/// 表の日時の列の絞り込み（いつから・いつまで。どちらも日付で、その日を含む。docs/design/desktop/desktop-jobs.md の 6.8）。
 /// どちらかを入れると、その列に日時の無い行は出さない。
 /// </summary>
 public sealed class DateRangeFilter : ObservableObject

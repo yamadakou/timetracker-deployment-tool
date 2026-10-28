@@ -10,7 +10,7 @@ using Xunit;
 
 namespace TTDeployTool.Application.Tests;
 
-/// <summary>計画と実行での利用可能期限（docs/design/desktop-jobs.md の 6.1）。</summary>
+/// <summary>計画と実行での利用可能期限（docs/design/desktop/desktop-jobs.md の 6.1）。</summary>
 public class DeploymentExpiryPlanTests
 {
     private static readonly TimeZoneInfo Tokyo = TimeZoneInfo.CreateCustomTimeZone("JST", TimeSpan.FromHours(9), "JST", "JST");

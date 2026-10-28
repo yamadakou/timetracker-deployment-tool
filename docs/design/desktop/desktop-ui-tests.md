@@ -1,7 +1,7 @@
 # 詳細設計: デスクトップアプリの UI テスト（Phase 6）
 
 - 対象ブランチ: `feature/desktop-app`
-- 前の段階: `docs/design/desktop-app.md`（Phase 5。13 のテストの方針では、WinUI 3 の画面を自動テストの対象にしていなかった）
+- 前の段階: `docs/design/desktop/desktop-app.md`（Phase 5。13 のテストの方針では、WinUI 3 の画面を自動テストの対象にしていなかった）
 - 状況: 案。オーナーの回答で決めたこと: 道具は FlaUI、範囲は CI とローカルの半自動の両方を段階的に、診断用のログ（`desktop-app.md` の 7.2）を先に入れる。8 の論点もオーナーの回答で決めた（CI は署名した MSIX・Dry-run は保存まで・半自動は実行と削除まで）。一次情報の確認日は 2026-10-19
 - 記録: `docs/REVIEW_ISSUES.md` の No.51（予定）
 

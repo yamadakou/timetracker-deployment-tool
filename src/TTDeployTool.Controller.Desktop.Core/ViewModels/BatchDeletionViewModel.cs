@@ -22,7 +22,7 @@ public sealed record BatchDeletionItem(DeploymentEntry Entry, DeletionPlanTicket
 }
 
 /// <summary>
-/// デプロイの一覧で 2 件以上を選んだときの、まとめての削除（docs/design/desktop-wizard.md の 7、Q10）。行ごとに計画を作って並べ、
+/// デプロイの一覧で 2 件以上を選んだときの、まとめての削除（docs/design/desktop/desktop-wizard.md の 7、Q10）。行ごとに計画を作って並べ、
 /// 計画に誤りがあるもの・ジョブがあるものは外す。削除する件数を入力するまで実行できない。実行すると行ごとに削除のジョブを登録する。
 /// </summary>
 public sealed class BatchDeletionViewModel : ObservableObject

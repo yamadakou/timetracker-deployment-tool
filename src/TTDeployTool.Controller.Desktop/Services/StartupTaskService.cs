@@ -4,7 +4,7 @@ using Windows.ApplicationModel;
 namespace TTDeployTool.Controller.Desktop.Services;
 
 /// <summary>
-/// Windows のサインイン時の起動（<see cref="StartupTask"/>。マニフェストの windows.startupTask。docs/design/desktop-jobs.md の 6.5）。
+/// Windows のサインイン時の起動（<see cref="StartupTask"/>。マニフェストの windows.startupTask。docs/design/desktop/desktop-jobs.md の 6.5）。
 /// パッケージのデスクトップ アプリでは、<see cref="StartupTask.RequestEnableAsync"/> で同意のダイアログは出ない。
 /// パッケージで動いていない場合などは、使えないものとして扱う。
 /// </summary>

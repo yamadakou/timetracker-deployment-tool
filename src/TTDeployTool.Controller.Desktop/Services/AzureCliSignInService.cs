@@ -6,7 +6,7 @@ using TTDeployTool.Controller.Desktop.Core.Services;
 namespace TTDeployTool.Controller.Desktop.Services;
 
 /// <summary>
-/// UI テストの System Test（docs/design/desktop-ui-tests.md の 7）のためのサインイン。Azure CLI のサインイン（ワークフローの
+/// UI テストの System Test（docs/design/desktop/desktop-ui-tests.md の 7）のためのサインイン。Azure CLI のサインイン（ワークフローの
 /// azure/login による OIDC）を使い、WAM の対話をしない。テスト用のビルド（/p:DefineConstants=UITEST_SIGNIN）でだけ入り、
 /// Store に出すパッケージには入らない。秘密の情報はアプリに渡さず、保存もしない。
 /// </summary>
