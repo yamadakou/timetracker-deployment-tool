@@ -73,7 +73,18 @@ public class SpikeTableViewTests
             Check(cellHeaders.Select(h => h.Properties.Name.ValueOrDefault).SequenceEqual(["グループ"]),
                 $"セルから見出しが分かる（{cell?.Properties.Name.ValueOrDefault} → {string.Join(", ", cellHeaders.Select(h => h.Properties.Name.ValueOrDefault))}）");
         }
-        var group = headers.FirstOrDefault(h => h.Properties.Name.ValueOrDefault == "グループ");
+        // 表から見出しの一覧が取れないときに備え、各列の 1 行目のセルから見出しをたどる
+        var viaCells = tablePattern
+            ? Enumerable.Range(0, table.Patterns.Grid.Pattern.ColumnCount.Value)
+                .Select(c => table.Patterns.Grid.Pattern.GetItem(0, c))
+                .SelectMany(c => c?.Patterns.TableItem.IsSupported == true ? HeaderItems(c) : Array.Empty<AutomationElement>()).ToArray()
+            : Array.Empty<AutomationElement>();
+        Check(viaCells.Select(h => h.Properties.ControlType.ValueOrDefault).All(t => t == ControlType.HeaderItem)
+              && viaCells.Select(h => h.Properties.Name.ValueOrDefault).SequenceEqual(["アプリ名", "グループ", "結果"]),
+            $"セルからたどった見出しが HeaderItem として読める（{string.Join(" / ", viaCells.Select(Describe))}）");
+        var group = headers.Concat(viaCells).FirstOrDefault(h => h.Properties.Name.ValueOrDefault == "グループ");
+        Check(app.Window.FindFirstDescendant(cf => cf.ByName("グループ").And(cf.ByControlType(ControlType.HeaderItem))) != null,
+            "見出しを名前でツリーから探せる（FindFirstDescendant）");
         if (group != null && group.Patterns.Invoke.IsSupported)
         {
             group.Patterns.Invoke.Pattern.Invoke();
