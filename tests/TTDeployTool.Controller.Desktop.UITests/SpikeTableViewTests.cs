@@ -1,5 +1,6 @@
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
+using FlaUI.UIA3.Converters;
 using FluentAssertions;
 using Xunit;
 
@@ -23,6 +24,33 @@ public class SpikeTableViewTests
         }
         string Describe(AutomationElement e) =>
             $"{e.Properties.ControlType.ValueOrDefault} class={e.Properties.ClassName.ValueOrDefault} name={e.Properties.Name.ValueOrDefault} help={e.Properties.HelpText.ValueOrDefault} focusable={e.Properties.IsKeyboardFocusable.ValueOrDefault}";
+        // ColumnHeaders・ColumnHeaderItems のプロパティは XAML の UIA の橋渡しで「対応しない」になるため、パターンのメソッドで直接読む
+        AutomationElement[] ColumnHeaders(AutomationElement grid)
+        {
+            try
+            {
+                var native = ((Interop.UIAutomationClient.IUIAutomationTablePattern)AutomationElementConverter.ToNative(grid).GetCurrentPattern(10012)).GetCurrentColumnHeaders();
+                return AutomationElementConverter.NativeArrayToManaged(grid.Automation, native);
+            }
+            catch (Exception e)
+            {
+                report.Add($"ColumnHeaders の読み取りに失敗: {e.GetType().Name}: {e.Message}");
+                return [];
+            }
+        }
+        AutomationElement[] HeaderItems(AutomationElement cell)
+        {
+            try
+            {
+                var native = ((Interop.UIAutomationClient.IUIAutomationTableItemPattern)AutomationElementConverter.ToNative(cell).GetCurrentPattern(10013)).GetCurrentColumnHeaderItems();
+                return AutomationElementConverter.NativeArrayToManaged(cell.Automation, native);
+            }
+            catch (Exception e)
+            {
+                report.Add($"ColumnHeaderItems の読み取りに失敗: {e.GetType().Name}: {e.Message}");
+                return [];
+            }
+        }
         List<string> Names() => table.FindAllDescendants().Select(e => e.Properties.Name.ValueOrDefault ?? "").ToList();
 
         Check(table.Properties.ControlType.ValueOrDefault == ControlType.DataGrid, $"表が DataGrid として見える（{table.Properties.ControlType.ValueOrDefault}）");
@@ -32,7 +60,7 @@ public class SpikeTableViewTests
         // 列の見出しは、表の子ではなく Table パターンの ColumnHeaders で出す作り（WinUI.TableView の TableViewAutomationPeer.GetColumnHeaders）
         var tablePattern = table.Patterns.Table.IsSupported;
         Check(tablePattern && table.Patterns.Grid.IsSupported, "表が Table・Grid パターンに対応する");
-        var headers = tablePattern ? table.Patterns.Table.Pattern.ColumnHeaders.Value : Array.Empty<AutomationElement>();
+        var headers = tablePattern ? ColumnHeaders(table) : Array.Empty<AutomationElement>();
         Check(headers.Select(h => h.Properties.ControlType.ValueOrDefault).All(t => t == ControlType.HeaderItem)
               && headers.Select(h => h.Properties.Name.ValueOrDefault).SequenceEqual(["アプリ名", "グループ", "結果"]),
             $"見出しが Table パターンから HeaderItem として読める（{string.Join(" / ", headers.Select(Describe))}）");
@@ -41,7 +69,7 @@ public class SpikeTableViewTests
             var grid = table.Patterns.Grid.Pattern;
             Check((grid.RowCount.Value, grid.ColumnCount.Value) == (2, 3), $"行と列の数（{grid.RowCount.Value} 行・{grid.ColumnCount.Value} 列）");
             var cell = grid.GetItem(0, 1);
-            var cellHeaders = cell?.Patterns.TableItem.IsSupported == true ? cell.Patterns.TableItem.Pattern.ColumnHeaderItems.Value : Array.Empty<AutomationElement>();
+            var cellHeaders = cell?.Patterns.TableItem.IsSupported == true ? HeaderItems(cell) : Array.Empty<AutomationElement>();
             Check(cellHeaders.Select(h => h.Properties.Name.ValueOrDefault).SequenceEqual(["グループ"]),
                 $"セルから見出しが分かる（{cell?.Properties.Name.ValueOrDefault} → {string.Join(", ", cellHeaders.Select(h => h.Properties.Name.ValueOrDefault))}）");
         }
@@ -74,7 +102,7 @@ public class SpikeTableViewTests
         app.Invoke("Spike.HideGroup");
         Thread.Sleep(1000);
         var after = Names();
-        var afterHeaders = tablePattern ? table.Patterns.Table.Pattern.ColumnHeaders.Value.Select(h => h.Properties.Name.ValueOrDefault).ToList() : new List<string>();
+        var afterHeaders = tablePattern ? ColumnHeaders(table).Select(h => h.Properties.Name.ValueOrDefault ?? "").ToList() : new List<string>();
         Check(!after.Contains("研修") && afterHeaders.SequenceEqual(["アプリ名", "結果"]), $"列を隠すと、その列の見出しとセルが消える（見出し: {string.Join(", ", afterHeaders)}）");
 
         Console.WriteLine(string.Join("\n", report));
