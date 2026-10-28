@@ -32,6 +32,12 @@ public class SpikeTableViewTests
         var headers = table.FindAllDescendants(cf => cf.ByControlType(ControlType.HeaderItem));
         Check(headers.Length >= 3, $"列見出しが HeaderItem として見える（{headers.Length} 個: {string.Join(", ", headers.Select(h => h.Properties.Name.ValueOrDefault))}）");
 
+        var everywhere = app.Window.FindAllDescendants().Where(e => (e.Properties.Name.ValueOrDefault ?? "") is "アプリ名" or "グループ")
+            .Select(e => $"{e.Properties.ControlType.ValueOrDefault} name={e.Properties.Name.ValueOrDefault}").ToList();
+        Check(everywhere.Count >= 2, $"列見出しの文字がウィンドウのどこかに見える（{string.Join(", ", everywhere)}）");
+        var custom = app.Window.FindFirstDescendant(cf => cf.ByAutomationId("Spike.ResultHeader"));
+        Check(custom != null, $"見出しに置いた要素の AutomationId で見つかる（{custom?.Properties.ControlType.ValueOrDefault} {custom?.Parent?.Properties.ControlType.ValueOrDefault}）");
+
         var rows = table.FindAllDescendants(cf => cf.ByControlType(ControlType.ListItem).Or(cf.ByControlType(ControlType.DataItem)));
         Check(rows.Length == 2, $"行が 2 つ見える（{rows.Length} 個）");
         if (rows.Length > 0 && rows[0].Patterns.SelectionItem.IsSupported)

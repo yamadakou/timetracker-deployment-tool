@@ -537,7 +537,11 @@
                             <tv:TableView.Columns>
                                 <tv:TableViewTextColumn Header="アプリ名" Binding="{Binding Name}" Width="150" CanReorder="False" />
                                 <tv:TableViewTextColumn x:Name="SpikeGroupColumn" Header="グループ" Binding="{Binding Group}" Width="150" />
-                                <tv:TableViewTextColumn Header="結果" Binding="{Binding Result}" Width="*" />
+                                <tv:TableViewTextColumn Binding="{Binding Result}" Width="*">
+                                    <tv:TableViewTextColumn.Header>
+                                        <TextBlock AutomationProperties.AutomationId="Spike.ResultHeader" Text="結果" />
+                                    </tv:TableViewTextColumn.Header>
+                                </tv:TableViewTextColumn>
                             </tv:TableView.Columns>
                         </tv:TableView>
                         <Button AutomationProperties.AutomationId="Spike.HideGroup" Content="グループの列を隠す" Click="OnSpikeHideGroup" />
