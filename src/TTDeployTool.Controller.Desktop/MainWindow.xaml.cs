@@ -270,6 +270,12 @@ public sealed partial class MainWindow : Window
     // 試作（No.78）
     private void OnSpikeHideGroup(object sender, RoutedEventArgs e) => SpikeGroupColumn.Visibility = Visibility.Collapsed;
 
+    private void OnSpikeSorting(object? sender, WinUI.TableView.TableViewSortingEventArgs e)
+    {
+        e.Handled = true;
+        SpikeSortLog.Text = $"sorted:{e.Column.Header}";
+    }
+
     internal void FillSpike() => SpikeTable.ItemsSource = new List<SpikeRow> { new("demo", "研修", "完了"), new("other", "営業", "失敗") };
 }
 
