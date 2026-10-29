@@ -198,3 +198,23 @@ internal sealed class TestAzureEvents : EventSource
     [Event(2, Level = EventLevel.Informational, Message = "{0}")]
     public void Sent(string message) => WriteEvent(2, message);
 }
+
+/// <summary>続けて動かしてよいと分かっている画面の部品の例外（KnownUiErrors）。</summary>
+public class KnownUiErrorsTests
+{
+    private sealed class Traced(string stackTrace) : ArgumentOutOfRangeException("index")
+    {
+        public override string StackTrace => stackTrace;
+    }
+
+    [Fact]
+    public void Only_The_TableView_Scroll_Race_Should_Be_Known()
+    {
+        const string scroll = "   at Microsoft.UI.Xaml.Controls.ItemCollection.get_ListItem(Int32 index)\n   at WinUI.TableView.TableView.ScrollRowIntoView(Int32 index)";
+
+        KnownUiErrors.IsTableViewScrollRace(new Traced(scroll)).Should().BeTrue();
+        KnownUiErrors.IsTableViewScrollRace(new Traced("   at TTDeployTool.Other()")).Should().BeFalse("ほかの場所の範囲外は、今までどおり処理されなかった例外");
+        KnownUiErrors.IsTableViewScrollRace(new ArgumentOutOfRangeException("index")).Should().BeFalse("投げていない例外には呼び出し履歴が無い");
+        KnownUiErrors.IsTableViewScrollRace(new InvalidOperationException(scroll)).Should().BeFalse("種類が違う");
+    }
+}

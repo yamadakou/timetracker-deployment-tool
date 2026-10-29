@@ -29,7 +29,17 @@ public partial class App : Microsoft.UI.Xaml.Application
         log.DeleteOld();
         _azureEvents = log.ForwardAzureEvents();
         var appLogger = log.CreateLogger("TTDeployTool.Desktop.App");
-        UnhandledException += (_, e) => appLogger.LogCritical(e.Exception, "処理されなかった例外");
+        UnhandledException += (_, e) =>
+        {
+            // 表の部品の中の、続けてよいと分かっている例外は、記録してアプリを続ける（Core の KnownUiErrors）
+            if (KnownUiErrors.IsTableViewScrollRace(e.Exception))
+            {
+                appLogger.LogWarning(e.Exception, "表の部品の中で例外が起きました（選んだ行の表示だけを行わず、続けます）");
+                e.Handled = true;
+                return;
+            }
+            appLogger.LogCritical(e.Exception, "処理されなかった例外");
+        };
         appLogger.LogInformation("起動しました（版 {Version}）", typeof(App).Assembly.GetName().Version);
 
         // 通知を押したときに、そのジョブを開く（Register の前に NotificationInvoked を登録する。docs/design/desktop/desktop-jobs.md の 5.1）
