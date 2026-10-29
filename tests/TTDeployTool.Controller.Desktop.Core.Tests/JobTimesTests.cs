@@ -84,8 +84,8 @@ public class JobTimesTests
         (restored.RegisteredAt, restored.ChangedAt).Should().Be((registered, registered.AddMinutes(5)), "登録日時は最初に登録した日時のまま");
     }
 
-    public static TheoryData<string> DateColumns => [nameof(JobListViewModel.ScheduledFilter), nameof(JobListViewModel.RegisteredFilter),
-        nameof(JobListViewModel.ChangedFilter), nameof(JobListViewModel.StartedFilter), nameof(JobListViewModel.FinishedFilter)];
+    public static TheoryData<string> DateColumns => [nameof(JobSortKey.Time), nameof(JobSortKey.RegisteredAt), nameof(JobSortKey.ChangedAt), nameof(JobSortKey.StartedAt),
+        nameof(JobSortKey.Finished)];
 
     [Theory]
     [MemberData(nameof(DateColumns))]
@@ -104,7 +104,8 @@ public class JobTimesTests
         };
         var h = await new Harness(time: _time, history: history).ReadyAsync();
         var list = h.Main.JobList;
-        var filter = (DateRangeFilter)typeof(JobListViewModel).GetProperty(column)!.GetValue(list)!;
+        list.Filters.DateColumn = list.Filters.DateColumns.Single(c => c.Key == column);
+        var filter = list.Filters.Dates;
         var local = (DateTimeOffset at) => new DateTimeOffset(at.ToLocalTime().Date);
         var names = () => list.Items.Select(j => j.Target.AppName).Order().ToList();
         filter.IsActive.Should().BeFalse();
@@ -112,14 +113,14 @@ public class JobTimesTests
 
         filter.From = local(day(1));
         filter.ClearCommand.CanExecute(null).Should().BeTrue();
-        names().Should().Equal(column is nameof(JobListViewModel.RegisteredFilter) or nameof(JobListViewModel.FinishedFilter)
+        names().Should().Equal(column is nameof(JobSortKey.RegisteredAt) or nameof(JobSortKey.Finished)
             ? ["none", "second", "third"]
             : ["second", "third"], "その日を含む。日時の無い行は出さない");
         filter.To = local(day(1));
         names().Should().Equal("second");
         filter.From = null;
         names().Should().Equal("first", "second");
-        list.CountText.Should().StartWith("絞り込んだ 2 件 / 全 4 件");
+        list.CountText.Should().StartWith("1〜2 件目を表示（絞り込んだ 2 件 / 全 4 件）");
 
         await filter.ClearCommand.ExecuteAsync();
         (filter.From, filter.To, filter.IsActive).Should().Be((null, null, false));
@@ -154,17 +155,17 @@ public class JobTimesTests
         var order = () => string.Concat(list.Items.Select(j => j.Target.AppName));
 
         list.SortBy(JobSortKey.RegisteredAt);
-        (order(), list.RegisteredHeader).Should().Be(("cab", "登録日時 ▲"));
+        (order(), list.SortColumn).Should().Be(("cab", "RegisteredAt"));
         list.SortBy(JobSortKey.ChangedAt);
-        (order(), list.ChangedHeader).Should().Be(("cab", "変更日時 ▲"), "値の無いものは最後");
+        order().Should().Be("cab", "値の無いものは最後");
         list.SortBy(JobSortKey.StartedAt);
-        (order(), list.StartedHeader).Should().Be(("bac", "実行開始日時 ▲"));
+        order().Should().Be("bac");
         list.SortBy(JobSortKey.Finished);
-        (order(), list.FinishedHeader).Should().Be(("bca", "実行終了日時 ▲"));
+        order().Should().Be("bca");
         list.SortBy("Duration");
-        (order(), list.DurationHeader).Should().Be(("bac", "処理時間 ▲"));
+        (order(), list.SortDescending).Should().Be(("bac", false));
         list.SortBy(JobSortKey.Duration);
-        (order(), list.DurationHeader, list.FinishedHeader).Should().Be(("abc", "処理時間 ▼", "実行終了日時"));
+        (order(), list.SortColumn, list.SortDescending).Should().Be(("abc", "Duration", true));
         list.SortBy(JobSortKey.Time);
         order().Should().Be("acb");
     }

@@ -90,7 +90,7 @@ public class ShellLogicTests
         h.Main.Deployments.SortBy("AppName");
         h.Main.Deployments.Rows.Select(r => r.AppName).Should().Equal("a", "b");
         h.Main.JobList.SortBy("Time");
-        h.Main.JobList.TimeHeader.Should().Be("予定日時 ▲");
+        (h.Main.JobList.SortColumn, h.Main.JobList.SortDescending).Should().Be(("Time", false));
 
         var unknown = () => h.Main.Deployments.SortBy("Nothing");
         unknown.Should().Throw<ArgumentException>();

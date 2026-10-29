@@ -47,6 +47,9 @@ public interface IAppPreferences
 
     /// <summary>前回の Windows のサインイン時の起動（まだ無ければ null）。</summary>
     StartupLaunch? LastStartupLaunch { get; set; }
+
+    /// <summary>表ごとの列の幅と順序（表の名前ごと。docs/design/desktop/desktop-tables.md の 10.1）。</summary>
+    IReadOnlyDictionary<string, IReadOnlyList<TableColumnLayout>> TableLayouts { get; set; }
 }
 
 /// <summary>保存しない設定（テストと、保存先が無い場合）。</summary>
@@ -63,4 +66,6 @@ public sealed class InMemoryAppPreferences : IAppPreferences
     public IReadOnlyList<SavedJob> SavedJobs { get; set; } = [];
 
     public StartupLaunch? LastStartupLaunch { get; set; }
+
+    public IReadOnlyDictionary<string, IReadOnlyList<TableColumnLayout>> TableLayouts { get; set; } = new Dictionary<string, IReadOnlyList<TableColumnLayout>>();
 }

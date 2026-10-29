@@ -31,24 +31,25 @@ public class DeploymentTableTests
     {
         var h = await LoadedAsync(Deployment("sub", "rg", "b"), Deployment("sub", "rg", "a"), Deployment("sub", "rg", "c"));
         var vm = h.Main.Deployments;
-        vm.SubscriptionHeader.Should().Be("サブスクリプション ▲");
+        (vm.SortColumn, vm.SortDescending).Should().Be(("Subscription", false));
 
         vm.SortBy(DeploymentSortKey.AppName);
         vm.Rows.Select(r => r.AppName).Should().Equal("a", "b", "c");
-        (vm.AppNameHeader, vm.SubscriptionHeader).Should().Be(("アプリ名 ▲", "サブスクリプション"));
+        (vm.SortColumn, vm.SortDescending).Should().Be(("AppName", false));
         vm.SortBy(DeploymentSortKey.AppName);
         vm.Rows.Select(r => r.AppName).Should().Equal("c", "b", "a");
-        vm.AppNameHeader.Should().Be("アプリ名 ▼");
+        vm.SortDescending.Should().BeTrue();
 
         vm.SortBy(DeploymentSortKey.ExpiresAt);
-        (vm.ExpiryHeader, vm.ResourceGroupHeader, vm.DeployedHeader).Should().Be(("利用可能期限日 ▲", "リソースグループ", "デプロイ日"));
+        (vm.SortColumn, vm.SortDescending).Should().Be(("ExpiresAt", false));
         vm.SortBy(DeploymentSortKey.ResourceGroup);
-        vm.ResourceGroupHeader.Should().Be("リソースグループ ▲");
+        vm.SortColumn.Should().Be("ResourceGroup");
         vm.SortBy(DeploymentSortKey.DeployedAt);
-        vm.DeployedHeader.Should().Be("デプロイ日 ▲");
+        vm.SortColumn.Should().Be("DeployedAt");
 
-        // アプリ名の絞り込み（中間一致）
-        vm.AppNameFilter = " B ";
+        // アプリ名の絞り込み（文字のフィルタ。中間一致）
+        vm.Filters.TextTarget = vm.Filters.TextTargets.Single(t => t.Label == "アプリ名");
+        vm.Filters.Text = " B ";
         vm.Rows.Select(r => r.AppName).Should().Equal("b");
     }
 
@@ -281,9 +282,9 @@ public class JobTableTests
         now.ResultText.Should().Be("実行しませんでした: エラーが発生しました: 失敗しました");
         var list = h.Main.JobList;
         list.Items.Should().Equal(now, scheduled);
-        list.CountText.Should().Be("全 2 件（終わっていないもの: 予定 1）");
+        list.CountText.Should().Be("1〜2 件目を表示（全 2 件）・1 / 1 ページ（終わっていないもの: 予定 1）");
         await scheduled.CancelCommand.ExecuteAsync();
-        list.CountText.Should().Be("全 2 件", "終わっていないものが無ければ内訳は出さない");
+        list.CountText.Should().Be("1〜2 件目を表示（全 2 件）・1 / 1 ページ", "終わっていないものが無ければ内訳は出さない");
     }
 
     [Fact]
@@ -297,39 +298,36 @@ public class JobTableTests
         var now = Pending(h, "gamma", null);
         await early.PauseCommand.ExecuteAsync();
 
-        list.Filter = JobListViewModel.Filters.Single(f => f.Mode == JobFilterMode.Scheduled);
+        list.Filters.ValuesOf("State").Select(v => v.Value).Should().Equal("一時停止", "予定", "実行の準備中");
+        list.Filters.SetValues("State", ["予定"]);
         list.Items.Should().Equal(late);
-        list.CountText.Should().Be("絞り込んだ 1 件 / 全 3 件（終わっていないもの: 実行中 1・予定 1・一時停止 1）");
-        list.Filter = JobListViewModel.Filters.Single(f => f.Mode == JobFilterMode.Active);
-        list.Items.Should().HaveCount(3);
-        list.Filter = JobListViewModel.Filters.Single(f => f.Mode == JobFilterMode.Finished);
-        list.Items.Should().BeEmpty();
-        list.Filter = JobListViewModel.Filters[0];
-        list.Filter.ToString().Should().Be("すべて");
-        list.TargetFilter = " ALPHA ";
+        list.CountText.Should().Be("1〜1 件目を表示（絞り込んだ 1 件 / 全 3 件）・1 / 1 ページ（終わっていないもの: 実行中 1・予定 1・一時停止 1）");
+        list.Filters.ClearValues("State");
+        list.Filters.TextTarget = list.Filters.TextTargets.Single(t => t.Label == "リソースグループ / アプリ名");
+        list.Filters.Text = " ALPHA ";
         list.Items.Should().Equal(early);
-        list.TargetFilter = "";
+        list.Filters.Text = "";
 
         list.SortBy(JobSortKey.Time);
         list.Items.Should().Equal(early, late, now);
-        (list.TimeHeader, list.KindHeader).Should().Be(("予定日時 ▲", "種類"));
+        (list.SortColumn, list.SortDescending).Should().Be(("Time", false));
         list.SortBy(JobSortKey.Time);
-        list.TimeHeader.Should().Be("予定日時 ▼");
+        list.SortDescending.Should().BeTrue();
         // 予定の無いものは最後
         list.Items.Should().Equal(late, early, now);
         list.SortBy(JobSortKey.Target);
         list.Items.Should().Equal(early, late, now);
-        list.TargetHeader.Should().Be("リソースグループ / アプリ名 ▲");
+        list.SortColumn.Should().Be("Target");
         list.SortBy(JobSortKey.Kind);
         list.Items.Select(j => j.KindText).Should().BeInAscendingOrder();
         list.SetSelection([early]);
         list.SortBy(JobSortKey.State);
-        list.StateHeader.Should().Be("状態 ▲");
+        list.SortColumn.Should().Be("State");
         // 並べ直しても選択は保つ
         list.Selected.Should().Equal(early);
-        list.Filter = JobListViewModel.Filters.Single(f => f.Mode == JobFilterMode.Scheduled);
+        list.Filters.SetValues("State", ["予定"]);
         list.Selected.Should().BeEmpty("絞り込みで消えた行は選択から外す");
-        list.Filter = JobListViewModel.Filters[0];
+        list.Filters.ClearValues(null);
         list.SortBy(JobSortKey.Registered);
         // 登録した順（昇順）
         list.Items.Should().Equal(late, early, now);
@@ -434,14 +432,14 @@ public class JobTableTests
         var h = await new Harness(time: _time).ReadyAsync();
         var list = h.Main.JobList;
         var job = Pending(h, "demo", _time.GetUtcNow().AddHours(1));
-        list.TargetFilter = "dem";
-        list.TargetFilter.Should().Be("dem");
+        list.Filters.Text = "dem";
+        list.Filters.Text.Should().Be("dem");
         list.Items.Should().Equal(job);
         list.SetSelection([job]);
         list.Selected.Should().Equal(job);
         list.SetSelection([]);
         list.SelectionText.Should().Be("行を選ぶと、まとめて操作できます。");
-        list.TargetFilter = "none";
+        list.Filters.Text = "none";
         list.Items.Should().BeEmpty();
     }
 

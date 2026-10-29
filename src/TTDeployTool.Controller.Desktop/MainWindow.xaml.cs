@@ -3,6 +3,7 @@ using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Imaging;
+using TTDeployTool.Application.Inventory;
 using TTDeployTool.Controller.Desktop.Core.Jobs;
 using TTDeployTool.Controller.Desktop.Core.Mvvm;
 using TTDeployTool.Controller.Desktop.Core.Services;
@@ -19,6 +20,8 @@ public sealed partial class MainWindow : Window
 {
     private bool _exiting;
     private TaskbarIcon? _tray;
+    private TableBinder<DeploymentEntry>? _deploymentsTable;
+    private TableBinder<JobViewModel>? _jobsTable;
 
     public MainWindow()
     {
@@ -39,6 +42,12 @@ public sealed partial class MainWindow : Window
         // 表の選択と ViewModel の選択は、Core の SelectionSync が合わせる（画面の側は渡すだけ）
         viewModel.Deployments.TableSelection.Attach(DeploymentsTable.SelectedItems);
         viewModel.JobList.TableSelection.Attach(JobsList.SelectedItems);
+        // 表の ▽・並べ替え・列の幅と順序は、Core の決まりで行う（docs/design/desktop/desktop-tables.md の 10）
+        var deployments = viewModel.Deployments;
+        _deploymentsTable = new TableBinder<DeploymentEntry>(DeploymentsTable, deployments.Filters, viewModel.DeploymentsLayout, deployments,
+            () => deployments.SortColumn, () => deployments.SortDescending, deployments.SortBy, deployments.ClearSort);
+        var jobs = viewModel.JobList;
+        _jobsTable = new TableBinder<JobViewModel>(JobsList, jobs.Filters, viewModel.JobsLayout, jobs, () => jobs.SortColumn, () => jobs.SortDescending, jobs.SortBy, jobs.ClearSort);
         CreateTray();
         _ = viewModel.StartAsync(atStartup);
         _ = CheckForUpdatesAsync(hwnd);
@@ -69,52 +78,40 @@ public sealed partial class MainWindow : Window
     private void OnTemplateChanged(object sender, SelectionChangedEventArgs e) =>
         ViewModel.Settings.SelectedTemplate = ((ComboBox)sender).SelectedItem as DeploymentTemplate;
 
-    private void OnSubscriptionFilterChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (((ComboBox)sender).SelectedItem is SubscriptionFilterOption option)
-            ViewModel.Deployments.SubscriptionFilter = option;
-    }
-
     // 削除・実行状況の画面の「デプロイの一覧に戻る」
     private void OnBackToList(object sender, RoutedEventArgs e) => Navigate(Pages.Deployments);
 
-    private void OnExpiryFilterChanged(object sender, SelectionChangedEventArgs e)
+    // 表の上のフィルタの対象の列（ComboBox の選択を ViewModel の型に戻す）
+    private void OnDeploymentTextTargetChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (((ComboBox)sender).SelectedItem is ExpiryFilterOption option)
-            ViewModel.Deployments.ExpiryFilter = option;
+        if (((ComboBox)sender).SelectedItem is TextFilterTarget<DeploymentEntry> target)
+            ViewModel.Deployments.Filters.TextTarget = target;
     }
 
-    private void OnStateFilterChanged(object sender, SelectionChangedEventArgs e)
+    private void OnDeploymentDateColumnChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (((ComboBox)sender).SelectedItem is DeploymentStateFilterOption option)
-            ViewModel.Deployments.StateFilter = option;
+        if (((ComboBox)sender).SelectedItem is TableColumn<DeploymentEntry> column)
+            ViewModel.Deployments.Filters.DateColumn = column;
     }
 
-    private void OnGroupFilterChanged(object sender, SelectionChangedEventArgs e)
+    private void OnJobTextTargetChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (((ComboBox)sender).SelectedItem is GroupFilterOption option)
-            ViewModel.Deployments.GroupFilter = option;
+        if (((ComboBox)sender).SelectedItem is TextFilterTarget<JobViewModel> target)
+            ViewModel.JobList.Filters.TextTarget = target;
     }
 
-    // 表の見出しを押すと並べ替える（Tag は列の名前。docs/design/desktop/desktop-wizard.md の 7）
-    private void OnSortDeployments(object sender, RoutedEventArgs e) => ViewModel.Deployments.SortBy((string)((Button)sender).Tag);
-
-    private void OnSortJobs(object sender, RoutedEventArgs e) => ViewModel.JobList.SortBy((string)((Button)sender).Tag);
-
-    private void OnJobFilterChanged(object sender, SelectionChangedEventArgs e)
+    private void OnJobDateColumnChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (((ComboBox)sender).SelectedItem is JobFilterOption option)
-            ViewModel.JobList.Filter = option;
+        if (((ComboBox)sender).SelectedItem is TableColumn<JobViewModel> column)
+            ViewModel.JobList.Filters.DateColumn = column;
     }
 
-    // 見出しの絞り込みの「閉じる」
-    private void OnCloseFlyout(object sender, RoutedEventArgs e)
-    {
-        foreach (var popup in Microsoft.UI.Xaml.Media.VisualTreeHelper.GetOpenPopupsForXamlRoot(Content.XamlRoot))
-            popup.IsOpen = false;
-    }
+    // 表の「列の幅と順序を初期値に戻す」
+    private void OnResetDeploymentsLayout(object sender, RoutedEventArgs e) => _deploymentsTable?.Reset();
 
-    // 表で選んだ行を ViewModel に伝える（ListView の SelectedItems は結び付けられないため。Core の SelectionSync）
+    private void OnResetJobsLayout(object sender, RoutedEventArgs e) => _jobsTable?.Reset();
+
+    // 表で選んだ行を ViewModel に伝える（表の SelectedItems は結び付けられないため。Core の SelectionSync）
     private void OnDeploymentsSelectionChanged(object sender, SelectionChangedEventArgs e) => ViewModel.Deployments.TableSelection.ViewChanged();
 
     private void OnJobsSelectionChanged(object sender, SelectionChangedEventArgs e) => ViewModel.JobList.TableSelection.ViewChanged();
@@ -139,6 +136,12 @@ public sealed partial class MainWindow : Window
     {
         if (((ComboBox)sender).SelectedItem is int size)
             ViewModel.Deployments.PageSize = size;
+    }
+
+    private void OnJobPageSizeChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (((ComboBox)sender).SelectedItem is int size)
+            ViewModel.JobList.PageSize = size;
     }
 
     private void OnConcurrencyChanged(object sender, SelectionChangedEventArgs e)

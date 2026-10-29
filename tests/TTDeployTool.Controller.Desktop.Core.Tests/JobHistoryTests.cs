@@ -193,39 +193,58 @@ public sealed class JobHistoryTests : IDisposable
     }
 
     [Fact]
-    public async Task The_All_Checkbox_Should_Select_And_Clear_The_Rows()
+    public async Task The_Jobs_Should_Be_Paged_And_Filtered_With_The_Subscription()
     {
         var h = await new Harness(time: _time).ReadyAsync();
         var list = h.Main.JobList;
-        list.AllSelected.Should().BeFalse("行が無い");
-        var a = Pending(h, "a", _time.Now.AddHours(1));
-        var b = Pending(h, "b", _time.Now.AddHours(2));
-        var raised = new List<string?>();
-        list.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+        list.CountText.Should().Be("ジョブはありません。");
+        for (var i = 0; i < 23; i++)
+            Pending(h, $"app{i:00}", _time.Now.AddHours(i + 1));
+        h.Main.Queue.Register(JobKind.Deploy, new JobTarget("other", "rg", "x"), _time.Now.AddHours(1), () => new TaskCompletionSource<Job>().Task);
+        string Names() => string.Join(",", list.Items.Select(j => j.Target.AppName));
 
-        list.AllSelected = true;
-        list.Selected.Should().BeEquivalentTo([a, b]);
-        list.AllSelected.Should().BeTrue();
-        raised.Should().Contain(nameof(JobListViewModel.AllSelected));
+        // 20 件ずつ。新しい順で、ページを移ると選択は外れる
+        (list.Items.Count, list.PageCount, list.PageIndex, list.PreviousPageCommand.CanExecute(null)).Should().Be((20, 2, 0, false));
+        list.CountText.Should().StartWith("1〜20 件目を表示（全 24 件）・1 / 2 ページ（終わっていないもの: ");
+        list.SetSelection([list.Items[0]]);
+        (list.Items[0].SubscriptionText, list.Items[1].SubscriptionText).Should().Be(("other", "検証（sub）"), "読んだサブスクリプションに無ければ ID");
+        await list.NextPageCommand.ExecuteAsync();
+        (Names(), list.NextPageCommand.CanExecute(null), list.Selected.Count).Should().Be(("app03,app02,app01,app00", false, 0));
+        list.CountText.Should().StartWith("21〜24 件目を表示（全 24 件）・2 / 2 ページ");
+        await list.PreviousPageCommand.ExecuteAsync();
+        list.PageSize = 50;
+        (list.Items.Count, list.PageCount).Should().Be((24, 1));
+        list.PageSize = 50;
+        JobListViewModel.PageSizes.Should().Equal(20, 50, 100);
 
-        list.SetSelection([a]);
-        list.AllSelected.Should().BeNull("一部だけ");
-        list.AllSelected = null;
-        list.Selected.Should().Equal([a], "中間の値を入れても変えない");
+        // サブスクリプションの列は、名前と ID（読んだサブスクリプションに無ければ ID）
+        list.Filters.ValuesOf("Subscription").Select(v => (v.Value, v.Count)).Should().Equal(("other", 1), ("検証（sub）", 23));
+        list.Filters.SetValues("Subscription", ["other"]);
+        Names().Should().Be("x");
+        list.CountText.Should().StartWith("1〜1 件目を表示（絞り込んだ 1 件 / 全 24 件）");
+        list.SortBy("Subscription");
+        list.Filters.ClearValues(null);
+        list.Items.First().Target.AppName.Should().Be("x", "サブスクリプションの表示の順（other が先）");
 
-        list.AllSelected = true;
-        raised.Clear();
-        var c = Pending(h, "c", _time.Now.AddHours(3));
-        list.AllSelected.Should().BeNull("増えた行は選んでいない");
-        raised.Should().Contain(nameof(JobListViewModel.AllSelected));
+        // 文字のフィルタ（対象の列＋含む文字）と、▽ の値の検索
+        list.Filters.TextTarget = list.Filters.TextTargets.Single(t => t.Label == "リソースグループ / アプリ名");
+        list.Filters.Text = "APP1";
+        list.Items.Should().HaveCount(10);
+        list.Filters.ValuesOf("Target", "app15").Select(v => v.Value).Should().Equal("rg / app15");
+        list.Filters.Text = "nothing";
+        list.CountText.Should().Be("表示するジョブはありません（全 24 件）。");
+        await list.Filters.ClearCommand.ExecuteAsync();
 
-        // 絞り込んだときは、表に出ている行だけ
-        list.TargetFilter = "c";
-        list.AllSelected.Should().BeFalse();
-        list.AllSelected = true;
-        list.Selected.Should().Equal(c);
-        list.AllSelected = false;
-        list.Selected.Should().BeEmpty();
+        // 状態の ▽ は、予定の時刻を含まない名前（「終わっていないもの」は複数を選んで絞り込む）
+        list.Filters.ValuesOf("State").Select(v => v.Value).Should().Equal("予定");
+        list.Filters.ValuesOf("Time").Should().HaveCount(2, "予定の日付ごと");
+        list.Filters.ValuesOf("Finished").Should().Equal(new FilterValue("（なし）", 24, true));
+        list.Filters.ValuesOf("Duration").Single().Value.Should().Be("（なし）");
+        list.Filters.ValuesOf("Result").Single().Value.Should().Be("（なし）");
+        list.ClearSort();
+        (list.SortColumn, list.SortDescending).Should().Be((null, true));
+        list.SortBy("Kind", descending: false);
+        (list.SortColumn, list.SortDescending).Should().Be(("Kind", false));
     }
 
     [Fact]
@@ -239,7 +258,7 @@ public sealed class JobHistoryTests : IDisposable
         active.DurationText.Should().BeNull();
 
         list.SortBy(JobSortKey.Finished);
-        list.FinishedHeader.Should().Be("実行終了日時 ▲");
+        (list.SortColumn, list.SortDescending).Should().Be(("Finished", false));
         list.Items.Select(j => j.Target.AppName).Should().Equal("early", "late", "active");
         list.SortBy("Finished");
         list.Items.Select(j => j.Target.AppName).Should().Equal("late", "early", "active");

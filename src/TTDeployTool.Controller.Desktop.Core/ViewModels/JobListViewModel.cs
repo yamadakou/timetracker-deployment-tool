@@ -5,30 +5,14 @@ using TTDeployTool.Controller.Desktop.Core.Services;
 
 namespace TTDeployTool.Controller.Desktop.Core.ViewModels;
 
-/// <summary>ジョブの一覧の絞り込み。</summary>
-public enum JobFilterMode
-{
-    All,
-
-    /// <summary>終わっていないもの（予定・待機中・一時停止・実行中を含む）。</summary>
-    Active,
-
-    /// <summary>予定（時刻を決めて、まだ始めていないもの）。</summary>
-    Scheduled,
-
-    Finished,
-}
-
-public sealed record JobFilterOption(JobFilterMode Mode, string Label)
-{
-    public override string ToString() => Label;
-}
-
 /// <summary>ジョブの一覧の並べ替えの列（<see cref="Registered"/> は登録した順で、既定は新しい順）。</summary>
 public enum JobSortKey
 {
     Registered,
     Kind,
+
+    /// <summary>サブスクリプション（No.78）。</summary>
+    Subscription,
     Target,
     State,
 
@@ -58,24 +42,21 @@ public enum JobSortKey
 /// </summary>
 public sealed class JobListViewModel : ObservableObject
 {
-    public static readonly IReadOnlyList<JobFilterOption> Filters =
-    [
-        new(JobFilterMode.All, "すべて"),
-        new(JobFilterMode.Active, "終わっていないもの"),
-        new(JobFilterMode.Scheduled, "予定"),
-        new(JobFilterMode.Finished, "終わったもの"),
-    ];
+    public static readonly IReadOnlyList<int> PageSizes = DeploymentListViewModel.PageSizes;
 
     private readonly JobQueue _queue;
     private readonly IDialogService _dialogs;
-    private JobFilterOption _filter = Filters[0];
-    private string _targetFilter = "";
     private JobSortKey _sortKey = JobSortKey.Registered;
     private bool _descending = true;
     private IReadOnlyList<JobViewModel> _selected = [];
     private string? _message;
+    private int _pageSize = PageSizes[0];
+    private int _pageIndex;
+    private int _matchedCount;
+    private readonly Func<string, string> _subscriptionDisplay;
 
-    public JobListViewModel(JobQueue queue, TimeProvider time, IDialogService dialogs)
+    /// <param name="subscriptionDisplay">サブスクリプションの表示（名前と ID）。無ければ ID</param>
+    public JobListViewModel(JobQueue queue, TimeProvider time, IDialogService dialogs, Func<string, string>? subscriptionDisplay = null)
     {
         _queue = queue;
         _dialogs = dialogs;
@@ -93,94 +74,101 @@ public sealed class JobListViewModel : ObservableObject
             SetSelection([]);
             return Task.CompletedTask;
         }, () => _selected.Count > 0);
-        foreach (var filter in new[] { ScheduledFilter, RegisteredFilter, ChangedFilter, StartedFilter, FinishedFilter })
-            filter.Changed += Refresh;
+        _subscriptionDisplay = subscriptionDisplay ?? (id => id);
+        var display = _subscriptionDisplay;
+        // 表の列（▽ の値・表の上のフィルタで探す文字・日付。docs/design/desktop/desktop-tables.md の 10.4）。日付は、行の表示と同じく、この PC のタイムゾーン
+        static string Day(DateTimeOffset? at) => at is { } value ? value.ToLocalTime().ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) : "（なし）";
+        Filters = new TableFilters<JobViewModel>(
+        [
+            new(nameof(JobSortKey.Kind), "種類", j => j.KindText),
+            new(nameof(JobSortKey.Subscription), "サブスクリプション", j => display(j.Target.Subscription)),
+            new(nameof(JobSortKey.Target), "リソースグループ / アプリ名", j => j.TargetText),
+            new(nameof(JobSortKey.State), "状態", j => j.StateLabel, j => j.StatusText),
+            new(nameof(JobSortKey.Time), "予定日時", j => j.ScheduledAt == null ? "すぐ実行" : Day(j.ScheduledAt), j => j.TimeText, j => j.ScheduledAt),
+            new(nameof(JobSortKey.RegisteredAt), "登録日時", j => Day(j.RegisteredAt), j => j.RegisteredText, j => j.RegisteredAt),
+            new(nameof(JobSortKey.ChangedAt), "変更日時", j => Day(j.ChangedAt), j => j.ChangedText, j => j.ChangedAt),
+            new(nameof(JobSortKey.StartedAt), "実行開始日時", j => Day(j.StartedAt), j => j.StartedText, j => j.StartedAt),
+            new(nameof(JobSortKey.Finished), "実行終了日時", j => Day(j.FinishedAt), j => j.FinishedText, j => j.FinishedAt),
+            new(nameof(JobSortKey.Duration), "処理時間", j => j.DurationText ?? "（なし）", j => j.DurationText),
+            new(ResultColumn, "結果", j => j.ResultText ?? "（なし）", j => j.ResultText),
+        ], () => _queue.Jobs);
+        Filters.Changed += () => Refresh(resetPage: true);
+        PreviousPageCommand = new AsyncCommand(() => GoTo(_pageIndex - 1), () => _pageIndex > 0);
+        NextPageCommand = new AsyncCommand(() => GoTo(_pageIndex + 1), () => _pageIndex < PageCount - 1);
         // ジョブの登録・消去と、状態の変更で並べ直す
-        queue.Jobs.CollectionChanged += (_, _) => Refresh();
+        queue.Jobs.CollectionChanged += (_, _) => Refresh(resetPage: false);
         queue.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(JobQueue.Summary))
-                Refresh();
+                Refresh(resetPage: false);
         };
     }
 
-    /// <summary>絞り込んで並べたジョブ。</summary>
+    /// <summary>絞り込んで並べたジョブのうち、今のページの行。</summary>
     public ObservableCollection<JobViewModel> Items { get; } = [];
 
-    /// <summary>見出しの「状態」の絞り込み。</summary>
-    public JobFilterOption Filter
-    {
-        get => _filter;
-        set
-        {
-            if (SetProperty(ref _filter, value))
-                Refresh();
-        }
-    }
+    /// <summary>結果の列の名前（並べ替えはしない）。</summary>
+    public const string ResultColumn = "Result";
 
-    /// <summary>見出しの「対象」の絞り込み（リソースグループ / アプリ名の中間一致）。</summary>
-    public string TargetFilter
-    {
-        get => _targetFilter;
-        set
-        {
-            if (SetProperty(ref _targetFilter, value.Trim()))
-                Refresh();
-        }
-    }
+    /// <summary>表の絞り込み（見出しの ▽・表の上の文字と日付のフィルタ。docs/design/desktop/desktop-tables.md の 10.4）。</summary>
+    public TableFilters<JobViewModel> Filters { get; }
 
-    /// <summary>件数の表示（「絞り込んだ件数 / 全件数」と、終わっていないジョブの内訳。No.75）。</summary>
+    /// <summary>件数とページの表示（「絞り込んだ件数 / 全件数」と、終わっていないジョブの内訳。No.75・No.78）。</summary>
     public string CountText => _queue.Jobs.Count == 0
         ? "ジョブはありません。"
-        : (Items.Count == _queue.Jobs.Count ? $"全 {Items.Count} 件" : $"絞り込んだ {Items.Count} 件 / 全 {_queue.Jobs.Count} 件") +
-          (_queue.Summary is { Length: > 0 } summary ? $"（終わっていないもの: {summary}）" : "");
+        : _matchedCount == 0
+            ? $"表示するジョブはありません（全 {_queue.Jobs.Count} 件）。"
+            : $"{_pageIndex * PageSize + 1}〜{Math.Min((_pageIndex + 1) * PageSize, _matchedCount)} 件目を表示（" +
+              (_matchedCount == _queue.Jobs.Count ? $"全 {_matchedCount} 件" : $"絞り込んだ {_matchedCount} 件 / 全 {_queue.Jobs.Count} 件") +
+              $"）・{_pageIndex + 1} / {PageCount} ページ" +
+              (_queue.Summary is { Length: > 0 } summary ? $"（終わっていないもの: {summary}）" : "");
 
-    public string KindHeader => Header("種類", JobSortKey.Kind);
+    /// <summary>1 ページの行の数（20・50・100。デプロイの一覧と同じ）。</summary>
+    public int PageSize
+    {
+        get => _pageSize;
+        set
+        {
+            if (SetProperty(ref _pageSize, value))
+                Refresh(resetPage: true);
+        }
+    }
 
-    public string TargetHeader => Header("リソースグループ / アプリ名", JobSortKey.Target);
+    public int PageCount => Math.Max(1, (_matchedCount + PageSize - 1) / PageSize);
 
-    public string StateHeader => Header("状態", JobSortKey.State);
+    /// <summary>今のページ（0 から）。</summary>
+    public int PageIndex => _pageIndex;
 
-    public string TimeHeader => Header("予定日時", JobSortKey.Time);
+    public AsyncCommand PreviousPageCommand { get; }
 
-    public string RegisteredHeader => Header("登録日時", JobSortKey.RegisteredAt);
+    public AsyncCommand NextPageCommand { get; }
 
-    public string ChangedHeader => Header("変更日時", JobSortKey.ChangedAt);
+    /// <summary>並べ替えている列の名前（既定の登録した順なら null）。画面の見出しの矢印に使う。</summary>
+    public string? SortColumn => _sortKey == JobSortKey.Registered ? null : _sortKey.ToString();
 
-    public string StartedHeader => Header("実行開始日時", JobSortKey.StartedAt);
-
-    public string FinishedHeader => Header("実行終了日時", JobSortKey.Finished);
-
-    public string DurationHeader => Header("処理時間", JobSortKey.Duration);
-
-    /// <summary>見出しの「予定日時」の絞り込み。</summary>
-    public DateRangeFilter ScheduledFilter { get; } = new();
-
-    /// <summary>見出しの「登録日時」の絞り込み。</summary>
-    public DateRangeFilter RegisteredFilter { get; } = new();
-
-    /// <summary>見出しの「変更日時」の絞り込み。</summary>
-    public DateRangeFilter ChangedFilter { get; } = new();
-
-    /// <summary>見出しの「実行開始日時」の絞り込み。</summary>
-    public DateRangeFilter StartedFilter { get; } = new();
-
-    /// <summary>見出しの「実行終了日時」の絞り込み。</summary>
-    public DateRangeFilter FinishedFilter { get; } = new();
+    /// <summary>逆順（降順）に並べているか。</summary>
+    public bool SortDescending => _descending;
 
     /// <summary>見出しを押したときに並べ替える。今と同じ列なら逆順、違う列なら昇順。</summary>
-    public void SortBy(JobSortKey key)
-    {
-        _descending = _sortKey == key && !_descending;
-        _sortKey = key;
-        foreach (var name in new[] { nameof(KindHeader), nameof(TargetHeader), nameof(StateHeader), nameof(TimeHeader), nameof(RegisteredHeader), nameof(ChangedHeader), nameof(StartedHeader),
-                     nameof(FinishedHeader), nameof(DurationHeader) })
-            OnPropertyChanged(name);
-        Refresh();
-    }
+    public void SortBy(JobSortKey key) => Sort(key, _sortKey == key && !_descending);
 
     /// <summary>見出しの Tag（列の名前。<see cref="JobSortKey"/> の名前）で並べ替える（画面の側から）。</summary>
     public void SortBy(string column) => SortBy(Enum.Parse<JobSortKey>(column));
+
+    /// <summary>▽ の「昇順」「降順」で並べ替える（画面の側から）。</summary>
+    public void SortBy(string column, bool descending) => Sort(Enum.Parse<JobSortKey>(column), descending);
+
+    /// <summary>▽ の「並べ替えを解除」で、既定の順（登録の新しい順）に戻す。</summary>
+    public void ClearSort() => Sort(JobSortKey.Registered, descending: true);
+
+    private void Sort(JobSortKey key, bool descending)
+    {
+        _descending = descending;
+        _sortKey = key;
+        OnPropertyChanged(nameof(SortColumn));
+        OnPropertyChanged(nameof(SortDescending));
+        Refresh(resetPage: true);
+    }
 
     /// <summary>表の選択と、この一覧の選択を合わせる。</summary>
     public SelectionSync<JobViewModel> TableSelection { get; }
@@ -192,20 +180,6 @@ public sealed class JobListViewModel : ObservableObject
     public JobViewModel? Current => _selected.Count == 1 ? _selected[0] : null;
 
     public bool HasCurrent => Current != null;
-
-    /// <summary>
-    /// 見出しの「すべて」のチェックボックス（D32）。表の行をすべて選んでいれば true、1 つも選んでいなければ false、一部だけなら null。
-    /// true にすると表の行をすべて選び、false にするとすべて外す。
-    /// </summary>
-    public bool? AllSelected
-    {
-        get => _selected.Count == 0 ? false : _selected.Count == Items.Count ? true : null;
-        set
-        {
-            if (value is { } all)
-                SetSelection(all ? Items : []);
-        }
-    }
 
     public string SelectionText => _selected.Count == 0 ? "行を選ぶと、まとめて操作できます。" : $"{_selected.Count} 件を選んでいます。";
 
@@ -220,7 +194,6 @@ public sealed class JobListViewModel : ObservableObject
         OnPropertyChanged(nameof(Current));
         OnPropertyChanged(nameof(HasCurrent));
         OnPropertyChanged(nameof(SelectionText));
-        OnPropertyChanged(nameof(AllSelected));
         foreach (var command in new[] { CancelSelectedCommand, PauseSelectedCommand, ResumeSelectedCommand, RescheduleSelectedCommand, ClearSelectionCommand, DeleteSelectedRecordsCommand })
             command.RaiseCanExecuteChanged();
         TableSelection.ViewModelChanged();
@@ -253,8 +226,6 @@ public sealed class JobListViewModel : ObservableObject
         get => _message;
         private set => SetProperty(ref _message, value);
     }
-
-    private string Header(string label, JobSortKey key) => _sortKey != key ? label : label + (_descending ? " ▼" : " ▲");
 
     // 選んだ行のうち、その操作ができるものにだけ行い、できなかった数を出す
     private async Task Apply(string name, Func<JobViewModel, AsyncCommand> command)
@@ -303,18 +274,6 @@ public sealed class JobListViewModel : ObservableObject
     private static string Result(string name, int done, int total) =>
         done == total ? $"{done} 件の{name}をしました。" : $"{done} 件の{name}をしました（{total - done} 件は、今の状態ではできないため、そのままです）。";
 
-    private bool Matches(JobViewModel job) =>
-        (_targetFilter.Length == 0 || job.TargetText.Contains(_targetFilter, StringComparison.OrdinalIgnoreCase))
-        && ScheduledFilter.Matches(job.ScheduledAt) && RegisteredFilter.Matches(job.RegisteredAt) && ChangedFilter.Matches(job.ChangedAt)
-        && StartedFilter.Matches(job.StartedAt) && FinishedFilter.Matches(job.FinishedAt)
-        && Filter.Mode switch
-        {
-            JobFilterMode.Active => job.IsActive,
-            JobFilterMode.Scheduled => job.State == DesktopJobState.Scheduled,
-            JobFilterMode.Finished => !job.IsActive,
-            _ => true,
-        };
-
     // 並べ替え（同じ値なら新しい順。値の無いもの〔予定の無いもの・まだ始めていないものなど〕は最後）
     private IEnumerable<JobViewModel> Sorted(IEnumerable<JobViewModel> jobs)
     {
@@ -323,6 +282,7 @@ public sealed class JobListViewModel : ObservableObject
         var keyed = jobs.Select(j => (Job: j, Key: _sortKey switch
         {
             JobSortKey.Kind => (IComparable?)j.KindText,
+            JobSortKey.Subscription => Filters.Column(nameof(JobSortKey.Subscription)).ValueOf(j),
             JobSortKey.Target => j.TargetText,
             JobSortKey.State => j.State,
             JobSortKey.RegisteredAt => j.RegisteredAt,
@@ -337,20 +297,37 @@ public sealed class JobListViewModel : ObservableObject
         return ordered.ThenByDescending(x => x.Job.Order).Concat(keyed.Where(x => x.Key == null).OrderByDescending(x => x.Job.Order)).Select(x => x.Job);
     }
 
-    private void Refresh()
+    private Task GoTo(int page)
     {
-        var matched = Sorted(_queue.Jobs.Where(Matches)).ToList();
-        if (!matched.SequenceEqual(Items))
+        _pageIndex = page;
+        Refresh(resetPage: false);
+        return Task.CompletedTask;
+    }
+
+    // 絞り込んで並べ、今のページの行を出す（並べ替え・絞り込み・ページの大きさを変えたら 1 ページ目に戻る）
+    private void Refresh(bool resetPage)
+    {
+        var matched = Sorted(_queue.Jobs.Where(Filters.Matches)).ToList();
+        _matchedCount = matched.Count;
+        if (resetPage || _pageIndex >= PageCount)
+            _pageIndex = 0;
+        var page = matched.Skip(_pageIndex * PageSize).Take(PageSize).ToList();
+        foreach (var job in page)
+            job.SubscriptionText = _subscriptionDisplay(job.Target.Subscription);
+        if (!page.SequenceEqual(Items))
         {
             // 並べ直しても、残っている行の選択は保つ（行を消す間に画面の表が選択を外すため、先に覚えておく）
             var selected = _selected.ToList();
             Items.Clear();
-            foreach (var job in matched)
+            foreach (var job in page)
                 Items.Add(job);
-            SetSelection(selected.Where(matched.Contains));
-            OnPropertyChanged(nameof(AllSelected));
+            SetSelection(selected.Where(page.Contains));
         }
         OnPropertyChanged(nameof(CountText));
+        OnPropertyChanged(nameof(PageCount));
+        OnPropertyChanged(nameof(PageIndex));
+        PreviousPageCommand.RaiseCanExecuteChanged();
+        NextPageCommand.RaiseCanExecuteChanged();
         DeleteSelectedRecordsCommand.RaiseCanExecuteChanged();
         DeleteFinishedRecordsCommand.RaiseCanExecuteChanged();
     }

@@ -126,10 +126,9 @@ public class AzureUiTests
 
             // 7d-2: デプロイの一覧（Resource Graph に反映される前でも、このアプリのジョブの結果で出る）。パスワードの表示と、期限の変更
             app.Show("Deployments");
-            // No.63: 絞り込みは表の見出しの「▽」から
-            app.Invoke("Deployments.FilterResourceGroup");
-            app.SetText("Deployments.ResourceGroupFilter", resourceGroup!);
-            app.Invoke("Deployments.ResourceGroupFilterClose");
+            // No.78: 文字の一部での絞り込みは、表の上のフィルタ（対象の列＋含む文字）
+            app.Select("Deployments.TextTarget", "リソースグループ");
+            app.SetText("Deployments.Text", resourceGroup!);
             app.Invoke("Deployments.Load");
             // 読み込みが終わるまで待つ（件数の表示は、デプロイの直後に重ねた結果で読み込む前から出ているため、それでは待てない。Desktop System Test、2026-10-26）
             AppSession.WaitUntil(() => app.IsEnabled("Deployments.Load"), "デプロイの一覧の読み込みが終わりませんでした。", LoadTimeout);

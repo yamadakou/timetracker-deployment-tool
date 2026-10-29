@@ -204,55 +204,52 @@ public class DeploymentListViewModelTests
         string[] Names() => vm.Rows.Select(r => r.AppName).ToArray();
         DateTimeOffset Day(int month, int day) => new(2026, month, day, 0, 0, 0, TimeSpan.FromHours(9));
 
-        // サブスクリプションの絞り込みは、「すべて」と読んだサブスクリプションから選ぶ
-        vm.SubscriptionFilters.Select(f => f.Label).Should().Equal("すべてのサブスクリプション", "本番（sub2、開発）", "検証（sub、開発）");
-        vm.SubscriptionFilter.Should().Be(DeploymentListViewModel.AllSubscriptions);
-        vm.SubscriptionFilter = vm.SubscriptionFilters[1];
-        Names().Should().Equal("d", "c");
-        vm.SubscriptionFilter = new SubscriptionFilterOption("SUB2", "大文字");
+        var f = vm.Filters;
+
+        // サブスクリプションの ▽ は、読んだデプロイのサブスクリプション（名前と ID）。ページによらず数える
+        f.ValuesOf("Subscription").Should().Equal(new FilterValue("本番（sub2）", 2, true), new FilterValue("検証（sub）", 2, true));
+        f.SetValues("Subscription", ["本番（sub2）"]);
         Names().Should().Equal("d", "c");
         // サブスクリプションを読み直しても、選んでいたものが残る
         await h.Main.Target.LoadCommand.ExecuteAsync();
-        vm.SubscriptionFilter.SubscriptionId.Should().Be("sub2");
-        vm.SubscriptionFilter = new SubscriptionFilterOption("none", "無い");
+        Names().Should().Equal("d", "c");
+        f.SetValues("Subscription", ["無い"]);
         Names().Should().BeEmpty();
         vm.PageText.Should().Be("表示するデプロイはありません（全 4 件）。");
-        // 選んでいたものが無ければ、すべてにする
-        await h.Main.Target.LoadCommand.ExecuteAsync();
-        vm.SubscriptionFilter.Should().Be(DeploymentListViewModel.AllSubscriptions);
-        vm.SubscriptionFilter = DeploymentListViewModel.AllSubscriptions;
+        f.ClearValues(null);
 
-        vm.ResourceGroupFilter = "RG-";
+        // 文字のフィルタ（対象の列＋含む文字）
+        f.TextTarget = f.TextTargets.Single(t => t.Label == "リソースグループ");
+        f.Text = "RG-";
         Names().Should().Equal("a", "b", "c");
         vm.PageText.Should().Be("1〜3 件目を表示（絞り込んだ 3 件 / 全 4 件）・1 / 1 ページ");
-        vm.ResourceGroupFilter = "";
+        f.Text = "";
 
-        vm.DeployedFrom = Day(10, 10);
+        // 日付のフィルタ（対象の列＋いつから・いつまで）
+        f.DateColumns.Select(c => c.Header).Should().Equal("利用可能期限日", "デプロイ日");
+        f.DateColumn = f.DateColumns[1];
+        f.Dates.From = Day(10, 10);
         Names().Should().Equal("b", "c");
-        vm.DeployedTo = Day(10, 15);
+        f.Dates.To = Day(10, 15);
         Names().Should().Equal("b");
-        vm.DeployedFrom = null;
+        f.Dates.From = null;
         Names().Should().Equal("a", "b");
-        vm.DeployedTo = null;
+        f.Dates.To = null;
 
-        var changes = new ChangeRecorder(vm);
-        vm.ExpiryFilter = DeploymentListViewModel.ExpiryFilters[1];
-        Names().Should().Equal("a");
-        vm.ExpiryFilter = DeploymentListViewModel.ExpiryFilters[2];
+        // 期限の ▽ は日付か「期限なし」「記録なし」。「7 日以内」は日付のフィルタの「いつまで」で選ぶ
+        f.ValuesOf("ExpiresAt").Select(v => v.Value).Should().Equal("2026-10-25", "2026-12-31", "期限なし", "記録なし");
+        f.SetValues("ExpiresAt", ["期限なし"]);
         Names().Should().Equal("b");
-        vm.IsExpiryRange.Should().BeFalse();
-        vm.ExpiryFilter = DeploymentListViewModel.ExpiryFilters[3];
-        changes.Names.Should().Contain(nameof(DeploymentListViewModel.IsExpiryRange));
-        vm.IsExpiryRange.Should().BeTrue();
-        Names().Should().Equal("a", "c");
-        vm.ExpiryFrom = Day(11, 1);
-        Names().Should().Equal("c");
-        vm.ExpiryTo = Day(12, 30);
-        Names().Should().BeEmpty();
-        vm.ExpiryFrom = null;
+        f.ClearValues("ExpiresAt");
+        f.DateColumn = f.DateColumns[0];
+        f.Dates.To = Day(10, 28);
         Names().Should().Equal("a");
-        vm.ExpiryTo = null;
-        vm.ExpiryFilter = DeploymentListViewModel.ExpiryFilters[0];
+        f.Dates.From = Day(11, 1);
+        f.Dates.To = null;
+        Names().Should().Equal("c");
+        f.Dates.To = Day(12, 30);
+        Names().Should().BeEmpty();
+        await f.ClearCommand.ExecuteAsync();
         Names().Should().HaveCount(4);
     }
 
@@ -568,6 +565,29 @@ public class DeploymentListViewModelTests
     }
 
     [Fact]
+    public async Task The_Job_Column_Should_Filter_By_The_Unfinished_Job_And_Follow_The_Queue()
+    {
+        var h = await LoadedAsync(Deployment("sub", "rg", "demo"), Deployment("sub", "rg", "old"), Deployment("sub", "rg", "free"));
+        var list = h.Main.Deployments;
+        string Names() => string.Join(",", list.Rows.Select(r => r.AppName));
+        var deploy = h.Main.Queue.Register(JobKind.Deploy, new JobTarget("sub", "rg", "demo"), _time.GetUtcNow().AddHours(1), () => new TaskCompletionSource<Job>().Task);
+        h.Main.Queue.Register(JobKind.Delete, new JobTarget("sub", "rg", "old"), _time.GetUtcNow().AddHours(1), () => new TaskCompletionSource<Job>().Task);
+
+        list.Filters.ValuesOf(DeploymentListViewModel.JobColumn).Select(v => (v.Value, v.Count)).Should().Equal(("なし", 1), ("デプロイのジョブ", 1), ("削除のジョブ", 1));
+        list.Filters.SetValues(DeploymentListViewModel.JobColumn, ["デプロイのジョブ", "削除のジョブ"]);
+        Names().Should().Be("demo,old");
+
+        // ジョブが終わると、ジョブの列で絞り込んでいれば絞り込み直す
+        await deploy.CancelCommand.ExecuteAsync();
+        Names().Should().Be("old");
+        list.Filters.ClearValues(null);
+        list.Filters.Text = "削除の";
+        Names().Should().Be("old", "「すべての列」は、日付でない列の文字（ジョブの列は ▽ の値）のどれかで探す");
+        list.Filters.Text = "なし";
+        Names().Should().Be("demo,free");
+    }
+
+    [Fact]
     public async Task A_Deployment_Finished_In_This_App_Should_Appear_Before_Azure_Reflects_It()
     {
         var h = await LoadedAsync();
@@ -747,8 +767,7 @@ public class DeploymentStateTests
     public void A_Partial_Deployment_Should_Be_Partial_And_Every_State_Should_Have_A_Label()
     {
         DeploymentStates.Of(Entry(("Succeeded", "Running"))).Should().Be(DeploymentState.Partial);
-        DeploymentStates.Filters.Select(f => f.Label).Should().Equal("すべて", "実行中", "停止中", "処理中（作成・更新・削除）", "失敗", "一部だけ", "デプロイ済み（反映待ち）", "不明");
-        DeploymentStates.Filters[0].State.Should().BeNull();
+        Enum.GetValues<DeploymentState>().Select(DeploymentStates.Label).Should().Equal("実行中", "停止中", "処理中（作成・更新・削除）", "失敗", "一部だけ", "デプロイ済み（反映待ち）", "不明");
     }
 
     [Fact]
@@ -781,14 +800,24 @@ public class DeploymentStateTests
         await list.LoadCommand.ExecuteAsync();
 
         list.SortBy("State");
-        list.StateHeader.Should().Be("状態 ▲");
+        (list.SortColumn, list.SortDescending).Should().Be(("State", false));
         list.Rows.Select(r => r.AppName).Should().Equal("b", "a", "c");
         list.SortBy(DeploymentSortKey.State);
         list.Rows.Select(r => r.AppName).Should().Equal("c", "a", "b");
 
-        list.StateFilter = DeploymentStates.Filters.Single(f => f.State == DeploymentState.Stopped);
-        list.Rows.Select(r => r.AppName).Should().Equal("a");
-        list.StateFilter = DeploymentStates.Filters[0];
+        list.Filters.ValuesOf("State").Select(v => (v.Value, v.Count)).Should().Equal(("停止中", 1), ("失敗", 1), ("実行中", 1));
+        list.Filters.SetValues("State", ["停止中", "失敗"]);
+        list.Rows.Select(r => r.AppName).Should().Equal("c", "a");
+        list.Filters.ClearValues("State");
         list.Rows.Should().HaveCount(3);
+
+        // ▽ の「昇順」「降順」「並べ替えを解除」
+        list.SortBy("AppName", descending: true);
+        list.Rows.Select(r => r.AppName).Should().Equal("c", "b", "a");
+        (list.SortColumn, list.SortDescending).Should().Be(("AppName", true));
+        list.SortBy("AppName", descending: false);
+        list.Rows.Select(r => r.AppName).Should().Equal("a", "b", "c");
+        list.ClearSort();
+        list.Sort.Should().Be(DeploymentListViewModel.SortOptions[0]);
     }
 }

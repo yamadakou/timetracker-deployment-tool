@@ -8,11 +8,14 @@ namespace TTDeployTool.Controller.Desktop.Core.ViewModels;
 /// </summary>
 public sealed class DateRangeFilter : ObservableObject
 {
+    private readonly TimeZoneInfo? _zone;
     private DateTimeOffset? _from;
     private DateTimeOffset? _to;
 
-    public DateRangeFilter()
+    /// <param name="zone">日付を比べるタイムゾーン（既定はこの PC のタイムゾーン）</param>
+    public DateRangeFilter(TimeZoneInfo? zone = null)
     {
+        _zone = zone;
         ClearCommand = new AsyncCommand(() =>
         {
             From = null;
@@ -44,14 +47,14 @@ public sealed class DateRangeFilter : ObservableObject
     /// <summary>いつから・いつまでが変わったとき。</summary>
     public event Action? Changed;
 
-    /// <summary>日時（UTC）が範囲に入るか（日付はこの PC のタイムゾーンで比べる）。</summary>
+    /// <summary>日時（UTC）が範囲に入るか（日付は、指定したタイムゾーン（既定はこの PC のタイムゾーン）で比べる）。</summary>
     public bool Matches(DateTimeOffset? value)
     {
         if (!IsActive)
             return true;
         if (value is not { } at)
             return false;
-        var date = at.ToLocalTime().Date;
+        var date = (_zone == null ? at.ToLocalTime() : TimeZoneInfo.ConvertTime(at, _zone)).Date;
         return (_from is not { } from || from.Date <= date) && (_to is not { } to || date <= to.Date);
     }
 

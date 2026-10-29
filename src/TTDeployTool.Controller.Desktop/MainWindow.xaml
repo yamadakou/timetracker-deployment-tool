@@ -7,6 +7,7 @@
     xmlns:local="using:TTDeployTool.Controller.Desktop"
     xmlns:vm="using:TTDeployTool.Controller.Desktop.Core.ViewModels"
     xmlns:jobs="using:TTDeployTool.Controller.Desktop.Core.Jobs"
+    xmlns:tv="using:WinUI.TableView"
     Title="TTDeployTool">
 
     <Grid x:Name="Root">
@@ -15,13 +16,6 @@
             <DataTemplate x:Key="LineTemplate" x:DataType="x:String">
                 <TextBlock Text="{x:Bind}" TextWrapping="Wrap" />
             </DataTemplate>
-            <!-- 表の見出し（押すと並べ替え。「▽」で絞り込みを開く。docs/design/desktop/desktop-wizard.md の 7） -->
-            <Style x:Key="HeaderButtonStyle" TargetType="Button">
-                <Setter Property="Background" Value="Transparent" />
-                <Setter Property="BorderThickness" Value="0" />
-                <Setter Property="Padding" Value="4,2" />
-                <Setter Property="FontWeight" Value="SemiBold" />
-            </Style>
             <!-- デプロイ・削除のジョブの進み具合、ログ、結果 -->
             <DataTemplate x:Key="JobTemplate" x:DataType="vm:JobViewModel">
                 <StackPanel Spacing="4" Margin="0,8">
@@ -300,7 +294,7 @@
                     </StackPanel>
 
                     <!-- デプロイの一覧（Azure から集める。docs/design/desktop/desktop-jobs.md の 6.3・6.4） -->
-                    <StackPanel x:Name="DeploymentsPanel" Tag="deployments" Spacing="12" MaxWidth="1240" HorizontalAlignment="Left" Visibility="Collapsed">
+                    <StackPanel x:Name="DeploymentsPanel" Tag="deployments" Spacing="12" Visibility="Collapsed">
                         <TextBlock AutomationProperties.AutomationId="Panel.Deployments" Style="{StaticResource SubtitleTextBlockStyle}" Text="デプロイの一覧" />
                         <TextBlock TextWrapping="Wrap" Text="サインインしたアカウントで読めるサブスクリプションから、本ツールでデプロイした環境（別の PC・CLI・MCP サーバーでデプロイしたものを含む）を読みます。パスワードは「パスワードを表示」を押したときだけ Azure から読み、PC には保存しません。" />
                         <Button AutomationProperties.AutomationId="Deployments.Load" Content="読み込む" Command="{x:Bind ViewModel.Deployments.LoadCommand}" />
@@ -328,109 +322,65 @@
                         <StackPanel Orientation="Horizontal" Spacing="8" Visibility="{x:Bind ViewModel.Deployments.BatchBusy.IsBusy, Mode=OneWay}"><ProgressRing IsActive="{x:Bind ViewModel.Deployments.BatchBusy.IsBusy, Mode=OneWay}" Width="16" Height="16" /><TextBlock VerticalAlignment="Center" Text="{x:Bind ViewModel.Deployments.BatchBusy.Text, Mode=OneWay}" /></StackPanel>
                         <TextBlock AutomationProperties.AutomationId="Deployments.BatchMessage" Text="{x:Bind ViewModel.Deployments.BatchMessage, Mode=OneWay}" TextWrapping="Wrap" />
 
-                        <!-- 表: 見出しを押すと並べ替え、「▽」で絞り込み。複数の行を選べる -->
-                        <Grid ColumnSpacing="4" Margin="40,0,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="200" /><ColumnDefinition Width="150" /><ColumnDefinition Width="130" /><ColumnDefinition Width="130" /><ColumnDefinition Width="140" />
-                                <ColumnDefinition Width="140" /><ColumnDefinition Width="130" /><ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0" Orientation="Horizontal">
-                                <Button AutomationProperties.AutomationId="Deployments.SortSubscription" Content="{x:Bind ViewModel.Deployments.SubscriptionHeader, Mode=OneWay}" Tag="Subscription" Click="OnSortDeployments" Style="{StaticResource HeaderButtonStyle}" />
-                                <Button AutomationProperties.AutomationId="Deployments.FilterSubscription" Content="▽" Style="{StaticResource HeaderButtonStyle}">
-                                    <Button.Flyout><Flyout><StackPanel Spacing="8">
-                                        <ComboBox AutomationProperties.AutomationId="Deployments.SubscriptionFilter" Header="サブスクリプション" ItemsSource="{x:Bind ViewModel.Deployments.SubscriptionFilters}" Width="260"
-                                                  DisplayMemberPath="Label" SelectedItem="{x:Bind ViewModel.Deployments.SubscriptionFilter, Mode=OneWay}" SelectionChanged="OnSubscriptionFilterChanged" />
-                                        <Button AutomationProperties.AutomationId="Deployments.SubscriptionFilterClose" Content="閉じる" Click="OnCloseFlyout" />
-                                    </StackPanel></Flyout></Button.Flyout>
-                                </Button>
-                            </StackPanel>
-                            <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                <Button AutomationProperties.AutomationId="Deployments.SortResourceGroup" Content="{x:Bind ViewModel.Deployments.ResourceGroupHeader, Mode=OneWay}" Tag="ResourceGroup" Click="OnSortDeployments" Style="{StaticResource HeaderButtonStyle}" />
-                                <Button AutomationProperties.AutomationId="Deployments.FilterResourceGroup" Content="▽" Style="{StaticResource HeaderButtonStyle}">
-                                    <Button.Flyout><Flyout><StackPanel Spacing="8">
-                                        <TextBox AutomationProperties.AutomationId="Deployments.ResourceGroupFilter" Header="リソースグループ名（一部でよい）" Width="260"
-                                                 Text="{x:Bind ViewModel.Deployments.ResourceGroupFilter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                        <Button AutomationProperties.AutomationId="Deployments.ResourceGroupFilterClose" Content="閉じる" Click="OnCloseFlyout" />
-                                    </StackPanel></Flyout></Button.Flyout>
-                                </Button>
-                            </StackPanel>
-                            <StackPanel Grid.Column="2" Orientation="Horizontal">
-                                <Button AutomationProperties.AutomationId="Deployments.SortAppName" Content="{x:Bind ViewModel.Deployments.AppNameHeader, Mode=OneWay}" Tag="AppName" Click="OnSortDeployments" Style="{StaticResource HeaderButtonStyle}" />
-                                <Button AutomationProperties.AutomationId="Deployments.FilterAppName" Content="▽" Style="{StaticResource HeaderButtonStyle}">
-                                    <Button.Flyout><Flyout><StackPanel Spacing="8">
-                                        <TextBox AutomationProperties.AutomationId="Deployments.AppNameFilter" Header="アプリ名（一部でよい）" Width="260"
-                                                 Text="{x:Bind ViewModel.Deployments.AppNameFilter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                        <Button AutomationProperties.AutomationId="Deployments.AppNameFilterClose" Content="閉じる" Click="OnCloseFlyout" />
-                                    </StackPanel></Flyout></Button.Flyout>
-                                </Button>
-                            </StackPanel>
-                            <StackPanel Grid.Column="3" Orientation="Horizontal">
-                                <Button AutomationProperties.AutomationId="Deployments.SortGroup" Content="{x:Bind ViewModel.Deployments.GroupHeader, Mode=OneWay}" Tag="Group" Click="OnSortDeployments" Style="{StaticResource HeaderButtonStyle}" />
-                                <Button AutomationProperties.AutomationId="Deployments.FilterGroup" Content="▽" Style="{StaticResource HeaderButtonStyle}">
-                                    <Button.Flyout><Flyout><StackPanel Spacing="8">
-                                        <ComboBox AutomationProperties.AutomationId="Deployments.GroupFilter" Header="グループ" ItemsSource="{x:Bind ViewModel.Deployments.GroupFilters}" DisplayMemberPath="Label" Width="260"
-                                                  SelectedItem="{x:Bind ViewModel.Deployments.GroupFilter, Mode=OneWay}" SelectionChanged="OnGroupFilterChanged" />
-                                        <Button AutomationProperties.AutomationId="Deployments.GroupFilterClose" Content="閉じる" Click="OnCloseFlyout" />
-                                    </StackPanel></Flyout></Button.Flyout>
-                                </Button>
-                            </StackPanel>
-                            <StackPanel Grid.Column="4" Orientation="Horizontal">
-                                <Button AutomationProperties.AutomationId="Deployments.SortState" Content="{x:Bind ViewModel.Deployments.StateHeader, Mode=OneWay}" Tag="State" Click="OnSortDeployments" Style="{StaticResource HeaderButtonStyle}" />
-                                <Button AutomationProperties.AutomationId="Deployments.FilterState" Content="▽" Style="{StaticResource HeaderButtonStyle}">
-                                    <Button.Flyout><Flyout><StackPanel Spacing="8">
-                                        <ComboBox AutomationProperties.AutomationId="Deployments.StateFilter" Header="状態" ItemsSource="{x:Bind vm:DeploymentStates.Filters}" DisplayMemberPath="Label" Width="260"
-                                                  SelectedItem="{x:Bind ViewModel.Deployments.StateFilter, Mode=OneWay}" SelectionChanged="OnStateFilterChanged" />
-                                        <Button AutomationProperties.AutomationId="Deployments.StateFilterClose" Content="閉じる" Click="OnCloseFlyout" />
-                                    </StackPanel></Flyout></Button.Flyout>
-                                </Button>
-                            </StackPanel>
-                            <StackPanel Grid.Column="5" Orientation="Horizontal">
-                                <Button AutomationProperties.AutomationId="Deployments.SortExpiry" Content="{x:Bind ViewModel.Deployments.ExpiryHeader, Mode=OneWay}" Tag="ExpiresAt" Click="OnSortDeployments" Style="{StaticResource HeaderButtonStyle}" />
-                                <Button AutomationProperties.AutomationId="Deployments.FilterExpiry" Content="▽" Style="{StaticResource HeaderButtonStyle}">
-                                    <Button.Flyout><Flyout><StackPanel Spacing="8">
-                                        <ComboBox AutomationProperties.AutomationId="Deployments.ExpiryFilter" Header="利用可能期限日" ItemsSource="{x:Bind vm:DeploymentListViewModel.ExpiryFilters}" DisplayMemberPath="Label" Width="260"
-                                                  SelectedItem="{x:Bind ViewModel.Deployments.ExpiryFilter, Mode=OneWay}" SelectionChanged="OnExpiryFilterChanged" />
-                                        <CalendarDatePicker AutomationProperties.AutomationId="Deployments.ExpiryFrom" Header="期限日（から）" Date="{x:Bind ViewModel.Deployments.ExpiryFrom, Mode=TwoWay}"
-                                                            Visibility="{x:Bind ViewModel.Deployments.IsExpiryRange, Mode=OneWay}" />
-                                        <CalendarDatePicker AutomationProperties.AutomationId="Deployments.ExpiryTo" Header="期限日（まで）" Date="{x:Bind ViewModel.Deployments.ExpiryTo, Mode=TwoWay}"
-                                                            Visibility="{x:Bind ViewModel.Deployments.IsExpiryRange, Mode=OneWay}" />
-                                        <Button AutomationProperties.AutomationId="Deployments.ExpiryFilterClose" Content="閉じる" Click="OnCloseFlyout" />
-                                    </StackPanel></Flyout></Button.Flyout>
-                                </Button>
-                            </StackPanel>
-                            <StackPanel Grid.Column="6" Orientation="Horizontal">
-                                <Button AutomationProperties.AutomationId="Deployments.SortDeployed" Content="{x:Bind ViewModel.Deployments.DeployedHeader, Mode=OneWay}" Tag="DeployedAt" Click="OnSortDeployments" Style="{StaticResource HeaderButtonStyle}" />
-                                <Button AutomationProperties.AutomationId="Deployments.FilterDeployed" Content="▽" Style="{StaticResource HeaderButtonStyle}">
-                                    <Button.Flyout><Flyout><StackPanel Spacing="8">
-                                        <CalendarDatePicker AutomationProperties.AutomationId="Deployments.DeployedFrom" Header="デプロイ日（から）" Date="{x:Bind ViewModel.Deployments.DeployedFrom, Mode=TwoWay}" />
-                                        <CalendarDatePicker AutomationProperties.AutomationId="Deployments.DeployedTo" Header="デプロイ日（まで）" Date="{x:Bind ViewModel.Deployments.DeployedTo, Mode=TwoWay}" />
-                                        <Button AutomationProperties.AutomationId="Deployments.DeployedFilterClose" Content="閉じる" Click="OnCloseFlyout" />
-                                    </StackPanel></Flyout></Button.Flyout>
-                                </Button>
-                            </StackPanel>
-                            <TextBlock Grid.Column="7" VerticalAlignment="Center" Style="{StaticResource BodyStrongTextBlockStyle}" Text="ジョブ" />
-                        </Grid>
-                        <ListView x:Name="DeploymentsTable" AutomationProperties.AutomationId="Deployments.Rows" ItemsSource="{x:Bind ViewModel.Deployments.Rows}" SelectionMode="Multiple"
-                                  SelectionChanged="OnDeploymentsSelectionChanged">
-                            <ListView.ItemTemplate>
-                                <DataTemplate x:DataType="vm:DeploymentRowViewModel">
-                                    <Grid ColumnSpacing="4" Padding="0,6">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="200" /><ColumnDefinition Width="150" /><ColumnDefinition Width="130" /><ColumnDefinition Width="130" /><ColumnDefinition Width="140" />
-                                            <ColumnDefinition Width="140" /><ColumnDefinition Width="130" /><ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="{x:Bind Subscription}" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind Subscription}" />
-                                        <TextBlock Grid.Column="1" Text="{x:Bind ResourceGroup}" TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Grid.Column="2" AutomationProperties.AutomationId="Row.AppName" Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind AppName}" TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Grid.Column="3" AutomationProperties.AutomationId="Row.Group" Text="{x:Bind GroupText, Mode=OneWay}" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind GroupWarning, Mode=OneWay}" />
-                                        <TextBlock Grid.Column="4" AutomationProperties.AutomationId="Row.State" Text="{x:Bind StateText, Mode=OneWay}" TextWrapping="Wrap" ToolTipService.ToolTip="{x:Bind StateDetail, Mode=OneWay}" />
-                                        <TextBlock Grid.Column="5" AutomationProperties.AutomationId="Row.Expiry" Text="{x:Bind ExpiryText, Mode=OneWay}" Foreground="{x:Bind local:Ui.ExpiryBrush(Level), Mode=OneWay}" TextWrapping="Wrap" />
-                                        <TextBlock Grid.Column="6" Text="{x:Bind DeployedText, Mode=OneWay}" />
-                                        <TextBlock Grid.Column="7" AutomationProperties.AutomationId="Row.Job" Text="{x:Bind JobText, Mode=OneWay}" TextWrapping="Wrap" Foreground="{ThemeResource SystemFillColorCautionBrush}" />
-                                    </Grid>
-                                </DataTemplate>
-                            </ListView.ItemTemplate>
-                        </ListView>
+                        <!-- 表の上のフィルタ（対象の列＋条件。docs/design/desktop/desktop-tables.md の 10.4） -->
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <ComboBox AutomationProperties.AutomationId="Deployments.TextTarget" Header="文字で絞り込む列" ItemsSource="{x:Bind ViewModel.Deployments.Filters.TextTargets}" MinWidth="180"
+                                      SelectedItem="{x:Bind ViewModel.Deployments.Filters.TextTarget, Mode=OneWay}" SelectionChanged="OnDeploymentTextTargetChanged" />
+                            <TextBox AutomationProperties.AutomationId="Deployments.Text" Header="含む文字" Width="220" Text="{x:Bind ViewModel.Deployments.Filters.Text, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            <ComboBox AutomationProperties.AutomationId="Deployments.DateColumn" Header="日付で絞り込む列" ItemsSource="{x:Bind ViewModel.Deployments.Filters.DateColumns}" MinWidth="160"
+                                      SelectedItem="{x:Bind ViewModel.Deployments.Filters.DateColumn, Mode=OneWay}" SelectionChanged="OnDeploymentDateColumnChanged" />
+                            <CalendarDatePicker AutomationProperties.AutomationId="Deployments.DateFrom" Header="この日から" Date="{x:Bind ViewModel.Deployments.Filters.Dates.From, Mode=TwoWay}" />
+                            <CalendarDatePicker AutomationProperties.AutomationId="Deployments.DateTo" Header="この日まで" Date="{x:Bind ViewModel.Deployments.Filters.Dates.To, Mode=TwoWay}" />
+                            <Button AutomationProperties.AutomationId="Deployments.ClearFilters" Content="絞り込みをすべて外す" VerticalAlignment="Bottom" Command="{x:Bind ViewModel.Deployments.Filters.ClearCommand}" />
+                        </StackPanel>
+
+                        <!-- 表（WinUI.TableView）: 見出しを押すと並べ替え、▽ で値を選んで絞り込み、境目のドラッグで幅、見出しのドラッグで順序。左上の角で今のページの行をすべて選ぶ -->
+                        <tv:TableView x:Name="DeploymentsTable" AutomationProperties.AutomationId="Deployments.Rows" AutomationProperties.Name="デプロイの一覧" ItemsSource="{x:Bind ViewModel.Deployments.Rows}"
+                                      AutoGenerateColumns="False" SelectionMode="Multiple" CornerButtonMode="SelectAll" IsReadOnly="True" CanGroupColumns="False" ShowFilterItemsCount="True"
+                                      CanReorderColumns="True" CanResizeColumns="True" MaxHeight="640" SelectionChanged="OnDeploymentsSelectionChanged">
+                            <tv:TableView.Columns>
+                                <tv:TableViewTemplateColumn Header="サブスクリプション" Tag="Subscription">
+                                    <tv:TableViewTemplateColumn.CellTemplate><DataTemplate x:DataType="vm:DeploymentRowViewModel">
+                                        <TextBlock Text="{x:Bind Subscription}" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind Subscription}" />
+                                    </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
+                                </tv:TableViewTemplateColumn>
+                                <tv:TableViewTemplateColumn Header="リソースグループ" Tag="ResourceGroup">
+                                    <tv:TableViewTemplateColumn.CellTemplate><DataTemplate x:DataType="vm:DeploymentRowViewModel">
+                                        <TextBlock Text="{x:Bind ResourceGroup}" TextTrimming="CharacterEllipsis" />
+                                    </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
+                                </tv:TableViewTemplateColumn>
+                                <tv:TableViewTemplateColumn Header="アプリ名" Tag="AppName">
+                                    <tv:TableViewTemplateColumn.CellTemplate><DataTemplate x:DataType="vm:DeploymentRowViewModel">
+                                        <TextBlock AutomationProperties.AutomationId="Row.AppName" Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind AppName}" TextTrimming="CharacterEllipsis" />
+                                    </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
+                                </tv:TableViewTemplateColumn>
+                                <tv:TableViewTemplateColumn Header="グループ" Tag="Group">
+                                    <tv:TableViewTemplateColumn.CellTemplate><DataTemplate x:DataType="vm:DeploymentRowViewModel">
+                                        <TextBlock AutomationProperties.AutomationId="Row.Group" Text="{x:Bind GroupText, Mode=OneWay}" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind GroupWarning, Mode=OneWay}" />
+                                    </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
+                                </tv:TableViewTemplateColumn>
+                                <tv:TableViewTemplateColumn Header="状態" Tag="State">
+                                    <tv:TableViewTemplateColumn.CellTemplate><DataTemplate x:DataType="vm:DeploymentRowViewModel">
+                                        <TextBlock AutomationProperties.AutomationId="Row.State" Text="{x:Bind StateText, Mode=OneWay}" TextWrapping="Wrap" ToolTipService.ToolTip="{x:Bind StateDetail, Mode=OneWay}" />
+                                    </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
+                                </tv:TableViewTemplateColumn>
+                                <tv:TableViewTemplateColumn Header="利用可能期限日" Tag="ExpiresAt">
+                                    <tv:TableViewTemplateColumn.CellTemplate><DataTemplate x:DataType="vm:DeploymentRowViewModel">
+                                        <TextBlock AutomationProperties.AutomationId="Row.Expiry" Text="{x:Bind ExpiryText, Mode=OneWay}" Foreground="{x:Bind local:Ui.ExpiryBrush(Level), Mode=OneWay}" TextWrapping="Wrap" />
+                                    </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
+                                </tv:TableViewTemplateColumn>
+                                <tv:TableViewTemplateColumn Header="デプロイ日" Tag="DeployedAt">
+                                    <tv:TableViewTemplateColumn.CellTemplate><DataTemplate x:DataType="vm:DeploymentRowViewModel">
+                                        <TextBlock Text="{x:Bind DeployedText, Mode=OneWay}" />
+                                    </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
+                                </tv:TableViewTemplateColumn>
+                                <tv:TableViewTemplateColumn Header="ジョブ" Tag="Job">
+                                    <tv:TableViewTemplateColumn.CellTemplate><DataTemplate x:DataType="vm:DeploymentRowViewModel">
+                                        <TextBlock AutomationProperties.AutomationId="Row.Job" Text="{x:Bind JobText, Mode=OneWay}" TextWrapping="Wrap" Foreground="{ThemeResource SystemFillColorCautionBrush}" />
+                                    </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
+                                </tv:TableViewTemplateColumn>
+                            </tv:TableView.Columns>
+                        </tv:TableView>
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <Button AutomationProperties.AutomationId="Deployments.Previous" Content="前のページ" Command="{x:Bind ViewModel.Deployments.PreviousPageCommand}" />
                             <Button AutomationProperties.AutomationId="Deployments.Next" Content="次のページ" Command="{x:Bind ViewModel.Deployments.NextPageCommand}" />
@@ -438,6 +388,7 @@
                             <ComboBox AutomationProperties.AutomationId="Deployments.PageSize" ItemsSource="{x:Bind vm:DeploymentListViewModel.PageSizes}"
                                       SelectedItem="{x:Bind ViewModel.Deployments.PageSize, Mode=OneWay}" SelectionChanged="OnPageSizeChanged" />
                             <TextBlock VerticalAlignment="Center" Text="件ずつ表示" />
+                            <Button AutomationProperties.AutomationId="Deployments.ResetLayout" Content="列の幅と順序を初期値に戻す" Click="OnResetDeploymentsLayout" />
                         </StackPanel>
 
                         <!-- 1 行だけ選んだときの詳細（選んだ行の値を ViewModel から直接結び付ける。テンプレートの ContentControl では、パスワードを読んだ後の表示が変わらなかった） -->
@@ -551,7 +502,7 @@
                     </StackPanel>
 
                     <!-- ジョブの一覧（表。docs/design/desktop/desktop-wizard.md の 7） -->
-                    <StackPanel x:Name="JobsPanel" Tag="jobs" Spacing="12" MaxWidth="1600" HorizontalAlignment="Left" Visibility="Collapsed">
+                    <StackPanel x:Name="JobsPanel" Tag="jobs" Spacing="12" Visibility="Collapsed">
                         <TextBlock AutomationProperties.AutomationId="Panel.Jobs" Style="{StaticResource SubtitleTextBlockStyle}" Text="ジョブの一覧" />
                         <TextBlock TextWrapping="Wrap" Text="このアプリで登録したデプロイ・削除です（予定・実行中・終わったもの）。終わったジョブは、アプリを終了しても記録として残します（180 日・500 件まで）。行を選ぶと、まとめて取り消し・一時停止・再開・予定の変更・記録から削除ができます。1 行だけ選んで「詳細」（または行をダブルクリック）で、進み具合・結果・ログを見られます。「記録から削除」は、この一覧と PC の記録を消すだけで、Azure のリソースは消しません（Azure から消すときは、デプロイの一覧の「Azure から削除…」）。" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
@@ -574,129 +525,87 @@
                             <Button AutomationProperties.AutomationId="Jobs.RescheduleSelected" Content="選んだジョブの予定を変える" VerticalAlignment="Bottom" Command="{x:Bind ViewModel.JobList.RescheduleSelectedCommand}" />
                         </StackPanel>
                         <TextBlock AutomationProperties.AutomationId="Jobs.Message" Text="{x:Bind ViewModel.JobList.Message, Mode=OneWay}" TextWrapping="Wrap" />
-                        <!-- 列が多いため、表だけを横にスクロールする（ウィンドウが狭いとき） -->
-                        <ScrollViewer HorizontalScrollBarVisibility="Auto" HorizontalScrollMode="Auto" VerticalScrollBarVisibility="Disabled" VerticalScrollMode="Disabled">
-                            <StackPanel Width="1500" Spacing="12">
-                                <!-- 表の行をすべて選ぶ・すべて外す（一部だけ選んでいるときは中間の表示。D32） -->
-                                <CheckBox AutomationProperties.AutomationId="Jobs.SelectAll" Content="すべて" Margin="12,0,0,0"
-                                          IsChecked="{x:Bind ViewModel.JobList.AllSelected, Mode=TwoWay}" />
-                                <Grid ColumnSpacing="4" Margin="40,0,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="110" /><ColumnDefinition Width="200" /><ColumnDefinition Width="170" /><ColumnDefinition Width="120" /><ColumnDefinition Width="120" /><ColumnDefinition Width="120" /><ColumnDefinition Width="120" /><ColumnDefinition Width="120" /><ColumnDefinition Width="90" /><ColumnDefinition Width="*" MinWidth="200" />
-                                    </Grid.ColumnDefinitions>
-                                    <Button Grid.Column="0" AutomationProperties.AutomationId="Jobs.SortKind" Content="{x:Bind ViewModel.JobList.KindHeader, Mode=OneWay}" Tag="Kind" Click="OnSortJobs" Style="{StaticResource HeaderButtonStyle}" />
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                        <Button AutomationProperties.AutomationId="Jobs.SortTarget" Content="{x:Bind ViewModel.JobList.TargetHeader, Mode=OneWay}" Tag="Target" Click="OnSortJobs" Style="{StaticResource HeaderButtonStyle}" />
-                                        <Button AutomationProperties.AutomationId="Jobs.FilterTarget" Content="▽" Style="{StaticResource HeaderButtonStyle}">
-                                            <Button.Flyout><Flyout><StackPanel Spacing="8">
-                                                <TextBox AutomationProperties.AutomationId="Jobs.TargetFilter" Header="リソースグループ / アプリ名（一部でよい）" Width="260"
-                                                         Text="{x:Bind ViewModel.JobList.TargetFilter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                                <Button AutomationProperties.AutomationId="Jobs.TargetFilterClose" Content="閉じる" Click="OnCloseFlyout" />
-                                            </StackPanel></Flyout></Button.Flyout>
-                                        </Button>
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="2" Orientation="Horizontal">
-                                        <Button AutomationProperties.AutomationId="Jobs.SortState" Content="{x:Bind ViewModel.JobList.StateHeader, Mode=OneWay}" Tag="State" Click="OnSortJobs" Style="{StaticResource HeaderButtonStyle}" />
-                                        <Button AutomationProperties.AutomationId="Jobs.FilterState" Content="▽" Style="{StaticResource HeaderButtonStyle}">
-                                            <Button.Flyout><Flyout><StackPanel Spacing="8">
-                                                <ComboBox AutomationProperties.AutomationId="Jobs.StateFilter" Header="状態" ItemsSource="{x:Bind vm:JobListViewModel.Filters}" Width="220"
-                                                          SelectedItem="{x:Bind ViewModel.JobList.Filter, Mode=OneWay}" SelectionChanged="OnJobFilterChanged" />
-                                                <Button AutomationProperties.AutomationId="Jobs.StateFilterClose" Content="閉じる" Click="OnCloseFlyout" />
-                                            </StackPanel></Flyout></Button.Flyout>
-                                        </Button>
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="3" Orientation="Horizontal">
-                                        <Button AutomationProperties.AutomationId="Jobs.SortTime" Content="{x:Bind ViewModel.JobList.TimeHeader, Mode=OneWay}" Tag="Time" Click="OnSortJobs" Style="{StaticResource HeaderButtonStyle}" />
-                                        <Button AutomationProperties.AutomationId="Jobs.FilterTime" Content="▽" Style="{StaticResource HeaderButtonStyle}">
-                                            <Button.Flyout><Flyout><StackPanel Spacing="8">
-                                                <CalendarDatePicker AutomationProperties.AutomationId="Jobs.TimeFrom" Header="この日から" Date="{x:Bind ViewModel.JobList.ScheduledFilter.From, Mode=TwoWay}" Width="220" />
-                                                <CalendarDatePicker AutomationProperties.AutomationId="Jobs.TimeTo" Header="この日まで" Date="{x:Bind ViewModel.JobList.ScheduledFilter.To, Mode=TwoWay}" Width="220" />
-                                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                                    <Button AutomationProperties.AutomationId="Jobs.TimeFilterClear" Content="絞り込みを外す" Command="{x:Bind ViewModel.JobList.ScheduledFilter.ClearCommand}" />
-                                                    <Button AutomationProperties.AutomationId="Jobs.TimeFilterClose" Content="閉じる" Click="OnCloseFlyout" />
-                                                </StackPanel>
-                                            </StackPanel></Flyout></Button.Flyout>
-                                        </Button>
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="4" Orientation="Horizontal">
-                                        <Button AutomationProperties.AutomationId="Jobs.SortRegistered" Content="{x:Bind ViewModel.JobList.RegisteredHeader, Mode=OneWay}" Tag="RegisteredAt" Click="OnSortJobs" Style="{StaticResource HeaderButtonStyle}" />
-                                        <Button AutomationProperties.AutomationId="Jobs.FilterRegistered" Content="▽" Style="{StaticResource HeaderButtonStyle}">
-                                            <Button.Flyout><Flyout><StackPanel Spacing="8">
-                                                <CalendarDatePicker AutomationProperties.AutomationId="Jobs.RegisteredFrom" Header="この日から" Date="{x:Bind ViewModel.JobList.RegisteredFilter.From, Mode=TwoWay}" Width="220" />
-                                                <CalendarDatePicker AutomationProperties.AutomationId="Jobs.RegisteredTo" Header="この日まで" Date="{x:Bind ViewModel.JobList.RegisteredFilter.To, Mode=TwoWay}" Width="220" />
-                                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                                    <Button AutomationProperties.AutomationId="Jobs.RegisteredFilterClear" Content="絞り込みを外す" Command="{x:Bind ViewModel.JobList.RegisteredFilter.ClearCommand}" />
-                                                    <Button AutomationProperties.AutomationId="Jobs.RegisteredFilterClose" Content="閉じる" Click="OnCloseFlyout" />
-                                                </StackPanel>
-                                            </StackPanel></Flyout></Button.Flyout>
-                                        </Button>
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="5" Orientation="Horizontal">
-                                        <Button AutomationProperties.AutomationId="Jobs.SortChanged" Content="{x:Bind ViewModel.JobList.ChangedHeader, Mode=OneWay}" Tag="ChangedAt" Click="OnSortJobs" Style="{StaticResource HeaderButtonStyle}" />
-                                        <Button AutomationProperties.AutomationId="Jobs.FilterChanged" Content="▽" Style="{StaticResource HeaderButtonStyle}">
-                                            <Button.Flyout><Flyout><StackPanel Spacing="8">
-                                                <CalendarDatePicker AutomationProperties.AutomationId="Jobs.ChangedFrom" Header="この日から" Date="{x:Bind ViewModel.JobList.ChangedFilter.From, Mode=TwoWay}" Width="220" />
-                                                <CalendarDatePicker AutomationProperties.AutomationId="Jobs.ChangedTo" Header="この日まで" Date="{x:Bind ViewModel.JobList.ChangedFilter.To, Mode=TwoWay}" Width="220" />
-                                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                                    <Button AutomationProperties.AutomationId="Jobs.ChangedFilterClear" Content="絞り込みを外す" Command="{x:Bind ViewModel.JobList.ChangedFilter.ClearCommand}" />
-                                                    <Button AutomationProperties.AutomationId="Jobs.ChangedFilterClose" Content="閉じる" Click="OnCloseFlyout" />
-                                                </StackPanel>
-                                            </StackPanel></Flyout></Button.Flyout>
-                                        </Button>
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="6" Orientation="Horizontal">
-                                        <Button AutomationProperties.AutomationId="Jobs.SortStarted" Content="{x:Bind ViewModel.JobList.StartedHeader, Mode=OneWay}" Tag="StartedAt" Click="OnSortJobs" Style="{StaticResource HeaderButtonStyle}" />
-                                        <Button AutomationProperties.AutomationId="Jobs.FilterStarted" Content="▽" Style="{StaticResource HeaderButtonStyle}">
-                                            <Button.Flyout><Flyout><StackPanel Spacing="8">
-                                                <CalendarDatePicker AutomationProperties.AutomationId="Jobs.StartedFrom" Header="この日から" Date="{x:Bind ViewModel.JobList.StartedFilter.From, Mode=TwoWay}" Width="220" />
-                                                <CalendarDatePicker AutomationProperties.AutomationId="Jobs.StartedTo" Header="この日まで" Date="{x:Bind ViewModel.JobList.StartedFilter.To, Mode=TwoWay}" Width="220" />
-                                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                                    <Button AutomationProperties.AutomationId="Jobs.StartedFilterClear" Content="絞り込みを外す" Command="{x:Bind ViewModel.JobList.StartedFilter.ClearCommand}" />
-                                                    <Button AutomationProperties.AutomationId="Jobs.StartedFilterClose" Content="閉じる" Click="OnCloseFlyout" />
-                                                </StackPanel>
-                                            </StackPanel></Flyout></Button.Flyout>
-                                        </Button>
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="7" Orientation="Horizontal">
-                                        <Button AutomationProperties.AutomationId="Jobs.SortFinished" Content="{x:Bind ViewModel.JobList.FinishedHeader, Mode=OneWay}" Tag="Finished" Click="OnSortJobs" Style="{StaticResource HeaderButtonStyle}" />
-                                        <Button AutomationProperties.AutomationId="Jobs.FilterFinished" Content="▽" Style="{StaticResource HeaderButtonStyle}">
-                                            <Button.Flyout><Flyout><StackPanel Spacing="8">
-                                                <CalendarDatePicker AutomationProperties.AutomationId="Jobs.FinishedFrom" Header="この日から" Date="{x:Bind ViewModel.JobList.FinishedFilter.From, Mode=TwoWay}" Width="220" />
-                                                <CalendarDatePicker AutomationProperties.AutomationId="Jobs.FinishedTo" Header="この日まで" Date="{x:Bind ViewModel.JobList.FinishedFilter.To, Mode=TwoWay}" Width="220" />
-                                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                                    <Button AutomationProperties.AutomationId="Jobs.FinishedFilterClear" Content="絞り込みを外す" Command="{x:Bind ViewModel.JobList.FinishedFilter.ClearCommand}" />
-                                                    <Button AutomationProperties.AutomationId="Jobs.FinishedFilterClose" Content="閉じる" Click="OnCloseFlyout" />
-                                                </StackPanel>
-                                            </StackPanel></Flyout></Button.Flyout>
-                                        </Button>
-                                    </StackPanel>
-                                    <Button Grid.Column="8" AutomationProperties.AutomationId="Jobs.SortDuration" Content="{x:Bind ViewModel.JobList.DurationHeader, Mode=OneWay}" Tag="Duration" Click="OnSortJobs" Style="{StaticResource HeaderButtonStyle}" />
-                                    <TextBlock Grid.Column="9" VerticalAlignment="Center" Style="{StaticResource BodyStrongTextBlockStyle}" Text="結果" />
-                                </Grid>
-                                <ListView x:Name="JobsList" AutomationProperties.AutomationId="Jobs.List" ItemsSource="{x:Bind ViewModel.JobList.Items}" SelectionMode="Multiple"
-                                          SelectionChanged="OnJobsSelectionChanged" DoubleTapped="OnJobDoubleTapped">
-                                    <ListView.ItemTemplate>
-                                        <DataTemplate x:DataType="vm:JobViewModel">
-                                            <Grid ColumnSpacing="4" Padding="0,6">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="110" /><ColumnDefinition Width="200" /><ColumnDefinition Width="170" /><ColumnDefinition Width="120" /><ColumnDefinition Width="120" /><ColumnDefinition Width="120" /><ColumnDefinition Width="120" /><ColumnDefinition Width="120" /><ColumnDefinition Width="90" /><ColumnDefinition Width="*" MinWidth="200" />
-                                                </Grid.ColumnDefinitions>
-                                                <TextBlock Grid.Column="0" AutomationProperties.AutomationId="Job.Kind" Text="{x:Bind KindText}" />
-                                                <TextBlock Grid.Column="1" AutomationProperties.AutomationId="Job.Target" Text="{x:Bind TargetText}" TextTrimming="CharacterEllipsis" />
-                                                <TextBlock Grid.Column="2" AutomationProperties.AutomationId="Job.Status" Text="{x:Bind StatusText, Mode=OneWay}" TextWrapping="Wrap" />
-                                                <TextBlock Grid.Column="3" AutomationProperties.AutomationId="Job.Time" Text="{x:Bind TimeText, Mode=OneWay}" />
-                                                <TextBlock Grid.Column="4" AutomationProperties.AutomationId="Job.Registered" Text="{x:Bind RegisteredText}" />
-                                                <TextBlock Grid.Column="5" AutomationProperties.AutomationId="Job.Changed" Text="{x:Bind ChangedText, Mode=OneWay}" />
-                                                <TextBlock Grid.Column="6" AutomationProperties.AutomationId="Job.Started" Text="{x:Bind StartedText, Mode=OneWay}" />
-                                                <TextBlock Grid.Column="7" AutomationProperties.AutomationId="Job.Finished" Text="{x:Bind FinishedText, Mode=OneWay}" />
-                                                <TextBlock Grid.Column="8" AutomationProperties.AutomationId="Job.Duration" Text="{x:Bind DurationText, Mode=OneWay}" />
-                                                <TextBlock Grid.Column="9" AutomationProperties.AutomationId="Job.Result" Text="{x:Bind ResultText, Mode=OneWay}" TextWrapping="Wrap" />
-                                            </Grid>
-                                        </DataTemplate>
-                                    </ListView.ItemTemplate>
-                                </ListView>
-                            </StackPanel>
-                        </ScrollViewer>
+                        <!-- 表の上のフィルタ（対象の列＋条件。docs/design/desktop/desktop-tables.md の 10.4） -->
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <ComboBox AutomationProperties.AutomationId="Jobs.TextTarget" Header="文字で絞り込む列" ItemsSource="{x:Bind ViewModel.JobList.Filters.TextTargets}" MinWidth="180"
+                                      SelectedItem="{x:Bind ViewModel.JobList.Filters.TextTarget, Mode=OneWay}" SelectionChanged="OnJobTextTargetChanged" />
+                            <TextBox AutomationProperties.AutomationId="Jobs.Text" Header="含む文字" Width="220" Text="{x:Bind ViewModel.JobList.Filters.Text, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            <ComboBox AutomationProperties.AutomationId="Jobs.DateColumn" Header="日付で絞り込む列" ItemsSource="{x:Bind ViewModel.JobList.Filters.DateColumns}" MinWidth="160"
+                                      SelectedItem="{x:Bind ViewModel.JobList.Filters.DateColumn, Mode=OneWay}" SelectionChanged="OnJobDateColumnChanged" />
+                            <CalendarDatePicker AutomationProperties.AutomationId="Jobs.DateFrom" Header="この日から" Date="{x:Bind ViewModel.JobList.Filters.Dates.From, Mode=TwoWay}" />
+                            <CalendarDatePicker AutomationProperties.AutomationId="Jobs.DateTo" Header="この日まで" Date="{x:Bind ViewModel.JobList.Filters.Dates.To, Mode=TwoWay}" />
+                            <Button AutomationProperties.AutomationId="Jobs.ClearFilters" Content="絞り込みをすべて外す" VerticalAlignment="Bottom" Command="{x:Bind ViewModel.JobList.Filters.ClearCommand}" />
+                        </StackPanel>
+                        <!-- 表（WinUI.TableView）: 見出しを押すと並べ替え、▽ で値を選んで絞り込み、境目のドラッグで幅、見出しのドラッグで順序。左上の角で今のページの行をすべて選ぶ -->
+                        <tv:TableView x:Name="JobsList" AutomationProperties.AutomationId="Jobs.List" AutomationProperties.Name="ジョブの一覧" ItemsSource="{x:Bind ViewModel.JobList.Items}"
+                                      AutoGenerateColumns="False" SelectionMode="Multiple" CornerButtonMode="SelectAll" IsReadOnly="True" CanGroupColumns="False" ShowFilterItemsCount="True"
+                                      CanReorderColumns="True" CanResizeColumns="True" MaxHeight="640" SelectionChanged="OnJobsSelectionChanged" DoubleTapped="OnJobDoubleTapped">
+                            <tv:TableView.Columns>
+                                <tv:TableViewTemplateColumn Header="種類" Tag="Kind">
+                                    <tv:TableViewTemplateColumn.CellTemplate><DataTemplate x:DataType="vm:JobViewModel">
+                                        <TextBlock AutomationProperties.AutomationId="Job.Kind" Text="{x:Bind KindText}" />
+                                    </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
+                                </tv:TableViewTemplateColumn>
+                                <tv:TableViewTemplateColumn Header="サブスクリプション" Tag="Subscription">
+                                    <tv:TableViewTemplateColumn.CellTemplate><DataTemplate x:DataType="vm:JobViewModel">
+                                        <TextBlock AutomationProperties.AutomationId="Job.Subscription" Text="{x:Bind SubscriptionText, Mode=OneWay}" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind SubscriptionText, Mode=OneWay}" />
+                                    </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
+                                </tv:TableViewTemplateColumn>
+                                <tv:TableViewTemplateColumn Header="リソースグループ / アプリ名" Tag="Target">
+                                    <tv:TableViewTemplateColumn.CellTemplate><DataTemplate x:DataType="vm:JobViewModel">
+                                        <TextBlock AutomationProperties.AutomationId="Job.Target" Text="{x:Bind TargetText}" TextTrimming="CharacterEllipsis" />
+                                    </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
+                                </tv:TableViewTemplateColumn>
+                                <tv:TableViewTemplateColumn Header="状態" Tag="State">
+                                    <tv:TableViewTemplateColumn.CellTemplate><DataTemplate x:DataType="vm:JobViewModel">
+                                        <TextBlock AutomationProperties.AutomationId="Job.Status" Text="{x:Bind StatusText, Mode=OneWay}" TextWrapping="Wrap" />
+                                    </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
+                                </tv:TableViewTemplateColumn>
+                                <tv:TableViewTemplateColumn Header="予定日時" Tag="Time">
+                                    <tv:TableViewTemplateColumn.CellTemplate><DataTemplate x:DataType="vm:JobViewModel">
+                                        <TextBlock AutomationProperties.AutomationId="Job.Time" Text="{x:Bind TimeText, Mode=OneWay}" />
+                                    </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
+                                </tv:TableViewTemplateColumn>
+                                <tv:TableViewTemplateColumn Header="登録日時" Tag="RegisteredAt">
+                                    <tv:TableViewTemplateColumn.CellTemplate><DataTemplate x:DataType="vm:JobViewModel">
+                                        <TextBlock AutomationProperties.AutomationId="Job.Registered" Text="{x:Bind RegisteredText}" />
+                                    </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
+                                </tv:TableViewTemplateColumn>
+                                <tv:TableViewTemplateColumn Header="変更日時" Tag="ChangedAt">
+                                    <tv:TableViewTemplateColumn.CellTemplate><DataTemplate x:DataType="vm:JobViewModel">
+                                        <TextBlock AutomationProperties.AutomationId="Job.Changed" Text="{x:Bind ChangedText, Mode=OneWay}" />
+                                    </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
+                                </tv:TableViewTemplateColumn>
+                                <tv:TableViewTemplateColumn Header="実行開始日時" Tag="StartedAt">
+                                    <tv:TableViewTemplateColumn.CellTemplate><DataTemplate x:DataType="vm:JobViewModel">
+                                        <TextBlock AutomationProperties.AutomationId="Job.Started" Text="{x:Bind StartedText, Mode=OneWay}" />
+                                    </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
+                                </tv:TableViewTemplateColumn>
+                                <tv:TableViewTemplateColumn Header="実行終了日時" Tag="Finished">
+                                    <tv:TableViewTemplateColumn.CellTemplate><DataTemplate x:DataType="vm:JobViewModel">
+                                        <TextBlock AutomationProperties.AutomationId="Job.Finished" Text="{x:Bind FinishedText, Mode=OneWay}" />
+                                    </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
+                                </tv:TableViewTemplateColumn>
+                                <tv:TableViewTemplateColumn Header="処理時間" Tag="Duration">
+                                    <tv:TableViewTemplateColumn.CellTemplate><DataTemplate x:DataType="vm:JobViewModel">
+                                        <TextBlock AutomationProperties.AutomationId="Job.Duration" Text="{x:Bind DurationText, Mode=OneWay}" />
+                                    </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
+                                </tv:TableViewTemplateColumn>
+                                <tv:TableViewTemplateColumn Header="結果" Tag="Result">
+                                    <tv:TableViewTemplateColumn.CellTemplate><DataTemplate x:DataType="vm:JobViewModel">
+                                        <TextBlock AutomationProperties.AutomationId="Job.Result" Text="{x:Bind ResultText, Mode=OneWay}" TextWrapping="Wrap" />
+                                    </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
+                                </tv:TableViewTemplateColumn>
+                            </tv:TableView.Columns>
+                        </tv:TableView>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button AutomationProperties.AutomationId="Jobs.Previous" Content="前のページ" Command="{x:Bind ViewModel.JobList.PreviousPageCommand}" />
+                            <Button AutomationProperties.AutomationId="Jobs.Next" Content="次のページ" Command="{x:Bind ViewModel.JobList.NextPageCommand}" />
+                            <ComboBox AutomationProperties.AutomationId="Jobs.PageSize" ItemsSource="{x:Bind vm:JobListViewModel.PageSizes}"
+                                      SelectedItem="{x:Bind ViewModel.JobList.PageSize, Mode=OneWay}" SelectionChanged="OnJobPageSizeChanged" />
+                            <TextBlock VerticalAlignment="Center" Text="件ずつ表示" />
+                            <Button AutomationProperties.AutomationId="Jobs.ResetLayout" Content="列の幅と順序を初期値に戻す" Click="OnResetJobsLayout" />
+                        </StackPanel>
                     </StackPanel>
 
                     <!-- まとめての削除（計画を並べ、件数を入力して確認。docs/design/desktop/desktop-wizard.md の 7、Q10） -->

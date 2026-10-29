@@ -153,11 +153,11 @@ public sealed class AppSession : IDisposable
             toggle.Toggle();
     }
 
-    /// <summary>表（ListView）の行を選びに加える（<paramref name="index"/> は上から 0 始まり。行が現れるまで待つ）。</summary>
+    /// <summary>表（WinUI.TableView。行は DataItem）の行を選びに加える（<paramref name="index"/> は上から 0 始まり。行が現れるまで待つ）。</summary>
     public void SelectRow(string automationId, int index = 0, TimeSpan? timeout = null)
     {
         var rows = Retry.WhileEmpty(
-            () => Find(automationId).FindAllChildren(cf => cf.ByControlType(ControlType.ListItem)),
+            () => Find(automationId).FindAllChildren(cf => cf.ByControlType(ControlType.ListItem).Or(cf.ByControlType(ControlType.DataItem))),
             timeout ?? Timeout, Interval, throwOnTimeout: true, ignoreException: true,
             timeoutMessage: $"表 {automationId} に行が出ませんでした。").Result!;
         rows[index].Patterns.SelectionItem.Pattern.AddToSelection();

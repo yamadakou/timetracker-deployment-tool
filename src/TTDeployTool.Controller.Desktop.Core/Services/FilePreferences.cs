@@ -1,4 +1,5 @@
 using System.Text.Json;
+using TTDeployTool.Controller.Desktop.Core.ViewModels;
 
 namespace TTDeployTool.Controller.Desktop.Core.Services;
 
@@ -77,6 +78,16 @@ public sealed class FilePreferences : IAppPreferences
         }
     }
 
+    public IReadOnlyDictionary<string, IReadOnlyList<TableColumnLayout>> TableLayouts
+    {
+        get => _data.TableLayouts ?? new Dictionary<string, IReadOnlyList<TableColumnLayout>>();
+        set
+        {
+            _data = _data with { TableLayouts = value };
+            Save();
+        }
+    }
+
     private static Data Load(string path)
     {
         try
@@ -104,5 +115,6 @@ public sealed class FilePreferences : IAppPreferences
 
     private sealed record Data(
         int? MaxConcurrentJobs = null, IReadOnlyList<DeploymentTemplate>? Templates = null, IReadOnlyList<string>? ExpiryNotices = null, bool StartupTaskAsked = false,
-        IReadOnlyList<SavedJob>? SavedJobs = null, StartupLaunch? LastStartupLaunch = null);
+        IReadOnlyList<SavedJob>? SavedJobs = null, StartupLaunch? LastStartupLaunch = null,
+        IReadOnlyDictionary<string, IReadOnlyList<TableColumnLayout>>? TableLayouts = null);
 }

@@ -103,7 +103,18 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         DryRun = new DryRunViewModel(Settings, dialogs, launcher);
         Wizard = new DeployWizardViewModel(Settings, Deployment, Target, Queue,
             job => job.ScheduledAt == null ? OpenJobAsync(job, Pages.Wizard) : ShowJobListAsync());
-        JobList = new JobListViewModel(Queue, time, dialogs);
+        JobList = new JobListViewModel(Queue, time, dialogs, id => Deployments.SubscriptionDisplay(id));
+        // 表の列の幅と順序（幅 0 は残りの幅いっぱいに伸ばす列。docs/design/desktop/desktop-tables.md の 10.1）
+        DeploymentsLayout = new TableLayout("deployments",
+        [
+            new("Subscription", 200), new("ResourceGroup", 150), new("AppName", 130), new("Group", 130), new("State", 140), new("ExpiresAt", 140), new("DeployedAt", 130),
+            new(DeploymentListViewModel.JobColumn, 0),
+        ], preferences);
+        JobsLayout = new TableLayout("jobs",
+        [
+            new("Kind", 110), new("Subscription", 200), new("Target", 200), new("State", 170), new("Time", 120), new("RegisteredAt", 120), new("ChangedAt", 120),
+            new("StartedAt", 120), new("Finished", 120), new("Duration", 90), new(JobListViewModel.ResultColumn, 0),
+        ], preferences);
         ScheduledJobs = new ScheduledJobStore(Queue, preferences, () => SignIn.Account?.UserName, (saved, options) =>
         {
             var session = Target.CreateJobSessionFor(saved.Subscription);
@@ -159,6 +170,12 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
     /// <summary>ジョブの一覧（docs/design/desktop/desktop-wizard.md の 7）。</summary>
     public JobListViewModel JobList { get; }
+
+    /// <summary>デプロイの一覧の表の列の幅と順序。</summary>
+    public TableLayout DeploymentsLayout { get; }
+
+    /// <summary>ジョブの一覧の表の列の幅と順序。</summary>
+    public TableLayout JobsLayout { get; }
 
     /// <summary>デプロイの一覧で 2 件以上を選んだときの、まとめての削除。</summary>
     public BatchDeletionViewModel BatchDeletion { get; }

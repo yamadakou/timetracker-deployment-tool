@@ -64,6 +64,8 @@
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.5.1" />
     <!-- 予定のデプロイのパスワードの暗号化（DPAPI。docs/design/desktop/desktop-jobs.md の 6.7） -->
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.12" />
+    <!-- 表（列の幅・順序・▽ の絞り込み。MIT。docs/design/desktop/desktop-tables.md の 9・10） -->
+    <PackageReference Include="WinUI.TableView" Version="1.5.1" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\TTDeployTool.Controller.Desktop.Core\TTDeployTool.Controller.Desktop.Core.csproj" />

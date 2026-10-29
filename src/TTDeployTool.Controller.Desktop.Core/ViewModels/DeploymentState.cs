@@ -29,9 +29,6 @@ public enum DeploymentState
     Unknown,
 }
 
-/// <summary>「状態」の絞り込みの選択肢（<see cref="State"/> が null なら、すべて）。</summary>
-public sealed record DeploymentStateFilterOption(DeploymentState? State, string Label);
-
 /// <summary>
 /// 3 つの Container App の状態から、一覧の「状態」を決める（docs/design/desktop/desktop-jobs.md の 6.3、No.73）。値は Container Apps の REST API の
 /// provisioningState（InProgress・Succeeded・Failed・Canceled・Deleting）と runningStatus（Progressing・Running・Stopped・Suspended・Ready）。
@@ -67,11 +64,4 @@ public static class DeploymentStates
         DeploymentState.Pending => "デプロイ済み（反映待ち）",
         _ => "不明",
     };
-
-    /// <summary>絞り込みの選択肢（「すべて」と、それぞれの状態）。</summary>
-    public static readonly IReadOnlyList<DeploymentStateFilterOption> Filters =
-    [
-        new(null, "すべて"),
-        .. Enum.GetValues<DeploymentState>().Select(s => new DeploymentStateFilterOption(s, Label(s))),
-    ];
 }

@@ -11,33 +11,6 @@ using TTDeployTool.Domain.Deployment;
 
 namespace TTDeployTool.Controller.Desktop.Core.ViewModels;
 
-/// <summary>利用可能期限日のフィルタ。</summary>
-public enum ExpiryFilterMode
-{
-    All,
-
-    /// <summary>7 日以内（過ぎたものを含む）。</summary>
-    Within7Days,
-
-    /// <summary>期限なし。</summary>
-    NoExpiry,
-
-    /// <summary>日付の範囲。</summary>
-    Range,
-}
-
-/// <summary>利用可能期限日のフィルタの選択肢。</summary>
-public sealed record ExpiryFilterOption(ExpiryFilterMode Mode, string Label);
-
-/// <summary>グループの絞り込みの選択肢（<see cref="Group"/> が null なら、<see cref="NoGroup"/> でグループなし、そうでなければすべて）。</summary>
-public sealed record GroupFilterOption(string? Group, bool NoGroup, string Label)
-{
-    public override string ToString() => Label;
-}
-
-/// <summary>サブスクリプションの絞り込みの選択肢（<see cref="SubscriptionId"/> が null なら、すべて）。</summary>
-public sealed record SubscriptionFilterOption(string? SubscriptionId, string Label);
-
 /// <summary>並べ替えの列。</summary>
 public enum DeploymentSortKey
 {
@@ -65,18 +38,10 @@ public sealed class DeploymentListViewModel : ObservableObject
     /// <summary>このアプリで終えた操作を、読んだ結果に重ねる時間（Resource Graph の反映の遅れ）。</summary>
     public static readonly TimeSpan RecentWindow = TimeSpan.FromMinutes(15);
 
-    /// <summary>期限が近いとみなす日数（色を変える・「7 日以内」のフィルタ）。</summary>
+    /// <summary>期限が近いとみなす日数（色を変える）。</summary>
     public const int SoonDays = 7;
 
     public static readonly IReadOnlyList<int> PageSizes = [20, 50, 100];
-
-    public static readonly IReadOnlyList<ExpiryFilterOption> ExpiryFilters =
-    [
-        new(ExpiryFilterMode.All, "すべて"),
-        new(ExpiryFilterMode.Within7Days, $"{SoonDays} 日以内（過ぎたものを含む）"),
-        new(ExpiryFilterMode.NoExpiry, "期限なし"),
-        new(ExpiryFilterMode.Range, "日付の範囲"),
-    ];
 
     public static readonly IReadOnlyList<DeploymentSortOption> SortOptions =
     [
@@ -96,12 +61,6 @@ public sealed class DeploymentListViewModel : ObservableObject
         new(DeploymentSortKey.Group, true, "グループ（降順）"),
     ];
 
-    /// <summary>グループの絞り込みの「すべて」。</summary>
-    public static readonly GroupFilterOption AllGroups = new(null, false, "すべて");
-
-    /// <summary>グループの絞り込みの「グループなし」。</summary>
-    public static readonly GroupFilterOption NoGroup = new(null, true, "グループなし");
-
     private readonly TargetViewModel _target;
     private readonly JobQueue _queue;
     private readonly IDeploymentLogger _deploymentLogger;
@@ -117,30 +76,15 @@ public sealed class DeploymentListViewModel : ObservableObject
     private IReadOnlyList<DeploymentEntry> _filtered = [];
     private bool _hasLoaded;
     private string? _error;
-    private SubscriptionFilterOption _subscriptionFilter = AllSubscriptions;
-    // 利用者が選んだサブスクリプション（読み直しで一覧が一度空になっても、また現れれば選び直す）
-    private string? _wantedSubscriptionId;
-    private string _resourceGroupFilter = "";
-    private string _appNameFilter = "";
     private IReadOnlyList<DeploymentRowViewModel> _selected = [];
     private bool _batchNoExpiry;
     private DateTimeOffset _batchExpiryDate;
     private string? _batchMessage;
-    private DateTimeOffset? _deployedFrom;
-    private DateTimeOffset? _deployedTo;
-    private ExpiryFilterOption _expiryFilter = ExpiryFilters[0];
-    private DeploymentStateFilterOption _stateFilter = DeploymentStates.Filters[0];
-    private GroupFilterOption _groupFilter = AllGroups;
     private string _batchGroup = "";
-    private DateTimeOffset? _expiryFrom;
-    private DateTimeOffset? _expiryTo;
     private DeploymentSortOption _sort = SortOptions[0];
     private int _pageSize = PageSizes[0];
     private int _pageIndex;
     private int _filteredCount;
-
-    /// <summary>サブスクリプションの絞り込みの「すべて」。</summary>
-    public static readonly SubscriptionFilterOption AllSubscriptions = new(null, "すべてのサブスクリプション");
 
     /// <param name="open">対象に入れた後に、画面を開く（ウィザード・実行状況・削除の名前: wizard・status・delete）</param>
     /// <param name="openBatchDeletion">2 件以上を選んで削除するときに、まとめての削除の画面を開いて計画する（docs/design/desktop/desktop-wizard.md の 7）</param>
@@ -164,26 +108,27 @@ public sealed class DeploymentListViewModel : ObservableObject
         DeleteSelectedCommand = new AsyncCommand(DeleteSelectedAsync, () => _selected.Count > 0);
         ChangeSelectedGroupCommand = new AsyncCommand(() => ChangeSelectedGroupAsync(remove: false), () => _selected.Count > 0 && DeploymentGroup.Normalize(BatchGroup) != null);
         RemoveSelectedGroupCommand = new AsyncCommand(() => ChangeSelectedGroupAsync(remove: true), () => _selected.Count > 0);
-        GroupFilters.Add(AllGroups);
-        GroupFilters.Add(NoGroup);
         TableSelection = new SelectionSync<DeploymentRowViewModel>(() => _selected, SetSelection);
         ClearSelectionCommand = new AsyncCommand(() =>
         {
             SetSelection([]);
             return Task.CompletedTask;
         }, () => _selected.Count > 0);
-        // 絞り込みの選択肢は、読んだサブスクリプション（一覧はすべてのサブスクリプションを読む）
-        SubscriptionFilters.Add(AllSubscriptions);
-        _target.Subscriptions.CollectionChanged += (_, _) => ResetSubscriptionFilters();
+        Filters = new TableFilters<DeploymentEntry>(CreateColumns(), () => _entries, StringComparer.OrdinalIgnoreCase, time.LocalTimeZone);
+        Filters.Changed += () => Refresh(resetPage: true, keepRows: true);
         LoadCommand = new AsyncCommand(() => Busy.RunAsync("デプロイの一覧を読んでいます", () => LoadAsync(resetPage: true)));
         PreviousPageCommand = new AsyncCommand(() => GoTo(_pageIndex - 1), () => _pageIndex > 0);
         NextPageCommand = new AsyncCommand(() => GoTo(_pageIndex + 1), () => _pageIndex < PageCount - 1);
         _queue = queue;
         queue.Finished += OnJobFinished;
-        // ジョブの登録・状態の変更で、行のジョブの表示を変える
+        // ジョブの登録・状態の変更で、行のジョブの表示を変える（ジョブの列で絞り込んでいれば、絞り込み直す）
         queue.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName == nameof(JobQueue.Summary))
+            if (e.PropertyName != nameof(JobQueue.Summary))
+                return;
+            if (Filters.IsFiltered(JobColumn) || Filters.Text.Length > 0)
+                Refresh(resetPage: false, keepRows: true);
+            else
                 ShowJobs();
         };
     }
@@ -233,61 +178,38 @@ public sealed class DeploymentListViewModel : ObservableObject
             : $"{_pageIndex * PageSize + 1}〜{Math.Min((_pageIndex + 1) * PageSize, FilteredCount)} 件目を表示（" +
               (FilteredCount == TotalCount ? $"全 {TotalCount} 件" : $"絞り込んだ {FilteredCount} 件 / 全 {TotalCount} 件") + $"）・{_pageIndex + 1} / {PageCount} ページ";
 
-    /// <summary>サブスクリプションの絞り込みの選択肢（「すべて」と、読んだサブスクリプション）。</summary>
-    public ObservableCollection<SubscriptionFilterOption> SubscriptionFilters { get; } = [];
-
-    /// <summary>サブスクリプションの絞り込み（既定はすべて）。</summary>
-    public SubscriptionFilterOption SubscriptionFilter
-    {
-        get => _subscriptionFilter;
-        set
-        {
-            _wantedSubscriptionId = value.SubscriptionId;
-            SetFilter(ref _subscriptionFilter, value);
-        }
-    }
-
-    /// <summary>アプリ名（中間一致）。</summary>
-    public string AppNameFilter { get => _appNameFilter; set => SetFilter(ref _appNameFilter, value.Trim()); }
+    /// <summary>表の絞り込み（見出しの ▽・表の上の文字と日付のフィルタ。docs/design/desktop/desktop-tables.md の 10.4）。</summary>
+    public TableFilters<DeploymentEntry> Filters { get; }
 
     /// <summary>見出しを押したときに並べ替える。今と同じ列なら逆順、違う列なら昇順（期限日は近い順。docs/design/desktop/desktop-wizard.md の 7）。</summary>
     public void SortBy(DeploymentSortKey key) =>
         Sort = SortOptions.First(o => o.Key == key && o.Descending == (Sort.Key == key && !Sort.Descending));
 
-    public string SubscriptionHeader => Header("サブスクリプション", DeploymentSortKey.Subscription);
-
-    public string ResourceGroupHeader => Header("リソースグループ", DeploymentSortKey.ResourceGroup);
-
-    public string AppNameHeader => Header("アプリ名", DeploymentSortKey.AppName);
-
-    public string ExpiryHeader => Header("利用可能期限日", DeploymentSortKey.ExpiresAt);
-
-    public string DeployedHeader => Header("デプロイ日", DeploymentSortKey.DeployedAt);
-
-    public string StateHeader => Header("状態", DeploymentSortKey.State);
-
-    public string GroupHeader => Header("グループ", DeploymentSortKey.Group);
-
-    /// <summary>「グループ」の絞り込みの選択肢（「すべて」「グループなし」と、読んだデプロイのグループ。大文字と小文字は区別せずに束ねる）。</summary>
-    public ObservableCollection<GroupFilterOption> GroupFilters { get; } = [];
-
-    /// <summary>「グループ」の絞り込み（既定はすべて）。</summary>
-    public GroupFilterOption GroupFilter { get => _groupFilter; set => SetFilter(ref _groupFilter, value); }
-
     /// <summary>読んだデプロイのグループ名（名前の順。大文字と小文字は区別せずに束ね、最初に見つかった書き方を出す。入力の候補にも使う）。</summary>
     public IReadOnlyList<string> GroupNames =>
         [.. _entries.Select(e => e.Group).OfType<string>().Distinct(DeploymentGroup.Comparer).Order(DeploymentGroup.Comparer)];
 
-    /// <summary>「状態」の絞り込み（既定はすべて。No.73）。</summary>
-    public DeploymentStateFilterOption StateFilter { get => _stateFilter; set => SetFilter(ref _stateFilter, value); }
-
     /// <summary>見出しの Tag（列の名前。<see cref="DeploymentSortKey"/> の名前）で並べ替える（画面の側から）。</summary>
     public void SortBy(string column) => SortBy(Enum.Parse<DeploymentSortKey>(column));
 
+    /// <summary>並べ替えている列の名前（画面の見出しの矢印に使う）。</summary>
+    public string SortColumn => Sort.Key.ToString();
+
+    /// <summary>逆順（降順）に並べているか。</summary>
+    public bool SortDescending => Sort.Descending;
+
+    /// <summary>▽ の「昇順」「降順」で並べ替える（画面の側から）。</summary>
+    public void SortBy(string column, bool descending) =>
+        Sort = SortOptions.First(o => o.Key == Enum.Parse<DeploymentSortKey>(column) && o.Descending == descending);
+
+    /// <summary>▽ の「並べ替えを解除」で、既定の順（サブスクリプションの昇順）に戻す。</summary>
+    public void ClearSort() => Sort = SortOptions[0];
+
+    /// <summary>ジョブの列の名前（並べ替えはしない）。</summary>
+    public const string JobColumn = "Job";
+
     /// <summary>表の選択と、この一覧の選択を合わせる。</summary>
     public SelectionSync<DeploymentRowViewModel> TableSelection { get; }
-
-    private string Header(string label, DeploymentSortKey key) => Sort.Key != key ? label : label + (Sort.Descending ? " ▼" : " ▲");
 
     /// <summary>選んだ行（表の複数の選択）。</summary>
     public IReadOnlyList<DeploymentRowViewModel> Selected => _selected;
@@ -377,36 +299,14 @@ public sealed class DeploymentListViewModel : ObservableObject
         private set => SetProperty(ref _batchMessage, value);
     }
 
-    /// <summary>リソースグループ名（中間一致）。</summary>
-    public string ResourceGroupFilter { get => _resourceGroupFilter; set => SetFilter(ref _resourceGroupFilter, value.Trim()); }
-
-    /// <summary>デプロイ日の範囲（日付だけを見る。空なら制限しない）。</summary>
-    public DateTimeOffset? DeployedFrom { get => _deployedFrom; set => SetFilter(ref _deployedFrom, value); }
-
-    public DateTimeOffset? DeployedTo { get => _deployedTo; set => SetFilter(ref _deployedTo, value); }
-
-    public ExpiryFilterOption ExpiryFilter
-    {
-        get => _expiryFilter;
-        set => SetFilter(ref _expiryFilter, value, nameof(ExpiryFilter), nameof(IsExpiryRange));
-    }
-
-    /// <summary>利用可能期限日の範囲の入力を表示するか。</summary>
-    public bool IsExpiryRange => ExpiryFilter.Mode == ExpiryFilterMode.Range;
-
-    public DateTimeOffset? ExpiryFrom { get => _expiryFrom; set => SetFilter(ref _expiryFrom, value); }
-
-    public DateTimeOffset? ExpiryTo { get => _expiryTo; set => SetFilter(ref _expiryTo, value); }
-
     public DeploymentSortOption Sort
     {
         get => _sort;
         set
         {
             SetFilter(ref _sort, value);
-            foreach (var name in new[] { nameof(SubscriptionHeader), nameof(ResourceGroupHeader), nameof(AppNameHeader), nameof(ExpiryHeader), nameof(DeployedHeader), nameof(StateHeader),
-                     nameof(GroupHeader) })
-                OnPropertyChanged(name);
+            OnPropertyChanged(nameof(SortColumn));
+            OnPropertyChanged(nameof(SortDescending));
         }
     }
 
@@ -465,36 +365,11 @@ public sealed class DeploymentListViewModel : ObservableObject
     internal void GroupChanged(DeploymentEntry entry, string? group) =>
         Remember(entry.SubscriptionId, entry.ResourceGroup, entry.AppName, e => e == null ? null : e with { Group = group, GroupDiffers = false });
 
-    // 読んだグループが変わったら、絞り込みの選択肢を作り直す（選んでいたグループが無くなれば、すべてに戻す）
-    private void ResetGroupFilters()
+    // 読んだグループが変わったら、グループ名の候補を知らせる
+    private void NotifyGroups()
     {
-        var options = new[] { AllGroups, NoGroup }.Concat(GroupNames.Select(g => new GroupFilterOption(g, false, g))).ToList();
-        if (!options.SequenceEqual(GroupFilters))
-        {
-            GroupFilters.Clear();
-            foreach (var option in options)
-                GroupFilters.Add(option);
-        }
-        _groupFilter = _groupFilter.Group == null
-            ? _groupFilter
-            : options.FirstOrDefault(o => o.Group != null && DeploymentGroup.Comparer.Equals(o.Group, _groupFilter.Group)) ?? AllGroups;
-        // 選択肢を作り直すと画面の選択が外れるため、いつも知らせて選び直させる
-        OnPropertyChanged(nameof(GroupFilter));
         OnPropertyChanged(nameof(GroupNames));
         OnPropertyChanged(nameof(BatchGroupSuggestions));
-    }
-
-    // サブスクリプションを読み直したら、絞り込みの選択肢を作り直す（選んでいたものが無くなれば、すべてに戻す）
-    private void ResetSubscriptionFilters()
-    {
-        var wanted = _wantedSubscriptionId;
-        SubscriptionFilters.Clear();
-        SubscriptionFilters.Add(AllSubscriptions);
-        foreach (var s in _target.Subscriptions)
-            SubscriptionFilters.Add(new SubscriptionFilterOption(s.SubscriptionId, s.Display));
-        SetFilter(ref _subscriptionFilter,
-            SubscriptionFilters.FirstOrDefault(f => string.Equals(f.SubscriptionId, wanted, StringComparison.OrdinalIgnoreCase)) ?? AllSubscriptions,
-            nameof(SubscriptionFilter));
     }
 
     private SubscriptionChoice? FindSubscription(string subscriptionId) =>
@@ -643,34 +518,26 @@ public sealed class DeploymentListViewModel : ObservableObject
         return entries;
     }
 
-    private bool Matches(DeploymentEntry e)
+    // 表の列（▽ の値・表の上のフィルタで探す文字・日付。docs/design/desktop/desktop-tables.md の 10.4）
+    private List<TableColumn<DeploymentEntry>> CreateColumns()
     {
-        var zone = Time.LocalTimeZone;
-        DateOnly Date(DateTimeOffset value) => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(value, zone).DateTime);
-        static DateOnly Picked(DateTimeOffset value) => DateOnly.FromDateTime(value.DateTime);
-        bool InRange(DateTimeOffset? value, DateTimeOffset? from, DateTimeOffset? to) =>
-            (from == null && to == null)
-            || (value is { } v && (from == null || Date(v) >= Picked(from.Value)) && (to == null || Date(v) <= Picked(to.Value)));
-
-        if (SubscriptionFilter.SubscriptionId is { } subscriptionId && !string.Equals(e.SubscriptionId, subscriptionId, StringComparison.OrdinalIgnoreCase))
-            return false;
-        if (ResourceGroupFilter.Length > 0 && !e.ResourceGroup.Contains(ResourceGroupFilter, StringComparison.OrdinalIgnoreCase))
-            return false;
-        if (AppNameFilter.Length > 0 && !e.AppName.Contains(AppNameFilter, StringComparison.OrdinalIgnoreCase))
-            return false;
-        if (!InRange(e.DeployedAt, DeployedFrom, DeployedTo))
-            return false;
-        if (StateFilter.State is { } state && DeploymentStates.Of(e) != state)
-            return false;
-        if (GroupFilter.NoGroup ? e.Group != null : GroupFilter.Group is { } group && !DeploymentGroup.Comparer.Equals(e.Group, group))
-            return false;
-        return ExpiryFilter.Mode switch
-        {
-            ExpiryFilterMode.Within7Days => e.ExpiryKind == ExpiryKind.Date && e.ExpiresAt <= Time.GetUtcNow().AddDays(SoonDays),
-            ExpiryFilterMode.NoExpiry => e.ExpiryKind == ExpiryKind.None,
-            ExpiryFilterMode.Range => e.ExpiryKind == ExpiryKind.Date && InRange(e.ExpiresAt, ExpiryFrom, ExpiryTo),
-            _ => true,
-        };
+        string Day(DateTimeOffset value) => TimeZoneInfo.ConvertTime(value, Time.LocalTimeZone).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        return
+        [
+            new(nameof(DeploymentSortKey.Subscription), "サブスクリプション", e => SubscriptionDisplay(e.SubscriptionId)),
+            new(nameof(DeploymentSortKey.ResourceGroup), "リソースグループ", e => e.ResourceGroup),
+            new(nameof(DeploymentSortKey.AppName), "アプリ名", e => e.AppName),
+            new(nameof(DeploymentSortKey.Group), "グループ", e => e.Group ?? "（グループなし）", e => e.Group),
+            new(nameof(DeploymentSortKey.State), "状態", e => DeploymentStates.Label(DeploymentStates.Of(e))),
+            new(nameof(DeploymentSortKey.ExpiresAt), "利用可能期限日", e => e.ExpiryKind switch
+            {
+                ExpiryKind.None => "期限なし",
+                ExpiryKind.Date => Day(e.ExpiresAt!.Value),
+                _ => "記録なし",
+            }, date: e => e.ExpiryKind == ExpiryKind.Date ? e.ExpiresAt : null),
+            new(nameof(DeploymentSortKey.DeployedAt), "デプロイ日", e => e.DeployedAt is { } at ? Day(at) : "記録なし", date: e => e.DeployedAt),
+            new(JobColumn, "ジョブ", e => _queue.ActiveFor(e.SubscriptionId, e.ResourceGroup, e.AppName) is { } job ? job.IsDeployment ? "デプロイのジョブ" : "削除のジョブ" : "なし"),
+        ];
     }
 
     // 並べ替え（値の無いものは最後。同じ値ならサブスクリプション・リソースグループ・アプリ名の順）
@@ -709,9 +576,9 @@ public sealed class DeploymentListViewModel : ObservableObject
     private void Refresh(bool resetPage, bool keepRows)
     {
         _entries = Apply();
-        ResetGroupFilters();
+        NotifyGroups();
         EntriesChanged.Invoke();
-        _filtered = Sorted(_entries.Where(Matches)).ToList();
+        _filtered = Sorted(_entries.Where(Filters.Matches)).ToList();
         _filteredCount = _filtered.Count;
         if (resetPage || _pageIndex >= PageCount)
             _pageIndex = 0;
@@ -842,12 +709,10 @@ public sealed class DeploymentListViewModel : ObservableObject
             row.SetActiveJob(_queue.ActiveFor(row.Entry.SubscriptionId, row.Entry.ResourceGroup, row.AppName));
     }
 
-    private void SetFilter<T>(ref T field, T value, [System.Runtime.CompilerServices.CallerMemberName] string propertyName = "", string? dependent = null)
+    private void SetFilter<T>(ref T field, T value, [System.Runtime.CompilerServices.CallerMemberName] string propertyName = "")
     {
         if (!SetProperty(ref field, value, propertyName))
             return;
-        if (dependent != null)
-            OnPropertyChanged(dependent);
         Refresh(resetPage: true, keepRows: true);
     }
 

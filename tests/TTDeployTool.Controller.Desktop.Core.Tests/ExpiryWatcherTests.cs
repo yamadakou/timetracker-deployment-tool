@@ -65,7 +65,7 @@ public class ExpiryWatcherTests
 
         await h.Main.Expiry.CheckAsync();
         // 一覧が変わっても、始めるまでは次の確認を決めない
-        h.Main.Deployments.ResourceGroupFilter = "rg";
+        h.Main.Deployments.Filters.Text = "rg";
 
         h.Azure.DirectoryQueries.Should().BeEmpty();
         h.Main.Jobs.Should().BeEmpty();

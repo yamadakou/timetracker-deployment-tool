@@ -106,33 +106,33 @@ public class GroupTests
         vm.Rows.Single(r => r.AppName == "c").GroupText.Should().BeEmpty();
 
         vm.GroupNames.Should().Equal(["eigyo", "営業", "研修"], "大文字と小文字は区別せずに束ね、最初の書き方を出す");
-        vm.GroupFilters.Select(f => f.Label).Should().Equal("すべて", "グループなし", "eigyo", "営業", "研修");
-        vm.GroupFilters[0].ToString().Should().Be("すべて");
+        vm.Filters.ValuesOf("Group").Select(v => (v.Value, v.Count)).Should().Equal(("eigyo", 2), ("営業", 1), ("研修", 1), ("（グループなし）", 1));
 
         vm.SortBy(DeploymentSortKey.Group);
-        (Names(vm), vm.GroupHeader).Should().Be(("d,e,a,b,c", "グループ ▲"), "グループの無い行は最後");
+        (Names(vm), vm.SortColumn).Should().Be(("d,e,a,b,c", "Group"), "グループの無い行は最後");
         vm.SortBy("Group");
         Names(vm).Should().Be("b,a,d,e,c");
 
-        vm.GroupFilter = vm.GroupFilters.Single(f => f.Label == "eigyo");
+        vm.Filters.SetValues("Group", ["EIGYO"]);
         Names(vm).Should().Be("d,e", "大文字と小文字を区別しない");
-        vm.GroupFilter = DeploymentListViewModel.NoGroup;
+        vm.Filters.SetValues("Group", ["（グループなし）"]);
         Names(vm).Should().Be("c");
-        vm.GroupFilter = vm.GroupFilters.Single(f => f.Label == "研修");
+        vm.Filters.SetValues("Group", ["研修"]);
 
-        // 読み直して、選んでいたグループが残っていれば選んだまま、無くなれば「すべて」に戻す
-        var raised = new List<string?>();
-        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+        // 読み直しても、選んでいたグループで絞り込んだまま（無くなれば、どの行も出さない）
         await vm.LoadCommand.ExecuteAsync();
-        (vm.GroupFilter.Group, Names(vm)).Should().Be(("研修", "b"));
-        raised.Should().Contain(nameof(DeploymentListViewModel.GroupFilter));
+        Names(vm).Should().Be("b");
         h.Azure.RecordsByTenant["t1"] = [.. Grouped("a", "営業")];
         await vm.LoadCommand.ExecuteAsync();
-        vm.GroupFilter.Should().Be(DeploymentListViewModel.AllGroups);
-        vm.GroupFilters.Select(f => f.Label).Should().Equal("すべて", "グループなし", "営業");
-        vm.GroupFilter = DeploymentListViewModel.NoGroup;
-        await vm.LoadCommand.ExecuteAsync();
-        vm.GroupFilter.Should().Be(DeploymentListViewModel.NoGroup, "「グループなし」は読み直しても残す");
+        Names(vm).Should().BeEmpty();
+        vm.Filters.ValuesOf("Group").Should().Equal(new FilterValue("営業", 1, false));
+        vm.Filters.ClearValues("Group");
+        Names(vm).Should().Be("a");
+
+        // 文字のフィルタは、セルに見えている文字（グループの無い行は空）で探す
+        vm.Filters.TextTarget = vm.Filters.TextTargets.Single(t => t.Label == "グループ");
+        vm.Filters.Text = "なし";
+        Names(vm).Should().BeEmpty();
     }
 
     [Fact]

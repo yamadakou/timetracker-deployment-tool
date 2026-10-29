@@ -47,6 +47,7 @@ public sealed class JobViewModel : ObservableObject
 
     private readonly JobKind _kind;
     private readonly JobTarget _target;
+    private string _subscriptionText;
     private readonly JobQueue? _queue;
     private readonly TaskCompletionSource _finished = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private Job? _job;
@@ -72,6 +73,7 @@ public sealed class JobViewModel : ObservableObject
     {
         _kind = kind;
         _target = target;
+        _subscriptionText = target.Subscription;
         _queue = queue;
         _scheduledAt = scheduledAt;
         _pending = scheduledAt == null ? DesktopJobState.Waiting : DesktopJobState.Scheduled;
@@ -234,6 +236,7 @@ public sealed class JobViewModel : ObservableObject
     // 予定（時刻を添える）以外の状態の表示
     private static readonly IReadOnlyDictionary<DesktopJobState, string> Labels = new Dictionary<DesktopJobState, string>
     {
+        [DesktopJobState.Scheduled] = "予定",
         [DesktopJobState.Waiting] = "待機中（同時に実行できる数に達しています）",
         [DesktopJobState.Paused] = "一時停止",
         [DesktopJobState.Starting] = "実行の準備中",
@@ -254,8 +257,11 @@ public sealed class JobViewModel : ObservableObject
     /// <summary>予定の時刻（すぐ実行するジョブは null）。</summary>
     public DateTimeOffset? ScheduledAt => _scheduledAt;
 
+    /// <summary>状態の名前（予定の時刻を含まない。ジョブの一覧の ▽ の値）。</summary>
+    public string StateLabel => Labels[State];
+
     public string StatusText => State == DesktopJobState.Scheduled
-        ? $"予定（{_scheduledAt!.Value.ToLocalTime():MM/dd HH:mm}）"
+        ? $"{Labels[State]}（{_scheduledAt!.Value.ToLocalTime():MM/dd HH:mm}）"
         : Labels[State];
 
     public string? StepText => State == DesktopJobState.Starting
@@ -292,6 +298,13 @@ public sealed class JobViewModel : ObservableObject
 
     /// <summary>ジョブの一覧の対象。</summary>
     public string TargetText => $"{_target.ResourceGroup} / {_target.AppName}";
+
+    /// <summary>サブスクリプションの表示（名前と ID。ジョブの一覧が入れる。入れる前は ID。No.78）。</summary>
+    public string SubscriptionText
+    {
+        get => _subscriptionText;
+        internal set => SetProperty(ref _subscriptionText, value);
+    }
 
     /// <summary>ジョブの一覧の時刻（予定の時刻。すぐ実行したものは「すぐ実行」）。</summary>
     public string TimeText => _scheduledAt is { } at ? $"{at.ToLocalTime():MM/dd HH:mm}" : "すぐ実行";
