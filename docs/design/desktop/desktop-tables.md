@@ -149,6 +149,12 @@ TableView には、列を隠す・固定する列を変える操作の画面が�
 
 ### 10.3.1 WinUI.TableView の中の例外（Desktop System Test、2026-10-29）
 TableView 1.5.1 は、行を 1 つだけ選ぶと、その行の番号で `ScrollRowIntoView` を後から（`DispatcherQueue.TryEnqueue`）実行する。それまでに表の行が減ると、番号が範囲の外になり `ArgumentOutOfRangeException` になる（行を選んだデプロイの削除が終わり、一覧を続けて作り直したとき。run 40864735420 でアプリが終了した）。部品の中の順番のため、アプリの側では防げない。この例外だけを、処理されなかった例外の扱い（`App.UnhandledException`）で記録して続ける（Core の `KnownUiErrors.IsTableViewScrollRace`。選んだ行を表示させる処理が 1 回行われないだけ）。ほかの例外は今までどおり
+- 同じ形の確認（2026-10-29。v1.5.1 のソースで、後から実行する処理〔`DispatcherQueue.TryEnqueue`・`async void`・`Task.Yield`・`Task.Delay`〕約 30 か所を確かめた）:
+  - 同じ不具合（覚えた行の番号で、範囲を確かめずに `Items[index]`）: 選択の変更（`TableView_SelectionChanged`）と、読み取り専用の表でセルを押した・キーボードで移ったとき（`MakeSlotCurrent` の `ScrollRowIntoView(slot.Row)`。この表は `IsReadOnly="True"` のため通る）の 2 か所。どちらも `ScrollRowIntoView` の中で起きるため、上の扱いで続けられる
+  - 番号を確かめているもの（問題なし）: `GetCellFromSlot`（`slot.IsValid`）、`ScrollIntoViewAfterDetailsPaneVisibility`（番号と中身が同じかを確かめる）、`ScrollRowIntoView` の後半（`ContainerFromIndex` は無ければ null）、`ApplyPendingCellStates`（今ある行だけ）
+  - 番号を使わないもの: 行の色・選択の印・行見出しの幅・列見出しの幅の更新、ドラッグでの選択（この表では使わない）、グループ化（`CanGroupColumns="False"`）、貼り付け・CSV の書き出し（読み取り専用で使わない）
+  - アプリの側: 後から実行するのは `TableBinder` の並べ替え（列の向きを読むだけ）だけで、行の番号は使わない
+  - 作者の Issue: `ScrollRowIntoView`・`ArgumentOutOfRangeException` で探したが、同じ報告は無い（見出しの幅が負になる例外 #437 は 1.5.1 で直っている）
 
 ### 10.4 絞り込みの作り（Q6 の B）
 | 項目 | 作り |
