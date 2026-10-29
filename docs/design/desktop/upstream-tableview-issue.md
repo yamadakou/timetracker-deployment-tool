@@ -1,7 +1,7 @@
 # WinUI.TableView への不具合の報告（下書き）
 
 - 関連: [`desktop-tables.md`](desktop-tables.md) の 10.3.1・REVIEW_ISSUES No.78
-- 状況: 下書き（2026-10-29）。オーナーが [w-ahmad/WinUI.TableView の Issue](https://github.com/w-ahmad/WinUI.TableView/issues/new?template=bug_report.md) に投稿する（このセッションには投稿の権限が無い）。作者の貢献の手引き（CONTRIBUTING.md）は「プルリクエストの前に Issue で相談する」ため、まず Issue に修正案の差分を添え、作者が良ければプルリクエストを出す
+- 状況: オーナーが投稿した（2026-10-29、[#478](https://github.com/w-ahmad/WinUI.TableView/issues/478)）。作者の返事を待つ。直った版が出たら、アプリの側の対策（`KnownUiErrors.IsTableViewScrollRace`）を外せるかを確かめる。以下は投稿の時点の下書き。オーナーが [w-ahmad/WinUI.TableView の Issue](https://github.com/w-ahmad/WinUI.TableView/issues/new?template=bug_report.md) に投稿する（このセッションには投稿の権限が無い）。作者の貢献の手引き（CONTRIBUTING.md）は「プルリクエストの前に Issue で相談する」ため、まず Issue に修正案の差分を添え、作者が良ければプルリクエストを出す
 - 確かめたソース: v1.5.1 と、main の fc181b9（2026-10-23）。どちらにも同じ不具合がある
 
 以下を、そのまま Issue の本文に貼る（英語）。

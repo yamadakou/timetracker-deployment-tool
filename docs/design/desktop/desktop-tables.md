@@ -154,7 +154,7 @@ TableView 1.5.1 は、行を 1 つだけ選ぶと、その行の番号で `Scrol
   - 番号を確かめているもの（問題なし）: `GetCellFromSlot`（`slot.IsValid`）、`ScrollIntoViewAfterDetailsPaneVisibility`（番号と中身が同じかを確かめる）、`ScrollRowIntoView` の後半（`ContainerFromIndex` は無ければ null）、`ApplyPendingCellStates`（今ある行だけ）
   - 番号を使わないもの: 行の色・選択の印・行見出しの幅・列見出しの幅の更新、ドラッグでの選択（この表では使わない）、グループ化（`CanGroupColumns="False"`）、貼り付け・CSV の書き出し（読み取り専用で使わない）
   - アプリの側: 後から実行するのは `TableBinder` の並べ替え（列の向きを読むだけ）だけで、行の番号は使わない
-  - 作者の Issue: `ScrollRowIntoView`・`ArgumentOutOfRangeException` で探したが、同じ報告は無い（見出しの幅が負になる例外 #437 は 1.5.1 で直っている）。修正案つきの報告の下書きは [`upstream-tableview-issue.md`](upstream-tableview-issue.md)
+  - 作者の Issue: `ScrollRowIntoView`・`ArgumentOutOfRangeException` で探したが、同じ報告は無い（見出しの幅が負になる例外 #437 は 1.5.1 で直っている）。修正案つきで報告した（[#478](https://github.com/w-ahmad/WinUI.TableView/issues/478)、2026-10-29。本文は [`upstream-tableview-issue.md`](upstream-tableview-issue.md)）
 
 ### 10.4 絞り込みの作り（Q6 の B）
 | 項目 | 作り |
