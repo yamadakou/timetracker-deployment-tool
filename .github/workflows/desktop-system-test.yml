@@ -83,6 +83,12 @@ jobs:
         }
         Get-AppxPackage -Name TTDeployTool | Format-List Name, PackageFamilyName, Version
 
+    # テスト中のアプリが期限での削除のジョブを登録して手順がずれないよう、先に期限切れのデプロイを CLI で削除する
+    # （このサブスクリプションは開発用で、期限切れは消してよい。2026-10-29）
+    - name: Remove expired deployments
+      shell: pwsh
+      run: ./.github/scripts/remove-expired-deployments.ps1 -SubscriptionId $env:TT_UITEST_SUBSCRIPTION_ID
+
     - name: UI test on Azure
       run: >
         dotnet test --project tests/TTDeployTool.Controller.Desktop.UITests --
