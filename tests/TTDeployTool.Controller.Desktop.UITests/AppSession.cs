@@ -157,11 +157,52 @@ public sealed class AppSession : IDisposable
     public void SelectRow(string automationId, int index = 0, TimeSpan? timeout = null)
     {
         var rows = Retry.WhileEmpty(
-            () => Find(automationId).FindAllChildren(cf => cf.ByControlType(ControlType.ListItem).Or(cf.ByControlType(ControlType.DataItem))),
+            () => RowsOf(automationId),
             timeout ?? Timeout, Interval, throwOnTimeout: true, ignoreException: true,
             timeoutMessage: $"表 {automationId} に行が出ませんでした。").Result!;
         rows[index].Patterns.SelectionItem.Pattern.AddToSelection();
     }
+
+    /// <summary>
+    /// 表の行のうち、列 <paramref name="cellId"/> の文字が <paramref name="text"/> の行（現れるまで待つ）。UI Automation の行の順は、画面の行の順と
+    /// 一致するとは限らないため（WinUI.TableView。Desktop System Test、2026-10-29）、行の位置ではなく中身で探す。
+    /// </summary>
+    public AutomationElement RowWith(string tableId, string cellId, string text, TimeSpan? timeout = null) =>
+        RowWhere(tableId, r => TextIn(r, cellId) == text, $"{cellId} が「{text}」", timeout);
+
+    /// <summary>表の行のうち、条件に合う行（現れるまで待つ）。</summary>
+    public AutomationElement RowWhere(string tableId, Func<AutomationElement, bool> match, string description, TimeSpan? timeout = null) =>
+        Retry.WhileNull(
+            () => RowsOf(tableId).FirstOrDefault(match),
+            timeout ?? Timeout, Interval, throwOnTimeout: true, ignoreException: true,
+            timeoutMessage: $"表 {tableId} に、{description}の行が出ませんでした（今の行: {RowsText(tableId)}）。").Result!;
+
+    /// <summary>表の行のうち、列 <paramref name="cellId"/> の文字が <paramref name="text"/> の行を選びに加える。</summary>
+    public void SelectRowWith(string tableId, string cellId, string text) =>
+        RowWith(tableId, cellId, text).Patterns.SelectionItem.Pattern.AddToSelection();
+
+    /// <summary>行の中の列 <paramref name="cellId"/> の文字（無ければ空）。</summary>
+    public static string TextIn(AutomationElement row, string cellId) =>
+        row.FindFirstDescendant(cf => cf.ByAutomationId(cellId)) is { } cell ? NameOf(cell) : "";
+
+    /// <summary>
+    /// 表の行のうち、列 <paramref name="keyId"/> の文字が <paramref name="key"/> の行の、列 <paramref name="cellId"/> の文字が条件を満たすまで待ち、
+    /// その文字を返す（行を作り直しても、そのたびに探し直す）。
+    /// </summary>
+    public string WaitForRowText(string tableId, string keyId, string key, string cellId, Func<string, bool> condition, string description, TimeSpan? timeout = null)
+    {
+        var last = "";
+        if (!TryWait(() => condition(last = TextIn(RowWith(tableId, keyId, key), cellId)), timeout))
+            throw new TimeoutException($"{tableId} の {key} の {cellId}: {description}（最後の表示: {last}。今の行: {RowsText(tableId)}）");
+        return last;
+    }
+
+    /// <summary>表の行の文字（UI Automation の行の順。失敗したときの記録に使う）。</summary>
+    public string RowsText(string tableId) =>
+        string.Join(" | ", RowsOf(tableId).Select(r => string.Join(" / ", r.FindAllDescendants(cf => cf.ByControlType(ControlType.Text)).Select(NameOf).Where(t => t.Length > 0))));
+
+    private AutomationElement[] RowsOf(string tableId) =>
+        Find(tableId).FindAllChildren(cf => cf.ByControlType(ControlType.ListItem).Or(cf.ByControlType(ControlType.DataItem)));
 
     /// <summary>入力欄（TextBox）の値。</summary>
     public string ValueOf(string automationId) => Find(automationId).Patterns.Value.Pattern.Value.Value ?? "";

@@ -1,3 +1,4 @@
+using FlaUI.Core.AutomationElements;
 using FluentAssertions;
 using Xunit;
 
@@ -204,10 +205,13 @@ public class AzureUiTests
             app.Invoke("Jobs.BannerShow");
             app.Find("Panel.Jobs");
             // 一覧は新しい順なので、先頭（最初に見つかる要素）が今登録したジョブ。No.63: 行を選んで、まとめての操作で取り消す
-            app.WaitForText("Job.Status", t => t.StartsWith("予定"), "予定のジョブが一覧の先頭に出る");
-            app.SelectRow("Jobs.List");
+            // No.78: 表の行は、位置ではなく対象（リソースグループ / アプリ名）で探す
+            var secondTarget = $"{resourceGroup} / {second}";
+            app.WaitForRowText("Jobs.List", "Job.Target", secondTarget, "Job.Status", t => t.StartsWith("予定"), "予定のジョブが一覧に出る");
+            Log($"ジョブの一覧の行: {app.RowsText("Jobs.List")}");
+            app.SelectRowWith("Jobs.List", "Job.Target", secondTarget);
             app.Invoke("Jobs.CancelSelected");
-            app.WaitForText("Job.Status", t => t == "取り消し", "予定を取り消せる");
+            app.WaitForRowText("Jobs.List", "Job.Target", secondTarget, "Job.Status", t => t == "取り消し", "予定を取り消せる");
             app.WaitForText("Jobs.Message", t => t.StartsWith("1 件の取り消し"), "取り消した数が出る");
 
             // 7b: 削除の実行中に、別の対象のデプロイを同時に実行し（既定の上限は 2）、今の手順の後で止める。
@@ -226,12 +230,16 @@ public class AzureUiTests
             app.Invoke("Wizard.ShowJob");
             app.Find("Panel.Status");
             app.Show("Jobs");
-            var concurrent = app.WaitForText("Job.Status", t => t is "実行中" or "待機中（同時に実行できる数に達しています）" or "完了" or "失敗", "2 つ目のデプロイが始まる", LoadTimeout);
-            Log($"2 つ目のデプロイを始めたときのジョブ: {app.TextOf("Jobs.Count")}");
+            // 同じ対象に、取り消した予定の行もあるため、取り消しでない行を見る
+            bool Running(AutomationElement row) => AppSession.TextIn(row, "Job.Target") == secondTarget && AppSession.TextIn(row, "Job.Status") != "取り消し";
+            var concurrent = "";
+            AppSession.WaitUntil(() => (concurrent = AppSession.TextIn(app.RowWhere("Jobs.List", Running, $"{secondTarget} の取り消しでない"), "Job.Status"))
+                is "実行中" or "待機中（同時に実行できる数に達しています）" or "完了" or "失敗", "2 つ目のデプロイが始まりませんでした。", LoadTimeout);
+            Log($"2 つ目のデプロイを始めたときのジョブ: {app.TextOf("Jobs.Count")}（行: {app.RowsText("Jobs.List")}）");
             concurrent.Should().Be("実行中", "対象が違えば、削除の実行中でも待たずに始める");
             // No.63: 1 行だけ選んで「詳細」で実行状況を開き、止めてからジョブの一覧に戻る（取り消した行の選択が残っているため、先に外す）
             app.Invoke("Jobs.ClearSelection");
-            app.SelectRow("Jobs.List");
+            app.RowWhere("Jobs.List", Running, $"{secondTarget} の取り消しでない").Patterns.SelectionItem.Pattern.AddToSelection();
             app.Invoke("Jobs.Detail");
             app.Find("Panel.Status");
             app.Invoke("Job.Stop");
