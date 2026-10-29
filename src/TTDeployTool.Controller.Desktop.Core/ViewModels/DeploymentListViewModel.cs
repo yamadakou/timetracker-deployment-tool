@@ -85,6 +85,7 @@ public sealed class DeploymentListViewModel : ObservableObject
     private int _pageSize = PageSizes[0];
     private int _pageIndex;
     private int _filteredCount;
+    private string _jobValues = "";
 
     /// <param name="open">対象に入れた後に、画面を開く（ウィザード・実行状況・削除の名前: wizard・status・delete）</param>
     /// <param name="openBatchDeletion">2 件以上を選んで削除するときに、まとめての削除の画面を開いて計画する（docs/design/desktop/desktop-wizard.md の 7）</param>
@@ -121,15 +122,18 @@ public sealed class DeploymentListViewModel : ObservableObject
         NextPageCommand = new AsyncCommand(() => GoTo(_pageIndex + 1), () => _pageIndex < PageCount - 1);
         _queue = queue;
         queue.Finished += OnJobFinished;
-        // ジョブの登録・状態の変更で、行のジョブの表示を変える（ジョブの列で絞り込んでいれば、絞り込み直す）
+        // ジョブの登録・状態の変更で、行のジョブの表示を変える。ジョブの列の値（ジョブの有無と種類）が変わったときだけ、絞り込み直す
+        // （状態の表示は実行中に何度も変わるため、そのたびに一覧を作り直すと、行の選択がちらつく。Desktop System Test、2026-10-29）
         queue.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName != nameof(JobQueue.Summary))
                 return;
-            if (Filters.IsFiltered(JobColumn) || Filters.Text.Length > 0)
+            var jobs = JobValues();
+            if (jobs != _jobValues && (Filters.IsFiltered(JobColumn) || Filters.Text.Length > 0))
                 Refresh(resetPage: false, keepRows: true);
             else
                 ShowJobs();
+            _jobValues = jobs;
         };
     }
 
@@ -700,6 +704,13 @@ public sealed class DeploymentListViewModel : ObservableObject
             return;
         }
         await _openBatchDeletion(_selected.Select(r => r.Entry).ToList());
+    }
+
+    // 読んだデプロイごとのジョブの列の値（変わったかを比べる）
+    private string JobValues()
+    {
+        var column = Filters.Column(JobColumn);
+        return string.Join("\n", _entries.Select(column.ValueOf));
     }
 
     // 今のページの行に、同じ対象の終わっていないジョブを入れる

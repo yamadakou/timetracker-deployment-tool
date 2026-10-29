@@ -577,6 +577,13 @@ public class DeploymentListViewModelTests
         list.Filters.SetValues(DeploymentListViewModel.JobColumn, ["デプロイのジョブ", "削除のジョブ"]);
         Names().Should().Be("demo,old");
 
+        // ジョブの状態が変わっても、ジョブの列の値（有無と種類）が同じなら、一覧を作り直さない（行の選択がちらつかないように）
+        var rebuilt = 0;
+        list.Rows.CollectionChanged += (_, _) => rebuilt++;
+        await deploy.PauseCommand.ExecuteAsync();
+        await deploy.ResumeCommand.ExecuteAsync();
+        rebuilt.Should().Be(0);
+
         // ジョブが終わると、ジョブの列で絞り込んでいれば絞り込み直す
         await deploy.CancelCommand.ExecuteAsync();
         Names().Should().Be("old");
