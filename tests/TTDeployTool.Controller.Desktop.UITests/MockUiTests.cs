@@ -35,7 +35,7 @@ public class MockUiTests
         // 列の中身（サブスクリプション・グループ・期限・状態）
         var first = app.RowWith("Deployments.Rows", "Row.AppName", "app00");
         AppSession.TextIn(first, "Row.Group").Should().Be("研修");
-        AppSession.TextIn(app.RowWith("Deployments.Rows", "Row.AppName", "app02"), "Row.Group").Should().Be("（グループなし）");
+        AppSession.TextIn(app.RowWith("Deployments.Rows", "Row.AppName", "app02"), "Row.Group").Should().BeEmpty("グループの無い行のセルは空（▽ の値は「（グループなし）」）");
         AppSession.TextIn(first, "Row.Expiry").Should().Be("期限なし");
         AppSession.TextIn(app.RowWith("Deployments.Rows", "Row.AppName", "app04"), "Row.State")
             .Should().NotBe(AppSession.TextIn(first, "Row.State"), "止めたデプロイの状態は、動いているものと違う");
@@ -131,9 +131,16 @@ public class MockUiTests
         app.Show("Jobs");
         app.WaitForText("Jobs.Count", t => t.Contains($"全 {Records} 件"), "記録の 45 件");
         app.Select("Jobs.PageSize", "50");
-        // いちばん新しい 2 件の結果（誤り）は長い文字。1 行の文字（種類）の高さと比べる
-        var row = app.RowWith("Jobs.List", "Job.Target", $"rg-mock-{100 + Records - 1} / app{100 + Records - 1}");
-        AppSession.ScrollIntoView(row);
+        AppSession.WaitUntil(() => app.RowCount("Jobs.List") == Records, "50 件ずつにすると 1 ページ");
+        // いちばん新しい 2 件の結果（誤り）は長い文字。1 行の文字（種類）の高さと比べる。行は作り直されるため、大きさが出るまで探し直す
+        var target = $"rg-mock-{100 + Records - 1} / app{100 + Records - 1}";
+        AppSession.WaitUntil(() =>
+        {
+            var found = app.RowWith("Jobs.List", "Job.Target", target);
+            AppSession.ScrollIntoView(found);
+            return Cell(found, "Job.Kind").BoundingRectangle.Height > 0;
+        }, "長い文字の行が画面に出る");
+        var row = app.RowWith("Jobs.List", "Job.Target", target);
         var result = Cell(row, "Job.Result");
         var line = Cell(row, "Job.Kind").BoundingRectangle.Height;
         var height = result.BoundingRectangle.Height;
