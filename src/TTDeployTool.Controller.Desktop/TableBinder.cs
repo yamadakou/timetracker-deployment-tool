@@ -186,7 +186,12 @@ internal sealed class TableBinder<T>
 
     private void SizeSpacer()
     {
-        var width = ScrollBarSpace + Math.Max(0, _table.CellsHorizontalOffset - HeaderReserve);
+        // 行を減らした直後など、表はチェックボックスの列の幅を一時的に NaN にする（TableView の中も NaN を 0 として扱う）。
+        // NaN から GridLength を作ると例外になり、DispatcherQueue の中のためアプリが落ちた（Desktop System Test、run 41050364091）
+        var offset = _table.CellsHorizontalOffset;
+        if (!double.IsFinite(offset))
+            return;
+        var width = ScrollBarSpace + Math.Max(0, offset - HeaderReserve);
         if (!_spacer.Width.IsAbsolute || _spacer.Width.Value != width)
             _spacer.Width = new GridLength(width);
     }
