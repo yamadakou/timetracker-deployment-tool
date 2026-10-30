@@ -41,6 +41,10 @@ public partial class MainWindow : Window
         });
         var menu = new System.Windows.Controls.ContextMenu();
         menu.Items.Add(new System.Windows.Controls.MenuItem { Header = "開く", Command = open });
+        // オーナーの実機での確認のための項目（ManualCheck）
+        foreach (var (header, run) in ManualCheck.Items(this))
+            menu.Items.Add(new System.Windows.Controls.MenuItem { Header = header, Command = new Core.Mvvm.AsyncCommand(run) });
+        menu.Items.Add(new System.Windows.Controls.Separator());
         menu.Items.Add(new System.Windows.Controls.MenuItem { Header = "終了", Command = new Core.Mvvm.AsyncCommand(() =>
         {
             Exit();

@@ -245,4 +245,7 @@ WinUI 3 のまま続ける場合は、Microsoft の TableView の安定版が出
 - WinUI 3 のアプリでは、同じ `AppNotificationService`（自己完結の Windows App SDK）で、オーナーの実機で通知が出て押せることを確かめている（REVIEW_ISSUES の No.61 など）
 - 実機で使えなかった場合の代わり: OS の通知の API（WinRT の `ToastNotificationManager`）は MSIX の WPF のホストで Enabled だったため、`INotificationService` をこの API で作り直せる（押したときの起動は、マニフェストの `toastNotificationActivation` と COM の受け口を自分で受ける）
 
+### 15.2 実機での確認（オーナーの判断で案 A、2026-10-30）
+試作の MSIX（CI の成果物 `ttdeploytool-blazor-prototype-msix`。その実行だけの証明書で署名し、公開鍵の `.cer` を添える）をオーナーの PC に入れ、通知領域の確認のメニュー（`ManualCheck`）で、通知を出す・押してウィンドウが出る（Windows App SDK と、代わりの OS の通知の API の両方）・サインイン時の起動を確かめる。手順と結果の見方は [`desktop-blazor-hybrid-check.md`](desktop-blazor-hybrid-check.md)。結果を待つ
+
 出典 12: Microsoft Learn「AppNotificationManager.IsSupported Method」（Windows App SDK 2.0。プッシュ通知の API が使えるか。自己完結のアプリでは Singleton パッケージへの依存に注意）https://learn.microsoft.com/windows/windows-app-sdk/api/winrt/microsoft.windows.appnotifications.appnotificationmanager.issupported（2026-10-30 に確認）

@@ -477,6 +477,27 @@ jobs:
         Write-Host "通知を出すシェルのプロセス: $($shell -join ', ')"
         "setting=$setting" | Set-Content TestResults/runner-notifications.txt
 
+    # オーナーの実機での確認（通知など。docs/design/desktop/desktop-blazor-hybrid-check.md）のため、この実行の MSIX と、署名の証明書の公開鍵（.cer）と手順書を残す。
+    # 秘密鍵はこのジョブの中だけで使い、成果物に入れない。評価版（Desktop Preview）とは別のアプリ（TTDeployTool.BlazorPrototype）
+    - name: Collect the MSIX for the owner's check
+      if: ${{ !cancelled() }}
+      shell: pwsh
+      run: |
+        $out = New-Item -ItemType Directory -Force -Path BlazorPrototypeMsix
+        $package = Get-ChildItem BlazorPackages -Recurse -Filter *.msix | Where-Object { $_.FullName -notmatch '\\Dependencies\\' } | Select-Object -First 1
+        Copy-Item $package.FullName (Join-Path $out "TTDeployTool-BlazorPrototype-x64.msix")
+        Export-Certificate -Cert "Cert:\CurrentUser\My\${{ steps.cert.outputs.thumbprint }}" -FilePath (Join-Path $out "TTDeployTool-BlazorPrototype.cer") | Out-Null
+        Copy-Item docs/design/desktop/desktop-blazor-hybrid-check.md (Join-Path $out "CHECK.md")
+        Get-ChildItem $out | Format-Table Name, Length
+
+    - name: Upload the MSIX for the owner's check
+      if: ${{ !cancelled() }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: ttdeploytool-blazor-prototype-msix
+        path: BlazorPrototypeMsix
+        retention-days: 7
+
     - name: Measure the Blazor MSIX
       # WebView2 のテストが失敗しても、MSIX と計測は続けて確かめる
       if: ${{ !cancelled() }}

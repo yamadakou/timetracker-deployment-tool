@@ -20,6 +20,7 @@ public partial class App : System.Windows.Application
     public const string CheckWaiting = "check-waiting";
 
     private MainWindow? _window;
+    private bool _checking;
 
     /// <summary>起動の種類（通常・サインイン時の起動・通知から）。</summary>
     public static string ActivationKind { get; private set; } = "";
@@ -43,8 +44,13 @@ public partial class App : System.Windows.Application
             // 通知を押したときに、ウィンドウを出す（Register の前に NotificationInvoked を登録する。WinUI のアプリと同じ）
             AppNotificationManager.Default.NotificationInvoked += (_, args) => Dispatcher.InvokeAsync(() =>
             {
-                InvokedNotifications.Add(string.Join("&", args.Arguments.Select(a => $"{a.Key}={a.Value}")));
-                _window?.ShowFromTray();
+                var arguments = string.Join("&", args.Arguments.Select(a => $"{a.Key}={a.Value}"));
+                InvokedNotifications.Add(arguments);
+                // 人が試すとき（確認の自動の実行でないとき）は、どの通知から開いたかを出す
+                if (_window != null && !_checking)
+                    ManualCheck.Opened(_window, "Windows App SDK", arguments);
+                else
+                    _window?.ShowFromTray();
             });
             AppNotificationManager.Default.Register();
             ActivationKind = AppInstance.GetCurrent().GetActivatedEventArgs().Kind.ToString();
@@ -59,6 +65,7 @@ public partial class App : System.Windows.Application
             var waitForReactivation = File.Exists(request) && File.ReadAllText(request).Trim() == "reactivate";
             var report = argument ?? (File.Exists(request) ? Path.Combine(HostSettings.DataDirectory, CheckReport) : null);
             File.Delete(request);
+            _checking = report != null;
             _window = new MainWindow();
             if (report != null)
             {
