@@ -1,6 +1,7 @@
 using FlaUI.Core.AutomationElements;
 using FluentAssertions;
 using TTDeployTool.Controller.Desktop.Core.Services;
+using TTDeployTool.Controller.Desktop.Core.ViewModels;
 using TTDeployTool.Controller.Desktop.Fixtures;
 using Xunit;
 
@@ -50,7 +51,9 @@ public class MockUiTests
         app.Invoke("Deployments.ClearFilters");
         AppSession.WaitUntil(() => app.RowCount("Deployments.Rows") == Deployments, "外すと戻る");
 
-        // 1 行選ぶと詳細（パスワードはモックのシークレット）、2 行選ぶとまとめての操作
+        // 1 行選ぶと詳細（パスワードはモックのシークレット）、2 行選ぶとまとめての操作。詳細は表の下に出るため、行を絞って表を短くする
+        app.SetText("Deployments.Text", "rg-mock-0");
+        AppSession.WaitUntil(() => app.RowCount("Deployments.Rows") == 10, "10 行に絞る");
         app.SelectRowWith("Deployments.Rows", "Row.AppName", "app00");
         app.Find("Deployments.Detail");
         app.Invoke("Row.ShowPasswords");
@@ -133,6 +136,7 @@ public class MockUiTests
         app.Select("Jobs.PageSize", "50");
         AppSession.WaitUntil(() => app.RowCount("Jobs.List") == Records, "50 件ずつにすると 1 ページ");
         // いちばん新しい 2 件の結果（誤り）は長い文字。1 行の文字（種類）の高さと比べる。行は作り直されるため、大きさが出るまで探し直す
+        // （結果の列は、保存した列の配置〔WithFixture〕で 2 番目に置く。画面の外の列のセルは大きさが 0 になる）
         var target = $"rg-mock-{100 + Records - 1} / app{100 + Records - 1}";
         AppSession.WaitUntil(() =>
         {
@@ -202,9 +206,24 @@ public class MockUiTests
         var files = new[] { FixtureData.FileName, "job-history.json", "preferences.json" }.Select(f => Path.Combine(directory, f)).ToList();
         File.WriteAllText(files[0], (FixtureSamples.Data(Deployments, now) with { WriteDelaySeconds = 120 }).ToJson());
         new FileJobHistory(files[1]).Records = FixtureSamples.JobRecords(Records, now);
+        // 保存した列の配置を当てる（ジョブの一覧の結果の列を、種類の次に置く。CI のウィンドウは狭く、右端の列は画面の外になるため）
+        new FilePreferences(files[2]).TableLayouts = new Dictionary<string, IReadOnlyList<TableColumnLayout>>
+        {
+            ["jobs"] =
+            [
+                new("Kind", 110), new("Result", 320), new("Subscription", 200), new("Target", 200), new("State", 170), new("Time", 120), new("RegisteredAt", 120),
+                new("ChangedAt", 120), new("StartedAt", 120), new("Finished", 120), new("Duration", 0),
+            ],
+        };
         try
         {
-            AppSession.Run(test, name);
+            AppSession.Run(app =>
+            {
+                // CI のウィンドウは狭いため、最大化して表の列と詳細を画面に入れる
+                if (app.Window.Patterns.Window.TryGetPattern(out var window))
+                    window.SetWindowVisualState(FlaUI.Core.Definitions.WindowVisualState.Maximized);
+                test(app);
+            }, name);
         }
         finally
         {
