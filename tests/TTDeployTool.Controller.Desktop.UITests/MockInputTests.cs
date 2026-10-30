@@ -60,8 +60,9 @@ public class MockInputTests
         // 起動し直しても同じ（列の配置を保存する）
         app.CloseAndWait().Should().BeTrue("ジョブが無ければ閉じると終わる");
         using var again = AppSession.Launch();
+        Maximize(again);
         OpenJobs(again);
-        KindAfterSubscription(again).Should().BeTrue("順序は起動し直しても同じ");
+        AppSession.WaitUntil(() => KindAfterSubscription(again), "順序は起動し直しても同じ");
         KindCellWidth(again).Should().BeCloseTo(widened, 4, "幅は起動し直しても同じ");
         again.Invoke("Jobs.ResetLayout");
         AppSession.WaitUntil(() => !KindAfterSubscription(again), "初期値に戻すと元の順序");

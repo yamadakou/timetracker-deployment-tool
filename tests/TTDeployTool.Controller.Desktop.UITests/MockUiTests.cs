@@ -197,6 +197,13 @@ public class MockUiTests
         }
     }
 
+    /// <summary>CI のウィンドウは狭いため、最大化して表の列と詳細を画面に入れる（画面の外のセルは、UI Automation の位置が 0 になる）。</summary>
+    internal static void Maximize(AppSession app)
+    {
+        if (app.Window.Patterns.Window.TryGetPattern(out var window))
+            window.SetWindowVisualState(FlaUI.Core.Definitions.WindowVisualState.Maximized);
+    }
+
     /// <summary>アプリが書いた、外の機能の記録（通知・開いたフォルダーと URL・サインイン時の起動。desktop-ui-tests.md の 6.3）。</summary>
     internal static IReadOnlyList<(string Kind, string Text)> Events() => FixtureEvents.Read(Path.Combine(AppSession.DataDirectory(), FixtureEvents.FileName));
 
@@ -230,9 +237,7 @@ public class MockUiTests
         {
             AppSession.Run(app =>
             {
-                // CI のウィンドウは狭いため、最大化して表の列と詳細を画面に入れる
-                if (app.Window.Patterns.Window.TryGetPattern(out var window))
-                    window.SetWindowVisualState(FlaUI.Core.Definitions.WindowVisualState.Maximized);
+                Maximize(app);
                 test(app);
             }, name);
         }
