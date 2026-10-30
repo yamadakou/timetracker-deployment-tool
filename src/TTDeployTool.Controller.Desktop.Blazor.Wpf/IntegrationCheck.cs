@@ -42,7 +42,20 @@ internal static class IntegrationCheck
             var protector = new DpapiSecretProtector();
             return protector.Unprotect(protector.Protect("試作の確認")) == "試作の確認";
         });
+        report["tableRows"] = await TryAsync(async () => await TableRowsAsync(window));
         await File.WriteAllTextAsync(path, JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true }));
+    }
+
+    // 画面（Razor）が表を描いたか（MSIX にまとめたとき、画面のファイルがパッケージに入っているか）。60 秒まで待つ
+    private static async Task<object?> TableRowsAsync(MainWindow window)
+    {
+        for (var i = 0; i < 120; i++)
+        {
+            if (window.Core is { } core && int.TryParse(await core.ExecuteScriptAsync("document.querySelectorAll('tbody tr').length"), out var rows) && rows > 0)
+                return rows;
+            await Task.Delay(500);
+        }
+        return 0;
     }
 
     private static void Try(Dictionary<string, object?> report, string name, Func<object?> check)

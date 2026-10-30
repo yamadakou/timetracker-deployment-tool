@@ -32,6 +32,7 @@ public partial class MainWindow : Window
                     e.UserDataFolder = folder;
             };
         }
+        WebView.BlazorWebViewInitialized += (_, e) => Core = e.WebView.CoreWebView2;
         Tray = new TaskbarIcon
         {
             ToolTipText = "TTDeployTool（Blazor Hybrid の試作）",
@@ -44,5 +45,6 @@ public partial class MainWindow : Window
     /// <summary>通知領域のアイコン（WinUI の画面と同じ H.NotifyIcon の WPF 版）。</summary>
     public TaskbarIcon Tray { get; }
 
-    public BlazorWebView BlazorView => WebView;
+    /// <summary>作られた WebView2（確認で、画面に表が出たかを読む）。</summary>
+    public Microsoft.Web.WebView2.Core.CoreWebView2? Core { get; private set; }
 }

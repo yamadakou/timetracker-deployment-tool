@@ -47,6 +47,8 @@
     <Compile Include="..\TTDeployTool.Controller.Desktop\Services\AppNotificationService.cs" Link="Linked\AppNotificationService.cs" />
     <Compile Include="..\TTDeployTool.Controller.Desktop\Services\StartupTaskService.cs" Link="Linked\StartupTaskService.cs" />
     <Compile Include="..\TTDeployTool.Controller.Desktop\Services\DpapiSecretProtector.cs" Link="Linked\DpapiSecretProtector.cs" />
+    <!-- .wapproj は、ビルドの出力からパッケージに入れるため、画面の入り口（index.html）を出力にも置く -->
+    <Content Update="wwwroot\**" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\TTDeployTool.Controller.Desktop\Assets\TrayIcon.ico" Link="TrayIcon.ico" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
