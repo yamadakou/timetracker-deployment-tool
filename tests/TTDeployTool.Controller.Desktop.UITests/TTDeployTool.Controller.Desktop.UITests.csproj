@@ -16,6 +16,10 @@
     <Content Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
+    <!-- モックのデータ（desktop-ui-tests.md の 6.2）を、アプリと同じ型で書く -->
+    <ProjectReference Include="..\..\src\TTDeployTool.Controller.Desktop.Fixtures\TTDeployTool.Controller.Desktop.Fixtures.csproj" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="FlaUI.UIA3" Version="5.0.0" />
     <PackageReference Include="FluentAssertions" Version="8.11.0" />
     <PackageReference Include="xunit.v3" Version="4.0.2" />

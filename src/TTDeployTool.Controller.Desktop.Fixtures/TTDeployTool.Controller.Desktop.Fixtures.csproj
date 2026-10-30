@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    UI テストのモック（docs/design/desktop/desktop-ui-tests.md の 6.2）。デスクトップアプリは /p:UiTestMock=true のビルド（CI の desktop-ui ジョブ）だけで
+    参照するため、Store に出すパッケージには入らない
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\TTDeployTool.Controller.Desktop.Core\TTDeployTool.Controller.Desktop.Core.csproj" />
+  </ItemGroup>
+</Project>

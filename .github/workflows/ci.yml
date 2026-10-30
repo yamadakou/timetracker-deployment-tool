@@ -253,10 +253,11 @@ jobs:
         Import-Certificate -FilePath $cer -CertStoreLocation "Cert:\LocalMachine\TrustedPeople" | Out-Null
         "thumbprint=$($cert.Thumbprint)" >> $env:GITHUB_OUTPUT
 
+    # UI テストのモック（サインインと Azure。docs/design/desktop/desktop-ui-tests.md の 6.2）を使うビルド。この MSIX は UI テストだけに使う
     - name: Build and sign MSIX (x64)
       run: >
         msbuild src/TTDeployTool.Controller.Desktop/TTDeployTool.Controller.Desktop.csproj /restore
-        /p:Configuration=Release /p:Platform=x64 /p:AppxBundle=Never /p:UapAppxPackageBuildMode=SideloadOnly
+        /p:Configuration=Release /p:Platform=x64 /p:AppxBundle=Never /p:UapAppxPackageBuildMode=SideloadOnly /p:UiTestMock=true
         /p:GenerateAppxPackageOnBuild=true /p:AppxPackageSigningEnabled=true
         /p:PackageCertificateThumbprint=${{ steps.cert.outputs.thumbprint }}
         /p:AppxPackageDir=${{ github.workspace }}\UiPackages\

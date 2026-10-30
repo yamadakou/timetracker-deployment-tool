@@ -23,14 +23,14 @@ public sealed class AppSession : IDisposable
 
     private readonly UIA3Automation _automation;
 
-    private AppSession(Application app, UIA3Automation automation, Window window)
+    private AppSession(FlaUI.Core.Application app, UIA3Automation automation, Window window)
     {
         App = app;
         _automation = automation;
         Window = window;
     }
 
-    public Application App { get; }
+    public FlaUI.Core.Application App { get; }
 
     public Window Window { get; }
 
@@ -43,7 +43,7 @@ public sealed class AppSession : IDisposable
     /// <summary>アプリを起動し、ウィンドウが開くのを待つ。</summary>
     public static AppSession Launch()
     {
-        var app = Application.LaunchStoreApp(AppUserModelId());
+        var app = FlaUI.Core.Application.LaunchStoreApp(AppUserModelId());
         var automation = new UIA3Automation();
         try
         {

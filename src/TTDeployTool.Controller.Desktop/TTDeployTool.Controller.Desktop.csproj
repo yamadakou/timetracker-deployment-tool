@@ -44,6 +44,16 @@
   <PropertyGroup Condition="'$(UiTestSignIn)' == 'true'">
     <DefineConstants>$(DefineConstants);UITEST_SIGNIN</DefineConstants>
   </PropertyGroup>
+  <!--
+    CI の UI テスト（ci.yml の desktop-ui ジョブ）のビルドだけ、/p:UiTestMock=true で、モックのサインインと Azure（TTDeployTool.Controller.Desktop.Fixtures）を使う
+    （docs/design/desktop/desktop-ui-tests.md の 6.2）。モックのプロジェクトはこのときだけ参照するため、Store に出すパッケージには入らない
+  -->
+  <PropertyGroup Condition="'$(UiTestMock)' == 'true'">
+    <DefineConstants>$(DefineConstants);UITEST_MOCK</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(UiTestMock)' == 'true'">
+    <ProjectReference Include="..\TTDeployTool.Controller.Desktop.Fixtures\TTDeployTool.Controller.Desktop.Fixtures.csproj" />
+  </ItemGroup>
   <ItemGroup>
     <Content Include="Assets\*.png" />
     <Content Include="Assets\*.ico" />

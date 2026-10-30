@@ -74,16 +74,26 @@ public partial class App : Microsoft.UI.Xaml.Application
 
         _window = new MainWindow();
         var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(_window);
-#if UITEST_SIGNIN
+#if UITEST_MOCK
+        // CI の UI テストのビルドだけ、モックのサインインと Azure を使う（アプリのデータの uitest-fixture.json。docs/design/desktop/desktop-ui-tests.md の 6.2）
+        appLogger.LogWarning("UI テスト用のビルドのため、モックのサインインと Azure を使います");
+        var fixturePath = Path.Combine(DesktopSettings.DataDirectory, Fixtures.FixtureData.FileName);
+        var fixture = Fixtures.FixtureData.Load(fixturePath);
+        ISignInService signIn = new Fixtures.FixtureSignInService(() => fixture ??= Fixtures.FixtureData.Load(fixturePath));
+        // データが無ければ、サインインできない（Azure には届かない）
+        IAzureClients azure = new Fixtures.FixtureAzureClients(fixture ?? new Fixtures.FixtureData(new SignedInAccount("", null), [], [], []));
+#elif UITEST_SIGNIN
         // UI テストの System Test のビルドだけ、Azure CLI のサインインを使う（Store に出すパッケージには入らない）
         appLogger.LogWarning("UI テスト用のビルドのため、Azure CLI のサインインを使います");
         ISignInService signIn = new AzureCliSignInService();
+        IAzureClients azure = new AzureClients();
 #else
         ISignInService signIn = new WamSignInService(hwnd, DesktopSettings.ClientId, DesktopSettings.DataDirectory);
+        IAzureClients azure = new AzureClients();
 #endif
         var viewModel = new MainViewModel(
             signIn,
-            new AzureClients(),
+            azure,
             new DialogService(_window, hwnd),
             new SystemLauncher(),
             TimeProvider.System,
