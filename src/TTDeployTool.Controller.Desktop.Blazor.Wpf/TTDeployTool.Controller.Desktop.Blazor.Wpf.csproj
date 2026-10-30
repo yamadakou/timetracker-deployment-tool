@@ -23,6 +23,11 @@
     <!-- 通知（AppNotificationManager）のための Windows App SDK を、アプリと一緒に置く（Windows App SDK のランタイムを PC に求めない） -->
     <WindowsPackageType>None</WindowsPackageType>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <!--
+      Windows App SDK を参照すると、WebView2 のパッケージは WinUI 用の参照（CsWinRT の projection）だけにし、BlazorWebView が使う
+      Microsoft.Web.WebView2.Wpf.dll を出力に入れない（Microsoft.Web.WebView2 の build/Common.targets）。WPF 用の参照に戻す（試作の CI で分かった）
+    -->
+    <WebView2EnableCsWinRTProjection>false</WebView2EnableCsWinRTProjection>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Azure.Identity.Broker" Version="1.7.0" />
