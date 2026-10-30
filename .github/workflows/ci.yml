@@ -426,12 +426,13 @@ jobs:
 
     # 単一プロジェクトの MSIX は WinUI 向けのため、WPF は Windows Application Packaging Project（.wapproj）でまとめる。
     # .wapproj は参照のライブラリにも win-x64 で問い合わせるため、復元で win-x64 も用意する（無いと NETSDK1047）
+    # MSIX に入れるビルドは、Windows App SDK にパッケージのアプリとして扱わせる（WindowsPackageType=MSIX。None のままだと通知が Unsupported だった）
     - name: Build and sign MSIX with .wapproj (x64)
       # WebView2 のテストが失敗しても、MSIX と計測は続けて確かめる
       if: ${{ !cancelled() }}
       run: >
         msbuild src/TTDeployTool.Controller.Desktop.Blazor.Package/TTDeployTool.Controller.Desktop.Blazor.Package.wapproj /restore
-        /p:Configuration=Release /p:Platform=x64 /p:RuntimeIdentifiers=win-x64 /p:AppxBundle=Never /p:UapAppxPackageBuildMode=SideloadOnly
+        /p:Configuration=Release /p:Platform=x64 /p:RuntimeIdentifiers=win-x64 /p:WindowsPackageType=MSIX /p:AppxBundle=Never /p:UapAppxPackageBuildMode=SideloadOnly
         /p:AppxPackageSigningEnabled=true /p:PackageCertificateThumbprint=${{ steps.cert.outputs.thumbprint }}
         /p:AppxPackageDir=${{ github.workspace }}\BlazorPackages\
 
