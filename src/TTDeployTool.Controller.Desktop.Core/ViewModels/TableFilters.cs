@@ -170,6 +170,16 @@ public sealed class TableFilters<T> : ObservableObject
         return string.Join("\r\n", lines);
     }
 
+    /// <summary>
+    /// 行を、列 <paramref name="keys"/> の順で、Markdown の表（1 行目が見出し）にする（クリップボードへのコピー。設定の Markdown のコピーと同じ書き方:
+    /// セルの「|」と改行は、表が崩れないように置き換える）。
+    /// </summary>
+    public string CopyMarkdown(IEnumerable<T> items, IEnumerable<string> keys)
+    {
+        var columns = keys.Select(Column).ToList();
+        return MarkdownText.Table([.. columns.Select(c => c.Header)], items.Select(item => (IReadOnlyList<string?>)[.. columns.Select(c => c.TextOf(item))]));
+    }
+
     private static string Quote(string value) =>
         value.IndexOfAny(['\t', '\r', '\n', '"']) < 0 ? value : $"\"{value.Replace("\"", "\"\"")}\"";
 

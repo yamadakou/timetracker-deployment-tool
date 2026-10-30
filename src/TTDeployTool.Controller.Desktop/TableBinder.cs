@@ -15,7 +15,7 @@ namespace TTDeployTool.Controller.Desktop;
 /// （表の内蔵の並べ替えは、向きを読んだら外す）。列の幅と順序は、変えるたびに保存する。
 /// 表の上の「含む文字」は、入力が止まってから絞り込む（<see cref="BindText"/>）。
 /// 表の最後の列（Tag が空）は、見出しの無い余白の列で、右端の列の境目と文字を、縦のスクロールバーの左に出す（10.6）。
-/// セルの文字のコピーは、Ctrl+C（選んだ行）と、セルの右クリックのメニューで行う。
+/// セルの文字のコピーは、Ctrl+C（選んだ行）と、セルの右クリックのメニュー（セルの文字・選んだ行・選んだ行の Markdown の表）で行う。
 /// </summary>
 internal sealed class TableBinder<T>
 {
@@ -229,7 +229,12 @@ internal sealed class TableBinder<T>
     }
 
     private void CopyRows(IEnumerable<object> rows, bool headers) =>
-        Copy(_filters.CopyText(rows.Select(_itemOf), DataColumns.Where(c => c.Visibility == Visibility.Visible).Select(Key), headers));
+        Copy(_filters.CopyText(rows.Select(_itemOf), VisibleKeys, headers));
+
+    private IEnumerable<string> VisibleKeys => DataColumns.Where(c => c.Visibility == Visibility.Visible).Select(Key);
+
+    // 選んだ行（選んでいなければ、右クリックした行）
+    private IEnumerable<object> MenuRows => _table.SelectedItems.Count > 0 ? _table.SelectedItems : _menuCell is { } c ? [c.Row] : [];
 
     // 右クリックしたセルの文字と、選んだ行（選んでいなければ、右クリックした行）
     private MenuFlyout CreateMenu()
@@ -241,14 +246,15 @@ internal sealed class TableBinder<T>
                 Copy(_filters.Column(c.Key).TextOf(_itemOf(c.Row)));
         };
         var rows = new MenuFlyoutItem { Text = "選んだ行をコピー" };
-        rows.Click += (_, _) =>
+        rows.Click += (_, _) => CopyRows(MenuRows, headers: false);
+        // Markdown の表（見出しつき。設定の Markdown のコピーと同じ書き方）
+        var markdown = new MenuFlyoutItem { Text = "選んだ行を Markdown 形式でコピー" };
+        markdown.Click += (_, _) =>
         {
-            if (_table.SelectedItems.Count > 0)
-                CopyRows(_table.SelectedItems, headers: false);
-            else if (_menuCell is { } c)
-                CopyRows([c.Row], headers: false);
+            if (MenuRows.Any())
+                Copy(_filters.CopyMarkdown(MenuRows.Select(_itemOf), VisibleKeys));
         };
-        var menu = new MenuFlyout { Items = { cell, rows } };
+        var menu = new MenuFlyout { Items = { cell, rows, markdown } };
         menu.Opening += (_, _) => cell.IsEnabled = _menuCell != null;
         return menu;
     }

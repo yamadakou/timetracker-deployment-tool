@@ -123,6 +123,8 @@ public class TableFiltersTests
         f.CopyText([new Item("a\tb", "x\"y", "1\n2", null)], ["Name", "Group", "Note"], headers: true)
             .Should().Be("名前\tグループ\tメモ\r\n\"a\tb\"\t\"x\"\"y\"\t\"1\n2\"", "タブ・改行・引用符を含む値は引用符で囲む");
         f.CopyText([], ["Name"], headers: false).Should().BeEmpty();
+        f.CopyMarkdown([Items[0], new Item("a|b", "x", "1\n2", null)], ["Name", "Note"])
+            .Should().Be("| 名前 | メモ |\n|---|---|\n| alpha | first |\n| a\\|b | 1 2 |", "Markdown の表。「|」と改行は置き換える");
     }
 
     [Fact]
