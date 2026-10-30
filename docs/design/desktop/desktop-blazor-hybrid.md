@@ -209,4 +209,40 @@ WinUI 3 のまま続ける場合は、Microsoft の TableView の安定版が出
 |---|---|
 | Windows App SDK と WebView2 | WPF のプロジェクトに Windows App SDK を足すと、WebView2 のパッケージが WinUI 用の参照（CsWinRT の projection）だけになり、BlazorWebView が起動時に `Microsoft.Web.WebView2.Wpf` を読めず落ちた。`WebView2EnableCsWinRTProjection=false` で直る（`Microsoft.Web.WebView2` の build/Common.targets） |
 | CDP のポート | 試作のテストだけ、環境変数 `TT_BLAZOR_CDP_PORT` で `BlazorWebViewInitializing` に `--remote-debugging-port` を渡す（本番のビルドには入れない作りにする） |
-| 通知 | `AppNotificationManager.IsSupported()` が MSIX でも false だった。Register を呼ぶ前の値か、WPF＋自己完結の Windows App SDK の制限かは未確認（10.1 の 1） |
+| 通知 | `AppNotificationManager.IsSupported()` が MSIX でも false だった。後で、これはプッシュ通知の判定と分かった（15.1） |
+
+## 15. 移行で機能が落ちないかの確認（オーナーの依頼、2026-10-30）
+今の WinUI 3 のアプリが Windows に頼っている機能（`Program.cs`・`App.xaml.cs`・`MainWindow.xaml.cs`・`Services`）を洗い出し、WPF のホストに同じ作りで組み込んで、CI の windows ランナーで確かめた（`IntegrationCheck`。run 41143495748・41144332794・41145241322。実機の操作・本物の Azure は使わない）。
+
+| 機能 | 今の WinUI 3 の作り | WPF のホストでの作り | 結果（パッケージにしない／MSIX） |
+|---|---|---|---|
+| 1 つだけ起動し、2 つ目の起動を渡す | `AppInstance.FindOrRegisterForKey`・`RedirectActivationToAsync`（Program.cs） | 同じ（Program.cs をほぼそのまま。WPF の Main を自分で書く） | MSIX: ✔ 2 つ目が 1 つ目に渡り、隠したウィンドウが出て、2 つ目は終わる |
+| 閉じると隠れて通知領域に残る・通知領域のメニュー（開く・終了） | `AppWindow.Closing` で取り消して `Hide`・`H.NotifyIcon.WinUI` | `Window.Closing` で取り消して `Hide`・`H.NotifyIcon.Wpf` の `ContextMenu` | ✔／✔ |
+| サインイン時の起動（登録・状態） | `StartupTaskService`（WinRT の `StartupTask`） | 同じファイル | パッケージが要る（Unavailable）／✔ 無効 → 有効 → 無効にできた |
+| 起動の種類（サインイン時の起動か） | `AppInstance.GetActivatedEventArgs().Kind` | 同じ | ✔ Launch を読めた（サインイン時の起動そのものは実機） |
+| WAM のサインイン | `WamSignInService`（窓のハンドル） | 同じファイル（`WindowInteropHelper`） | ✔／✔（トークンは取っていない。サインインの窓が前に出るかは実機） |
+| Windows の通知を出す・許可の状態 | `AppNotificationService`（Windows App SDK の `AppNotificationManager`） | 同じファイル | **確かめ切れない**（下の 15.1） |
+| 通知を押してウィンドウを出す | `NotificationInvoked`・`Register` を起動の種類を読む前に | 同じ順 | **確かめ切れない**（同上） |
+| フォルダーの選択 | WinRT の `FolderPicker`（窓のハンドル） | WPF の `OpenFolderDialog`（.NET 8 以降） | ✔ 作れる（選ぶ操作は人） |
+| 確認のダイアログ | WinUI の `ContentDialog` | 画面（Razor）のダイアログか WPF の `MessageBox`（作るのは移行のとき） | Windows に頼らない |
+| クリップボード | WinRT の `Clipboard`（履歴に残さない） | WPF の `Clipboard`（試作）。WinRT のものも WPF から使える | ✔（WebView2 のテストの Ctrl+C） |
+| 既定のアプリで開く | `Process.Start`（UseShellExecute） | 同じ | Windows の API は同じ |
+| 予定のパスワードの暗号化 | `DpapiSecretProtector` | 同じファイル | ✔／✔ |
+| Store の更新の確認 | `StoreContext`・`InitializeWithWindow` | 同じ呼び方 | 呼べる（Store から入れていないため、誤りで 0 件の扱い。WinUI のアプリも同じく誤りを無視する） |
+| アプリのデータのフォルダー | `ApplicationData.Current.LocalFolder`（パッケージ） | 同じ | ✔ MSIX で LocalState |
+
+### 15.1 通知の結果と見立て
+| 確かめたこと | パッケージにしない | MSIX |
+|---|---|---|
+| Windows App SDK の `AppNotificationManager.Default.Setting` | Unsupported | Unsupported（`WindowsPackageType=MSIX` でビルドしても同じ） |
+| OS の通知の API（WinRT の `ToastNotificationManager.CreateToastNotifier().Setting`） | 使えない（パッケージの ID が無い） | **Enabled** |
+| 通知を出す（`AppNotificationService.Show`）・通知センターに入ったか（`GetAllAsync`） | 例外は出ない・読めない（NullReferenceException） | 同じ |
+| 通知を UI Automation で押す | 通知が画面に出ない | 同じ |
+| ランナー | Windows Server 2025 Datacenter。通知を出すシェルのプロセス（ShellExperienceHost など）が無い | — |
+
+- **IsSupported の読み違い**: 14 章で見た `AppNotificationManager.IsSupported()` は、Microsoft Learn によると**プッシュ通知**の API が使えるかを返すもので（出典 12）、ローカルの通知（今のアプリが使うもの）の判定ではなかった
+- ランナーには通知を画面に出す仕組みが無いため、通知を出して押す流れは CI では確かめられない（WinUI 3 のアプリでも同じで、今は UI テストで通知をモックにしている）。OS の API ではこのアプリの通知は許可されている（Enabled）ので、Windows App SDK の `Unsupported` がランナーのためか、WPF のホストの作りのためかは、ここでは分けられない
+- WinUI 3 のアプリでは、同じ `AppNotificationService`（自己完結の Windows App SDK）で、オーナーの実機で通知が出て押せることを確かめている（REVIEW_ISSUES の No.61 など）
+- 実機で使えなかった場合の代わり: OS の通知の API（WinRT の `ToastNotificationManager`）は MSIX の WPF のホストで Enabled だったため、`INotificationService` をこの API で作り直せる（押したときの起動は、マニフェストの `toastNotificationActivation` と COM の受け口を自分で受ける）
+
+出典 12: Microsoft Learn「AppNotificationManager.IsSupported Method」（Windows App SDK 2.0。プッシュ通知の API が使えるか。自己完結のアプリでは Singleton パッケージへの依存に注意）https://learn.microsoft.com/windows/windows-app-sdk/api/winrt/microsoft.windows.appnotifications.appnotificationmanager.issupported（2026-10-30 に確認）
