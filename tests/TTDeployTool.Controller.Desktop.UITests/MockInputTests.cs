@@ -66,7 +66,10 @@ public class MockInputTests
         KindCellWidth(again).Should().BeCloseTo(widened, 4, "幅は起動し直しても同じ");
         again.Invoke("Jobs.ResetLayout");
         AppSession.WaitUntil(() => !KindAfterSubscription(again), "初期値に戻すと元の順序");
-        KindCellWidth(again).Should().BeCloseTo(kindCell, 4, "初期値の幅");
+        // 幅は、見出しの幅が決まった後の配置でセルに移るため、待つ
+        var width = 0;
+        AppSession.TryWait(() => Math.Abs((width = KindCellWidth(again)) - kindCell) <= 4, null);
+        width.Should().BeCloseTo(kindCell, 4, "初期値の幅に戻る");
     }, layout: false);
 
     [Fact]
