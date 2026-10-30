@@ -22,7 +22,7 @@ public class MockSystemTests
             "期限の近いデプロイを通知する", TimeSpan.FromSeconds(60));
         var expired = $"rg-mock-{Deployments - 1:00} / app{Deployments - 1:00}";
         app.Show("Jobs");
-        app.WaitForRowText("Jobs.List", "Job.Target", expired, "Job.Kind", t => t == "削除", "期限を過ぎたデプロイの削除のジョブを登録する", TimeSpan.FromSeconds(60));
+        app.WaitForRowText("Jobs.List", "Job.Target", expired, "Job.Kind", t => t == "期限での削除", "期限を過ぎたデプロイの削除のジョブを登録する", TimeSpan.FromSeconds(60));
     }, data: d => FixtureSamples.Data(Deployments, DateTimeOffset.UtcNow, expired: 1) with { WriteDelaySeconds = 120 });
 
     [Fact]

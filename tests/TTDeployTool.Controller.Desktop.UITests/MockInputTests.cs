@@ -37,8 +37,8 @@ public class MockInputTests
     {
         OpenJobs(app);
         var kind = Header(app, "種類");
-        // 見出しの右の境目をドラッグして広げる
-        AppSession.Drag(new Point(kind.Right - 2, kind.Y + kind.Height / 2), new Point(kind.Right + 60, kind.Y + kind.Height / 2));
+        // 見出しの右の境目をドラッグして広げる（境目の当たり判定は見出しの上の方だけ。下の方は「…」のボタン）
+        AppSession.Drag(new Point(kind.Right - 1, kind.Y + 3), new Point(kind.Right + 60, kind.Y + 3));
         AppSession.WaitUntil(() => Header(app, "種類").Width >= kind.Width + 40, "境目のドラッグで列が広がる");
         var widened = Header(app, "種類").Width;
         // 見出しをドラッグして、リソースグループ / アプリ名 の位置に動かす
@@ -83,7 +83,12 @@ public class MockInputTests
         AppSession.Clipboard().Split('\n').Should().HaveCount(2);
         AppSession.Press(VirtualKeyShort.CONTROL, VirtualKeyShort.SHIFT, VirtualKeyShort.KEY_C);
         AppSession.WaitUntil(() => AppSession.Clipboard().StartsWith("種類\t", StringComparison.Ordinal), "Ctrl+Shift+C で見出しつき");
-    });
+    }, jobsLayout:
+    [
+        // リソースグループ / アプリ名 の列を左に置く（CI の画面は狭く、右の列のセルは画面の外になって押せない）
+        new("Kind", 110), new("Target", 200), new("Result", 320), new("Subscription", 200), new("State", 170), new("Time", 120), new("RegisteredAt", 120),
+        new("ChangedAt", 120), new("StartedAt", 120), new("Finished", 120), new("Duration", 0),
+    ]);
 
     [Fact]
     public void Filter_Menu_Corner_Check_Box_And_Double_Click_Should_Work() => WithFixture(app =>
@@ -93,9 +98,13 @@ public class MockInputTests
         var kind = Header(app, "種類");
         AppSession.Click(new Point(kind.Right - 14, kind.Y + kind.Height / 2));
         var ok = app.FindAnywhere("OkButton");
-        var deploy = app.Window.FindAllDescendants(cf => cf.ByControlType(ControlType.CheckBox))
-            .FirstOrDefault(c => (c.Properties.Name.ValueOrDefault ?? "").StartsWith("デプロイ", StringComparison.Ordinal))
+        // 値のチェックボックスには名前が無く、横の文字（値）に名前があるため、同じ高さのチェックボックスを選ぶ（表のセルの「デプロイ」は除く）
+        var label = app.Window.FindAllDescendants(cf => cf.ByControlType(ControlType.Text).And(cf.ByName("デプロイ")))
+            .FirstOrDefault(t => t.BoundingRectangle.Height > 0 && t.Properties.AutomationId.ValueOrDefault != "Job.Kind")
             ?? throw new InvalidOperationException("▽ の値の一覧に「デプロイ」がありません。");
+        var deploy = app.Window.FindAllDescendants(cf => cf.ByControlType(ControlType.CheckBox))
+            .OrderBy(c => Math.Abs(Middle(c.BoundingRectangle).Y - Middle(label.BoundingRectangle).Y))
+            .First();
         deploy.Patterns.Toggle.Pattern.Toggle();
         ok.Patterns.Invoke.Pattern.Invoke();
         app.WaitForText("Jobs.Count", t => t.Contains($"絞り込んだ {Records / 2} 件 / 全 {Records} 件"), "▽ で削除だけに絞られる");
