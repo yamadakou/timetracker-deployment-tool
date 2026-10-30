@@ -245,6 +245,65 @@ public sealed class AppSession : IDisposable
     }
 
     /// <summary>
+    /// 点を押す（<paramref name="right"/> は右クリック、<paramref name="twice"/> はダブルクリック）。モックの UI テストだけが使う、マウスの入力の合成
+    /// （UI Automation のパターンで操作できないもの。docs/design/desktop/desktop-ui-tests.md の 6.3）。
+    /// </summary>
+    public static void Click(System.Drawing.Point point, bool right = false, bool twice = false)
+    {
+        FlaUI.Core.Input.Mouse.MoveTo(point);
+        if (twice)
+            FlaUI.Core.Input.Mouse.DoubleClick(point);
+        else if (right)
+            FlaUI.Core.Input.Mouse.RightClick(point);
+        else
+            FlaUI.Core.Input.Mouse.LeftClick(point);
+        Thread.Sleep(300);
+    }
+
+    /// <summary>マウスで <paramref name="from"/> から <paramref name="to"/> までドラッグする（少しずつ動かす。表の部品は、動かした量でドラッグを始めるため）。</summary>
+    public static void Drag(System.Drawing.Point from, System.Drawing.Point to)
+    {
+        FlaUI.Core.Input.Mouse.MoveTo(from);
+        Thread.Sleep(200);
+        FlaUI.Core.Input.Mouse.Down(FlaUI.Core.Input.MouseButton.Left);
+        for (var i = 1; i <= 10; i++)
+        {
+            FlaUI.Core.Input.Mouse.MoveTo(new System.Drawing.Point(from.X + (to.X - from.X) * i / 10, from.Y + (to.Y - from.Y) * i / 10));
+            Thread.Sleep(50);
+        }
+        FlaUI.Core.Input.Mouse.Up(FlaUI.Core.Input.MouseButton.Left);
+        Thread.Sleep(500);
+    }
+
+    /// <summary>キーボードで、修飾キーと一緒にキーを押す（Ctrl+C など）。</summary>
+    public static void Press(params FlaUI.Core.WindowsAPI.VirtualKeyShort[] keys)
+    {
+        FlaUI.Core.Input.Keyboard.TypeSimultaneously(keys);
+        Thread.Sleep(300);
+    }
+
+    /// <summary>クリップボードの文字（テストの側で読む。PowerShell の Get-Clipboard）。</summary>
+    public static string Clipboard()
+    {
+        var start = new System.Diagnostics.ProcessStartInfo("pwsh", "-NoProfile -Command \"[Console]::OutputEncoding = [Text.Encoding]::UTF8; Get-Clipboard -Raw\"")
+        {
+            RedirectStandardOutput = true,
+            StandardOutputEncoding = System.Text.Encoding.UTF8,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+        using var process = System.Diagnostics.Process.Start(start)!;
+        var text = process.StandardOutput.ReadToEnd();
+        process.WaitForExit();
+        return text.TrimEnd('\r', '\n');
+    }
+
+    /// <summary>ウィンドウの中の要素（ポップアップ・ダイアログを含む）を AutomationId で探す。現れるまで待つ。</summary>
+    public AutomationElement FindAnywhere(string automationId) =>
+        Retry.WhileNull(() => Window.FindFirstDescendant(cf => cf.ByAutomationId(automationId)), Timeout, Interval, throwOnTimeout: true, ignoreException: true,
+            timeoutMessage: $"要素 {automationId} が見つかりませんでした。").Result!;
+
+    /// <summary>
     /// 表の行の数（今のページの行）。表は見えている行の分しか行の要素を作らない（仮想化）ため、子の数ではなく Grid パターンの行の数で読む
     /// （CI の UI テスト、run 41066697432: 20 行のうち 11 行しか子に無かった）。
     /// </summary>

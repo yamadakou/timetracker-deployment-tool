@@ -80,28 +80,39 @@ public partial class App : Microsoft.UI.Xaml.Application
         var fixturePath = Path.Combine(DesktopSettings.DataDirectory, Fixtures.FixtureData.FileName);
         var fixture = Fixtures.FixtureData.Load(fixturePath);
         ISignInService signIn = new Fixtures.FixtureSignInService(() => fixture ??= Fixtures.FixtureData.Load(fixturePath));
-        // データが無ければ、サインインできない（Azure には届かない）
-        IAzureClients azure = new Fixtures.FixtureAzureClients(fixture ?? new Fixtures.FixtureData(new SignedInAccount("", null), [], [], []));
+        // データが無ければ、サインインできない（Azure には届かない）。通知・既定のアプリで開く・サインイン時の起動は、記録に書く（6.3）
+        var fixtureData = fixture ?? new Fixtures.FixtureData(new SignedInAccount("", null), [], [], []);
+        IAzureClients azure = new Fixtures.FixtureAzureClients(fixtureData);
+        var events = new Fixtures.FixtureEvents(Path.Combine(DesktopSettings.DataDirectory, Fixtures.FixtureEvents.FileName));
+        ISystemLauncher launcher = new Fixtures.FixtureLauncher(events);
+        INotificationService notifications = new Fixtures.FixtureNotifications(events, fixtureData.Notifications);
+        IStartupTaskService startupTask = new Fixtures.FixtureStartupTask(events, fixtureData.StartupTask);
 #elif UITEST_SIGNIN
         // UI テストの System Test のビルドだけ、Azure CLI のサインインを使う（Store に出すパッケージには入らない）
         appLogger.LogWarning("UI テスト用のビルドのため、Azure CLI のサインインを使います");
         ISignInService signIn = new AzureCliSignInService();
         IAzureClients azure = new AzureClients();
+        ISystemLauncher launcher = new SystemLauncher();
+        INotificationService notifications = new AppNotificationService();
+        IStartupTaskService startupTask = new StartupTaskService();
 #else
         ISignInService signIn = new WamSignInService(hwnd, DesktopSettings.ClientId, DesktopSettings.DataDirectory);
         IAzureClients azure = new AzureClients();
+        ISystemLauncher launcher = new SystemLauncher();
+        INotificationService notifications = new AppNotificationService();
+        IStartupTaskService startupTask = new StartupTaskService();
 #endif
         var viewModel = new MainViewModel(
             signIn,
             azure,
             new DialogService(_window, hwnd),
-            new SystemLauncher(),
+            launcher,
             TimeProvider.System,
             log,
             preferences: new FilePreferences(Path.Combine(DesktopSettings.DataDirectory, "preferences.json")),
-            notifications: new AppNotificationService(),
+            notifications: notifications,
             clipboard: new ClipboardService(),
-            startupTask: new StartupTaskService(),
+            startupTask: startupTask,
             secrets: new DpapiSecretProtector(),
             history: new FileJobHistory(Path.Combine(DesktopSettings.DataDirectory, "job-history.json")));
         // 常駐中に 2 つ目を起動したら、隠したウィンドウを出す（Program.cs）

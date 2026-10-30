@@ -38,9 +38,9 @@ public static class FixtureSamples
 
     /// <summary>
     /// <paramref name="deployments"/> 件のデプロイ（デプロイごとに、Environment と 3 つの Container App）。期限は 4 件ごとに なし・3 日後（近い）・40 日後・90 日後。
-    /// 5 件ごとに 1 件は止めた状態。期限を過ぎたものは作らない（期限での自動の削除が、テストの知らないジョブを始めるため）。
+    /// 5 件ごとに 1 件は止めた状態。期限を過ぎたものは、<paramref name="expired"/> 件だけ最後に作る（期限での自動の削除のジョブを始めるため、確かめるテストだけで使う）。
     /// </summary>
-    public static FixtureData Data(int deployments, DateTimeOffset now)
+    public static FixtureData Data(int deployments, DateTimeOffset now, int expired = 0)
     {
         var resources = new List<ManagedResourceRecord>();
         var groups = new List<FixtureResourceGroup>();
@@ -50,7 +50,7 @@ public static class FixtureSamples
             var subscription = Subscription(i);
             var rg = ResourceGroup(i);
             var app = AppName(i);
-            var expiry = (i % 4) switch
+            var expiry = i >= deployments - expired ? DeploymentExpiry.FormatTag(now.AddDays(-1)) : (i % 4) switch
             {
                 0 => DeploymentExpiry.None,
                 1 => DeploymentExpiry.FormatTag(now.AddDays(3)),

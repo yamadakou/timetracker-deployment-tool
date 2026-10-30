@@ -9,6 +9,7 @@ namespace TTDeployTool.Controller.Desktop.Fixtures;
 /// UI テストのモックのデータ（docs/design/desktop/desktop-ui-tests.md の 6.2）。テストが起動の前に、アプリのデータのフォルダーに
 /// <see cref="FileName"/> を置く。形は本物の型（サインインのアカウント・テナント・サブスクリプション・Resource Graph の結果）をそのまま JSON にしたもの。
 /// <see cref="WriteDelaySeconds"/> は、Azure への書き込み 1 回にかける時間（ジョブを実行中のまま見せる長さ。停止は手順の境目で効くため、停止までの時間にもなる）。
+/// <see cref="Notifications"/>・<see cref="StartupTask"/> は、Windows の通知の許可と、サインイン時の起動の始めの状態（6.3）。
 /// </summary>
 public sealed record FixtureData(
     SignedInAccount Account,
@@ -17,7 +18,9 @@ public sealed record FixtureData(
     IReadOnlyList<ManagedResourceRecord> Resources,
     IReadOnlyList<FixtureResourceGroup>? ResourceGroups = null,
     IReadOnlyList<FixtureSecret>? Secrets = null,
-    double WriteDelaySeconds = 2)
+    double WriteDelaySeconds = 2,
+    NotificationPermission Notifications = NotificationPermission.Enabled,
+    StartupTaskStatus StartupTask = StartupTaskStatus.Disabled)
 {
     /// <summary>アプリのデータのフォルダーに置くファイルの名前。</summary>
     public const string FileName = "uitest-fixture.json";

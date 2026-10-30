@@ -52,6 +52,9 @@ public class FixtureTests
         apps.Select(a => a.Tags.GetValueOrDefault(DeploymentGroup.Key)).Distinct().Should().BeEquivalentTo(["研修", "営業", null]);
         apps.Select(a => a.Tags[DeploymentExpiry.ExpiresAtKey]).Should().Contain(DeploymentExpiry.None).And.Contain(DeploymentExpiry.FormatTag(Now.AddDays(3)));
         apps.Count(a => a.App!.RunningStatus == "Stopped").Should().Be(5);
+        apps.Should().NotContain(a => a.Tags[DeploymentExpiry.ExpiresAtKey] == DeploymentExpiry.FormatTag(Now.AddDays(-1)), "既定では期限を過ぎたものは作らない");
+        FixtureSamples.Data(4, Now, expired: 1).Resources.Where(r => r.Name == "app03-tt").Single().Tags[DeploymentExpiry.ExpiresAtKey]
+            .Should().Be(DeploymentExpiry.FormatTag(Now.AddDays(-1)), "最後の 1 件の期限は過ぎている");
 
         var records = FixtureSamples.JobRecords(45, Now);
         records.Should().HaveCount(45);
@@ -195,6 +198,43 @@ public class FixtureTests
         (await clients.Tenants(credential).ListAsync()).Single().TenantId.Should().Be(FixtureSamples.TenantId);
         (await clients.Subscriptions(credential).ListAsync()).Should().HaveCount(2);
         (await clients.Deployments(credential).ListAsync([FixtureSamples.SubscriptionB])).Should().HaveCount(48).And.OnlyContain(r => r.SubscriptionId == FixtureSamples.SubscriptionB);
+    }
+
+    [Fact]
+    public async Task The_Outside_Features_Should_Be_Recorded()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"tt-events-{Guid.NewGuid():N}.txt");
+        try
+        {
+            FixtureEvents.Read(path).Should().BeEmpty("記録が無ければ空");
+            var events = new FixtureEvents(path);
+            var notifications = new FixtureNotifications(events, NotificationPermission.DisabledForApplication);
+            notifications.Permission.Should().Be(NotificationPermission.DisabledForApplication);
+            notifications.Show(new AppNotice("期限", "近づいています\n2 行目"));
+            var launcher = new FixtureLauncher(events);
+            launcher.OpenFolder(@"C:\temp");
+            launcher.OpenUri(new Uri("https://example.com/"));
+
+            var startup = new FixtureStartupTask(events, StartupTaskStatus.Disabled);
+            (await startup.GetStatusAsync()).Should().Be(StartupTaskStatus.Disabled);
+            (await startup.EnableAsync()).Should().Be(StartupTaskStatus.Enabled);
+            await startup.DisableAsync();
+            (await startup.GetStatusAsync()).Should().Be(StartupTaskStatus.Disabled);
+            var blocked = new FixtureStartupTask(events, StartupTaskStatus.DisabledByUser);
+            (await blocked.EnableAsync()).Should().Be(StartupTaskStatus.DisabledByUser, "利用者が無効にしたら、アプリからは有効にできない");
+            await blocked.DisableAsync();
+            (await blocked.GetStatusAsync()).Should().Be(StartupTaskStatus.DisabledByUser);
+
+            File.AppendAllText(path, "種類だけ" + Environment.NewLine);
+            FixtureEvents.Read(path).Should().Equal(
+                (FixtureEvents.Notice, "期限\t近づいています 2 行目"), (FixtureEvents.OpenFolder, @"C:\temp"), (FixtureEvents.OpenUri, "https://example.com/"),
+                (FixtureEvents.StartupTask, "Enabled"), (FixtureEvents.StartupTask, "Disabled"), (FixtureEvents.StartupTask, "DisabledByUser"),
+                (FixtureEvents.StartupTask, "DisabledByUser"), ("種類だけ", ""));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
     }
 
     private static async Task WaitAsync(Func<bool> condition, string description)

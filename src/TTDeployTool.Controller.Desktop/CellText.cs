@@ -5,7 +5,7 @@ using TTDeployTool.Controller.Desktop.Core.ViewModels;
 namespace TTDeployTool.Controller.Desktop;
 
 /// <summary>
-/// 表のセルの文字（6 行までで「…」で切る。docs/design/desktop/desktop-tables.md の 10）で、切れたときだけ、マウスを置くと全体を出す。
+/// 表のセルの文字（6 行までで「…」で切る。docs/design/desktop/desktop-tables.md の 10）で、切れたときだけ、マウスを置くと全体を出す（UI Automation の説明にも入れる）。
 /// </summary>
 public static class CellText
 {
@@ -25,5 +25,12 @@ public static class CellText
         text.RegisterPropertyChangedCallback(TextBlock.TextProperty, (_, _) => Update(text));
     }
 
-    private static void Update(TextBlock text) => ToolTipService.SetToolTip(text, TableRules.ToolTip(text.IsTextTrimmed, text.Text));
+    // ツールチップと同じ全体の文字を、UI Automation の説明（HelpText）にも入れる（読み上げで全体が分かり、UI テストで確かめられる。
+    // ツールチップは HelpText にならない。CI の UI テスト、run 41070225534）
+    private static void Update(TextBlock text)
+    {
+        var full = TableRules.ToolTip(text.IsTextTrimmed, text.Text);
+        ToolTipService.SetToolTip(text, full);
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetHelpText(text, full ?? "");
+    }
 }

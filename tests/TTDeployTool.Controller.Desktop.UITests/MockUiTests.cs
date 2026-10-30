@@ -14,8 +14,8 @@ namespace TTDeployTool.Controller.Desktop.UITests;
 /// </summary>
 public class MockUiTests
 {
-    private const int Deployments = 25;
-    private const int Records = 45;
+    internal const int Deployments = 25;
+    internal const int Records = 45;
 
     [Fact]
     public void The_Deployment_List_Should_Page_Sort_Filter_And_Show_The_Row() => WithFixture(app =>
@@ -55,14 +55,14 @@ public class MockUiTests
         app.SetText("Deployments.Text", "rg-mock-0");
         AppSession.WaitUntil(() => app.RowCount("Deployments.Rows") == 10, "10 行に絞る");
         app.SelectRowWith("Deployments.Rows", "Row.AppName", "app00");
-        app.Find("Deployments.Detail");
+        // 詳細の入れ物（Border）は UI Automation の木に出ないため、詳細の中のボタンで確かめる
         app.Invoke("Row.ShowPasswords");
         app.WaitForText("Row.DbPassword", t => t == "••••••••", "パスワードは伏せ字で出る");
         app.Invoke("Row.TogglePasswords");
         app.WaitForText("Row.DbPassword", t => t == "Db-Pass-00", "表示すると、モックのパスワードが出る");
         // 表は見えている行の分しか行の要素を作らないため、上の方の行（同じサブスクリプション）を選ぶ
         app.SelectRowWith("Deployments.Rows", "Row.AppName", "app02");
-        AppSession.WaitUntil(() => !app.Exists("Deployments.Detail"), "2 行選ぶと詳細は消える");
+        AppSession.WaitUntil(() => !app.Exists("Row.ShowPasswords"), "2 行選ぶと詳細は消える");
         app.IsEnabled("Deployments.ChangeExpiry").Should().BeTrue("まとめて期限を変えられる");
         app.IsEnabled("Deployments.Delete").Should().BeTrue("まとめて削除できる");
     });
@@ -149,24 +149,24 @@ public class MockUiTests
         var line = Cell(row, "Job.Kind").BoundingRectangle.Height;
         var height = result.BoundingRectangle.Height;
         (height / (double)line).Should().BeInRange(5, 6.6, $"6 行で切れる（高さ {height}・1 行 {line}）");
-        (result.Properties.HelpText.ValueOrDefault ?? "").Should().Be(FixtureSamples.LongText, "切れたセルは、マウスを置くと全体が出る");
+        (result.Properties.HelpText.ValueOrDefault ?? "").Should().Be(FixtureSamples.LongText, "切れたセルは、マウスを置くと全体が出る（同じ文字を UI Automation の説明にも入れる）");
         var shortRow = app.RowWith("Jobs.List", "Job.Target", $"rg-mock-{100 + Records - 4} / app{100 + Records - 4}");
         AppSession.ScrollIntoView(shortRow);
         Cell(shortRow, "Job.Result").BoundingRectangle.Height.Should().BeLessThan(line * 2, "短い文字は 1 行");
         (Cell(shortRow, "Job.Result").Properties.HelpText.ValueOrDefault ?? "").Should().BeEmpty("切れていなければツールチップは出さない");
     });
 
-    private static AutomationElement Cell(AutomationElement row, string id) =>
+    internal static AutomationElement Cell(AutomationElement row, string id) =>
         row.FindFirstDescendant(cf => cf.ByAutomationId(id)) ?? throw new InvalidOperationException($"{id} が行にありません。");
 
-    private static void SignIn(AppSession app)
+    internal static void SignIn(AppSession app)
     {
         app.Show("Target");
         app.Invoke("SignIn.SignIn");
         app.WaitForText("SignIn.Account", t => t.Contains("mock-user@example.com"), "モックのアカウントでサインインする");
     }
 
-    private static void Load(AppSession app)
+    internal static void Load(AppSession app)
     {
         app.Show("Deployments");
         app.Invoke("Deployments.Load");
@@ -174,7 +174,7 @@ public class MockUiTests
     }
 
     // デプロイの一覧の行から削除の画面を開き、今すぐ削除するか、予定に追加する（予定は今から 1 時間後）
-    private static void Delete(AppSession app, string appName, bool schedule)
+    internal static void Delete(AppSession app, string appName, bool schedule)
     {
         app.Show("Deployments");
         if (app.IsEnabled("Deployments.ClearSelection"))
@@ -197,19 +197,30 @@ public class MockUiTests
         }
     }
 
-    // モックのデータと終わったジョブの記録を置いて起動し、終わったら（アプリを閉じた後に）置いたファイルと設定を消す
-    private static void WithFixture(Action<AppSession> test, [System.Runtime.CompilerServices.CallerMemberName] string name = "")
+    /// <summary>アプリが書いた、外の機能の記録（通知・開いたフォルダーと URL・サインイン時の起動。desktop-ui-tests.md の 6.3）。</summary>
+    internal static IReadOnlyList<(string Kind, string Text)> Events() => FixtureEvents.Read(Path.Combine(AppSession.DataDirectory(), FixtureEvents.FileName));
+
+    /// <summary>
+    /// モックのデータ（<paramref name="data"/> で変えられる）と終わったジョブの記録を置いて起動し、終わったら（アプリを閉じた後に）置いたファイル・記録・設定を消す。
+    /// <paramref name="layout"/> なら、保存した列の配置（ジョブの一覧。既定は結果の列を左に。<paramref name="jobsLayout"/> で変えられる）も置く。
+    /// </summary>
+    internal static void WithFixture(Action<AppSession> test, Func<FixtureData, FixtureData>? data = null, bool layout = true, IReadOnlyList<TableColumnLayout>? jobsLayout = null,
+        [System.Runtime.CompilerServices.CallerMemberName] string name = "")
     {
         var directory = AppSession.DataDirectory();
         Directory.CreateDirectory(directory);
         var now = DateTimeOffset.UtcNow;
-        var files = new[] { FixtureData.FileName, "job-history.json", "preferences.json" }.Select(f => Path.Combine(directory, f)).ToList();
-        File.WriteAllText(files[0], (FixtureSamples.Data(Deployments, now) with { WriteDelaySeconds = 120 }).ToJson());
+        var files = new[] { FixtureData.FileName, "job-history.json", "preferences.json", FixtureEvents.FileName }.Select(f => Path.Combine(directory, f)).ToList();
+        foreach (var file in files)
+            File.Delete(file);
+        var fixture = FixtureSamples.Data(Deployments, now) with { WriteDelaySeconds = 120 };
+        File.WriteAllText(files[0], (data?.Invoke(fixture) ?? fixture).ToJson());
         new FileJobHistory(files[1]).Records = FixtureSamples.JobRecords(Records, now);
         // 保存した列の配置を当てる（ジョブの一覧の結果の列を、種類の次に置く。CI のウィンドウは狭く、右端の列は画面の外になるため）
-        new FilePreferences(files[2]).TableLayouts = new Dictionary<string, IReadOnlyList<TableColumnLayout>>
+        if (layout)
+            new FilePreferences(files[2]).TableLayouts = new Dictionary<string, IReadOnlyList<TableColumnLayout>>
         {
-            ["jobs"] =
+            ["jobs"] = jobsLayout ??
             [
                 new("Kind", 110), new("Result", 320), new("Subscription", 200), new("Target", 200), new("State", 170), new("Time", 120), new("RegisteredAt", 120),
                 new("ChangedAt", 120), new("StartedAt", 120), new("Finished", 120), new("Duration", 0),
