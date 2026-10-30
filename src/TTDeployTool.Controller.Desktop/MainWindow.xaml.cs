@@ -45,10 +45,10 @@ public sealed partial class MainWindow : Window
         // 表の ▽・並べ替え・列の幅と順序は、Core の決まりで行う（docs/design/desktop/desktop-tables.md の 10）
         var deployments = viewModel.Deployments;
         _deploymentsTable = new TableBinder<DeploymentEntry>(DeploymentsTable, deployments.Filters, viewModel.DeploymentsLayout, deployments,
-            row => ((DeploymentRowViewModel)row).Entry, DeploymentListViewModel.CanSortBy,
+            row => (row as DeploymentRowViewModel)?.Entry, DeploymentListViewModel.CanSortBy,
             () => deployments.SortColumn, () => deployments.SortDescending, deployments.SortBy, deployments.ClearSort);
         var jobs = viewModel.JobList;
-        _jobsTable = new TableBinder<JobViewModel>(JobsList, jobs.Filters, viewModel.JobsLayout, jobs, row => (JobViewModel)row, JobListViewModel.CanSortBy,
+        _jobsTable = new TableBinder<JobViewModel>(JobsList, jobs.Filters, viewModel.JobsLayout, jobs, row => row as JobViewModel, JobListViewModel.CanSortBy,
             () => jobs.SortColumn, () => jobs.SortDescending, jobs.SortBy, jobs.ClearSort);
         _deploymentsTable.BindText(DeploymentsText);
         _jobsTable.BindText(JobsText);

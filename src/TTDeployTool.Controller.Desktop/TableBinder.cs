@@ -18,6 +18,7 @@ namespace TTDeployTool.Controller.Desktop;
 /// セルの文字のコピーは、Ctrl+C（選んだ行）と、セルの右クリックのメニュー（セルの文字・選んだ行・選んだ行の Markdown の表）で行う。
 /// </summary>
 internal sealed class TableBinder<T>
+    where T : class
 {
     // 縦のスクロールバーの幅（マウスを置いて広がったとき）より少し広く
     private const double ScrollBarSpace = 16;
@@ -27,7 +28,7 @@ internal sealed class TableBinder<T>
     private readonly TableView _table;
     private readonly TableFilters<T> _filters;
     private readonly TableLayout _layout;
-    private readonly Func<object, T> _itemOf;
+    private readonly Func<object, T?> _itemOf;
     private readonly Func<string?> _sortColumn;
     private readonly Func<bool> _sortDescending;
     private readonly Action<string, bool> _sort;
@@ -38,9 +39,10 @@ internal sealed class TableBinder<T>
     private bool _sortPending;
     private (string Key, object Row)? _menuCell;
 
-    /// <param name="itemOf">表の行（ItemsSource の要素）から、Core の絞り込みの行を取り出す</param>
+    /// <param name="itemOf">表の行（ItemsSource の要素）から、Core の絞り込みの行を取り出す。行でない値（使い回しの途中の行の入れ物が持つ
+    /// 「切り離された行」の目印など）には null を返す</param>
     /// <param name="canSort">見出しで並べ替えられる列か（並べ替えない列を押すと、Core の並べ替えが例外になる）</param>
-    public TableBinder(TableView table, TableFilters<T> filters, TableLayout layout, INotifyPropertyChanged list, Func<object, T> itemOf, Func<string, bool> canSort,
+    public TableBinder(TableView table, TableFilters<T> filters, TableLayout layout, INotifyPropertyChanged list, Func<object, T?> itemOf, Func<string, bool> canSort,
         Func<string?> sortColumn, Func<bool> sortDescending, Action<string, bool> sort, Action clearSort)
     {
         _table = table;
@@ -81,7 +83,7 @@ internal sealed class TableBinder<T>
             column.CanSort = canSort(key);
             column.CanFilter = true;
             // 列の値（コピー・読み上げ・表の内蔵の並べ替え）は、セルに見えている文字。無いと行そのもの（型の名前）になる
-            column.OperationContentBinding = TextBinding(row => filters.Column(key).TextOf(itemOf(row)));
+            column.OperationContentBinding = TextBinding(row => itemOf(row) is { } item ? filters.Column(key).TextOf(item) : "");
             column.RegisterPropertyChangedCallback(TableViewColumn.WidthProperty, (_, _) => Save());
         }
         Apply(layout.Current);
@@ -235,7 +237,7 @@ internal sealed class TableBinder<T>
     }
 
     private void CopyRows(IEnumerable<object> rows, bool headers) =>
-        Copy(_filters.CopyText(rows.Select(_itemOf), VisibleKeys, headers));
+        Copy(_filters.CopyText(rows.Select(_itemOf).OfType<T>(), VisibleKeys, headers));
 
     private IEnumerable<string> VisibleKeys => DataColumns.Where(c => c.Visibility == Visibility.Visible).Select(Key);
 
@@ -248,8 +250,8 @@ internal sealed class TableBinder<T>
         var cell = new MenuFlyoutItem { Text = "この文字をコピー" };
         cell.Click += (_, _) =>
         {
-            if (_menuCell is { } c)
-                Copy(_filters.Column(c.Key).TextOf(_itemOf(c.Row)));
+            if (_menuCell is { } c && _itemOf(c.Row) is { } item)
+                Copy(_filters.Column(c.Key).TextOf(item));
         };
         var rows = new MenuFlyoutItem { Text = "選んだ行をコピー" };
         rows.Click += (_, _) => CopyRows(MenuRows, headers: false);
@@ -258,7 +260,7 @@ internal sealed class TableBinder<T>
         markdown.Click += (_, _) =>
         {
             if (MenuRows.Any())
-                Copy(_filters.CopyMarkdown(MenuRows.Select(_itemOf), VisibleKeys));
+                Copy(_filters.CopyMarkdown(MenuRows.Select(_itemOf).OfType<T>(), VisibleKeys));
         };
         var menu = new MenuFlyout { Items = { cell, rows, markdown } };
         menu.Opening += (_, _) => cell.IsEnabled = _menuCell != null;
@@ -281,7 +283,19 @@ internal sealed class TableBinder<T>
 
     private sealed class TextConverter(Func<object, string> text) : IValueConverter
     {
-        public object? Convert(object value, Type targetType, object parameter, string language) => value == null ? null : text(value);
+        // 表の読み上げ（UI Automation）・コピー・並べ替えが、行の配置の途中にも呼ぶ。ここで例外を出すと、WinRT の境界を越えて
+        // アプリが記録を残さずに落ちる（0xc000027b。Desktop System Test、run 41035872850）ため、出さない
+        public object? Convert(object value, Type targetType, object parameter, string language)
+        {
+            try
+            {
+                return value == null ? null : text(value);
+            }
+            catch (Exception)
+            {
+                return "";
+            }
+        }
 
         public object ConvertBack(object value, Type targetType, object parameter, string language) => throw new NotSupportedException();
     }
