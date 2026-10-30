@@ -62,6 +62,8 @@ internal static class IntegrationCheck
         // 通知: WinUI のアプリと同じ実装で出し、許可の状態を読み、通知センターに入ったかを確かめる
         Try(report, "notificationPermission", () => new AppNotificationService().Permission.ToString());
         Try(report, "notificationSetting", () => AppNotificationManager.Default.Setting.ToString());
+        // 比べるため、OS の通知の API（WinRT の ToastNotificationManager。パッケージの ID で使う）でも、通知を出せるかを読む
+        Try(report, "toastNotifierSetting", () => Windows.UI.Notifications.ToastNotificationManager.CreateToastNotifier().Setting.ToString());
         Try(report, "notificationShown", () =>
         {
             new AppNotificationService().Show(new AppNotice(NoticeTitle, "デプロイが終わりました（試作の確認）。", JobId: "job-check", Page: TTDeployTool.Controller.Desktop.Core.ViewModels.Pages.Status));

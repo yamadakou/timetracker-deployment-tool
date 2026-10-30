@@ -463,6 +463,19 @@ jobs:
         Copy-Item $report TestResults/integration-packaged.json
         "BLAZOR_AUMID=$($installed.PackageFamilyName)!App" >> $env:GITHUB_ENV
 
+    # 通知が使えるかは OS（ランナー）にもよるため、アプリの外からも読む（Windows PowerShell 5.1 の WinRT。エクスプローラーの通知の許可）
+    - name: Check whether this runner supports notifications
+      if: ${{ !cancelled() }}
+      shell: powershell
+      run: |
+        [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null
+        $setting = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier("Microsoft.Windows.Explorer").Setting
+        Write-Host "OS の通知の許可（エクスプローラー）: $setting"
+        Write-Host "OS: $((Get-CimInstance Win32_OperatingSystem).Caption) $((Get-CimInstance Win32_OperatingSystem).Version)"
+        $shell = Get-Process -Name ShellExperienceHost, StartMenuExperienceHost -ErrorAction SilentlyContinue | ForEach-Object Name
+        Write-Host "通知を出すシェルのプロセス: $($shell -join ', ')"
+        "setting=$setting" | Set-Content TestResults/runner-notifications.txt
+
     - name: Measure the Blazor MSIX
       # WebView2 のテストが失敗しても、MSIX と計測は続けて確かめる
       if: ${{ !cancelled() }}
