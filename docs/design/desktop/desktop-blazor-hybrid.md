@@ -2,7 +2,7 @@
 
 - 対象ブランチ: `feature/desktop-blazor-hybrid`（`feature/desktop-app` の 6123da3 から）。既存の WinUI 3 のアプリ（`src/TTDeployTool.Controller.Desktop`）とそのテスト・CI は変えず、試作は別のプロジェクトとして足す
 - 関連: [`desktop-tables.md`](desktop-tables.md)（表の仕様と、WinUI.TableView の不具合・回避策。9・10 章）・[`desktop-ui-tests.md`](desktop-ui-tests.md)（UI テスト。6.2・6.3）・[`desktop-app.md`](desktop-app.md)（サインイン・通知・MSIX）・[`desktop-app-store.md`](desktop-app-store.md)
-- 状況: 論点 Q1〜Q5 はオーナーの回答ですべて推奨どおりに決定（2026-10-30。12 章）。試作を実装した（13 章）。結果と比較は 14 章・10 章
+- 状況: 論点 Q1〜Q5 はオーナーの回答ですべて推奨どおりに決定（2026-10-30。12 章）。試作を実装し（13 章）、CI で確かめた（14 章）。比較と推奨は 10 章（移るかはオーナーの判断を待つ）
 - 一次情報の確認日: 2026-10-30（出典は 11 章）
 - 記録: `docs/REVIEW_ISSUES.md` の No.79
 
@@ -123,16 +123,30 @@ CI（`ci.yml`）には、試作用のジョブ `blazor-prototype`（ubuntu: ② 
 | 行のダブルクリック（ジョブの一覧） | 行の `@ondblclick`（今の WinUI では、そのジョブの実行状況の画面を開く。試作では詳細の区画を出す） | `JobListViewModel` | bUnit・Playwright |
 | キーボード（2 章 #7） | 見出しのボタン・▽・チェックボックスは Tab で届く。幅は見出しのボタンにフォーカスがあるときの Alt+←/→ など（試作で決める） | — | Playwright |
 
-## 10. 比較（試作の後に書く）
-試作の結果で埋める。下は、文書での見立て（試作の前）。
+## 10. 比較（試作の結果から。2026-10-30）
+数字は CI の windows ランナー（run 41109148255）の値で、実機とは違う（目安）。WinUI 3 は今のアプリの UI テストのモックのビルド（最初の画面〔サインイン〕まで）、Blazor Hybrid は試作（モックでサインインし、デプロイの一覧を 20 行出した後）。
 
-| 観点 | WinUI 3 のまま続ける | Blazor Hybrid（WPF のホスト）に移る | 見立て |
+| 観点 | WinUI 3 のまま続ける | Blazor Hybrid（WPF のホスト）に移る | 評価 |
 |---|---|---|---|
-| 安定性 | WinUI.TableView の中の不具合を回避策で抑えている（2 章）。部品の版を上げるたびに確かめ直す | 表の中の見えない処理が無くなる。WebView2 Runtime の更新（自動）による変化は受ける | 移る方が良くなる見込み（試作で、2 章の場面を Playwright で再現して確かめる） |
-| UX | 表計算に近い操作は TableView の範囲で得た。キーボードで見出しに届かない | 仕様をそのまま作れる。キーボードで見出しに届く。見た目は CSS で寄せる | 同等以上の見込み。見た目は試作の画面で判断 |
-| テストのしやすさ | 画面の側は FlaUI の UI テスト（Windows・遅い・入力の合成が難しい） | bUnit（Linux・速い）と Playwright（Linux）で大半を確かめ、Windows は少数 | 移る方が良くなる見込み |
-| 移行の費用 | なし | 画面（`MainWindow.xaml` 715 行・`TableBinder` など）を Razor で書き直す。Core はそのまま。ホスト・MSIX・リリースのワークフロー・UI テストを作り直す | 試作の結果から日数を見積もる |
-| リスク | 部品の不具合が続く。Microsoft の TableView は実験版（desktop-tables.md の 9.2） | WebView2 のメモリと起動時間、Runtime の無い PC、.wapproj での Store への提出、WAM の窓が前に出るか（実機） | 8 章の確認と、実機での確認（移ると決めた後） |
+| 安定性 | WinUI.TableView の中の不具合を回避策で抑えている（2 章の 6 件。うち 1 件は例外を握りつぶして続ける）。部品の版を上げるたびに確かめ直す | 表の中の見えない処理が無く、2 章の不具合の種類が生まれない。試作では、画面の側の回避策は 0 件。WebView2 Runtime の自動更新による変化は受ける | **移る方が良い** |
+| UX | 表計算に近い操作は TableView の範囲。見出しにキーボードで届かない。▽ の中・右クリックの操作は FlaUI でも届きにくい | 9 章の UX をすべて作れた。見出しに Tab で届き、Enter で並べ替え、Alt+←/→ で幅、Alt+Shift+←/→ で順序を変えられる（今の画面より良い）。見た目は CSS で Windows 11 の色と文字に寄せたが、WinUI の部品（日付の選択・ダイアログなど）と同じにはならない | 表は**移る方が良い**。ほかの画面の見た目は、作ってから判断 |
+| テストのしやすさ | 画面の側は単体テストが届かず、FlaUI の UI テスト（Windows・MSIX の導入が要る・遅い・ドラッグや変換中の入力の合成が難しい） | 画面の部品の単体テスト（bUnit 31 件、約 3 秒、Linux）で行・分岐とも 100%。ブラウザーでの本物の入力のテスト（Playwright 11 件、約 40 秒、Linux）で、ドラッグ・変換中の入力・6 行の表示・ツールチップ・右クリックまで確かめた。WebView2 の中のテスト（1 件、約 10 秒）も CDP でつながった | **移る方が良い** |
+| 起動 | 窓が出るまで 2.5 秒 | 窓が出るまで 0.7 秒（パッケージにしない）・0.8 秒（MSIX）。起動から表が出るまで 3.6 秒（WebView2 に CDP でつなぐ時間を含む） | 同等（窓は早いが、画面が出るまでは WebView2 の起動を待つ） |
+| メモリ | 1 プロセス。Working Set 156 MB・プライベート 49 MB | 7 プロセス（アプリと msedgewebview2.exe 6 つ）。Working Set 446〜465 MB・プライベート 145〜153 MB（Working Set には Edge と共有する部分を含む） | **WinUI 3 の方が少ない**（プライベートで約 100 MB 多い） |
+| Windows との連携 | 実装済み | WAM（窓のハンドル）・通知領域・DPAPI・サインイン時の起動（MSIX）は、今の実装のファイルを変えずに使えた。通知（`AppNotificationManager.IsSupported`）は、パッケージにしない・MSIX のどちらも false で、まだ確かめ切れていない（14 章） | 通知だけ要確認 |
+| 配布 | 単一プロジェクトの MSIX・x64 と arm64 のバンドル・Store への提出の流れができている | .wapproj で MSIX にまとめ、導入して動いた（x64 だけ）。arm64・バンドル・Store への提出は作り直しと確認が要る。WebView2 Runtime（Windows 11 は OS に含まれる）が要る | WinUI 3 の方が手間が無い |
+| 移行の費用（見込み） | なし | 画面の書き直し（`MainWindow.xaml` 715 行・ウィザードなど 9 画面。表の部品は試作のものを使う）3〜5 日、ホスト・MSIX・リリースのワークフロー 2〜3 日、UI テストを Playwright に置き換え 2〜3 日。Core（ViewModel と単体テスト）はそのまま | 約 2 週間 |
+| リスク | TableView の新しい不具合。Microsoft の TableView は実験版（desktop-tables.md の 9.2） | メモリ、通知、arm64 と Store、WAM の窓が前に出るか（実機）、WebView2 の無い Windows 10 の PC | — |
+
+### 10.1 推奨
+**Blazor Hybrid（WPF のホスト）に移る**ことを勧める。理由は、今いちばん手間がかかっている表の不具合と、画面の側を自動で確かめられないことの 2 つが、どちらも作りから無くなるため（試作で、回避策 0 件・画面の部品の網羅率 100%・本物の入力のテストが Linux で動く、を確かめた）。メモリが約 100 MB 増えることは、常駐するアプリとしては受け入れられる範囲と考える（オーナーの判断）。
+
+移る前に確かめること（どれも移ると決めた後の最初の作業とする）:
+1. 通知: WPF のホストで `AppNotificationManager` が使えない理由を調べ、使えなければ WinRT の `ToastNotificationManager` に替える（MSIX ならパッケージの ID で使える）
+2. 実機: WAM のサインインの窓がアプリの前に出ること・日本語の変換中の入力・見た目（`desktop-app-check.md` と同じ確認）
+3. 配布: .wapproj での arm64 とバンドル、Store への提出の形（`desktop-app-store.md` の流れの作り直し）
+
+WinUI 3 のまま続ける場合は、Microsoft の TableView の安定版が出たら乗り換えを検討する（desktop-tables.md の 9.2）。
 
 ## 11. 出典（2026-10-30 に確認）
 1. Microsoft Learn「ASP.NET Core Blazor Hybrid」（.NET 10 版。BlazorWebView は .NET MAUI・WPF・Windows Forms。コンポーネントはアプリの中で動き、WebAssembly は使わない）https://learn.microsoft.com/aspnet/core/blazor/hybrid/
@@ -155,6 +169,7 @@ CI（`ci.yml`）には、試作用のジョブ `blazor-prototype`（ubuntu: ② 
 | Q3 | Core の ViewModel との結び方（5 章） | **A: 薄い基底のコンポーネント**（推奨どおり） |
 | Q4 | テストの方法（6 章） | **A: bUnit・Playwright〔テスト用のホスト〕・WebView2 への CDP の接続**（推奨どおり） |
 | Q5 | 試作のプロジェクトの構成と CI（7 章） | **7 章の案**（推奨どおり） |
+| Q6 | WinUI 3 のまま続けるか、Blazor Hybrid に移るか（10 章） | 未定（推奨: Blazor Hybrid〔WPF のホスト〕に移る。10.1） |
 
 ## 13. 試作の作り（2026-10-30）
 | プロジェクト | 中身 |
@@ -177,3 +192,20 @@ CI（`ci.yml`）には、試作用のジョブ `blazor-prototype`（ubuntu: ② 
 | 見出し | すべてボタン（並べ替えない列は Tab で届く文字）で、`aria-sort` を持つ。Tab で見出しと ▽ に届き、Enter で並べ替え・▽ を開ける（WinUI.TableView では届かなかった） |
 | JavaScript からの呼び出し | つまみ・Alt+矢印は `[JSInvokable]` の .NET のメソッドを呼ぶだけで、判断は .NET 側（bUnit で確かめる）。JavaScript の行は網羅率の対象にしていない（Playwright で操作として確かめる） |
 | 決まりの場所 | 並べ替え・絞り込み・ページ・列の配置の保存・コピーの文字は、すべて今の Core のまま使えた（Core は 1 行も変えていない）。足した決まりは `HtmlTableRules`（3 回で既定の順・列の移動など）だけ |
+
+## 14. 試作の結果（CI、2026-10-30）
+| 確かめたこと | 結果 | 出典 |
+|---|---|---|
+| 画面の部品の単体テスト（bUnit） | ✔ 31 件。`TTDeployTool.Controller.Desktop.Blazor` の行・分岐とも 100%（Debug・Release。CI の `blazor-prototype` で 100% 未満なら失敗） | run 41104713974 以降 |
+| ブラウザーでの本物の入力（Playwright、Linux） | ✔ 11 件: 見出しの 3 回の並べ替えと並べ替えない列・▽（クリック・探す）・含む文字（変換中は絞り込まない・確定の後に絞り込みフォーカスはそのまま・外すと入力欄も空）・20 件ずつのページ・つまみのドラッグでの幅と見出しのドラッグでの順序と起動し直し・初期値に戻す・キーボード（Tab・Enter・Alt+矢印・Esc）・右端の列が残りの幅いっぱいと狭い窓での横のスクロール・6 行で切れる表示とツールチップ・セル・TSV・Markdown のコピー・左上のチェックボックス（一部の印）・行のダブルクリック | 同上 |
+| WebView2 の中（Playwright を CDP でつなぐ、Windows） | ✔ 1 件: 表・並べ替え・含む文字（フォーカス）・キーボードでの幅・Ctrl+C（WPF のクリップボード）。CDP のポートは `BlazorWebViewInitializing` で渡す（環境変数 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` では開かなかった） | run 41107829426 |
+| Windows との連携（パッケージにしない／MSIX） | 窓のハンドル ✔／✔、WAM のサインインの実装（`WamSignInService`・`InteractiveBrowserCredentialBrokerOptions(hwnd)`）✔／✔、WebView2 Runtime 155.0.4283.62、通知領域 ✔／✔、DPAPI ✔／✔、サインイン時の起動 Unavailable（パッケージが要る）／**Disabled（使える）**、通知 `IsSupported` false／**false（要確認）**、表 20 行／20 行 | run 41109148255 |
+| MSIX（.wapproj） | ✔ msbuild で作成・署名・導入・起動できた（x64）。ビルドで `wwwroot` を出力に置くこと、参照のライブラリを win-x64 でも復元することが要った | run 41109148255・41110302673 |
+| 起動時間とメモリ | 10 章の表 | run 41109148255 |
+
+### 14.1 試作で分かった Windows の部分の注意
+| 項目 | 内容 |
+|---|---|
+| Windows App SDK と WebView2 | WPF のプロジェクトに Windows App SDK を足すと、WebView2 のパッケージが WinUI 用の参照（CsWinRT の projection）だけになり、BlazorWebView が起動時に `Microsoft.Web.WebView2.Wpf` を読めず落ちた。`WebView2EnableCsWinRTProjection=false` で直る（`Microsoft.Web.WebView2` の build/Common.targets） |
+| CDP のポート | 試作のテストだけ、環境変数 `TT_BLAZOR_CDP_PORT` で `BlazorWebViewInitializing` に `--remote-debugging-port` を渡す（本番のビルドには入れない作りにする） |
+| 通知 | `AppNotificationManager.IsSupported()` が MSIX でも false だった。Register を呼ぶ前の値か、WPF＋自己完結の Windows App SDK の制限かは未確認（10.1 の 1） |
