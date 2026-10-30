@@ -197,3 +197,12 @@ Core の分岐網羅は今回の変更で 100% だったが、画面の側（`Ta
 | 判断を Core に移す | `TableRows<T>`（セルの文字: 行でない値・例外は空、コピーの文字・Markdown: 行でない値は飛ばす）、`TableRules`（余白の幅: NaN・無限・同じ幅のときは変えない、コピーの対象の行: 選んだ行か右クリックした行、並べ替えの決め方: 最初に向きのある列、列の配置の動かし方: 保存した順に並べ余白の列を最後に・表に無い列は飛ばす、保存する幅、ツールチップ、入力欄への書き戻し）、`TextFilterInput`（変換の間は待ち、入力が 0.4 秒止まってから絞り込む）。どれも単体テスト（`TableRowsTests`）で行・分岐とも 100%。画面の側には WinUI の呼び出し（列の Move・幅・フォーカス・クリップボード・タイマー）だけを残す |
 | 行のある表の CI の UI テスト | ジョブの一覧をサインインしていなくても開けるようにし（ジョブの操作はサインインするまで押せない。`desktop-wizard.md` の 7）、CI の UI テスト（`CiUiTests.Job_Records_Should_Fill_The_Table_And_Survive_Sorting_And_Filtering`）で、終わったジョブの記録 3 件（`job-history.json`）を置いて起動し、行が 3 件出る・見出しで昇順 → 降順 → 既定の順・並べ替えない「結果」の見出しは押せない・含む文字で 1 行に減る（NaN の場面）・絞り込みを外すと 3 行に戻り入力欄も空になる・列の配置を初期値に戻す、を確かめ、アプリが落ちていないことを見る |
 | 残る、自動で確かめない分岐 | ▽ のメニューの中（UI Automation の木に出ない）、右クリックのメニュー・Ctrl+C（マウス・キーボードの入力を合成しないため）、見出しのドラッグでの幅と順序の変更、6 行で切れる表示とツールチップ、日本語の変換中の入力。これらの判断は Core の単体テストで確かめる。操作は、その後に加えたモックの UI テスト（`MockUiTests`・`MockInputTests`。マウスとキーボードの入力を合成する。`desktop-ui-tests.md` の 6.2・6.3）で確かめ、実機に残すのは日本語の変換中の入力と見た目（`desktop-app-check.md` の 4.4） |
+
+### 10.8 動かした列の見出しが列から外れる（モックの UI テスト、2026-10-30）
+入力を合成するモックの UI テスト（`MockInputTests`）で、見出しのドラッグで「種類」を動かし、起動し直して「列の幅と順序を初期値に戻す」を押すと、順序は戻るが「種類」の幅が戻らなかった（165 のまま。初期値は 110）。
+
+| 項目 | 内容 |
+|---|---|
+| 原因 | WinUI.TableView 1.5.1 の `TableViewColumnCollection.Move` は、見出しの行の `MoveHeaders` で見出しを外して入れ直す。外すとき（`RemoveHeader`）に列の `HeaderControl` を null にし、入れ直すとき（`InsertHeader`）に戻さない。見出しの幅の計算（`CalculateHeaderWidths`）は `HeaderControl` のある列だけを扱うため、動かした列は、後から `Width` を変えても見出しとセルの幅が変わらない。並べ替えの向き・絞り込み中の印（`HeaderControl?.OnSortDirectionChanged` など）も見出しに出ない。見出しのドラッグも `Move` を使うため、実機でも起きる。上流の main（2026-10-30 時点）も同じ |
+| 直し方 | `TableBinder` で、列を動かした後（保存した配置を当てる・初期値に戻す・見出しのドラッグの `ColumnReordered`）に、`HeaderControl` が外れた列を一度隠して出し直す（`Visibility` の変更で、表が見出しを作り直してつなぎ直す）。表を読み込む前は見出しが無いため何もしない |
+| 確かめ方 | `MockInputTests.Columns_Should_Resize_And_Reorder_By_Dragging_And_Survive_A_Restart`（ドラッグで幅と順序を変える → 起動し直しても同じ → 初期値に戻すと順序と幅が戻る） |

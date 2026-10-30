@@ -72,7 +72,11 @@ internal sealed class TableBinder<T>
             if (e.PropertyName is "SortColumn" or "SortDescending")
                 ShowSort();
         };
-        table.ColumnReordered += (_, _) => KeepSpacerLast();
+        table.ColumnReordered += (_, e) =>
+        {
+            Relink(e.Column);
+            KeepSpacerLast();
+        };
         foreach (var column in DataColumns)
         {
             var key = Key(column);
@@ -166,7 +170,22 @@ internal sealed class TableBinder<T>
     private void Arrange(IReadOnlyList<string> order)
     {
         foreach (var (from, to) in TableRules.Arrange([.. _table.Columns.Select(c => IsData(c) ? Key(c) : "")], order, ""))
+        {
+            var column = _table.Columns[from];
             _table.Columns.Move(from, to);
+            Relink(column);
+        }
+    }
+
+    // WinUI.TableView 1.5.1 の Columns.Move は、見出しを並べ直すときに列から見出しへの参照（HeaderControl）を外したままにする。
+    // そのため動かした列は、後から幅を変えても（初期値に戻すなど）見出しの幅が変わらず、並べ替えの向きも見出しに出ない。
+    // 列を一度隠して出し直すと、表が見出しを作り直して参照をつなぎ直す（desktop-tables.md の 10.8）。表を読み込む前（見出しを作る前）は何もしない
+    private void Relink(TableViewColumn column)
+    {
+        if (!_table.IsLoaded || column.HeaderControl is not null || column.Visibility != Visibility.Visible)
+            return;
+        column.Visibility = Visibility.Collapsed;
+        column.Visibility = Visibility.Visible;
     }
 
     // 余白の列は動かせないが、ほかの列をその右に置けるため、順序を変えるたびに最後に戻す
