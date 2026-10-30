@@ -108,6 +108,11 @@ jobs:
             Copy-Item (Join-Path $logs "ttdeploytool-desktop-*.log") TestResults
           }
         }
+        # アプリが記録を残さずに落ちたとき（WinUI の中の強制終了など）の手がかり: Windows のアプリケーションのイベント（アプリのエラー 1000・.NET Runtime 1026）
+        New-Item -ItemType Directory -Force -Path TestResults | Out-Null
+        Get-WinEvent -FilterHashtable @{ LogName = "Application"; StartTime = (Get-Date).AddHours(-2); Id = 1000, 1001, 1026 } -ErrorAction SilentlyContinue |
+          Where-Object { $_.Message -match "TTDeployTool" } |
+          Format-List TimeCreated, Id, ProviderName, Message | Out-File TestResults/application-events.txt -Width 300
 
     - name: Upload test results
       if: always()

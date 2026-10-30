@@ -64,7 +64,9 @@ internal sealed class TableBinder<T>
         table.CopyToClipboard += OnCopyToClipboard;
         table.CellContextFlyout = CreateMenu();
         table.CellContextFlyoutOpening += (_, e) => _menuCell = IsData(table.Columns.VisibleColumns[e.Slot.Column]) ? (Key(table.Columns.VisibleColumns[e.Slot.Column]), e.Item) : null;
-        table.RegisterPropertyChangedCallback(TableView.CellsHorizontalOffsetProperty, (_, _) => SizeSpacer());
+        // チェックボックスの列の幅は、表が行の配置の途中で設定する。その中で列の幅を変えると、配置を入れ子で計算し直してアプリが落ちる
+        // （記録の残らない落ち方。Desktop System Test、run 41020015841）ため、配置が終わってから変える
+        table.RegisterPropertyChangedCallback(TableView.CellsHorizontalOffsetProperty, (_, _) => table.DispatcherQueue.TryEnqueue(SizeSpacer));
         filters.Changed += ShowFiltered;
         list.PropertyChanged += (_, e) =>
         {
@@ -180,8 +182,12 @@ internal sealed class TableBinder<T>
         Save();
     }
 
-    private void SizeSpacer() =>
-        _spacer.Width = new GridLength(ScrollBarSpace + Math.Max(0, _table.CellsHorizontalOffset - HeaderReserve));
+    private void SizeSpacer()
+    {
+        var width = ScrollBarSpace + Math.Max(0, _table.CellsHorizontalOffset - HeaderReserve);
+        if (!_spacer.Width.IsAbsolute || _spacer.Width.Value != width)
+            _spacer.Width = new GridLength(width);
+    }
 
     private void SortLater()
     {
