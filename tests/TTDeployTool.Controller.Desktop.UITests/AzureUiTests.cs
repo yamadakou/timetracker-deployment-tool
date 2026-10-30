@@ -209,6 +209,23 @@ public class AzureUiTests
             var secondTarget = $"{resourceGroup} / {second}";
             app.WaitForRowText("Jobs.List", "Job.Target", secondTarget, "Job.Status", t => t.StartsWith("予定"), "予定のジョブが一覧に出る");
             Log($"ジョブの一覧の行: {app.RowsText("Jobs.List")}");
+            // No.78: 見出しで並べ替えられ、▽ が使える（テンプレートの列は、初期値では並べ替えも ▽ もできない。評価版 0.1.67 の実機の確認）。
+            // 見出しを押すたびに、昇順 → 降順 → 既定の順（見出しの名前に状態が足され、3 回目で消える。向きは Core の並べ替えに合わせて出す）
+            var header = app.ColumnHeader("Jobs.List", "状態");
+            Log($"見出し: {(header.Properties.Name.ValueOrDefault ?? "")}（{header.Properties.HelpText.ValueOrDefault}）");
+            header.Patterns.Invoke.IsSupported.Should().BeTrue("見出しを押して並べ替えられる");
+            (header.Properties.HelpText.ValueOrDefault ?? "").Split(", ").Should().HaveCount(2, "並べ替えと ▽ の絞り込みの両方ができる");
+            var names = new List<string>();
+            for (var i = 0; i < 3; i++)
+            {
+                app.ColumnHeader("Jobs.List", "状態").Patterns.Invoke.Pattern.Invoke();
+                var before = names.LastOrDefault() ?? "状態";
+                AppSession.WaitUntil(() => (app.ColumnHeader("Jobs.List", "状態").Properties.Name.ValueOrDefault ?? "") != before, $"見出しを {i + 1} 回押すと、並べ替えの状態が変わる");
+                names.Add((app.ColumnHeader("Jobs.List", "状態").Properties.Name.ValueOrDefault ?? ""));
+            }
+            Log($"見出しを押した後の名前: {string.Join(" → ", names)}");
+            names[0].Should().NotBe(names[1]);
+            names[2].Should().Be("状態", "3 回目で既定の順に戻る");
             app.SelectRowWith("Jobs.List", "Job.Target", secondTarget);
             app.Invoke("Jobs.CancelSelected");
             app.WaitForRowText("Jobs.List", "Job.Target", secondTarget, "Job.Status", t => t == "取り消し", "予定を取り消せる");

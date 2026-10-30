@@ -1,5 +1,7 @@
 using System.ComponentModel;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using TTDeployTool.Controller.Desktop.Core.ViewModels;
 using WinUI.TableView;
 
@@ -9,6 +11,7 @@ namespace TTDeployTool.Controller.Desktop;
 /// 表（WinUI.TableView）と、Core の絞り込み・並べ替え・列の配置をつなぐ（docs/design/desktop/desktop-tables.md の 10）。列の Tag は Core の列の名前。
 /// 表の行は今のページの行だけのため、▽ の値と絞り込みは Core（<see cref="TableFilters{T}"/>）で行い、並べ替えも Core の決まりで行う
 /// （表の内蔵の並べ替えは、向きを読んだら外す）。列の幅と順序は、変えるたびに保存する。
+/// 表の上の「含む文字」は、入力が止まってから絞り込む（<see cref="BindText"/>）。
 /// </summary>
 internal sealed class TableBinder<T>
 {
@@ -22,7 +25,8 @@ internal sealed class TableBinder<T>
     private bool _applying;
     private bool _sortPending;
 
-    public TableBinder(TableView table, TableFilters<T> filters, TableLayout layout, INotifyPropertyChanged list,
+    /// <param name="sortMemberPath">行の型の文字列のプロパティ。表の内蔵の並べ替えが向きを読むまでの間に使う（無いと行そのものを比べて例外になる）</param>
+    public TableBinder(TableView table, TableFilters<T> filters, TableLayout layout, INotifyPropertyChanged list, string sortMemberPath,
         Func<string?> sortColumn, Func<bool> sortDescending, Action<string, bool> sort, Action clearSort)
     {
         _table = table;
@@ -44,13 +48,64 @@ internal sealed class TableBinder<T>
         };
         table.ColumnReordered += (_, _) => Save();
         foreach (var column in table.Columns)
+        {
+            // テンプレートの列は、初期値では並べ替えも ▽ もできない（TableViewTemplateColumn が CanSort・CanFilter を false にする）
+            column.CanSort = true;
+            column.CanFilter = true;
+            column.SortMemberPath = sortMemberPath;
             column.RegisterPropertyChangedCallback(TableViewColumn.WidthProperty, (_, _) => Save());
+        }
         Apply(layout.Current);
         ShowSort();
     }
 
     /// <summary>列の幅と順序を初期値に戻す。</summary>
     public void Reset() => Apply(_layout.Reset());
+
+    /// <summary>
+    /// 「含む文字」の入力欄を、表の上の文字のフィルタにつなぐ。打つたびに絞り込むと、日本語の変換の途中で一覧が作り直され、
+    /// 入力欄からフォーカスが外れることがあるため、変換の間は待ち、入力が止まってから絞り込む。絞り込みで入力欄からフォーカスが外れたら戻す。
+    /// </summary>
+    public void BindText(TextBox box)
+    {
+        var composing = false;
+        var timer = _table.DispatcherQueue.CreateTimer();
+        timer.Interval = TimeSpan.FromMilliseconds(400);
+        timer.IsRepeating = false;
+        timer.Tick += (_, _) =>
+        {
+            if (composing)
+                return;
+            var focused = box.FocusState != FocusState.Unfocused;
+            var caret = box.SelectionStart;
+            _filters.Text = box.Text;
+            if (focused)
+            {
+                _table.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
+                {
+                    if (box.FocusState == FocusState.Unfocused)
+                    {
+                        box.Focus(FocusState.Programmatic);
+                        box.SelectionStart = Math.Min(caret, box.Text.Length);
+                    }
+                });
+            }
+        };
+        box.Text = _filters.Text;
+        box.TextChanged += (_, _) => timer.Start();
+        box.TextCompositionStarted += (_, _) => composing = true;
+        box.TextCompositionEnded += (_, _) =>
+        {
+            composing = false;
+            timer.Start();
+        };
+        // 「絞り込みをすべて外す」などで文字が変わったら、入力欄に出す（前後の空白だけの違いは、入力中のため書き換えない）
+        _filters.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(TableFilters<T>.Text) && box.Text.Trim() != _filters.Text)
+                box.Text = _filters.Text;
+        };
+    }
 
     private static string Key(TableViewColumn column) => (string)column.Tag;
 

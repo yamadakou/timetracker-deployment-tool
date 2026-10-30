@@ -44,10 +44,13 @@ public sealed partial class MainWindow : Window
         viewModel.JobList.TableSelection.Attach(JobsList.SelectedItems);
         // 表の ▽・並べ替え・列の幅と順序は、Core の決まりで行う（docs/design/desktop/desktop-tables.md の 10）
         var deployments = viewModel.Deployments;
-        _deploymentsTable = new TableBinder<DeploymentEntry>(DeploymentsTable, deployments.Filters, viewModel.DeploymentsLayout, deployments,
+        _deploymentsTable = new TableBinder<DeploymentEntry>(DeploymentsTable, deployments.Filters, viewModel.DeploymentsLayout, deployments, nameof(DeploymentRowViewModel.AppName),
             () => deployments.SortColumn, () => deployments.SortDescending, deployments.SortBy, deployments.ClearSort);
         var jobs = viewModel.JobList;
-        _jobsTable = new TableBinder<JobViewModel>(JobsList, jobs.Filters, viewModel.JobsLayout, jobs, () => jobs.SortColumn, () => jobs.SortDescending, jobs.SortBy, jobs.ClearSort);
+        _jobsTable = new TableBinder<JobViewModel>(JobsList, jobs.Filters, viewModel.JobsLayout, jobs, nameof(JobViewModel.TargetText),
+            () => jobs.SortColumn, () => jobs.SortDescending, jobs.SortBy, jobs.ClearSort);
+        _deploymentsTable.BindText(DeploymentsText);
+        _jobsTable.BindText(JobsText);
         CreateTray();
         _ = viewModel.StartAsync(atStartup);
         _ = CheckForUpdatesAsync(hwnd);

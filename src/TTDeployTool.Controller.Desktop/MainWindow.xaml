@@ -12,6 +12,17 @@
 
     <Grid x:Name="Root">
         <Grid.Resources>
+            <!-- 表のセルの文字: 6 行までで「…」で切る（行の高さをそろえる。切れたときは CellText.ShowFullText で、マウスを置くと全体を出す） -->
+            <Style x:Key="CellTextStyle" TargetType="TextBlock">
+                <Setter Property="TextWrapping" Value="Wrap" />
+                <Setter Property="MaxLines" Value="6" />
+                <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            </Style>
+            <Style x:Key="CellStrongTextStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyStrongTextBlockStyle}">
+                <Setter Property="TextWrapping" Value="Wrap" />
+                <Setter Property="MaxLines" Value="6" />
+                <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            </Style>
             <!-- 文字列の一覧の 1 行（TextBlock にして、UI Automation とスクリーン リーダーが各行を読めるようにする） -->
             <DataTemplate x:Key="LineTemplate" x:DataType="x:String">
                 <TextBlock Text="{x:Bind}" TextWrapping="Wrap" />
@@ -326,7 +337,7 @@
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <ComboBox AutomationProperties.AutomationId="Deployments.TextTarget" Header="文字で絞り込む列" ItemsSource="{x:Bind ViewModel.Deployments.Filters.TextTargets}" MinWidth="180"
                                       SelectedItem="{x:Bind ViewModel.Deployments.Filters.TextTarget, Mode=OneWay}" SelectionChanged="OnDeploymentTextTargetChanged" />
-                            <TextBox AutomationProperties.AutomationId="Deployments.Text" Header="含む文字" Width="220" Text="{x:Bind ViewModel.Deployments.Filters.Text, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBox x:Name="DeploymentsText" AutomationProperties.AutomationId="Deployments.Text" Header="含む文字" Width="220" />
                             <ComboBox AutomationProperties.AutomationId="Deployments.DateColumn" Header="日付で絞り込む列" ItemsSource="{x:Bind ViewModel.Deployments.Filters.DateColumns}" MinWidth="160"
                                       SelectedItem="{x:Bind ViewModel.Deployments.Filters.DateColumn, Mode=OneWay}" SelectionChanged="OnDeploymentDateColumnChanged" />
                             <CalendarDatePicker AutomationProperties.AutomationId="Deployments.DateFrom" Header="この日から" Date="{x:Bind ViewModel.Deployments.Filters.Dates.From, Mode=TwoWay}" />
@@ -341,42 +352,42 @@
                             <tv:TableView.Columns>
                                 <tv:TableViewTemplateColumn Header="サブスクリプション" Tag="Subscription">
                                     <tv:TableViewTemplateColumn.CellTemplate><DataTemplate x:DataType="vm:DeploymentRowViewModel">
-                                        <TextBlock Text="{x:Bind Subscription}" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind Subscription}" />
+                                        <TextBlock Style="{StaticResource CellTextStyle}" Text="{x:Bind Subscription}" local:CellText.ShowFullText="True" />
                                     </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
                                 </tv:TableViewTemplateColumn>
                                 <tv:TableViewTemplateColumn Header="リソースグループ" Tag="ResourceGroup">
                                     <tv:TableViewTemplateColumn.CellTemplate><DataTemplate x:DataType="vm:DeploymentRowViewModel">
-                                        <TextBlock Text="{x:Bind ResourceGroup}" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Style="{StaticResource CellTextStyle}" Text="{x:Bind ResourceGroup}" local:CellText.ShowFullText="True" />
                                     </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
                                 </tv:TableViewTemplateColumn>
                                 <tv:TableViewTemplateColumn Header="アプリ名" Tag="AppName">
                                     <tv:TableViewTemplateColumn.CellTemplate><DataTemplate x:DataType="vm:DeploymentRowViewModel">
-                                        <TextBlock AutomationProperties.AutomationId="Row.AppName" Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind AppName}" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock AutomationProperties.AutomationId="Row.AppName" Style="{StaticResource CellStrongTextStyle}" Text="{x:Bind AppName}" local:CellText.ShowFullText="True" />
                                     </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
                                 </tv:TableViewTemplateColumn>
                                 <tv:TableViewTemplateColumn Header="グループ" Tag="Group">
                                     <tv:TableViewTemplateColumn.CellTemplate><DataTemplate x:DataType="vm:DeploymentRowViewModel">
-                                        <TextBlock AutomationProperties.AutomationId="Row.Group" Text="{x:Bind GroupText, Mode=OneWay}" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind GroupWarning, Mode=OneWay}" />
+                                        <TextBlock Style="{StaticResource CellTextStyle}" AutomationProperties.AutomationId="Row.Group" Text="{x:Bind GroupText, Mode=OneWay}" ToolTipService.ToolTip="{x:Bind GroupWarning, Mode=OneWay}" />
                                     </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
                                 </tv:TableViewTemplateColumn>
                                 <tv:TableViewTemplateColumn Header="状態" Tag="State">
                                     <tv:TableViewTemplateColumn.CellTemplate><DataTemplate x:DataType="vm:DeploymentRowViewModel">
-                                        <TextBlock AutomationProperties.AutomationId="Row.State" Text="{x:Bind StateText, Mode=OneWay}" TextWrapping="Wrap" ToolTipService.ToolTip="{x:Bind StateDetail, Mode=OneWay}" />
+                                        <TextBlock Style="{StaticResource CellTextStyle}" AutomationProperties.AutomationId="Row.State" Text="{x:Bind StateText, Mode=OneWay}" ToolTipService.ToolTip="{x:Bind StateDetail, Mode=OneWay}" />
                                     </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
                                 </tv:TableViewTemplateColumn>
                                 <tv:TableViewTemplateColumn Header="利用可能期限日" Tag="ExpiresAt">
                                     <tv:TableViewTemplateColumn.CellTemplate><DataTemplate x:DataType="vm:DeploymentRowViewModel">
-                                        <TextBlock AutomationProperties.AutomationId="Row.Expiry" Text="{x:Bind ExpiryText, Mode=OneWay}" Foreground="{x:Bind local:Ui.ExpiryBrush(Level), Mode=OneWay}" TextWrapping="Wrap" />
+                                        <TextBlock Style="{StaticResource CellTextStyle}" AutomationProperties.AutomationId="Row.Expiry" Text="{x:Bind ExpiryText, Mode=OneWay}" Foreground="{x:Bind local:Ui.ExpiryBrush(Level), Mode=OneWay}" local:CellText.ShowFullText="True" />
                                     </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
                                 </tv:TableViewTemplateColumn>
                                 <tv:TableViewTemplateColumn Header="デプロイ日" Tag="DeployedAt">
                                     <tv:TableViewTemplateColumn.CellTemplate><DataTemplate x:DataType="vm:DeploymentRowViewModel">
-                                        <TextBlock Text="{x:Bind DeployedText, Mode=OneWay}" />
+                                        <TextBlock Style="{StaticResource CellTextStyle}" Text="{x:Bind DeployedText, Mode=OneWay}" local:CellText.ShowFullText="True" />
                                     </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
                                 </tv:TableViewTemplateColumn>
-                                <tv:TableViewTemplateColumn Header="ジョブ" Tag="Job">
+                                <tv:TableViewTemplateColumn Header="ジョブ" Tag="Job" MinWidth="160">
                                     <tv:TableViewTemplateColumn.CellTemplate><DataTemplate x:DataType="vm:DeploymentRowViewModel">
-                                        <TextBlock AutomationProperties.AutomationId="Row.Job" Text="{x:Bind JobText, Mode=OneWay}" TextWrapping="Wrap" Foreground="{ThemeResource SystemFillColorCautionBrush}" />
+                                        <TextBlock Style="{StaticResource CellTextStyle}" AutomationProperties.AutomationId="Row.Job" Text="{x:Bind JobText, Mode=OneWay}" Foreground="{ThemeResource SystemFillColorCautionBrush}" local:CellText.ShowFullText="True" />
                                     </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
                                 </tv:TableViewTemplateColumn>
                             </tv:TableView.Columns>
@@ -529,7 +540,7 @@
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <ComboBox AutomationProperties.AutomationId="Jobs.TextTarget" Header="文字で絞り込む列" ItemsSource="{x:Bind ViewModel.JobList.Filters.TextTargets}" MinWidth="180"
                                       SelectedItem="{x:Bind ViewModel.JobList.Filters.TextTarget, Mode=OneWay}" SelectionChanged="OnJobTextTargetChanged" />
-                            <TextBox AutomationProperties.AutomationId="Jobs.Text" Header="含む文字" Width="220" Text="{x:Bind ViewModel.JobList.Filters.Text, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBox x:Name="JobsText" AutomationProperties.AutomationId="Jobs.Text" Header="含む文字" Width="220" />
                             <ComboBox AutomationProperties.AutomationId="Jobs.DateColumn" Header="日付で絞り込む列" ItemsSource="{x:Bind ViewModel.JobList.Filters.DateColumns}" MinWidth="160"
                                       SelectedItem="{x:Bind ViewModel.JobList.Filters.DateColumn, Mode=OneWay}" SelectionChanged="OnJobDateColumnChanged" />
                             <CalendarDatePicker AutomationProperties.AutomationId="Jobs.DateFrom" Header="この日から" Date="{x:Bind ViewModel.JobList.Filters.Dates.From, Mode=TwoWay}" />
@@ -543,57 +554,57 @@
                             <tv:TableView.Columns>
                                 <tv:TableViewTemplateColumn Header="種類" Tag="Kind">
                                     <tv:TableViewTemplateColumn.CellTemplate><DataTemplate x:DataType="vm:JobViewModel">
-                                        <TextBlock AutomationProperties.AutomationId="Job.Kind" Text="{x:Bind KindText}" />
+                                        <TextBlock Style="{StaticResource CellTextStyle}" AutomationProperties.AutomationId="Job.Kind" Text="{x:Bind KindText}" local:CellText.ShowFullText="True" />
                                     </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
                                 </tv:TableViewTemplateColumn>
                                 <tv:TableViewTemplateColumn Header="サブスクリプション" Tag="Subscription">
                                     <tv:TableViewTemplateColumn.CellTemplate><DataTemplate x:DataType="vm:JobViewModel">
-                                        <TextBlock AutomationProperties.AutomationId="Job.Subscription" Text="{x:Bind SubscriptionText, Mode=OneWay}" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind SubscriptionText, Mode=OneWay}" />
+                                        <TextBlock Style="{StaticResource CellTextStyle}" AutomationProperties.AutomationId="Job.Subscription" Text="{x:Bind SubscriptionText, Mode=OneWay}" local:CellText.ShowFullText="True" />
                                     </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
                                 </tv:TableViewTemplateColumn>
                                 <tv:TableViewTemplateColumn Header="リソースグループ / アプリ名" Tag="Target">
                                     <tv:TableViewTemplateColumn.CellTemplate><DataTemplate x:DataType="vm:JobViewModel">
-                                        <TextBlock AutomationProperties.AutomationId="Job.Target" Text="{x:Bind TargetText}" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Style="{StaticResource CellTextStyle}" AutomationProperties.AutomationId="Job.Target" Text="{x:Bind TargetText}" local:CellText.ShowFullText="True" />
                                     </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
                                 </tv:TableViewTemplateColumn>
                                 <tv:TableViewTemplateColumn Header="状態" Tag="State">
                                     <tv:TableViewTemplateColumn.CellTemplate><DataTemplate x:DataType="vm:JobViewModel">
-                                        <TextBlock AutomationProperties.AutomationId="Job.Status" Text="{x:Bind StatusText, Mode=OneWay}" TextWrapping="Wrap" />
+                                        <TextBlock Style="{StaticResource CellTextStyle}" AutomationProperties.AutomationId="Job.Status" Text="{x:Bind StatusText, Mode=OneWay}" local:CellText.ShowFullText="True" />
                                     </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
                                 </tv:TableViewTemplateColumn>
                                 <tv:TableViewTemplateColumn Header="予定日時" Tag="Time">
                                     <tv:TableViewTemplateColumn.CellTemplate><DataTemplate x:DataType="vm:JobViewModel">
-                                        <TextBlock AutomationProperties.AutomationId="Job.Time" Text="{x:Bind TimeText, Mode=OneWay}" />
+                                        <TextBlock Style="{StaticResource CellTextStyle}" AutomationProperties.AutomationId="Job.Time" Text="{x:Bind TimeText, Mode=OneWay}" local:CellText.ShowFullText="True" />
                                     </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
                                 </tv:TableViewTemplateColumn>
                                 <tv:TableViewTemplateColumn Header="登録日時" Tag="RegisteredAt">
                                     <tv:TableViewTemplateColumn.CellTemplate><DataTemplate x:DataType="vm:JobViewModel">
-                                        <TextBlock AutomationProperties.AutomationId="Job.Registered" Text="{x:Bind RegisteredText}" />
+                                        <TextBlock Style="{StaticResource CellTextStyle}" AutomationProperties.AutomationId="Job.Registered" Text="{x:Bind RegisteredText}" local:CellText.ShowFullText="True" />
                                     </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
                                 </tv:TableViewTemplateColumn>
                                 <tv:TableViewTemplateColumn Header="変更日時" Tag="ChangedAt">
                                     <tv:TableViewTemplateColumn.CellTemplate><DataTemplate x:DataType="vm:JobViewModel">
-                                        <TextBlock AutomationProperties.AutomationId="Job.Changed" Text="{x:Bind ChangedText, Mode=OneWay}" />
+                                        <TextBlock Style="{StaticResource CellTextStyle}" AutomationProperties.AutomationId="Job.Changed" Text="{x:Bind ChangedText, Mode=OneWay}" local:CellText.ShowFullText="True" />
                                     </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
                                 </tv:TableViewTemplateColumn>
                                 <tv:TableViewTemplateColumn Header="実行開始日時" Tag="StartedAt">
                                     <tv:TableViewTemplateColumn.CellTemplate><DataTemplate x:DataType="vm:JobViewModel">
-                                        <TextBlock AutomationProperties.AutomationId="Job.Started" Text="{x:Bind StartedText, Mode=OneWay}" />
+                                        <TextBlock Style="{StaticResource CellTextStyle}" AutomationProperties.AutomationId="Job.Started" Text="{x:Bind StartedText, Mode=OneWay}" local:CellText.ShowFullText="True" />
                                     </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
                                 </tv:TableViewTemplateColumn>
                                 <tv:TableViewTemplateColumn Header="実行終了日時" Tag="Finished">
                                     <tv:TableViewTemplateColumn.CellTemplate><DataTemplate x:DataType="vm:JobViewModel">
-                                        <TextBlock AutomationProperties.AutomationId="Job.Finished" Text="{x:Bind FinishedText, Mode=OneWay}" />
+                                        <TextBlock Style="{StaticResource CellTextStyle}" AutomationProperties.AutomationId="Job.Finished" Text="{x:Bind FinishedText, Mode=OneWay}" local:CellText.ShowFullText="True" />
                                     </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
                                 </tv:TableViewTemplateColumn>
                                 <tv:TableViewTemplateColumn Header="処理時間" Tag="Duration">
                                     <tv:TableViewTemplateColumn.CellTemplate><DataTemplate x:DataType="vm:JobViewModel">
-                                        <TextBlock AutomationProperties.AutomationId="Job.Duration" Text="{x:Bind DurationText, Mode=OneWay}" />
+                                        <TextBlock Style="{StaticResource CellTextStyle}" AutomationProperties.AutomationId="Job.Duration" Text="{x:Bind DurationText, Mode=OneWay}" local:CellText.ShowFullText="True" />
                                     </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
                                 </tv:TableViewTemplateColumn>
-                                <tv:TableViewTemplateColumn Header="結果" Tag="Result">
+                                <tv:TableViewTemplateColumn Header="結果" Tag="Result" MinWidth="320">
                                     <tv:TableViewTemplateColumn.CellTemplate><DataTemplate x:DataType="vm:JobViewModel">
-                                        <TextBlock AutomationProperties.AutomationId="Job.Result" Text="{x:Bind ResultText, Mode=OneWay}" TextWrapping="Wrap" />
+                                        <TextBlock Style="{StaticResource CellTextStyle}" AutomationProperties.AutomationId="Job.Result" Text="{x:Bind ResultText, Mode=OneWay}" local:CellText.ShowFullText="True" />
                                     </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
                                 </tv:TableViewTemplateColumn>
                             </tv:TableView.Columns>

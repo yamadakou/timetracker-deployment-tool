@@ -4,6 +4,7 @@ using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
 using FlaUI.Core.Tools;
 using FlaUI.UIA3;
+using FlaUI.UIA3.Converters;
 using Windows.Management.Deployment;
 
 namespace TTDeployTool.Controller.Desktop.UITests;
@@ -200,6 +201,29 @@ public sealed class AppSession : IDisposable
     /// <summary>表の行の文字（UI Automation の行の順。失敗したときの記録に使う）。</summary>
     public string RowsText(string tableId) =>
         string.Join(" | ", RowsOf(tableId).Select(r => string.Join(" / ", r.FindAllDescendants(cf => cf.ByControlType(ControlType.Text)).Select(NameOf).Where(t => t.Length > 0))));
+
+    /// <summary>
+    /// 表の列の見出し（HeaderItem）。WinUI.TableView の見出しは UI Automation の木に出ないため、1 行目のセルの TableItem パターンからたどる
+    /// （行の無い表では見つからない。docs/design/desktop/desktop-tables.md の 9）。見出しの名前には、並べ替え・絞り込みの状態が「, 昇順」のように足される。
+    /// </summary>
+    public AutomationElement ColumnHeader(string tableId, string header) =>
+        Retry.WhileNull(
+            () =>
+            {
+                var grid = Find(tableId).Patterns.Grid.Pattern;
+                return Enumerable.Range(0, grid.ColumnCount.Value)
+                    .Select(c => grid.GetItem(0, c))
+                    .Where(c => c != null)
+                    .SelectMany(HeaderItems)
+                    .FirstOrDefault(h => NameOf(h) == header || NameOf(h).StartsWith($"{header}, ", StringComparison.Ordinal));
+            },
+            Timeout, Interval, throwOnTimeout: true, ignoreException: true,
+            timeoutMessage: $"表 {tableId} に、見出し「{header}」が見つかりませんでした。").Result!;
+
+    // FlaUI の ColumnHeaderItems のプロパティは XAML の UI Automation の橋渡しで「対応しない」になるため、TableItem パターン（10013）のメソッドで読む
+    private static AutomationElement[] HeaderItems(AutomationElement cell) =>
+        AutomationElementConverter.NativeArrayToManaged(cell.Automation,
+            ((Interop.UIAutomationClient.IUIAutomationTableItemPattern)AutomationElementConverter.ToNative(cell).GetCurrentPattern(10013)).GetCurrentColumnHeaderItems());
 
     private AutomationElement[] RowsOf(string tableId) =>
         Find(tableId).FindAllChildren(cf => cf.ByControlType(ControlType.ListItem).Or(cf.ByControlType(ControlType.DataItem)));
