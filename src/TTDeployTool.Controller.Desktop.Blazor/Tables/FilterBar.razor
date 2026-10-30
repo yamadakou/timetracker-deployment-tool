@@ -1,0 +1,49 @@
+@typeparam TItem where TItem : class
+@inherits ViewModelComponent
+
+@* 表の上の 2 つのフィルタ（desktop-tables.md の 10.4）: 「対象の列＋含む文字」と「対象の列＋いつから・いつまで」、「絞り込みをすべて外す」 *@
+<div class="tt-filters" role="group" aria-label="絞り込み">
+    <label class="tt-field">
+        <span>文字で絞り込む列</span>
+        <select data-filter-target="@Name" @onchange="SetTextTarget">
+            @for (var i = 0; i < Filters.TextTargets.Count; i++)
+            {
+                <option value="@i" selected="@(Filters.TextTargets[i] == Filters.TextTarget)">@Filters.TextTargets[i].Label</option>
+            }
+        </select>
+    </label>
+    <TextFilterBox TItem="TItem" Filters="Filters" Name="@Name" />
+    <label class="tt-field">
+        <span>日付で絞り込む列</span>
+        <select data-date-column="@Name" @onchange="SetDateColumn">
+            @for (var i = 0; i < Filters.DateColumns.Count; i++)
+            {
+                <option value="@i" selected="@(Filters.DateColumns[i] == Filters.DateColumn)">@Filters.DateColumns[i].Header</option>
+            }
+        </select>
+    </label>
+    <label class="tt-field">
+        <span>この日から</span>
+        <input type="date" data-date-from="@Name" value="@DateInput.Format(Filters.Dates.From)" @onchange="e => Filters.Dates.From = DateInput.Parse(e.Value)" />
+    </label>
+    <label class="tt-field">
+        <span>この日まで</span>
+        <input type="date" data-date-to="@Name" value="@DateInput.Format(Filters.Dates.To)" @onchange="e => Filters.Dates.To = DateInput.Parse(e.Value)" />
+    </label>
+    <button type="button" class="tt-clear" disabled="@(!Filters.ClearCommand.CanExecute(null))" @onclick="Filters.ClearCommand.ExecuteAsync">絞り込みをすべて外す</button>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public TableFilters<TItem> Filters { get; set; } = default!;
+
+    /// <summary>表の名前（テストが入力欄を探す）。</summary>
+    [Parameter]
+    public string Name { get; set; } = "";
+
+    protected override void OnInitialized() => Watch(Filters, Filters.Dates, Filters.ClearCommand);
+
+    private void SetTextTarget(ChangeEventArgs e) => Filters.TextTarget = Filters.TextTargets[int.Parse((string)e.Value!)];
+
+    private void SetDateColumn(ChangeEventArgs e) => Filters.DateColumn = Filters.DateColumns[int.Parse((string)e.Value!)];
+}

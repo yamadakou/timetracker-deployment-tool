@@ -1,0 +1,43 @@
+@using TTDeployTool.Controller.Desktop.Core.Mvvm
+@inherits ViewModelComponent
+
+@* 表の下のページ（20・50・100 件ずつ。Core の一覧がページを持つ） *@
+<div class="tt-pager" data-pager="@Name">
+    <button type="button" disabled="@(!Previous.CanExecute(null))" @onclick="Previous.ExecuteAsync">前のページ</button>
+    <button type="button" disabled="@(!Next.CanExecute(null))" @onclick="Next.ExecuteAsync">次のページ</button>
+    <label class="tt-field tt-inline">
+        <span>1 ページの件数</span>
+        <select @onchange="e => PageSizeChanged.InvokeAsync(int.Parse((string)e.Value!))">
+            @foreach (var size in PageSizes)
+            {
+                <option value="@size" selected="@(size == PageSize)">@size</option>
+            }
+        </select>
+    </label>
+    <span class="tt-page-text" role="status">@Text</span>
+</div>
+
+@code {
+    [Parameter]
+    public string Name { get; set; } = "";
+
+    [Parameter, EditorRequired]
+    public AsyncCommand Previous { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public AsyncCommand Next { get; set; } = default!;
+
+    [Parameter]
+    public IReadOnlyList<int> PageSizes { get; set; } = [];
+
+    [Parameter]
+    public int PageSize { get; set; }
+
+    [Parameter]
+    public EventCallback<int> PageSizeChanged { get; set; }
+
+    [Parameter]
+    public string Text { get; set; } = "";
+
+    protected override void OnInitialized() => Watch(Previous, Next);
+}

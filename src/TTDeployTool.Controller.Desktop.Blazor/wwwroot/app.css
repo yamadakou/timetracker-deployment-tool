@@ -1,0 +1,79 @@
+/* 試作の画面の見た目（Windows 11 の Fluent に寄せる。色と文字だけ。docs/design/desktop/desktop-blazor-hybrid.md の 4） */
+:root {
+  --tt-font: "Segoe UI Variable Text", "Segoe UI", "Yu Gothic UI", "Meiryo UI", system-ui, sans-serif;
+  --tt-bg: #f3f3f3;
+  --tt-card: #ffffff;
+  --tt-text: #1a1a1a;
+  --tt-subtle: #5c5c5c;
+  --tt-line: #e0e0e0;
+  --tt-accent: #005fb8;
+  --tt-accent-text: #ffffff;
+  --tt-selected: #e5f0fb;
+  --tt-hover: #f5f5f5;
+  --tt-caution: #9d5d00;
+  --tt-critical: #c42b1c;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --tt-bg: #202020; --tt-card: #2b2b2b; --tt-text: #ffffff; --tt-subtle: #c5c5c5; --tt-line: #3d3d3d;
+    --tt-accent: #60cdff; --tt-accent-text: #000000; --tt-selected: #1f3a52; --tt-hover: #323232; --tt-caution: #fce100; --tt-critical: #ff99a4;
+  }
+}
+html, body { margin: 0; background: var(--tt-bg); color: var(--tt-text); font: 14px/1.43 var(--tt-font); }
+button, input, select { font: inherit; color: inherit; }
+button { background: var(--tt-card); border: 1px solid var(--tt-line); border-radius: 4px; padding: 4px 12px; cursor: pointer; }
+button:hover:not(:disabled) { background: var(--tt-hover); }
+button:disabled { opacity: .45; cursor: default; }
+button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--tt-accent); outline-offset: 1px; }
+.tt-primary { background: var(--tt-accent); color: var(--tt-accent-text); border-color: var(--tt-accent); }
+.tt-primary:hover:not(:disabled) { background: var(--tt-accent); filter: brightness(1.1); }
+input[type=text], input[type=search], input[type=date], select { background: var(--tt-card); border: 1px solid var(--tt-line); border-radius: 4px; padding: 4px 8px; }
+
+.tt-header { display: flex; align-items: center; gap: 16px; padding: 8px 16px; background: var(--tt-card); border-bottom: 1px solid var(--tt-line); }
+.tt-title { font-weight: 600; }
+.tt-tabs { display: flex; gap: 4px; }
+.tt-tabs [aria-selected=true] { border-color: var(--tt-accent); box-shadow: inset 0 -2px var(--tt-accent); }
+.tt-account { margin-left: auto; color: var(--tt-subtle); }
+main { padding: 12px 16px; }
+.tt-page h1 { font-size: 20px; font-weight: 600; margin: 4px 0 12px; }
+.tt-bar, .tt-filters, .tt-pager, .tt-table-foot { display: flex; flex-wrap: wrap; align-items: end; gap: 8px 12px; margin: 8px 0; }
+.tt-field { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--tt-subtle); }
+.tt-field > input, .tt-field > select { font-size: 14px; color: var(--tt-text); }
+.tt-inline { flex-direction: row; align-items: center; gap: 6px; }
+.tt-error { color: var(--tt-critical); }
+.tt-notice, .tt-hint, .tt-busy { color: var(--tt-subtle); }
+.tt-hint { font-size: 12px; }
+
+/* 表: 左のチェックボックスの列は固定の幅、右端の列は残りの幅いっぱい（table-layout: fixed で、幅を指定しない列に残りを配る）。
+   ウィンドウが表の最小の幅より狭いときは、表の区画だけを横にスクロールする（列は縮めない） */
+.tt-table-scroll { overflow: auto; max-height: calc(100vh - 290px); min-height: 160px; background: var(--tt-card); border: 1px solid var(--tt-line); border-radius: 6px; }
+.tt-table { table-layout: fixed; width: 100%; border-collapse: separate; border-spacing: 0; }
+.tt-table th, .tt-table td { border-bottom: 1px solid var(--tt-line); padding: 6px 8px; text-align: left; vertical-align: top; overflow: hidden; }
+.tt-table thead th { position: sticky; top: 0; z-index: 1; background: var(--tt-card); font-weight: 600; overflow: visible; }
+.tt-table .tt-check { width: 40px; padding: 6px 4px 6px 12px; }
+.tt-table tbody tr:hover { background: var(--tt-hover); }
+.tt-table tbody tr.tt-selected { background: var(--tt-selected); }
+.tt-head { display: flex; align-items: center; gap: 2px; min-width: 0; cursor: grab; }
+.tt-sort { flex: 1 1 auto; min-width: 0; display: flex; gap: 4px; justify-content: space-between; background: none; border: 0; padding: 2px 4px; font-weight: 600; text-align: left; }
+.tt-head-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tt-nosort { flex: 1 1 auto; padding: 2px 4px; }
+.tt-arrow { color: var(--tt-accent); }
+.tt-filter { flex: none; background: none; border: 0; padding: 2px 6px; color: var(--tt-subtle); }
+.tt-filtered .tt-filter { color: var(--tt-accent); font-weight: 700; }
+.tt-grip { position: absolute; top: 0; right: -4px; width: 8px; height: 100%; cursor: col-resize; z-index: 2; }
+.tt-grip::after { content: ""; position: absolute; top: 25%; left: 3px; height: 50%; border-left: 1px solid var(--tt-line); }
+/* セルの文字は 6 行まで折り返し、それより長いと「…」で切る（切れたときだけ、マウスを置くと全体を出す。table.js） */
+.tt-cell { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 6; overflow: hidden; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.tt-popup { position: absolute; top: 100%; left: 0; z-index: 10; width: 280px; padding: 8px; background: var(--tt-card); border: 1px solid var(--tt-line); border-radius: 8px;
+  box-shadow: 0 8px 16px rgba(0,0,0,.14); font-weight: 400; cursor: default; display: flex; flex-direction: column; gap: 6px; }
+.tt-popup-sort, .tt-popup-buttons { display: flex; flex-wrap: wrap; gap: 4px; }
+.tt-popup-values { list-style: none; margin: 0; padding: 0; max-height: 240px; overflow: auto; }
+.tt-popup-values label, .tt-popup-all { display: flex; gap: 6px; align-items: center; padding: 2px 0; }
+.tt-popup-count { color: var(--tt-subtle); }
+.tt-overlay { position: fixed; inset: 0; z-index: 19; }
+.tt-menu { position: fixed; z-index: 20; display: flex; flex-direction: column; padding: 4px; background: var(--tt-card); border: 1px solid var(--tt-line); border-radius: 8px; box-shadow: 0 8px 16px rgba(0,0,0,.14); }
+.tt-menu button { border: 0; text-align: left; }
+.tt-detail { margin-top: 12px; padding: 12px; background: var(--tt-card); border: 1px solid var(--tt-line); border-radius: 6px; }
+.tt-detail h2 { font-size: 16px; margin: 0 0 8px; }
+.tt-detail-result { white-space: pre-wrap; overflow-wrap: anywhere; }

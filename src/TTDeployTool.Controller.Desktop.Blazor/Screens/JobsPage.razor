@@ -1,0 +1,49 @@
+@inherits ViewModelComponent
+
+@* ジョブの一覧（desktop-blazor-hybrid.md の 1）。行のダブルクリックで、そのジョブの詳細を出す（WinUI の画面では実行状況の画面を開く） *@
+<section class="tt-page" aria-labelledby="jobs-title">
+    <h1 id="jobs-title">ジョブの一覧</h1>
+    <div class="tt-bar">
+        <span data-selection="jobs">@Model.SelectionText</span>
+        <button type="button" disabled="@(!Model.ClearSelectionCommand.CanExecute(null))" @onclick="Model.ClearSelectionCommand.ExecuteAsync">選択を外す</button>
+    </div>
+    <FilterBar TItem="JobViewModel" Filters="Model.Filters" Name="jobs" />
+    <DataTable TRow="JobViewModel" TItem="JobViewModel" Source="_source" Label="ジョブの一覧" Clipboard="Clipboard" OnRowDoubleClick="Open" />
+    <Pager Name="jobs" Previous="Model.PreviousPageCommand" Next="Model.NextPageCommand" PageSizes="JobListViewModel.PageSizes"
+           PageSize="Model.PageSize" PageSizeChanged="size => Model.PageSize = size" Text="@Model.CountText" />
+    @if (_detail is { } job)
+    {
+        <section class="tt-detail" aria-label="ジョブの詳細">
+            <h2>@job.Title</h2>
+            <p>@job.StatusText</p>
+            <p>@job.TimesText</p>
+            @if (job.ResultText is { } result)
+            {
+                <p class="tt-detail-result">@result</p>
+            }
+            <button type="button" @onclick="() => _detail = null">閉じる</button>
+        </section>
+    }
+</section>
+
+@code {
+    private TableSource<JobViewModel, JobViewModel> _source = default!;
+    private JobViewModel? _detail;
+
+    [Parameter, EditorRequired]
+    public JobListViewModel Model { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public TableLayout Layout { get; set; } = default!;
+
+    [Parameter]
+    public IClipboardService? Clipboard { get; set; }
+
+    protected override void OnInitialized()
+    {
+        _source = TableSources.Jobs(Model, Layout);
+        Watch(Model, Model.ClearSelectionCommand);
+    }
+
+    private void Open(JobViewModel job) => _detail = job;
+}

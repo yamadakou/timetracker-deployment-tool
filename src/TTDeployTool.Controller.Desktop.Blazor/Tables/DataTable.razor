@@ -1,0 +1,91 @@
+@typeparam TRow where TRow : class
+@typeparam TItem where TItem : class
+@inherits ViewModelComponent
+
+@* 表（desktop-blazor-hybrid.md の 9）。見出しのボタンで並べ替え（3 回で既定の順）、▽ で値を選んで絞り込み、見出しの右端のつまみで幅、見出しのドラッグで順序。
+   見出しのボタンにフォーカスがあるとき、Alt+←/→ で幅、Alt+Shift+←/→ で順序を変える。Ctrl+C（Shift で見出しつき）で選んだ行をコピー、セルの右クリックでメニュー。 *@
+<div class="tt-table-area" data-table="@Source.Name" @ref="_root">
+    <div class="tt-table-scroll" tabindex="0" @onkeydown="OnKeyDown">
+        <table class="tt-table" aria-label="@Label" aria-rowcount="@Source.Rows.Count" style="min-width: @Px(HtmlTableRules.MinTableWidth(_layout, Source.FillMinWidth))">
+            <colgroup>
+                <col style="width: @Px(HtmlTableRules.CheckColumnWidth)" />
+                @for (var i = 0; i < _layout.Count; i++)
+                {
+                    var width = HtmlTableRules.WidthOf(_layout, i, Source.FillMinWidth);
+                    <col data-key="@_layout[i].Key" style="@(width is { } w ? $"width: {Px(w)}" : null)" />
+                }
+            </colgroup>
+            <thead>
+                <tr>
+                    <th class="tt-check" scope="col">
+                        <input type="checkbox" aria-label="このページの行をすべて選ぶ" checked="@(AllState == true)"
+                               data-indeterminate="@(AllState == null ? "true" : "false")" @onchange="ToggleAll" />
+                    </th>
+                    @foreach (var column in _layout)
+                    {
+                        var key = column.Key;
+                        var header = Source.Filters.Column(key).Header;
+                        var filtered = Source.Filters.IsFiltered(key);
+                        <th scope="col" data-key="@key" aria-sort="@AriaSort(key)" class="@(filtered ? "tt-filtered" : null)"
+                            style="@(key == _layout[^1].Key ? $"min-width: {Px(HtmlTableRules.LastMinWidth(_layout, Source.FillMinWidth))}" : null)"
+                            @ondragover:preventDefault @ondrop="() => Drop(key)">
+                            <div class="tt-head" draggable="true" @ondragstart="() => _dragKey = key">
+                                @if (Source.CanSort(key))
+                                {
+                                    <button type="button" class="tt-sort" data-head-key="@key" @onclick="() => SortBy(key)">
+                                        <span class="tt-head-text">@header</span><span class="tt-arrow" aria-hidden="true">@Arrow(key)</span>
+                                    </button>
+                                }
+                                else
+                                {
+                                    <span class="tt-head-text tt-nosort" tabindex="0" data-head-key="@key">@header</span>
+                                }
+                                <button type="button" class="tt-filter" aria-label="@($"{header}の絞り込み")" aria-pressed="@(filtered ? "true" : "false")"
+                                        aria-expanded="@(_filterKey == key ? "true" : "false")" @onclick="() => ToggleFilter(key)">▽</button>
+                            </div>
+                            <span class="tt-grip" data-key="@key" aria-hidden="true"></span>
+                            @if (_filterKey == key)
+                            {
+                                <FilterPopup TItem="TItem" Filters="Source.Filters" Key="@key" Header="@header" CanSort="Source.CanSort(key)"
+                                             OnSort="d => SortFromMenu(key, d)" OnClearSort="ClearSortFromMenu" OnClose="CloseFilter" />
+                            }
+                        </th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in Source.Rows)
+                {
+                    var selected = IsSelected(row);
+                    <tr @key="row" aria-selected="@(selected ? "true" : "false")" class="@(selected ? "tt-selected" : null)"
+                        @onclick="() => Toggle(row)" @ondblclick="() => OnRowDoubleClick.InvokeAsync(row)">
+                        <td class="tt-check">
+                            <input type="checkbox" aria-label="この行を選ぶ" checked="@selected" @onclick:stopPropagation @onchange="() => Toggle(row)" />
+                        </td>
+                        @foreach (var column in _layout)
+                        {
+                            var key = column.Key;
+                            <td data-key="@key" @oncontextmenu="e => OpenMenu(row, key, e)" @oncontextmenu:preventDefault>
+                                <div class="tt-cell">@Source.CellText(row, key)</div>
+                            </td>
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    @if (_menu is { } menu)
+    {
+        <div class="tt-overlay" @onclick="CloseMenu" @oncontextmenu="CloseMenu" @oncontextmenu:preventDefault></div>
+        <div class="tt-menu" role="menu" style="left: @Px(menu.X); top: @Px(menu.Y)" @onkeydown="OnMenuKeyDown">
+            <button type="button" role="menuitem" @onclick="CopyCell">この文字をコピー</button>
+            <button type="button" role="menuitem" @onclick="() => CopyRows(markdown: false)">選んだ行をコピー</button>
+            <button type="button" role="menuitem" @onclick="() => CopyRows(markdown: true)">選んだ行を Markdown 形式でコピー</button>
+        </div>
+    }
+    <div class="tt-table-foot">
+        <button type="button" class="tt-reset" @onclick="ResetLayout">列の幅と順序を初期値に戻す</button>
+        <span class="tt-hint">見出しのつまみで幅、見出しのドラッグで順序を変えられます（見出しのボタンで Alt+←/→ は幅、Alt+Shift+←/→ は順序）。</span>
+        <span class="tt-status" role="status">@_message</span>
+    </div>
+</div>

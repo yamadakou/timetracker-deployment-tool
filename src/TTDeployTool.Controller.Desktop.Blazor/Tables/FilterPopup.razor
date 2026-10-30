@@ -1,0 +1,115 @@
+@typeparam TItem where TItem : class
+
+@* 見出しの ▽（desktop-tables.md の 10.4）: 値の一覧（件数つき）から選んで絞り込む・値を探す・並べ替える。値と件数は Core の TableFilters が作る *@
+<div class="tt-popup" role="dialog" aria-label="@($"{Header}の絞り込み")" @onkeydown="OnKeyDown" @onclick:stopPropagation>
+    @if (CanSort)
+    {
+        <div class="tt-popup-sort">
+            <button type="button" @onclick="() => OnSort.InvokeAsync(false)">昇順</button>
+            <button type="button" @onclick="() => OnSort.InvokeAsync(true)">降順</button>
+            <button type="button" @onclick="OnClearSort">並べ替えを解除</button>
+        </div>
+    }
+    <input type="search" class="tt-popup-search" placeholder="検索" aria-label="値を探す" value="@_search" @oninput="Search" />
+    <label class="tt-popup-all">
+        <input type="checkbox" checked="@AllVisibleChecked" @onchange="ToggleAll" />（すべて選択）
+    </label>
+    <ul class="tt-popup-values">
+        @foreach (var value in _visible)
+        {
+            <li>
+                <label>
+                    <input type="checkbox" checked="@_checked.Contains(value.Value)" @onchange="() => Toggle(value.Value)" />
+                    <span class="tt-popup-value">@value.Value</span><span class="tt-popup-count">（@value.Count）</span>
+                </label>
+            </li>
+        }
+    </ul>
+    <div class="tt-popup-buttons">
+        <button type="button" class="tt-primary" @onclick="Apply">OK</button>
+        <button type="button" @onclick="OnClose">キャンセル</button>
+        <button type="button" @onclick="Clear">フィルターをクリア</button>
+    </div>
+</div>
+
+@code {
+    private string _search = "";
+    private IReadOnlyList<FilterValue> _visible = [];
+    private HashSet<string> _checked = [];
+
+    [Parameter, EditorRequired]
+    public TableFilters<TItem> Filters { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public string Key { get; set; } = "";
+
+    [Parameter]
+    public string Header { get; set; } = "";
+
+    [Parameter]
+    public bool CanSort { get; set; }
+
+    /// <summary>並べ替える（逆順か）。</summary>
+    [Parameter]
+    public EventCallback<bool> OnSort { get; set; }
+
+    [Parameter]
+    public EventCallback OnClearSort { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    private bool AllVisibleChecked => _visible.All(v => _checked.Contains(v.Value));
+
+    protected override void OnInitialized()
+    {
+        _visible = Filters.ValuesOf(Key);
+        _checked = [.. _visible.Where(v => v.IsSelected).Select(v => v.Value)];
+    }
+
+    private void Search(ChangeEventArgs e)
+    {
+        _search = (string?)e.Value ?? "";
+        _visible = Filters.ValuesOf(Key, _search);
+    }
+
+    private void Toggle(string value)
+    {
+        if (!_checked.Remove(value))
+            _checked.Add(value);
+    }
+
+    private void ToggleAll()
+    {
+        var all = AllVisibleChecked;
+        foreach (var value in _visible)
+        {
+            if (all)
+                _checked.Remove(value.Value);
+            else
+                _checked.Add(value.Value);
+        }
+    }
+
+    // 探していなければ、すべてを選んだら絞り込みを外す（表計算と同じ）。探していれば、見えている値のうち選んだものに絞り込む
+    private async Task Apply()
+    {
+        if (_search.Length == 0 && AllVisibleChecked)
+            Filters.ClearValues(Key);
+        else
+            Filters.SetValues(Key, _visible.Where(v => _checked.Contains(v.Value)).Select(v => v.Value));
+        await OnClose.InvokeAsync();
+    }
+
+    private async Task Clear()
+    {
+        Filters.ClearValues(Key);
+        await OnClose.InvokeAsync();
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+            await OnClose.InvokeAsync();
+    }
+}

@@ -1,0 +1,47 @@
+@using TTDeployTool.Application.Inventory
+@inherits ViewModelComponent
+
+@* デプロイの一覧（desktop-blazor-hybrid.md の 1。試作では、読み込み・選択・絞り込み・表・ページだけ。行の操作とまとめての操作は作らない） *@
+<section class="tt-page" aria-labelledby="deployments-title">
+    <h1 id="deployments-title">デプロイの一覧</h1>
+    <div class="tt-bar">
+        <button type="button" class="tt-primary" disabled="@(!Model.LoadCommand.CanExecute(null))" @onclick="Model.LoadCommand.ExecuteAsync">読み込む</button>
+        @if (Model.Busy.IsBusy)
+        {
+            <span class="tt-busy" role="status">@Model.Busy.Text</span>
+        }
+        <span data-selection="deployments">@Model.SelectionText</span>
+        <button type="button" disabled="@(!Model.ClearSelectionCommand.CanExecute(null))" @onclick="Model.ClearSelectionCommand.ExecuteAsync">選択を外す</button>
+    </div>
+    @if (Model.Error is { } error)
+    {
+        <p class="tt-error" role="alert">@error</p>
+    }
+    @foreach (var notice in Model.Notices)
+    {
+        <p class="tt-notice">@notice</p>
+    }
+    <FilterBar TItem="DeploymentEntry" Filters="Model.Filters" Name="deployments" />
+    <DataTable TRow="DeploymentRowViewModel" TItem="DeploymentEntry" Source="_source" Label="デプロイの一覧" Clipboard="Clipboard" />
+    <Pager Name="deployments" Previous="Model.PreviousPageCommand" Next="Model.NextPageCommand" PageSizes="DeploymentListViewModel.PageSizes"
+           PageSize="Model.PageSize" PageSizeChanged="size => Model.PageSize = size" Text="@Model.PageText" />
+</section>
+
+@code {
+    private TableSource<DeploymentRowViewModel, DeploymentEntry> _source = default!;
+
+    [Parameter, EditorRequired]
+    public DeploymentListViewModel Model { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public TableLayout Layout { get; set; } = default!;
+
+    [Parameter]
+    public IClipboardService? Clipboard { get; set; }
+
+    protected override void OnInitialized()
+    {
+        _source = TableSources.Deployments(Model, Layout);
+        Watch(Model, Model.Busy, Model.Notices, Model.LoadCommand, Model.ClearSelectionCommand);
+    }
+}

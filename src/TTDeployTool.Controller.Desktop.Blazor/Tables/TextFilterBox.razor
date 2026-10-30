@@ -1,0 +1,81 @@
+@typeparam TItem where TItem : class
+@implements IAsyncDisposable
+
+@* 表の上の「含む文字」（desktop-tables.md の 10.5 #7）。変換の間は待ち、入力が止まってから絞り込む（Core の TextFilterInput）。
+   入力欄の値は描き直しで書き戻さない（変換の途中の入力欄に値を入れると、変換が切れるため）。Core の文字が外から変わったときだけ、JavaScript で入れる *@
+<label class="tt-field">
+    <span>含む文字</span>
+    <input type="text" @ref="_box" data-filter="@Name" value="@_initial" @oninput="OnInput" />
+</label>
+
+@code {
+    private ElementReference _box;
+    private string _initial = "";
+    private string _text = "";
+    private TextFilterInput _input = default!;
+    private ITimer _timer = default!;
+    private Task<IJSObjectReference> _module = default!;
+    private DotNetObjectReference<TextFilterBox<TItem>> _self = default!;
+
+    [Inject]
+    private IJSRuntime JS { get; set; } = default!;
+
+    [Inject]
+    private TimeProvider Time { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public TableFilters<TItem> Filters { get; set; } = default!;
+
+    /// <summary>表の名前（テストが入力欄を探す）。</summary>
+    [Parameter]
+    public string Name { get; set; } = "";
+
+    protected override void OnInitialized()
+    {
+        _initial = _text = Filters.Text;
+        _timer = Time.CreateTimer(_ => _ = InvokeAsync(Elapsed), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+        _input = new TextFilterInput(() => _timer.Change(TextFilterInput.Delay, Timeout.InfiniteTimeSpan), text => Filters.Text = text);
+        Filters.PropertyChanged += OnFiltersChanged;
+        _self = DotNetObjectReference.Create(this);
+        _module = JsModule.ImportAsync(JS);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+            await (await _module).InvokeVoidAsync("attachComposition", _box, _self);
+    }
+
+    /// <summary>日本語などの変換が始まった（JavaScript から）。</summary>
+    [JSInvokable]
+    public void CompositionStarted() => _input.CompositionStarted();
+
+    /// <summary>変換が終わった（JavaScript から）。</summary>
+    [JSInvokable]
+    public void CompositionEnded() => _input.CompositionEnded();
+
+    private void OnInput(ChangeEventArgs e)
+    {
+        _text = (string?)e.Value ?? "";
+        _input.Changed();
+    }
+
+    private void Elapsed() => _input.Elapsed(_text);
+
+    // 「絞り込みをすべて外す」などで Core の文字が変わったら、入力欄に入れる（前後の空白だけの違いは、入力中のため変えない。Core の TableRules.WriteBack）
+    private async void OnFiltersChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(TableFilters<TItem>.Text) || !TableRules.WriteBack(_text, Filters.Text))
+            return;
+        _text = Filters.Text;
+        await InvokeAsync(() => JsModule.InvokeQuietlyAsync(_module, "setValue", _box, _text));
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        Filters.PropertyChanged -= OnFiltersChanged;
+        _timer.Dispose();
+        _self.Dispose();
+        await JsModule.DisposeQuietlyAsync(_module);
+    }
+}

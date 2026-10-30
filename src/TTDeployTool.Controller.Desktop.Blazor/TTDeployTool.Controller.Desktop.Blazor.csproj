@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <!--
+    Blazor Hybrid の試作の画面（docs/design/desktop/desktop-blazor-hybrid.md。REVIEW_ISSUES No.79）。Razor のコンポーネントは Windows に依存しないため、
+    Linux でもビルド・テストできる（bUnit・テスト用のホストでの Playwright）。画面の状態と操作は、WinUI 3 のアプリと同じ TTDeployTool.Controller.Desktop.Core を使う。
+    試作のデータは Fixtures のモックだけ（サインインなし、本物の Azure に届かない）
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="10.0.14" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\TTDeployTool.Controller.Desktop.Core\TTDeployTool.Controller.Desktop.Core.csproj" />
+    <ProjectReference Include="..\TTDeployTool.Controller.Desktop.Fixtures\TTDeployTool.Controller.Desktop.Fixtures.csproj" />
+  </ItemGroup>
+</Project>
