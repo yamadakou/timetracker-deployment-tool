@@ -32,30 +32,40 @@ public class MockInputTests
 
     private static Point Middle(Rectangle r) => new(r.X + r.Width / 2, r.Y + r.Height / 2);
 
+    // 列の順序は、先頭の行のセルの位置で見る（列を動かした後、UI Automation の見出しの項目の位置は、動かす前の列のまま残る）
+    private static bool KindAfterSubscription(AppSession app)
+    {
+        var row = app.RowWith(Table, "Job.Target", Newest);
+        return Cell(row, "Job.Kind").BoundingRectangle.X > Cell(row, "Job.Subscription").BoundingRectangle.X;
+    }
+
+    private static int KindCellWidth(AppSession app) => Cell(app.RowWith(Table, "Job.Target", Newest), "Job.Kind").BoundingRectangle.Width;
+
     [Fact]
     public void Columns_Should_Resize_And_Reorder_By_Dragging_And_Survive_A_Restart() => WithFixture(app =>
     {
         OpenJobs(app);
         var kind = Header(app, "種類");
+        var kindCell = KindCellWidth(app);
         // 境目をドラッグして広げる。「…」のボタンが見出しの高さいっぱいにあると、見出しの右の端ではつかめない（TableViewColumnHeader の
         // IsCursorInRightResizeArea）ため、右隣の見出しの左の端でつかむ（右端の列は、右隣の余白の列の左の端でつかむ）
         var next = Header(app, "サブスクリプション");
         AppSession.Drag(new Point(next.X + 2, next.Y + next.Height / 2), new Point(next.X + 62, next.Y + next.Height / 2), () => app.Screenshot("drag-resize"));
         AppSession.WaitUntil(() => Header(app, "種類").Width >= kind.Width + 40, "境目のドラッグで列が広がる");
-        var widened = Header(app, "種類").Width;
+        var widened = KindCellWidth(app);
         // 見出しをドラッグして、リソースグループ / アプリ名 の位置に動かす
         AppSession.Drag(Middle(Header(app, "種類")), Middle(Header(app, "リソースグループ / アプリ名")), () => app.Screenshot("drag-reorder"));
-        AppSession.WaitUntil(() => Header(app, "種類").X > Header(app, "サブスクリプション").X, "見出しのドラッグで順序が変わる");
+        AppSession.WaitUntil(() => KindAfterSubscription(app), "見出しのドラッグで順序が変わる");
 
         // 起動し直しても同じ（列の配置を保存する）
         app.CloseAndWait().Should().BeTrue("ジョブが無ければ閉じると終わる");
         using var again = AppSession.Launch();
         OpenJobs(again);
-        Header(again, "種類").X.Should().BeGreaterThan(Header(again, "サブスクリプション").X, "順序は起動し直しても同じ");
-        Header(again, "種類").Width.Should().BeCloseTo(widened, 4, "幅は起動し直しても同じ");
+        KindAfterSubscription(again).Should().BeTrue("順序は起動し直しても同じ");
+        KindCellWidth(again).Should().BeCloseTo(widened, 4, "幅は起動し直しても同じ");
         again.Invoke("Jobs.ResetLayout");
-        AppSession.WaitUntil(() => Header(again, "種類").X < Header(again, "サブスクリプション").X, "初期値に戻すと元の順序");
-        Header(again, "種類").Width.Should().BeCloseTo(kind.Width, 4, "初期値の幅");
+        AppSession.WaitUntil(() => !KindAfterSubscription(again), "初期値に戻すと元の順序");
+        KindCellWidth(again).Should().BeCloseTo(kindCell, 4, "初期値の幅");
     }, layout: false);
 
     [Fact]
