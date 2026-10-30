@@ -446,8 +446,16 @@ jobs:
         $installed = Get-AppxPackage -Name TTDeployTool.BlazorPrototype
         $data = Join-Path $env:LOCALAPPDATA "Packages\$($installed.PackageFamilyName)\LocalState"
         New-Item -ItemType Directory -Force -Path $data | Out-Null
-        New-Item -ItemType File -Force -Path (Join-Path $data "check-request") | Out-Null
+        # 「reactivate」: 確認の後、2 つ目の起動が 1 つ目に渡るのを待つ（1 つ目が check-waiting を書いたら、2 つ目を起動する）
+        Set-Content -Path (Join-Path $data "check-request") -Value "reactivate"
         Start-Process "shell:AppsFolder\$($installed.PackageFamilyName)!App"
+        $waiting = Join-Path $data "check-waiting"
+        for ($i = 0; $i -lt 180 -and -not (Test-Path $waiting); $i++) { Start-Sleep -Seconds 1 }
+        if (Test-Path $waiting) {
+          Start-Process "shell:AppsFolder\$($installed.PackageFamilyName)!App"
+          Start-Sleep -Seconds 5
+          Write-Host "2 つ目の起動の後のプロセス: $(@(Get-Process -Name ttdeploytool-blazor -ErrorAction SilentlyContinue).Count) 個"
+        }
         $report = Join-Path $data "check-report.json"
         for ($i = 0; $i -lt 120 -and -not (Test-Path $report); $i++) { Start-Sleep -Seconds 1 }
         Start-Sleep -Seconds 2

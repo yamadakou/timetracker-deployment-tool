@@ -33,13 +33,56 @@ public partial class MainWindow : Window
             };
         }
         WebView.BlazorWebViewInitialized += (_, e) => Core = e.WebView.CoreWebView2;
+        // 通知領域のアイコン（押すと開く。メニューは「開く」「終了」。WinUI のアプリと同じ）
+        var open = new Core.Mvvm.AsyncCommand(() =>
+        {
+            ShowFromTray();
+            return Task.CompletedTask;
+        });
+        var menu = new System.Windows.Controls.ContextMenu();
+        menu.Items.Add(new System.Windows.Controls.MenuItem { Header = "開く", Command = open });
+        menu.Items.Add(new System.Windows.Controls.MenuItem { Header = "終了", Command = new Core.Mvvm.AsyncCommand(() =>
+        {
+            Exit();
+            return Task.CompletedTask;
+        }) });
         Tray = new TaskbarIcon
         {
             ToolTipText = "TTDeployTool（Blazor Hybrid の試作）",
             Icon = new System.Drawing.Icon(Path.Combine(AppContext.BaseDirectory, "TrayIcon.ico")),
+            ContextMenu = menu,
+            LeftClickCommand = open,
+            NoLeftClickDelay = true,
         };
         Tray.ForceCreate(enablesEfficiencyMode: false);
+        // 閉じると、終了せずに隠して通知領域に残る（WinUI のアプリはジョブがあるときだけ。試作のホストは画面の状態を持たないため、いつも隠す）
+        Closing += (_, e) =>
+        {
+            if (_exiting)
+                return;
+            e.Cancel = true;
+            Hide();
+        };
         Closed += (_, _) => Tray.Dispose();
+    }
+
+    private bool _exiting;
+
+    /// <summary>隠したウィンドウを出す（通知領域のアイコン、2 つ目の起動、通知から）。</summary>
+    public void ShowFromTray()
+    {
+        Show();
+        if (WindowState == WindowState.Minimized)
+            WindowState = WindowState.Normal;
+        Activate();
+    }
+
+    /// <summary>通知領域の「終了」と、確認の終わり。</summary>
+    public void Exit()
+    {
+        _exiting = true;
+        Close();
+        System.Windows.Application.Current.Shutdown();
     }
 
     /// <summary>通知領域のアイコン（WinUI の画面と同じ H.NotifyIcon の WPF 版）。</summary>
