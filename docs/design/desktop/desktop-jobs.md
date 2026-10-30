@@ -305,7 +305,7 @@
 - 画面の側: `Program.Main`（1 つだけ起動。Microsoft Learn の手順のとおり）、`AppNotificationService`（`AppNotificationManager`）と、マニフェストの通知からの起動、通知領域のアイコン（H.NotifyIcon.WinUI 2.4.1。メニューは「開く」「終了」、ツールチップにジョブの状況）、「ジョブ」の画面に常駐と制約の説明
 - 通知領域のアイコンは、最初 PNG を指定し、起動時に `System.Drawing.Icon` が読めずに例外になった（CI の UI テストが、診断用のログの `Critical` で見つけた）。BMP の形式の ICO（`Assets/TrayIcon.ico`）にして直した
 - テスト: `Desktop.Core` のテスト 132 件成功（3 回続けて実行して不安定さなし）・行と分岐の網羅率 100%。UI テスト（CI）に 1 つだけ起動することの確認を加え、CI（run 39439054110）で 10 件成功（Azure のテスト 1 件はスキップ）。半自動の UI テスト（`AzureUiTests`）に、予定のジョブがある状態で閉じるとウィンドウが隠れて終了しないこと、もう一度起動すると隠したウィンドウが出ることを加えた。オーナーの確認の後、Desktop System Test（run 39443150877、UI テスト約 16 分）で成功（診断用のログの「起動しました」は 1 回だけで、2 つ目の起動は 1 つ目に渡された。`Critical` なし。これまでの確認（デプロイ・同時実行・停止・削除・リソースグループの削除、P1〜P4）も成功）
-- オーナーの実機で確かめること: 通知領域のアイコンとメニュー、通知と、通知を押したときの動き、ウィンドウを隠している間の WAM のサインインの画面（`desktop-app-check.md` の 5.2）
+- オーナーの実機で確かめること: 通知領域のアイコンとメニュー、通知と、通知を押したときの動き、ウィンドウを隠している間の WAM のサインインの画面（`desktop-app-check.md` の 4.2）
 
 **実施結果（7d-1）**
 - Domain: `DeploymentExpiry`（入力の形の誤り・今日より前の誤り・期限の決め方・期限日の終わり・タグの書式）と `ExpiryDecision`（決まった期限と決まり方 `Specified` / `Inherited` / `Default`、画面とログの説明）。`DeployOptions.ExpiresOn`・`LifecycleTags`。`DeploymentValidator` は Azure へのデプロイのときだけ形を確かめる（Dry-run では使わない）
