@@ -48,7 +48,9 @@ public sealed class AppSession : IDisposable
         try
         {
             var window = app.GetMainWindow(automation, TimeSpan.FromSeconds(90))
-                         ?? throw new InvalidOperationException("アプリのウィンドウが開きませんでした。");
+                         ?? throw new InvalidOperationException(app.HasExited
+                             ? $"アプリのウィンドウが開く前に、アプリが終わりました（終了コード 0x{app.ExitCode:x8}）。"
+                             : "アプリのウィンドウが開きませんでした。");
             return new AppSession(app, automation, window);
         }
         catch

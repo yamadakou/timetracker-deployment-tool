@@ -283,6 +283,23 @@ jobs:
         dotnet test --project tests/TTDeployTool.Controller.Desktop.UITests --
         --output detailed --report-xunit-trx --results-directory=${{ github.workspace }}\TestResults
 
+    # アプリの診断用のログ（パスワード・トークン・アカウント名は含まない）と、記録を残さずに落ちたときの Windows のアプリケーションのイベントを結果に入れる
+    - name: Copy the diagnostic log
+      if: always()
+      shell: pwsh
+      run: |
+        New-Item -ItemType Directory -Force -Path TestResults | Out-Null
+        $package = Get-AppxPackage -Name TTDeployTool | Select-Object -First 1
+        if ($package) {
+          $logs = Join-Path $env:LOCALAPPDATA "Packages\$($package.PackageFamilyName)\LocalState\logs"
+          if (Test-Path $logs) {
+            Copy-Item (Join-Path $logs "ttdeploytool-desktop-*.log") TestResults
+          }
+        }
+        Get-WinEvent -FilterHashtable @{ LogName = "Application"; StartTime = (Get-Date).AddHours(-2); Id = 1000, 1001, 1026 } -ErrorAction SilentlyContinue |
+          Where-Object { $_.Message -match "TTDeployTool" } |
+          Format-List TimeCreated, Id, ProviderName, Message | Out-File TestResults/application-events.txt -Width 300
+
     - name: Upload test results
       if: always()
       uses: actions/upload-artifact@v7
