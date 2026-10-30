@@ -306,3 +306,167 @@ jobs:
       with:
         name: desktop-ui-test-results
         path: TestResults
+
+  # Blazor Hybrid の試作（docs/design/desktop/desktop-blazor-hybrid.md。REVIEW_ISSUES No.79）: 画面の部品の網羅率（bUnit。行・分岐とも 100% でなければ失敗）と、
+  # テスト用のホスト（Blazor Server）の画面を Chromium で本物の入力で操作するテスト（Playwright）。Azure は使わない（Fixtures のモック）
+  blazor-prototype:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: 10.0.x
+
+    - name: Coverage of the Blazor components (bUnit)
+      run: |
+        mkdir -p TestResults
+        dotnet build tests/TTDeployTool.Controller.Desktop.Blazor.Tests --configuration Release
+        dotnet tool install --global coverlet.console --version 10.1.0
+        dll=tests/TTDeployTool.Controller.Desktop.Blazor.Tests/bin/Release/net10.0/TTDeployTool.Controller.Desktop.Blazor.Tests.dll
+        coverlet "$dll" --target dotnet --targetargs "exec $dll" --include "[TTDeployTool.Controller.Desktop.Blazor]*" \
+          --threshold 100 --threshold-type line --threshold-type branch --format cobertura --output TestResults/blazor-coverage.cobertura.xml
+
+    - name: Install Playwright browser
+      run: |
+        dotnet build tests/TTDeployTool.Controller.Desktop.Blazor.BrowserTests --configuration Release
+        pwsh tests/TTDeployTool.Controller.Desktop.Blazor.BrowserTests/bin/Release/net10.0/playwright.ps1 install --with-deps chromium
+
+    - name: Browser tests (Playwright)
+      run: >
+        dotnet test --project tests/TTDeployTool.Controller.Desktop.Blazor.BrowserTests --configuration Release --no-build --
+        --filter-class TTDeployTool.Controller.Desktop.Blazor.BrowserTests.BrowserHostTests
+        --output detailed --report-xunit-trx --results-directory=TestResults
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: blazor-prototype-results
+        path: TestResults
+
+  # Blazor Hybrid の試作の Windows の部分（desktop-blazor-hybrid.md の 8）: WPF のホストのビルド、Windows との連携の確認（WAM のハンドル・通知・サインイン時の起動・
+  # 通知領域・DPAPI。トークンは取らない）、WebView2 に CDP でつなぐテスト、.wapproj での MSIX の作成と導入、起動時間とメモリ（WinUI 3 のアプリのモックのビルドと比べる）。
+  # Azure は使わない。証明書はこのジョブの中だけで使い、保存しない
+  blazor-prototype-windows:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: 10.0.x
+
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Build the WPF host
+      run: msbuild src/TTDeployTool.Controller.Desktop.Blazor.Wpf/TTDeployTool.Controller.Desktop.Blazor.Wpf.csproj /restore /p:Configuration=Release /p:Platform=x64
+
+    - name: Check Windows integration (unpackaged)
+      shell: pwsh
+      run: |
+        New-Item -ItemType Directory -Force -Path TestResults | Out-Null
+        $exe = (Get-ChildItem src/TTDeployTool.Controller.Desktop.Blazor.Wpf/bin -Recurse -Filter ttdeploytool-blazor.exe | Select-Object -First 1).FullName
+        Write-Host "WPF host: $exe"
+        $report = Join-Path (Resolve-Path TestResults) "integration-unpackaged.json"
+        $p = Start-Process -FilePath $exe -ArgumentList "--check", "`"$report`"" -PassThru
+        if (-not $p.WaitForExit(120000)) { $p.Kill($true); throw "確認が終わりません" }
+        Get-Content $report
+        "TT_BLAZOR_WPF_EXE=$exe" >> $env:GITHUB_ENV
+
+    - name: WebView2 test (Playwright over CDP)
+      env:
+        TT_BLAZOR_REPORT: ${{ github.workspace }}\TestResults\webview2-time-to-table.json
+      run: >
+        dotnet test --project tests/TTDeployTool.Controller.Desktop.Blazor.BrowserTests --configuration Release --
+        --filter-class TTDeployTool.Controller.Desktop.Blazor.BrowserTests.WebView2Tests
+        --output detailed --report-xunit-trx --results-directory=${{ github.workspace }}\TestResults
+
+    - name: Measure the Blazor host
+      shell: pwsh
+      run: ./.github/scripts/measure-desktop-app.ps1 -Name "Blazor Hybrid (WPF, unpackaged)" -Exe $env:TT_BLAZOR_WPF_EXE -Output TestResults/measure-blazor.json
+
+    - name: Create a temporary signing certificate
+      id: cert
+      shell: pwsh
+      run: |
+        $cert = New-SelfSignedCertificate -Type Custom -Subject "CN=TTDeployTool" -KeyUsage DigitalSignature `
+          -FriendlyName "TTDeployTool Blazor prototype" -CertStoreLocation "Cert:\CurrentUser\My" `
+          -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.3", "2.5.29.19={text}")
+        $cer = Join-Path $env:RUNNER_TEMP "prototype.cer"
+        Export-Certificate -Cert $cert -FilePath $cer | Out-Null
+        Import-Certificate -FilePath $cer -CertStoreLocation "Cert:\LocalMachine\TrustedPeople" | Out-Null
+        "thumbprint=$($cert.Thumbprint)" >> $env:GITHUB_OUTPUT
+
+    # 単一プロジェクトの MSIX は WinUI 向けのため、WPF は Windows Application Packaging Project（.wapproj）でまとめる
+    - name: Build and sign MSIX with .wapproj (x64)
+      run: >
+        msbuild src/TTDeployTool.Controller.Desktop.Blazor.Package/TTDeployTool.Controller.Desktop.Blazor.Package.wapproj /restore
+        /p:Configuration=Release /p:Platform=x64 /p:AppxBundle=Never /p:UapAppxPackageBuildMode=SideloadOnly
+        /p:AppxPackageSigningEnabled=true /p:PackageCertificateThumbprint=${{ steps.cert.outputs.thumbprint }}
+        /p:AppxPackageDir=${{ github.workspace }}\BlazorPackages\
+
+    - name: Install MSIX and check Windows integration (packaged)
+      shell: pwsh
+      run: |
+        $package = Get-ChildItem BlazorPackages -Recurse -Filter *.msix | Where-Object { $_.FullName -notmatch '\\Dependencies\\' } | Select-Object -First 1
+        Write-Host "Package: $($package.FullName) ($([math]::Round($package.Length / 1MB, 1)) MB)"
+        Add-AppxPackage -Path $package.FullName
+        $installed = Get-AppxPackage -Name TTDeployTool.BlazorPrototype
+        $data = Join-Path $env:LOCALAPPDATA "Packages\$($installed.PackageFamilyName)\LocalState"
+        New-Item -ItemType Directory -Force -Path $data | Out-Null
+        New-Item -ItemType File -Force -Path (Join-Path $data "check-request") | Out-Null
+        Start-Process "shell:AppsFolder\$($installed.PackageFamilyName)!App"
+        $report = Join-Path $data "check-report.json"
+        for ($i = 0; $i -lt 120 -and -not (Test-Path $report); $i++) { Start-Sleep -Seconds 1 }
+        Start-Sleep -Seconds 2
+        Get-Content $report
+        Copy-Item $report TestResults/integration-packaged.json
+        "BLAZOR_AUMID=$($installed.PackageFamilyName)!App" >> $env:GITHUB_ENV
+
+    - name: Measure the Blazor MSIX
+      shell: pwsh
+      run: ./.github/scripts/measure-desktop-app.ps1 -Name "Blazor Hybrid (WPF, MSIX)" -AppUserModelId $env:BLAZOR_AUMID -ProcessName ttdeploytool-blazor -Output TestResults/measure-blazor-msix.json
+
+    # 比べる相手: 今の WinUI 3 のアプリ（UI テストのモックのビルド。desktop-ui ジョブと同じ作り方）。起動して最初の画面（サインイン）が出た後の値
+    - name: Build, sign and install the WinUI 3 app for comparison
+      shell: pwsh
+      run: |
+        msbuild src/TTDeployTool.Controller.Desktop/TTDeployTool.Controller.Desktop.csproj /restore `
+          /p:Configuration=Release /p:Platform=x64 /p:AppxBundle=Never /p:UapAppxPackageBuildMode=SideloadOnly /p:UiTestMock=true `
+          /p:GenerateAppxPackageOnBuild=true /p:AppxPackageSigningEnabled=true `
+          /p:PackageCertificateThumbprint=${{ steps.cert.outputs.thumbprint }} /p:AppxPackageDir=${{ github.workspace }}\WinUiPackages\
+        if ($LASTEXITCODE -ne 0) { throw "WinUI 3 のアプリのビルドに失敗しました" }
+        $all = Get-ChildItem WinUiPackages -Recurse -Filter *.msix
+        $package = $all | Where-Object { $_.FullName -notmatch '\\Dependencies\\' } | Select-Object -First 1
+        $dependencies = @($all | Where-Object { $_.FullName -match '\\Dependencies\\x64\\' } | ForEach-Object FullName)
+        Write-Host "Package: $($package.FullName) ($([math]::Round($package.Length / 1MB, 1)) MB)"
+        if ($dependencies.Count -gt 0) { Add-AppxPackage -Path $package.FullName -DependencyPath $dependencies } else { Add-AppxPackage -Path $package.FullName }
+        $installed = Get-AppxPackage -Name TTDeployTool
+        "WINUI_AUMID=$($installed.PackageFamilyName)!App" >> $env:GITHUB_ENV
+
+    - name: Measure the WinUI 3 app
+      shell: pwsh
+      run: ./.github/scripts/measure-desktop-app.ps1 -Name "WinUI 3 (MSIX, mock build)" -AppUserModelId $env:WINUI_AUMID -ProcessName ttdeploytool-desktop -Output TestResults/measure-winui.json
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: blazor-prototype-windows-results
+        path: TestResults

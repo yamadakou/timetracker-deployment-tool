@@ -1,0 +1,12 @@
+<Window x:Class="TTDeployTool.Controller.Desktop.Blazor.Wpf.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:blazor="clr-namespace:Microsoft.AspNetCore.Components.WebView.Wpf;assembly=Microsoft.AspNetCore.Components.WebView.Wpf"
+        xmlns:prototype="clr-namespace:TTDeployTool.Controller.Desktop.Blazor;assembly=TTDeployTool.Controller.Desktop.Blazor"
+        Title="TTDeployTool（Blazor Hybrid の試作）" Width="1400" Height="900">
+    <blazor:BlazorWebView x:Name="WebView" HostPage="wwwroot\index.html" Services="{DynamicResource services}">
+        <blazor:BlazorWebView.RootComponents>
+            <blazor:RootComponent Selector="#app" ComponentType="{x:Type prototype:PrototypeApp}" />
+        </blazor:BlazorWebView.RootComponents>
+    </blazor:BlazorWebView>
+</Window>

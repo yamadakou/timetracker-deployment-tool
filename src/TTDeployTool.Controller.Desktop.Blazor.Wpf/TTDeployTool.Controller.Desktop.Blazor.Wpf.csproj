@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <!--
+    Blazor Hybrid の試作の WPF のホスト（docs/design/desktop/desktop-blazor-hybrid.md の 3・8。Q1 の A）。窓・BlazorWebView・通知領域だけを持ち、
+    画面は TTDeployTool.Controller.Desktop.Blazor（Razor）、状態と操作は Desktop.Core。データは Fixtures のモックだけ。
+    Windows との連携（WAM のサインイン・Windows の通知・サインイン時の起動・DPAPI）は、WinUI 3 のアプリの今の実装のファイルをそのまま使えるかを
+    確かめるため、そのファイルを参照して（リンク）ビルドし、引数 check と報告のファイルで起動すると、確かめた結果を JSON に書いて終了する（トークンは取らない）。
+    Windows でしかビルドできないため TTDeployTool.sln には入れず、CI の blazor-prototype-windows ジョブでビルドする
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>TTDeployTool.Controller.Desktop.Blazor.Wpf</RootNamespace>
+    <AssemblyName>ttdeploytool-blazor</AssemblyName>
+    <Platforms>x64</Platforms>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <ApplicationIcon>..\TTDeployTool.Controller.Desktop\Assets\TrayIcon.ico</ApplicationIcon>
+    <!-- WinUI 3 のアプリと同じく、利用者の PC に .NET のランタイムを求めない（起動時間・メモリを同じ条件で比べる） -->
+    <SelfContained>true</SelfContained>
+    <!-- 通知（AppNotificationManager）のための Windows App SDK を、アプリと一緒に置く（Windows App SDK のランタイムを PC に求めない） -->
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Azure.Identity.Broker" Version="1.7.0" />
+    <PackageReference Include="H.NotifyIcon.Wpf" Version="2.4.1" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Wpf" Version="10.0.120" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2705" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.5.1" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.12" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- WPF の暗黙の using には System.IO が無い（リンクした WinUI のアプリのファイルは使う） -->
+    <Using Include="System.IO" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- WinUI 3 のアプリの Windows の実装（変えずに使えるかを確かめる） -->
+    <Compile Include="..\TTDeployTool.Controller.Desktop\Services\WamSignInService.cs" Link="Linked\WamSignInService.cs" />
+    <Compile Include="..\TTDeployTool.Controller.Desktop\Services\AppNotificationService.cs" Link="Linked\AppNotificationService.cs" />
+    <Compile Include="..\TTDeployTool.Controller.Desktop\Services\StartupTaskService.cs" Link="Linked\StartupTaskService.cs" />
+    <Compile Include="..\TTDeployTool.Controller.Desktop\Services\DpapiSecretProtector.cs" Link="Linked\DpapiSecretProtector.cs" />
+    <Content Include="..\TTDeployTool.Controller.Desktop\Assets\TrayIcon.ico" Link="TrayIcon.ico" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\TTDeployTool.Controller.Desktop.Blazor\TTDeployTool.Controller.Desktop.Blazor.csproj" />
+  </ItemGroup>
+</Project>
