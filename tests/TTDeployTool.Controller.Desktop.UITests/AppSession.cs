@@ -260,17 +260,30 @@ public sealed class AppSession : IDisposable
         Thread.Sleep(300);
     }
 
-    /// <summary>マウスで <paramref name="from"/> から <paramref name="to"/> までドラッグする（少しずつ動かす。表の部品は、動かした量でドラッグを始めるため）。</summary>
-    public static void Drag(System.Drawing.Point from, System.Drawing.Point to)
+    /// <summary>
+    /// マウスで <paramref name="from"/> から <paramref name="to"/> までドラッグする（少しずつ動かす。表の部品は、動かした量でドラッグを始めるため）。
+    /// <paramref name="during"/> は、離す前に呼ぶ（ドラッグの途中の画面を撮るなど）。
+    /// </summary>
+    public static void Drag(System.Drawing.Point from, System.Drawing.Point to, Action? during = null)
     {
-        FlaUI.Core.Input.Mouse.MoveTo(from);
+        // 少し手前から近づけ、境目の上で止める（表の部品は、マウスが境目に入ったときにつかめる形〔カーソル〕にする）
+        FlaUI.Core.Input.Mouse.Position = new System.Drawing.Point(from.X - 10, from.Y);
         Thread.Sleep(200);
-        FlaUI.Core.Input.Mouse.Down(FlaUI.Core.Input.MouseButton.Left);
-        for (var i = 1; i <= 10; i++)
+        for (var x = from.X - 10; x <= from.X; x++)
         {
-            FlaUI.Core.Input.Mouse.MoveTo(new System.Drawing.Point(from.X + (to.X - from.X) * i / 10, from.Y + (to.Y - from.Y) * i / 10));
-            Thread.Sleep(50);
+            FlaUI.Core.Input.Mouse.Position = new System.Drawing.Point(x, from.Y);
+            Thread.Sleep(20);
         }
+        Thread.Sleep(300);
+        FlaUI.Core.Input.Mouse.Down(FlaUI.Core.Input.MouseButton.Left);
+        Thread.Sleep(300);
+        for (var i = 1; i <= 30; i++)
+        {
+            FlaUI.Core.Input.Mouse.Position = new System.Drawing.Point(from.X + (to.X - from.X) * i / 30, from.Y + (to.Y - from.Y) * i / 30);
+            Thread.Sleep(30);
+        }
+        Thread.Sleep(300);
+        during?.Invoke();
         FlaUI.Core.Input.Mouse.Up(FlaUI.Core.Input.MouseButton.Left);
         Thread.Sleep(500);
     }
