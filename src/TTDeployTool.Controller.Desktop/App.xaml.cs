@@ -17,6 +17,11 @@ public partial class App : Microsoft.UI.Xaml.Application
     private MainWindow? _window;
     private IDisposable? _azureEvents;
 
+#if UITEST_SIGNIN
+    [ThreadStatic]
+    private static bool _writingFirstChance;
+#endif
+
     public App()
     {
         InitializeComponent();
@@ -40,6 +45,27 @@ public partial class App : Microsoft.UI.Xaml.Application
             }
             appLogger.LogCritical(e.Exception, "処理されなかった例外");
         };
+        // WinUI の UnhandledException に届かない例外（別のスレッド・WinRT の境界の外）も書く
+        AppDomain.CurrentDomain.UnhandledException += (_, e) => appLogger.LogCritical(e.ExceptionObject as Exception, "処理されなかった例外（AppDomain）");
+        TaskScheduler.UnobservedTaskException += (_, e) => appLogger.LogError(e.Exception, "待たれなかったタスクの例外");
+#if UITEST_SIGNIN
+        // UI テスト用のビルドだけ: 投げられたすべての例外と呼び出し元を書く。アプリが記録を残さずに落ちたとき（0xc000027b など）、
+        // どこで投げた例外かを調べるため（Desktop System Test、run 41039566120）。Azure の応答の誤り（404 など）は、ログが多くなるため書かない
+        AppDomain.CurrentDomain.FirstChanceException += (_, e) =>
+        {
+            if (_writingFirstChance || e.Exception is global::Azure.RequestFailedException or OperationCanceledException)
+                return;
+            _writingFirstChance = true;
+            try
+            {
+                appLogger.LogWarning("例外が投げられました（UI テスト用のビルドの調べ）: {Type}: {Message}\n{Stack}", e.Exception.GetType().FullName, e.Exception.Message, Environment.StackTrace);
+            }
+            finally
+            {
+                _writingFirstChance = false;
+            }
+        };
+#endif
         appLogger.LogInformation("起動しました（版 {Version}）", typeof(App).Assembly.GetName().Version);
 
         // 通知を押したときに、そのジョブを開く（Register の前に NotificationInvoked を登録する。docs/design/desktop/desktop-jobs.md の 5.1）
