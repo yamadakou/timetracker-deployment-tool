@@ -170,6 +170,7 @@ WinUI 3 のまま続ける場合は、Microsoft の TableView の安定版が出
 | Q4 | テストの方法（6 章） | **A: bUnit・Playwright〔テスト用のホスト〕・WebView2 への CDP の接続**（推奨どおり） |
 | Q5 | 試作のプロジェクトの構成と CI（7 章） | **7 章の案**（推奨どおり） |
 | Q6 | WinUI 3 のまま続けるか、Blazor Hybrid に移るか（10 章） | 未定（推奨: Blazor Hybrid〔WPF のホスト〕に移る。10.1） |
+| Q7 | 試作に本物の Azure でのシステムテストを作るか | **A: 今は作らない**（推奨どおり。2026-10-30）。試作の判断（表の安定性・UX・テストのしやすさ）は Azure を使わずに確かめられたため。移ると決めたら、本番の画面を作るときに `AzureUiTests`（計画・実行・状態の確認・削除。`desktop-ui-tests.md` の 6.1 の P1〜P4）を、WebView2 に CDP でつなぐ Playwright のテストに置き換え、`desktop-system-test.yml` で動かす（10.1 の移る前に確かめることの次に行う） |
 
 ## 13. 試作の作り（2026-10-30）
 | プロジェクト | 中身 |
