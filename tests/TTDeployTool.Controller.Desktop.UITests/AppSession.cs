@@ -280,10 +280,17 @@ public sealed class AppSession : IDisposable
             SendMouse(new System.Drawing.Point(from.X + (to.X - from.X) * i / 30, from.Y + (to.Y - from.Y) * i / 30), MouseMove);
             Thread.Sleep(30);
         }
-        Thread.Sleep(300);
+        // 見出しの順序の変更は、動かし終えて止まってから離すと、離した後に落とす処理が走る
+        for (var i = 0; i < 5; i++)
+        {
+            SendMouse(new System.Drawing.Point(to.X + (i % 2 == 0 ? 1 : -1), to.Y), MouseMove);
+            Thread.Sleep(60);
+        }
+        SendMouse(to, MouseMove);
+        Thread.Sleep(500);
         during?.Invoke();
         SendMouse(to, MouseLeftUp);
-        Thread.Sleep(500);
+        Thread.Sleep(1000);
     }
 
     private const uint MouseMove = 0x0001;

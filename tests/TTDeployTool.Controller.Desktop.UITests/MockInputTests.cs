@@ -44,7 +44,7 @@ public class MockInputTests
         AppSession.WaitUntil(() => Header(app, "種類").Width >= kind.Width + 40, "境目のドラッグで列が広がる");
         var widened = Header(app, "種類").Width;
         // 見出しをドラッグして、リソースグループ / アプリ名 の位置に動かす
-        AppSession.Drag(Middle(Header(app, "種類")), Middle(Header(app, "リソースグループ / アプリ名")));
+        AppSession.Drag(Middle(Header(app, "種類")), Middle(Header(app, "リソースグループ / アプリ名")), () => app.Screenshot("drag-reorder"));
         AppSession.WaitUntil(() => Header(app, "種類").X > Header(app, "サブスクリプション").X, "見出しのドラッグで順序が変わる");
 
         // 起動し直しても同じ（列の配置を保存する）
