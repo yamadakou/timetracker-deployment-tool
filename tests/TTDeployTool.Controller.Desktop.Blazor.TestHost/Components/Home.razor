@@ -1,0 +1,6 @@
+@page "/"
+@using Microsoft.AspNetCore.Components.Web
+@using TTDeployTool.Controller.Desktop.Blazor
+
+@* WebView と同じく、先に描かない（プリレンダーしない） *@
+<PrototypeApp @rendermode="new InteractiveServerRenderMode(prerender: false)" />

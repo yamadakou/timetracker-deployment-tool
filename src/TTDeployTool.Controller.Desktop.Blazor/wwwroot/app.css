@@ -60,7 +60,7 @@ main { padding: 12px 16px; }
 .tt-arrow { color: var(--tt-accent); }
 .tt-filter { flex: none; background: none; border: 0; padding: 2px 6px; color: var(--tt-subtle); }
 .tt-filtered .tt-filter { color: var(--tt-accent); font-weight: 700; }
-.tt-grip { position: absolute; top: 0; right: -4px; width: 8px; height: 100%; cursor: col-resize; z-index: 2; }
+.tt-grip { position: absolute; top: 0; right: 0; width: 8px; height: 100%; cursor: col-resize; z-index: 2; }
 .tt-grip::after { content: ""; position: absolute; top: 25%; left: 3px; height: 50%; border-left: 1px solid var(--tt-line); }
 /* セルの文字は 6 行まで折り返し、それより長いと「…」で切る（切れたときだけ、マウスを置くと全体を出す。table.js） */
 .tt-cell { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 6; overflow: hidden; white-space: pre-wrap; overflow-wrap: anywhere; }
