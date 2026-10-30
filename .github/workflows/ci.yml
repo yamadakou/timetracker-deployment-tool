@@ -405,10 +405,14 @@ jobs:
         --output detailed --report-xunit-trx --results-directory=${{ github.workspace }}\TestResults
 
     - name: Measure the Blazor host
+      # WebView2 のテストが失敗しても、MSIX と計測は続けて確かめる
+      if: ${{ !cancelled() }}
       shell: pwsh
       run: ./.github/scripts/measure-desktop-app.ps1 -Name "Blazor Hybrid (WPF, unpackaged)" -Exe $env:TT_BLAZOR_WPF_EXE -Output TestResults/measure-blazor.json
 
     - name: Create a temporary signing certificate
+      # WebView2 のテストが失敗しても、MSIX と計測は続けて確かめる
+      if: ${{ !cancelled() }}
       id: cert
       shell: pwsh
       run: |
@@ -422,6 +426,8 @@ jobs:
 
     # 単一プロジェクトの MSIX は WinUI 向けのため、WPF は Windows Application Packaging Project（.wapproj）でまとめる
     - name: Build and sign MSIX with .wapproj (x64)
+      # WebView2 のテストが失敗しても、MSIX と計測は続けて確かめる
+      if: ${{ !cancelled() }}
       run: >
         msbuild src/TTDeployTool.Controller.Desktop.Blazor.Package/TTDeployTool.Controller.Desktop.Blazor.Package.wapproj /restore
         /p:Configuration=Release /p:Platform=x64 /p:AppxBundle=Never /p:UapAppxPackageBuildMode=SideloadOnly
@@ -429,6 +435,8 @@ jobs:
         /p:AppxPackageDir=${{ github.workspace }}\BlazorPackages\
 
     - name: Install MSIX and check Windows integration (packaged)
+      # WebView2 のテストが失敗しても、MSIX と計測は続けて確かめる
+      if: ${{ !cancelled() }}
       shell: pwsh
       run: |
         $package = Get-ChildItem BlazorPackages -Recurse -Filter *.msix | Where-Object { $_.FullName -notmatch '\\Dependencies\\' } | Select-Object -First 1
@@ -447,11 +455,15 @@ jobs:
         "BLAZOR_AUMID=$($installed.PackageFamilyName)!App" >> $env:GITHUB_ENV
 
     - name: Measure the Blazor MSIX
+      # WebView2 のテストが失敗しても、MSIX と計測は続けて確かめる
+      if: ${{ !cancelled() }}
       shell: pwsh
       run: ./.github/scripts/measure-desktop-app.ps1 -Name "Blazor Hybrid (WPF, MSIX)" -AppUserModelId $env:BLAZOR_AUMID -ProcessName ttdeploytool-blazor -Output TestResults/measure-blazor-msix.json
 
     # 比べる相手: 今の WinUI 3 のアプリ（UI テストのモックのビルド。desktop-ui ジョブと同じ作り方）。起動して最初の画面（サインイン）が出た後の値
     - name: Build, sign and install the WinUI 3 app for comparison
+      # WebView2 のテストが失敗しても、MSIX と計測は続けて確かめる
+      if: ${{ !cancelled() }}
       shell: pwsh
       run: |
         msbuild src/TTDeployTool.Controller.Desktop/TTDeployTool.Controller.Desktop.csproj /restore `
@@ -468,6 +480,8 @@ jobs:
         "WINUI_AUMID=$($installed.PackageFamilyName)!App" >> $env:GITHUB_ENV
 
     - name: Measure the WinUI 3 app
+      # WebView2 のテストが失敗しても、MSIX と計測は続けて確かめる
+      if: ${{ !cancelled() }}
       shell: pwsh
       run: ./.github/scripts/measure-desktop-app.ps1 -Name "WinUI 3 (MSIX, mock build)" -AppUserModelId $env:WINUI_AUMID -ProcessName ttdeploytool-desktop -Output TestResults/measure-winui.json
 

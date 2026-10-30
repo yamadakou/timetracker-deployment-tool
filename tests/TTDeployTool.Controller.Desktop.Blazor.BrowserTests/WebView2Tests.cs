@@ -10,7 +10,7 @@ namespace TTDeployTool.Controller.Desktop.Blazor.BrowserTests;
 /// <summary>
 /// ③ WPF のホスト（Windows）を起動し、WebView2 に CDP でつないで、テスト用のホストと同じ画面が WebView2 の中でも動くことを確かめる
 /// （Playwright「WebView2」・Microsoft Learn「Automate and test WebView2 apps」。desktop-blazor-hybrid.md の 6）。
-/// 環境変数 TT_BLAZOR_WPF_EXE（WPF のホストの exe）があるときだけ動く。TT_BLAZOR_REPORT があれば、起動から表が出るまでの時間を JSON で書く。
+/// 環境変数 TT_BLAZOR_WPF_EXE（WPF のホストの exe）があるときだけ動く。CDP のポートは、WPF のホストが BlazorWebViewInitializing で WebView2 に渡す（TT_BLAZOR_CDP_PORT）。TT_BLAZOR_REPORT があれば、起動から表が出るまでの時間を JSON で書く。
 /// </summary>
 public sealed class WebView2Tests
 {
@@ -27,22 +27,23 @@ public sealed class WebView2Tests
         listener.Stop();
         var userData = Path.Combine(Path.GetTempPath(), "ttdeploytool-blazor-webview2", Guid.NewGuid().ToString("N"));
         var start = new ProcessStartInfo(exe) { UseShellExecute = false };
-        start.Environment["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = $"--remote-debugging-port={port}";
-        start.Environment["WEBVIEW2_USER_DATA_FOLDER"] = userData;
+        start.Environment["TT_BLAZOR_CDP_PORT"] = port.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        start.Environment["TT_BLAZOR_USER_DATA"] = userData;
         var clock = Stopwatch.StartNew();
         using var process = Process.Start(start)!;
         try
         {
-            using var http = new HttpClient();
-            for (var i = 0; ; i++)
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
+            while (true)
             {
                 try
                 {
                     await http.GetStringAsync($"http://127.0.0.1:{port}/json/version");
                     break;
                 }
-                catch (HttpRequestException) when (i < 300 && !process.HasExited)
+                catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && clock.Elapsed < TimeSpan.FromSeconds(90))
                 {
+                    process.HasExited.Should().BeFalse("WPF のホストが CDP のポートを開く前に終わった（終了コード {0}）", process.HasExited ? process.ExitCode : 0);
                     await Task.Delay(200);
                 }
             }

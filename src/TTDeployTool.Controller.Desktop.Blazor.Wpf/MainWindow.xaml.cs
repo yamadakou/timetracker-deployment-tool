@@ -21,6 +21,17 @@ public partial class MainWindow : Window
         services.AddTTDeployToolPrototype(HostSettings.DataDirectory, _ => new WpfClipboard());
         Resources.Add("services", services.BuildServiceProvider());
         InitializeComponent();
+        // テスト（Playwright の WebView2Tests）だけ: 環境変数 TT_BLAZOR_CDP_PORT があれば、WebView2 を CDP のポートと別のユーザーデータのフォルダーで作る
+        // （Microsoft Learn「ASP.NET Core Blazor Hybrid」の Web View configuration: BlazorWebViewInitializing）
+        if (Environment.GetEnvironmentVariable("TT_BLAZOR_CDP_PORT") is { Length: > 0 } port)
+        {
+            WebView.BlazorWebViewInitializing += (_, e) =>
+            {
+                e.EnvironmentOptions = new Microsoft.Web.WebView2.Core.CoreWebView2EnvironmentOptions($"--remote-debugging-port={port}");
+                if (Environment.GetEnvironmentVariable("TT_BLAZOR_USER_DATA") is { Length: > 0 } folder)
+                    e.UserDataFolder = folder;
+            };
+        }
         Tray = new TaskbarIcon
         {
             ToolTipText = "TTDeployTool（Blazor Hybrid の試作）",
