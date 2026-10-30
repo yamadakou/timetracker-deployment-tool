@@ -16,6 +16,8 @@ internal static class Ui
 
     public static bool Not(bool value) => !value;
 
+    public static Visibility IfFalse(bool value) => value ? Visibility.Collapsed : Visibility.Visible;
+
     /// <summary>利用可能期限の近さの色（過ぎた → 赤、近い → 黄、ほかは文字の色）。</summary>
     public static Brush ExpiryBrush(ExpiryLevel level) => (Brush)Microsoft.UI.Xaml.Application.Current.Resources[level switch
     {

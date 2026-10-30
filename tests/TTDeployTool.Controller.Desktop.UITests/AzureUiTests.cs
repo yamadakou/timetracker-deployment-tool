@@ -215,14 +215,7 @@ public class AzureUiTests
             Log($"見出し: {(header.Properties.Name.ValueOrDefault ?? "")}（{header.Properties.HelpText.ValueOrDefault}）");
             header.Patterns.Invoke.IsSupported.Should().BeTrue("見出しを押して並べ替えられる");
             (header.Properties.HelpText.ValueOrDefault ?? "").Split(", ").Should().HaveCount(2, "並べ替えと ▽ の絞り込みの両方ができる");
-            var names = new List<string>();
-            for (var i = 0; i < 3; i++)
-            {
-                app.ColumnHeader("Jobs.List", "状態").Patterns.Invoke.Pattern.Invoke();
-                var before = names.LastOrDefault() ?? "状態";
-                AppSession.WaitUntil(() => (app.ColumnHeader("Jobs.List", "状態").Properties.Name.ValueOrDefault ?? "") != before, $"見出しを {i + 1} 回押すと、並べ替えの状態が変わる");
-                names.Add((app.ColumnHeader("Jobs.List", "状態").Properties.Name.ValueOrDefault ?? ""));
-            }
+            var names = app.SortByHeaderThreeTimes("Jobs.List", "状態");
             Log($"見出しを押した後の名前: {string.Join(" → ", names)}");
             names[0].Should().NotBe(names[1]);
             names[2].Should().Be("状態", "3 回目で既定の順に戻る");

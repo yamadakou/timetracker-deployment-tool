@@ -40,9 +40,11 @@ public class CiUiTests
     [Fact]
     public void Pages_That_Need_Azure_Should_Wait_For_Sign_In_And_Show_No_Banner() => AppSession.Run(app =>
     {
-        // No.63: サインインしていないときは、新しくデプロイ・ジョブの一覧も押せない（ウィザードの誤りの表示は Azure の UI テストで確かめる）
-        foreach (var page in new[] { "Nav.Deployments", "Nav.Wizard", "Nav.Jobs" })
+        // No.63: サインインしていないときは、デプロイの一覧・新しくデプロイは押せない（ウィザードの誤りの表示は Azure の UI テストで確かめる）。
+        // No.78: ジョブの一覧は、過去の記録を見るため、サインインしていなくても開ける（ジョブの操作は押せない）
+        foreach (var page in new[] { "Nav.Deployments", "Nav.Wizard" })
             app.IsEnabled(page).Should().BeFalse($"サインインするまで {page} は押せない");
+        app.IsEnabled("Nav.Jobs").Should().BeTrue("ジョブの一覧は、サインインしていなくても開ける");
         app.Exists("Jobs.Banner").Should().BeFalse("ジョブが無ければ上部の帯を出さない");
         app.Exists("Job.Title").Should().BeFalse();
         app.Exists("Job.Progress").Should().BeFalse();
@@ -160,6 +162,70 @@ public class CiUiTests
     });
 
     // アプリが書き込み中のログを読む
+    /// <summary>
+    /// No.78: 行のある表（ジョブの一覧）。終わったジョブの記録（job-history.json）を置いて起動し、サインインせずに、並べ替え・絞り込みで行が減る・
+    /// 絞り込みを外す・列の配置を初期値に戻す、を確かめる（表の部品の中の例外でアプリが落ちないこと。Desktop System Test の 6〜9 回目に落ちた場面を、
+    /// Azure を使わずに通す。docs/design/desktop/desktop-tables.md の 10.7）。
+    /// </summary>
+    [Fact]
+    public void Job_Records_Should_Fill_The_Table_And_Survive_Sorting_And_Filtering()
+    {
+        var path = Path.Combine(AppSession.DataDirectory(), "job-history.json");
+        File.WriteAllText(path, JobRecords(DateTimeOffset.UtcNow));
+        try
+        {
+            AppSession.Run(app =>
+            {
+                app.Show("Jobs");
+                app.WaitForText("Jobs.Count", t => t.Contains("全 3 件"), "記録の 3 件が一覧に出る");
+                app.Exists("Jobs.SignInNote").Should().BeTrue("サインインするまで、ジョブの操作はできない旨を出す");
+                app.RowCount("Jobs.List").Should().Be(3);
+                app.WaitForRowText("Jobs.List", "Job.Target", "rg-ci-b / app-b", "Job.Status", t => t.StartsWith("失敗"), "失敗した記録の行");
+
+                // 並べ替え（Core の並べ替え）と、並べ替えない列
+                app.SortByHeaderThreeTimes("Jobs.List", "状態").Last().Should().Be("状態", "3 回目で既定の順に戻る");
+                app.ColumnHeader("Jobs.List", "結果").Patterns.Invoke.IsSupported.Should().BeFalse("結果の列は並べ替えない");
+
+                // 含む文字で行が減る（行を減らすと、表はチェックボックスの列の幅を一時的に NaN にする）・外すと戻る
+                app.Select("Jobs.TextTarget", "リソースグループ / アプリ名");
+                app.SetText("Jobs.Text", "rg-ci-b");
+                AppSession.WaitUntil(() => app.RowCount("Jobs.List") == 1, "含む文字で 1 行に絞られる");
+                app.TextOf("Jobs.Count").Should().Contain("絞り込んだ 1 件 / 全 3 件");
+                app.Invoke("Jobs.ClearFilters");
+                AppSession.WaitUntil(() => app.RowCount("Jobs.List") == 3, "絞り込みを外すと 3 行に戻る");
+                app.ValueOf("Jobs.Text").Should().BeEmpty("外すと入力欄も空になる");
+
+                // 列の幅と順序を初期値に戻す（余白の列は最後のまま）
+                app.Invoke("Jobs.ResetLayout");
+                app.RowCount("Jobs.List").Should().Be(3);
+                app.IsWindowShown.Should().BeTrue("表の部品の中の例外で落ちていない");
+            });
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    // 終わったジョブの記録（Core の JobRecord と同じ形。列挙は名前）
+    private static string JobRecords(DateTimeOffset now)
+    {
+        static string Record(string kind, string group, string app, string state, string? error, DateTimeOffset finished)
+        {
+            var errorJson = error == null ? "null" : System.Text.Json.JsonSerializer.Serialize(error);
+            return $$"""
+                {"Kind":"{{kind}}","Subscription":"00000000-0000-0000-0000-000000000001","ResourceGroup":"{{group}}","AppName":"{{app}}","ExpiryDeletion":false,
+                 "ScheduledAt":null,"FinishedAt":"{{finished:O}}","State":"{{state}}","Error":{{errorJson}},"Note":null,"Endpoint":null,
+                 "PersistenceSummary":null,"ExpirySummary":null,"DeletionSummary":null,"Logs":[],"RegisteredAt":"{{finished.AddMinutes(-10):O}}",
+                 "ChangedAt":"{{finished:O}}","StartedAt":"{{finished.AddMinutes(-5):O}}"}
+                """;
+        }
+        return "[" + string.Join(",",
+            Record("Deploy", "rg-ci-a", "app-a", "Succeeded", null, now.AddDays(-2)),
+            Record("Delete", "rg-ci-b", "app-b", "Failed", "権限がありません", now.AddDays(-1)),
+            Record("Deploy", "rg-ci-c", "app-c", "Canceled", null, now.AddHours(-1))) + "]";
+    }
+
     private static string ReadShared(string path)
     {
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);

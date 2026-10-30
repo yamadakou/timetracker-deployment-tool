@@ -102,7 +102,8 @@
                 <NavigationViewItem AutomationProperties.AutomationId="Nav.Target" Content="サインイン" Tag="target" Icon="Contact" IsSelected="True" />
                 <NavigationViewItem AutomationProperties.AutomationId="Nav.Deployments" Content="デプロイの一覧" Tag="deployments" Icon="AllApps" IsEnabled="{x:Bind ViewModel.SignIn.IsSignedIn, Mode=OneWay}" />
                 <NavigationViewItem AutomationProperties.AutomationId="Nav.Wizard" Content="新しくデプロイ" Tag="wizard" Icon="Upload" IsEnabled="{x:Bind ViewModel.SignIn.IsSignedIn, Mode=OneWay}" />
-                <NavigationViewItem x:Name="JobsNavItem" AutomationProperties.AutomationId="Nav.Jobs" Content="ジョブの一覧" Tag="jobs" Icon="List" IsEnabled="{x:Bind ViewModel.SignIn.IsSignedIn, Mode=OneWay}" />
+                <!-- ジョブの一覧は、サインインしていなくても開ける（過去の記録を見るため。ジョブの操作はサインインするまで押せない。No.78、2026-10-30） -->
+                <NavigationViewItem x:Name="JobsNavItem" AutomationProperties.AutomationId="Nav.Jobs" Content="ジョブの一覧" Tag="jobs" Icon="List" />
                 <NavigationViewItem AutomationProperties.AutomationId="Nav.DryRun" Content="ローカル検証（Dry-run）" Tag="dryrun" Icon="Save" />
 
             </NavigationView.MenuItems>
@@ -520,23 +521,34 @@
                         <TextBlock TextWrapping="Wrap" Text="このアプリで登録したデプロイ・削除です（予定・実行中・終わったもの）。終わったジョブは、アプリを終了しても記録として残します（180 日・500 件まで）。行を選ぶと、まとめて取り消し・一時停止・再開・予定の変更・記録から削除ができます。1 行だけ選んで「詳細」（または行をダブルクリック）で、進み具合・結果・ログを見られます。「記録から削除」は、この一覧と PC の記録を消すだけで、Azure のリソースは消しません（Azure から消すときは、デプロイの一覧の「Azure から削除…」）。" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <TextBlock AutomationProperties.AutomationId="Jobs.Count" VerticalAlignment="Center" Text="{x:Bind ViewModel.JobList.CountText, Mode=OneWay}" />
-                            <Button AutomationProperties.AutomationId="Jobs.DeleteFinishedRecords" Content="終わったジョブを記録から削除" Command="{x:Bind ViewModel.JobList.DeleteFinishedRecordsCommand}" />
+                            <ContentControl IsTabStop="False" IsEnabled="{x:Bind ViewModel.SignIn.IsSignedIn, Mode=OneWay}">
+                                <Button AutomationProperties.AutomationId="Jobs.DeleteFinishedRecords" Content="終わったジョブを記録から削除" Command="{x:Bind ViewModel.JobList.DeleteFinishedRecordsCommand}" />
+                            </ContentControl>
                         </StackPanel>
+                        <TextBlock AutomationProperties.AutomationId="Jobs.SignInNote" TextWrapping="Wrap" Visibility="{x:Bind local:Ui.IfFalse(ViewModel.SignIn.IsSignedIn), Mode=OneWay}"
+                                   Text="サインインするまで、ジョブの操作（取り消し・一時停止・再開・予定の変更・記録から削除）はできません。一覧と詳細は見られます。" />
                         <!-- 選んだ行への操作 -->
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <TextBlock AutomationProperties.AutomationId="Jobs.Selection" VerticalAlignment="Center" Text="{x:Bind ViewModel.JobList.SelectionText, Mode=OneWay}" />
                             <Button AutomationProperties.AutomationId="Jobs.Detail" Content="詳細" IsEnabled="{x:Bind ViewModel.JobList.HasCurrent, Mode=OneWay}" Click="OnShowJobDetail" />
-                            <Button AutomationProperties.AutomationId="Jobs.CancelSelected" Content="取り消し" Command="{x:Bind ViewModel.JobList.CancelSelectedCommand}" />
-                            <Button AutomationProperties.AutomationId="Jobs.PauseSelected" Content="一時停止" Command="{x:Bind ViewModel.JobList.PauseSelectedCommand}" />
-                            <Button AutomationProperties.AutomationId="Jobs.ResumeSelected" Content="再開" Command="{x:Bind ViewModel.JobList.ResumeSelectedCommand}" />
-                            <Button AutomationProperties.AutomationId="Jobs.DeleteSelectedRecords" Content="記録から削除" Command="{x:Bind ViewModel.JobList.DeleteSelectedRecordsCommand}" />
+                            <!-- ジョブの操作は、サインインするまで押せない（ボタンの Command と並べて IsEnabled を結び付けられないため、入れ物で止める） -->
+                            <ContentControl IsTabStop="False" IsEnabled="{x:Bind ViewModel.SignIn.IsSignedIn, Mode=OneWay}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button AutomationProperties.AutomationId="Jobs.CancelSelected" Content="取り消し" Command="{x:Bind ViewModel.JobList.CancelSelectedCommand}" />
+                                    <Button AutomationProperties.AutomationId="Jobs.PauseSelected" Content="一時停止" Command="{x:Bind ViewModel.JobList.PauseSelectedCommand}" />
+                                    <Button AutomationProperties.AutomationId="Jobs.ResumeSelected" Content="再開" Command="{x:Bind ViewModel.JobList.ResumeSelectedCommand}" />
+                                    <Button AutomationProperties.AutomationId="Jobs.DeleteSelectedRecords" Content="記録から削除" Command="{x:Bind ViewModel.JobList.DeleteSelectedRecordsCommand}" />
+                                </StackPanel>
+                            </ContentControl>
                             <Button AutomationProperties.AutomationId="Jobs.ClearSelection" Content="選択を外す" Command="{x:Bind ViewModel.JobList.ClearSelectionCommand}" />
                         </StackPanel>
+                        <ContentControl IsTabStop="False" IsEnabled="{x:Bind ViewModel.SignIn.IsSignedIn, Mode=OneWay}">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <DatePicker AutomationProperties.AutomationId="Jobs.ScheduleDate" Header="予定の日付" Date="{x:Bind ViewModel.JobList.Schedule.Date, Mode=TwoWay}" />
                             <TimePicker AutomationProperties.AutomationId="Jobs.ScheduleTime" Header="時刻" ClockIdentifier="24HourClock" Time="{x:Bind ViewModel.JobList.Schedule.TimeOfDay, Mode=TwoWay}" />
                             <Button AutomationProperties.AutomationId="Jobs.RescheduleSelected" Content="選んだジョブの予定を変える" VerticalAlignment="Bottom" Command="{x:Bind ViewModel.JobList.RescheduleSelectedCommand}" />
                         </StackPanel>
+                        </ContentControl>
                         <TextBlock AutomationProperties.AutomationId="Jobs.Message" Text="{x:Bind ViewModel.JobList.Message, Mode=OneWay}" TextWrapping="Wrap" />
                         <!-- 表の上のフィルタ（対象の列＋条件。docs/design/desktop/desktop-tables.md の 10.4） -->
                         <StackPanel Orientation="Horizontal" Spacing="8">

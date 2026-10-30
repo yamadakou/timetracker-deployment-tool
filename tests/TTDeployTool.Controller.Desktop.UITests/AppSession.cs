@@ -74,6 +74,13 @@ public sealed class AppSession : IDisposable
         return $"{package.Id.FamilyName}!App";
     }
 
+    /// <summary>導入したアプリのデータのフォルダー（ApplicationData.LocalFolder。起動の前に、ジョブの記録などを置くのに使う）。</summary>
+    public static string DataDirectory()
+    {
+        var family = AppUserModelId().Split('!')[0];
+        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Packages", family, "LocalState");
+    }
+
     /// <summary>ウィンドウが表示されているか（閉じて通知領域に残ると、隠れる）。</summary>
     public bool IsWindowShown => IsWindowVisible(Window.Properties.NativeWindowHandle.Value);
 
@@ -219,6 +226,26 @@ public sealed class AppSession : IDisposable
             },
             Timeout, Interval, throwOnTimeout: true, ignoreException: true,
             timeoutMessage: $"表 {tableId} に、見出し「{header}」が見つかりませんでした。").Result!;
+
+    /// <summary>
+    /// 見出し <paramref name="header"/> を 3 回押し、そのたびの見出しの名前を返す（昇順 → 降順 → 既定の順。名前に並べ替えの状態が足され、3 回目で消える）。
+    /// 向きは Core の並べ替えに合わせて出すため、Core で並べ替えられたことも分かる。
+    /// </summary>
+    public IReadOnlyList<string> SortByHeaderThreeTimes(string tableId, string header)
+    {
+        var names = new List<string>();
+        for (var i = 0; i < 3; i++)
+        {
+            ColumnHeader(tableId, header).Patterns.Invoke.Pattern.Invoke();
+            var before = names.LastOrDefault() ?? header;
+            WaitUntil(() => NameOf(ColumnHeader(tableId, header)) != before, $"見出し「{header}」を {i + 1} 回押すと、並べ替えの状態が変わる");
+            names.Add(NameOf(ColumnHeader(tableId, header)));
+        }
+        return names;
+    }
+
+    /// <summary>表の行の数（UI Automation から見える行。今のページの行）。</summary>
+    public int RowCount(string tableId) => RowsOf(tableId).Length;
 
     // FlaUI の ColumnHeaderItems のプロパティは XAML の UI Automation の橋渡しで「対応しない」になるため、TableItem パターン（10013）のメソッドで読む
     private static AutomationElement[] HeaderItems(AutomationElement cell) =>

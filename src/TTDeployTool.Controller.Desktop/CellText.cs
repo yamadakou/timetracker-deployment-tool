@@ -1,5 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using TTDeployTool.Controller.Desktop.Core.ViewModels;
 
 namespace TTDeployTool.Controller.Desktop;
 
@@ -24,5 +25,5 @@ public static class CellText
         text.RegisterPropertyChangedCallback(TextBlock.TextProperty, (_, _) => Update(text));
     }
 
-    private static void Update(TextBlock text) => ToolTipService.SetToolTip(text, text.IsTextTrimmed ? text.Text : null);
+    private static void Update(TextBlock text) => ToolTipService.SetToolTip(text, TableRules.ToolTip(text.IsTextTrimmed, text.Text));
 }

@@ -16,19 +16,16 @@ namespace TTDeployTool.Controller.Desktop;
 /// 表の上の「含む文字」は、入力が止まってから絞り込む（<see cref="BindText"/>）。
 /// 表の最後の列（Tag が空）は、見出しの無い余白の列で、右端の列の境目と文字を、縦のスクロールバーの左に出す（10.6）。
 /// セルの文字のコピーは、Ctrl+C（選んだ行）と、セルの右クリックのメニュー（セルの文字・選んだ行・選んだ行の Markdown の表）で行う。
+/// 判断（余白の幅・セルの文字・コピーの対象・並べ替え・列の配置・入力の待ち合わせ）は Core の <see cref="TableRows{T}"/>・<see cref="TableRules"/>・<see cref="TextFilterInput"/> で行い、
+/// ここは WinUI の呼び出しだけにする（10.7）。
 /// </summary>
 internal sealed class TableBinder<T>
     where T : class
 {
-    // 縦のスクロールバーの幅（マウスを置いて広がったとき）より少し広く
-    private const double ScrollBarSpace = 16;
-    // TableView は、残りの幅いっぱいの列の幅を「表の幅 - 32」から求め、左のチェックボックスの列の幅を引かないため、その差も余白にする
-    private const double HeaderReserve = 32;
-
     private readonly TableView _table;
     private readonly TableFilters<T> _filters;
     private readonly TableLayout _layout;
-    private readonly Func<object, T?> _itemOf;
+    private readonly TableRows<T> _rows;
     private readonly Func<string?> _sortColumn;
     private readonly Func<bool> _sortDescending;
     private readonly Action<string, bool> _sort;
@@ -48,7 +45,7 @@ internal sealed class TableBinder<T>
         _table = table;
         _filters = filters;
         _layout = layout;
-        _itemOf = itemOf;
+        _rows = new TableRows<T>(filters, itemOf);
         _sortColumn = sortColumn;
         _sortDescending = sortDescending;
         _sort = sort;
@@ -83,7 +80,7 @@ internal sealed class TableBinder<T>
             column.CanSort = canSort(key);
             column.CanFilter = true;
             // 列の値（コピー・読み上げ・表の内蔵の並べ替え）は、セルに見えている文字。無いと行そのもの（型の名前）になる
-            column.OperationContentBinding = TextBinding(row => itemOf(row) is { } item ? filters.Column(key).TextOf(item) : "");
+            column.OperationContentBinding = TextBinding(row => _rows.CellText(key, row));
             column.RegisterPropertyChangedCallback(TableViewColumn.WidthProperty, (_, _) => Save());
         }
         Apply(layout.Current);
@@ -100,18 +97,15 @@ internal sealed class TableBinder<T>
     /// </summary>
     public void BindText(TextBox box)
     {
-        var composing = false;
         var timer = _table.DispatcherQueue.CreateTimer();
-        timer.Interval = TimeSpan.FromMilliseconds(400);
+        timer.Interval = TextFilterInput.Delay;
         timer.IsRepeating = false;
+        var input = new TextFilterInput(timer.Start, text => _filters.Text = text);
         timer.Tick += (_, _) =>
         {
-            if (composing)
-                return;
             var focused = box.FocusState != FocusState.Unfocused;
             var caret = box.SelectionStart;
-            _filters.Text = box.Text;
-            if (focused)
+            if (input.Elapsed(box.Text) && focused)
             {
                 _table.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
                 {
@@ -124,17 +118,13 @@ internal sealed class TableBinder<T>
             }
         };
         box.Text = _filters.Text;
-        box.TextChanged += (_, _) => timer.Start();
-        box.TextCompositionStarted += (_, _) => composing = true;
-        box.TextCompositionEnded += (_, _) =>
-        {
-            composing = false;
-            timer.Start();
-        };
-        // 「絞り込みをすべて外す」などで文字が変わったら、入力欄に出す（前後の空白だけの違いは、入力中のため書き換えない）
+        box.TextChanged += (_, _) => input.Changed();
+        box.TextCompositionStarted += (_, _) => input.CompositionStarted();
+        box.TextCompositionEnded += (_, _) => input.CompositionEnded();
+        // 「絞り込みをすべて外す」などで文字が変わったら、入力欄に出す
         _filters.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName == nameof(TableFilters<T>.Text) && box.Text.Trim() != _filters.Text)
+            if (e.PropertyName == nameof(TableFilters<T>.Text) && TableRules.WriteBack(box.Text, _filters.Text))
                 box.Text = _filters.Text;
         };
     }
@@ -153,15 +143,12 @@ internal sealed class TableBinder<T>
         _applying = true;
         try
         {
-            for (var i = 0; i < layout.Count; i++)
+            Arrange([.. layout.Select(c => c.Key)]);
+            foreach (var saved in layout)
             {
-                var column = _table.Columns.First(c => IsData(c) && Key(c) == layout[i].Key);
-                var index = _table.Columns.IndexOf(column);
-                if (index != i)
-                    _table.Columns.Move(index, i);
-                column.Width = layout[i].Width > 0 ? new GridLength(layout[i].Width) : new GridLength(1, GridUnitType.Star);
+                if (DataColumns.FirstOrDefault(c => Key(c) == saved.Key) is { } column)
+                    column.Width = saved.Width > 0 ? new GridLength(saved.Width) : new GridLength(1, GridUnitType.Star);
             }
-            KeepSpacerLast();
         }
         finally
         {
@@ -172,27 +159,27 @@ internal sealed class TableBinder<T>
     private void Save()
     {
         if (!_applying)
-            _layout.Save([.. DataColumns.Select(c => new TableColumnLayout(Key(c), c.Width.IsAbsolute ? c.Width.Value : 0))]);
+            _layout.Save([.. DataColumns.Select(c => TableRules.Saved(Key(c), c.Width.IsAbsolute ? c.Width.Value : null))]);
+    }
+
+    // 列を順 order に並べ、余白の列を最後にする（Core の TableRules.Arrange が動かし方を決める）
+    private void Arrange(IReadOnlyList<string> order)
+    {
+        foreach (var (from, to) in TableRules.Arrange([.. _table.Columns.Select(c => IsData(c) ? Key(c) : "")], order, ""))
+            _table.Columns.Move(from, to);
     }
 
     // 余白の列は動かせないが、ほかの列をその右に置けるため、順序を変えるたびに最後に戻す
     private void KeepSpacerLast()
     {
-        var index = _table.Columns.IndexOf(_spacer);
-        if (index != _table.Columns.Count - 1)
-            _table.Columns.Move(index, _table.Columns.Count - 1);
+        Arrange([.. DataColumns.Select(Key)]);
         Save();
     }
 
+    // 行を減らした直後など、表はチェックボックスの列の幅を一時的に NaN にする。NaN のときと同じ幅のときは変えない（Core の TableRules.SpacerWidth）
     private void SizeSpacer()
     {
-        // 行を減らした直後など、表はチェックボックスの列の幅を一時的に NaN にする（TableView の中も NaN を 0 として扱う）。
-        // NaN から GridLength を作ると例外になり、DispatcherQueue の中のためアプリが落ちた（Desktop System Test、run 41050364091）
-        var offset = _table.CellsHorizontalOffset;
-        if (!double.IsFinite(offset))
-            return;
-        var width = ScrollBarSpace + Math.Max(0, offset - HeaderReserve);
-        if (!_spacer.Width.IsAbsolute || _spacer.Width.Value != width)
+        if (TableRules.SpacerWidth(_table.CellsHorizontalOffset, _spacer.Width.IsAbsolute ? _spacer.Width.Value : null) is { } width)
             _spacer.Width = new GridLength(width);
     }
 
@@ -204,14 +191,13 @@ internal sealed class TableBinder<T>
         _table.DispatcherQueue.TryEnqueue(() =>
         {
             _sortPending = false;
-            var sorted = DataColumns.FirstOrDefault(c => c.SortDirection != null);
-            var descending = sorted?.SortDirection == SortDirection.Descending;
+            var request = TableRules.SortRequest(DataColumns.Select(c => (Key(c), c.SortDirection is { } d ? d == SortDirection.Descending : (bool?)null)));
             // 表の内蔵の並べ替えは外し、Core が並べた順のまま出す
             _table.SortDescriptions.Clear();
-            if (sorted == null)
-                _clearSort();
+            if (request is { } r)
+                _sort(r.Key, r.Descending);
             else
-                _sort(Key(sorted), descending);
+                _clearSort();
             ShowSort();
         });
     }
@@ -241,13 +227,12 @@ internal sealed class TableBinder<T>
         CopyRows(_table.SelectedItems, e.IncludeHeaders);
     }
 
-    private void CopyRows(IEnumerable<object> rows, bool headers) =>
-        Copy(_filters.CopyText(rows.Select(_itemOf).OfType<T>(), VisibleKeys, headers));
+    private void CopyRows(IEnumerable<object> rows, bool headers) => Copy(_rows.CopyText(rows, VisibleKeys, headers));
 
     private IEnumerable<string> VisibleKeys => DataColumns.Where(c => c.Visibility == Visibility.Visible).Select(Key);
 
     // 選んだ行（選んでいなければ、右クリックした行）
-    private IEnumerable<object> MenuRows => _table.SelectedItems.Count > 0 ? _table.SelectedItems : _menuCell is { } c ? [c.Row] : [];
+    private IReadOnlyList<object> MenuRows => TableRules.Target([.. _table.SelectedItems], _menuCell?.Row);
 
     // 右クリックしたセルの文字と、選んだ行（選んでいなければ、右クリックした行）
     private MenuFlyout CreateMenu()
@@ -255,18 +240,14 @@ internal sealed class TableBinder<T>
         var cell = new MenuFlyoutItem { Text = "この文字をコピー" };
         cell.Click += (_, _) =>
         {
-            if (_menuCell is { } c && _itemOf(c.Row) is { } item)
-                Copy(_filters.Column(c.Key).TextOf(item));
+            if (_menuCell is { } c)
+                Copy(_rows.CellText(c.Key, c.Row));
         };
         var rows = new MenuFlyoutItem { Text = "選んだ行をコピー" };
         rows.Click += (_, _) => CopyRows(MenuRows, headers: false);
         // Markdown の表（見出しつき。設定の Markdown のコピーと同じ書き方）
         var markdown = new MenuFlyoutItem { Text = "選んだ行を Markdown 形式でコピー" };
-        markdown.Click += (_, _) =>
-        {
-            if (MenuRows.Any())
-                Copy(_filters.CopyMarkdown(MenuRows.Select(_itemOf).OfType<T>(), VisibleKeys));
-        };
+        markdown.Click += (_, _) => Copy(_rows.CopyMarkdown(MenuRows, VisibleKeys));
         var menu = new MenuFlyout { Items = { cell, rows, markdown } };
         menu.Opening += (_, _) => cell.IsEnabled = _menuCell != null;
         return menu;
@@ -288,19 +269,8 @@ internal sealed class TableBinder<T>
 
     private sealed class TextConverter(Func<object, string> text) : IValueConverter
     {
-        // 表の読み上げ（UI Automation）・コピー・並べ替えが、行の配置の途中にも呼ぶ。ここで例外を出すと、WinRT の境界を越えて
-        // アプリが記録を残さずに落ちる（0xc000027b。Desktop System Test、run 41035872850）ため、出さない
-        public object? Convert(object value, Type targetType, object parameter, string language)
-        {
-            try
-            {
-                return value == null ? null : text(value);
-            }
-            catch (Exception)
-            {
-                return "";
-            }
-        }
+        // 表の読み上げ（UI Automation）・コピー・並べ替えが、行の配置の途中にも呼ぶ。例外は出さない（Core の TableRows.CellText）
+        public object? Convert(object value, Type targetType, object parameter, string language) => text(value);
 
         public object ConvertBack(object value, Type targetType, object parameter, string language) => throw new NotSupportedException();
     }
