@@ -57,7 +57,8 @@ public class MockUiTests
         app.WaitForText("Row.DbPassword", t => t == "••••••••", "パスワードは伏せ字で出る");
         app.Invoke("Row.TogglePasswords");
         app.WaitForText("Row.DbPassword", t => t == "Db-Pass-00", "表示すると、モックのパスワードが出る");
-        app.SelectRowWith("Deployments.Rows", "Row.AppName", "app01");
+        // 表は見えている行の分しか行の要素を作らないため、上の方の行（同じサブスクリプション）を選ぶ
+        app.SelectRowWith("Deployments.Rows", "Row.AppName", "app02");
         AppSession.WaitUntil(() => !app.Exists("Deployments.Detail"), "2 行選ぶと詳細は消える");
         app.IsEnabled("Deployments.ChangeExpiry").Should().BeTrue("まとめて期限を変えられる");
         app.IsEnabled("Deployments.Delete").Should().BeTrue("まとめて削除できる");
@@ -130,14 +131,16 @@ public class MockUiTests
         app.Show("Jobs");
         app.WaitForText("Jobs.Count", t => t.Contains($"全 {Records} 件"), "記録の 45 件");
         app.Select("Jobs.PageSize", "50");
-        // 最初の 2 件の結果（誤り）は長い文字。1 行の文字（種類）の高さと比べる
-        var row = app.RowWith("Jobs.List", "Job.Target", "rg-mock-100 / app100");
+        // いちばん新しい 2 件の結果（誤り）は長い文字。1 行の文字（種類）の高さと比べる
+        var row = app.RowWith("Jobs.List", "Job.Target", $"rg-mock-{100 + Records - 1} / app{100 + Records - 1}");
+        AppSession.ScrollIntoView(row);
         var result = Cell(row, "Job.Result");
         var line = Cell(row, "Job.Kind").BoundingRectangle.Height;
         var height = result.BoundingRectangle.Height;
         (height / (double)line).Should().BeInRange(5, 6.6, $"6 行で切れる（高さ {height}・1 行 {line}）");
         (result.Properties.HelpText.ValueOrDefault ?? "").Should().Be(FixtureSamples.LongText, "切れたセルは、マウスを置くと全体が出る");
-        var shortRow = app.RowWith("Jobs.List", "Job.Target", "rg-mock-105 / app105");
+        var shortRow = app.RowWith("Jobs.List", "Job.Target", $"rg-mock-{100 + Records - 4} / app{100 + Records - 4}");
+        AppSession.ScrollIntoView(shortRow);
         Cell(shortRow, "Job.Result").BoundingRectangle.Height.Should().BeLessThan(line * 2, "短い文字は 1 行");
         (Cell(shortRow, "Job.Result").Properties.HelpText.ValueOrDefault ?? "").Should().BeEmpty("切れていなければツールチップは出さない");
     });

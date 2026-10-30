@@ -97,7 +97,7 @@ public static class FixtureSamples
 
     /// <summary>
     /// 終わったジョブの記録 <paramref name="count"/> 件（新しいものほど後ろ。1 時間ずつ前に終わった）。成功・失敗・取り消し・停止を順に繰り返し、
-    /// 最初の 2 件の誤り（結果の列）は 6 行で切れる長い文字。対象は <see cref="ResourceGroup"/>・<see cref="AppName"/>（デプロイの一覧の 100 番から。重ならない）。
+    /// いちばん新しい 2 件（一覧の先頭）の誤り（結果の列）は 6 行で切れる長い文字。対象は <see cref="ResourceGroup"/>・<see cref="AppName"/>（デプロイの一覧の 100 番から。重ならない）。
     /// </summary>
     public static IReadOnlyList<JobRecord> JobRecords(int count, DateTimeOffset now) =>
     [
@@ -105,7 +105,7 @@ public static class FixtureSamples
         {
             var finished = now.AddHours(-(count - i));
             var state = (i % 4) switch { 0 => DesktopJobState.Succeeded, 1 => DesktopJobState.Failed, 2 => DesktopJobState.Canceled, _ => DesktopJobState.Stopped };
-            var error = i < 2 ? LongText : state == DesktopJobState.Failed ? "権限がありません。" : null;
+            var error = i >= count - 2 ? LongText : state == DesktopJobState.Failed ? "権限がありません。" : null;
             return new JobRecord(i % 2 == 0 ? JobKind.Deploy : JobKind.Delete, Subscription(i), ResourceGroup(100 + i), AppName(100 + i), false, null, finished, state, error,
                 null, null, null, null, null, [], finished.AddMinutes(-10), finished, finished.AddMinutes(-5));
         }),

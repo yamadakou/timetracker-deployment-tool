@@ -244,8 +244,18 @@ public sealed class AppSession : IDisposable
         return names;
     }
 
-    /// <summary>表の行の数（UI Automation から見える行。今のページの行）。</summary>
-    public int RowCount(string tableId) => RowsOf(tableId).Length;
+    /// <summary>
+    /// 表の行の数（今のページの行）。表は見えている行の分しか行の要素を作らない（仮想化）ため、子の数ではなく Grid パターンの行の数で読む
+    /// （CI の UI テスト、run 41066697432: 20 行のうち 11 行しか子に無かった）。
+    /// </summary>
+    public int RowCount(string tableId) => Find(tableId).Patterns.Grid.Pattern.RowCount.Value;
+
+    /// <summary>行を画面に入るまでスクロールする（画面の外の行の要素は、大きさが 0 になる）。</summary>
+    public static void ScrollIntoView(AutomationElement row)
+    {
+        if (row.Patterns.ScrollItem.TryGetPattern(out var scroll))
+            scroll.ScrollIntoView();
+    }
 
     // FlaUI の ColumnHeaderItems のプロパティは XAML の UI Automation の橋渡しで「対応しない」になるため、TableItem パターン（10013）のメソッドで読む
     private static AutomationElement[] HeaderItems(AutomationElement cell) =>

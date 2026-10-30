@@ -57,7 +57,8 @@ public class FixtureTests
         records.Should().HaveCount(45);
         records.Select(r => r.State).Distinct().Should().BeEquivalentTo([DesktopJobState.Succeeded, DesktopJobState.Failed, DesktopJobState.Canceled, DesktopJobState.Stopped]);
         records.Select(r => r.Kind).Distinct().Should().BeEquivalentTo([JobKind.Deploy, JobKind.Delete]);
-        records[0].Error.Should().Be(FixtureSamples.LongText);
+        records[44].Error.Should().Be(FixtureSamples.LongText, "いちばん新しい 2 件は長い文字");
+        records[43].Error.Should().Be(FixtureSamples.LongText);
         records[5].Error.Should().Be("権限がありません。");
         records[4].Error.Should().BeNull();
         records.Last().FinishedAt.Should().Be(Now.AddHours(-1));
