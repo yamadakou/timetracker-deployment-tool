@@ -157,6 +157,22 @@ public sealed class TableFilters<T> : ObservableObject
     /// <summary>行がすべての絞り込みに合うか。</summary>
     public bool Matches(T item) => Matches(item, except: null);
 
+    /// <summary>
+    /// 行を、列 <paramref name="keys"/> の順で、セルに見えている文字（<see cref="TableColumn{T}.TextOf"/>）のタブ区切りにする（クリップボードへのコピー）。
+    /// 表計算に貼れるよう、タブ・改行・引用符を含む値は引用符で囲む（引用符は 2 つ重ねる）。
+    /// </summary>
+    public string CopyText(IEnumerable<T> items, IEnumerable<string> keys, bool headers)
+    {
+        var columns = keys.Select(Column).ToList();
+        var lines = items.Select(item => string.Join('\t', columns.Select(c => Quote(c.TextOf(item)))));
+        if (headers)
+            lines = lines.Prepend(string.Join('\t', columns.Select(c => Quote(c.Header))));
+        return string.Join("\r\n", lines);
+    }
+
+    private static string Quote(string value) =>
+        value.IndexOfAny(['\t', '\r', '\n', '"']) < 0 ? value : $"\"{value.Replace("\"", "\"\"")}\"";
+
     private bool Matches(T item, string? except) =>
         _values.All(v => v.Key == except || v.Value.Contains(Column(v.Key).ValueOf(item)))
         && (Text.Length == 0 || (TextTarget.Column is { } c

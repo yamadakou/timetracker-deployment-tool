@@ -116,6 +116,43 @@ public class TableFiltersTests
     }
 
     [Fact]
+    public void The_Copy_Should_Be_Tab_Separated_In_The_Given_Column_Order()
+    {
+        var f = Filters();
+        f.CopyText(Items.Take(2), ["Group", "Name", "Note"], headers: false).Should().Be("Sales\talpha\tfirst\r\nsales\tbeta\t", "空のメモは見えている文字（空）");
+        f.CopyText([new Item("a\tb", "x\"y", "1\n2", null)], ["Name", "Group", "Note"], headers: true)
+            .Should().Be("名前\tグループ\tメモ\r\n\"a\tb\"\t\"x\"\"y\"\t\"1\n2\"", "タブ・改行・引用符を含む値は引用符で囲む");
+        f.CopyText([], ["Name"], headers: false).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Every_Column_Should_Either_Sort_Or_Be_The_Last_Column()
+    {
+        // 見出しで並べ替えられる列は、どれも並べ替えで例外にならない（評価版 0.1.71 では、ジョブ・結果の列を押すと落ちた）
+        var h = new Harness();
+        var deployments = h.Main.Deployments;
+        foreach (var key in deployments.Filters.Columns.Select(c => c.Key))
+        {
+            DeploymentListViewModel.CanSortBy(key).Should().Be(key != DeploymentListViewModel.JobColumn, key);
+            if (DeploymentListViewModel.CanSortBy(key))
+            {
+                deployments.SortBy(key, descending: true);
+                deployments.SortColumn.Should().Be(key);
+            }
+        }
+        var jobs = h.Main.JobList;
+        foreach (var key in jobs.Filters.Columns.Select(c => c.Key))
+        {
+            JobListViewModel.CanSortBy(key).Should().Be(key != JobListViewModel.ResultColumn, key);
+            if (JobListViewModel.CanSortBy(key))
+            {
+                jobs.SortBy(key, descending: true);
+                jobs.SortDescending.Should().BeTrue(key);
+            }
+        }
+    }
+
+    [Fact]
     public void The_Layout_Should_Be_Saved_And_Merged_With_New_Columns()
     {
         var preferences = new InMemoryAppPreferences();

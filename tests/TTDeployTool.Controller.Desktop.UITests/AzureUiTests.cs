@@ -226,6 +226,8 @@ public class AzureUiTests
             Log($"見出しを押した後の名前: {string.Join(" → ", names)}");
             names[0].Should().NotBe(names[1]);
             names[2].Should().Be("状態", "3 回目で既定の順に戻る");
+            // 並べ替えない列（結果）は、見出しを押せない（評価版 0.1.71 では、押すと Core の並べ替えが例外になりアプリが落ちた）
+            app.ColumnHeader("Jobs.List", "結果").Patterns.Invoke.IsSupported.Should().BeFalse("結果の列は並べ替えない");
             app.SelectRowWith("Jobs.List", "Job.Target", secondTarget);
             app.Invoke("Jobs.CancelSelected");
             app.WaitForRowText("Jobs.List", "Job.Target", secondTarget, "Job.Status", t => t == "取り消し", "予定を取り消せる");

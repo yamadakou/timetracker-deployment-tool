@@ -390,6 +390,8 @@
                                         <TextBlock Style="{StaticResource CellTextStyle}" AutomationProperties.AutomationId="Row.Job" Text="{x:Bind JobText, Mode=OneWay}" Foreground="{ThemeResource SystemFillColorCautionBrush}" local:CellText.ShowFullText="True" />
                                     </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
                                 </tv:TableViewTemplateColumn>
+                                <!-- 余白の列（見出しなし）: 右端の列の境目と文字を、縦のスクロールバーの左に出す（desktop-tables.md の 10.6。幅は TableBinder が決める） -->
+                                <tv:TableViewTemplateColumn Header="" Tag="" />
                             </tv:TableView.Columns>
                         </tv:TableView>
                         <StackPanel Orientation="Horizontal" Spacing="8">
@@ -607,6 +609,8 @@
                                         <TextBlock Style="{StaticResource CellTextStyle}" AutomationProperties.AutomationId="Job.Result" Text="{x:Bind ResultText, Mode=OneWay}" local:CellText.ShowFullText="True" />
                                     </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
                                 </tv:TableViewTemplateColumn>
+                                <!-- 余白の列（見出しなし）: 右端の列の境目と文字を、縦のスクロールバーの左に出す（desktop-tables.md の 10.6。幅は TableBinder が決める） -->
+                                <tv:TableViewTemplateColumn Header="" Tag="" />
                             </tv:TableView.Columns>
                         </tv:TableView>
                         <StackPanel Orientation="Horizontal" Spacing="8">

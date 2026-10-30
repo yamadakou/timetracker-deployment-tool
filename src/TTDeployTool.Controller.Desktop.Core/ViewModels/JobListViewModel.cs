@@ -110,6 +110,9 @@ public sealed class JobListViewModel : ObservableObject
     /// <summary>結果の列の名前（並べ替えはしない）。</summary>
     public const string ResultColumn = "Result";
 
+    /// <summary>見出しで並べ替えられる列か（<see cref="JobSortKey"/> にある列。結果の列は並べ替えない）。</summary>
+    public static bool CanSortBy(string column) => Enum.TryParse<JobSortKey>(column, out _);
+
     /// <summary>表の絞り込み（見出しの ▽・表の上の文字と日付のフィルタ。docs/design/desktop/desktop-tables.md の 10.4）。</summary>
     public TableFilters<JobViewModel> Filters { get; }
 

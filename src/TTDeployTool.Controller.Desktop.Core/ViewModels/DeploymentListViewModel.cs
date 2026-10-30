@@ -212,6 +212,9 @@ public sealed class DeploymentListViewModel : ObservableObject
     /// <summary>ジョブの列の名前（並べ替えはしない）。</summary>
     public const string JobColumn = "Job";
 
+    /// <summary>見出しで並べ替えられる列か（<see cref="DeploymentSortKey"/> にある列。ジョブの列は並べ替えない）。</summary>
+    public static bool CanSortBy(string column) => Enum.TryParse<DeploymentSortKey>(column, out _);
+
     /// <summary>表の選択と、この一覧の選択を合わせる。</summary>
     public SelectionSync<DeploymentRowViewModel> TableSelection { get; }
 
