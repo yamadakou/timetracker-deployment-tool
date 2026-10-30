@@ -212,6 +212,7 @@ public sealed class DeploymentTableTests : IAsyncLifetime
     {
         var scroll = _page.Find(".tt-table-scroll");
         scroll.KeyDown(new KeyboardEventArgs { Key = "c", CtrlKey = true });
+        scroll.KeyDown(new KeyboardEventArgs { Key = "C", CtrlKey = true });
         _app.Clipboard.Texts.Should().BeEmpty();
 
         Rows[0].Click();
@@ -219,6 +220,7 @@ public sealed class DeploymentTableTests : IAsyncLifetime
         scroll.KeyDown(new KeyboardEventArgs { Key = "c", CtrlKey = true });
         scroll.KeyDown(new KeyboardEventArgs { Key = "C", CtrlKey = true, ShiftKey = true });
         scroll.KeyDown(new KeyboardEventArgs { Key = "c" });
+        scroll.KeyDown(new KeyboardEventArgs { Key = "x", CtrlKey = true });
         _app.Clipboard.Texts.Should().HaveCount(2);
         _app.Clipboard.Texts[0].Split("\r\n").Should().HaveCount(2);
         _app.Clipboard.Texts[0].Should().StartWith(List.Filters.Column("Subscription").ValueOf(List.Rows[0].Entry) + "\t" + List.Rows[0].Entry.ResourceGroup + "\t");

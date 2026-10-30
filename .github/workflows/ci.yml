@@ -386,6 +386,13 @@ jobs:
         $report = Join-Path (Resolve-Path TestResults) "integration-unpackaged.json"
         $p = Start-Process -FilePath $exe -ArgumentList "--check", "`"$report`"" -PassThru
         if (-not $p.WaitForExit(120000)) { $p.Kill($true); throw "確認が終わりません" }
+        Write-Host "終了コード: $($p.ExitCode)"
+        # 落ちたときの手がかり（crash.log と、Windows のアプリケーションのイベント）
+        foreach ($log in @((Join-Path $env:LOCALAPPDATA "TTDeployTool.BlazorPrototype\crash.log"), (Join-Path $env:TEMP "crash.log"))) {
+          if (Test-Path $log) { Copy-Item $log TestResults/; Get-Content $log }
+        }
+        Get-WinEvent -FilterHashtable @{ LogName = "Application"; StartTime = (Get-Date).AddMinutes(-10); Id = 1000, 1001, 1026 } -ErrorAction SilentlyContinue |
+          Format-List TimeCreated, Id, ProviderName, Message | Out-String -Width 300 | Write-Host
         Get-Content $report
         "TT_BLAZOR_WPF_EXE=$exe" >> $env:GITHUB_ENV
 
