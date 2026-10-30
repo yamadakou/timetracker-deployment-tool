@@ -2,7 +2,7 @@
 
 - 対象ブランチ: `feature/desktop-blazor-hybrid`（`feature/desktop-app` の 6123da3 から）。既存の WinUI 3 のアプリ（`src/TTDeployTool.Controller.Desktop`）とそのテスト・CI は変えず、試作は別のプロジェクトとして足す
 - 関連: [`desktop-tables.md`](desktop-tables.md)（表の仕様と、WinUI.TableView の不具合・回避策。9・10 章）・[`desktop-ui-tests.md`](desktop-ui-tests.md)（UI テスト。6.2・6.3）・[`desktop-app.md`](desktop-app.md)（サインイン・通知・MSIX）・[`desktop-app-store.md`](desktop-app-store.md)
-- 状況: 案。論点 Q1〜Q5 はオーナーの判断を待つ。実装は判断の後に行う
+- 状況: 論点 Q1〜Q5 はオーナーの回答ですべて推奨どおりに決定（2026-10-30。12 章）。試作を実装した（13 章）。結果と比較は 14 章・10 章
 - 一次情報の確認日: 2026-10-30（出典は 11 章）
 - 記録: `docs/REVIEW_ISSUES.md` の No.79
 
@@ -74,7 +74,7 @@ Razor のコンポーネントは Windows に依存しない（`net10.0` の Raz
 
 | 案 | 内容 | メリット | デメリット |
 |---|---|---|---|
-| **A（推奨）** | 3 段にする。① **bUnit**（2.13.3、MIT。xUnit v3 で使う）で、コンポーネントの描画とイベント（見出しを押す・チェック・入力・変換の開始と終了・ダブルクリック）を確かめる。`TTDeployTool.sln` に入れ、今の `build` ジョブ（と Linux）で動く。行・分岐 100% をここで取る。② **Playwright**（`Microsoft.Playwright` 1.64.1、MIT）で、同じコンポーネントをテスト用の小さな ASP.NET Core のホスト（Blazor Server。モックのデータ）に載せ、Chromium で実際のマウス・キーボード・ドラッグ・変換中の入力（CDP）・CSS の効き（6 行で切れる・右端の列の幅）を確かめる。Linux の CI で動く。③ Windows のランナーで、WPF のホストを `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=<port>` で起動し、Playwright の `ConnectOverCDPAsync` で WebView2 につなぐ少数のテスト（起動・表が出る・WAM のハンドルが取れる、出典 5・7） | 画面の判断の多くが bUnit で速く確かめられる（今は FlaUI の UI テストでしか確かめられない部分）。② は本物のブラウザーのエンジン（WebView2 と同じ Chromium 系）で、FlaUI より速く安定した操作ができる。③ で WebView2 の中でも同じに動くことを確かめる | テストの段が 3 つになる。② は Edge の WebView2 そのものではない（③ で補う）。WebView2 の CDP の接続は、Playwright の文書の例が Node.js で、.NET の手順は自分で書く |
+| **A（推奨）** | 3 段にする。① **bUnit**（2.13.3、MIT。xUnit v3 で使う）で、コンポーネントの描画とイベント（見出しを押す・チェック・入力・変換の開始と終了・ダブルクリック）を確かめる。`TTDeployTool.sln` に入れ、今の `build` ジョブ（と Linux）で動く。行・分岐 100% をここで取る。② **Playwright**（`Microsoft.Playwright`。MIT。リポジトリの System Test と同じ 1.56.0 を使う。最新は 1.64.1）で、同じコンポーネントをテスト用の小さな ASP.NET Core のホスト（Blazor Server。モックのデータ）に載せ、Chromium で実際のマウス・キーボード・ドラッグ・変換中の入力（CDP）・CSS の効き（6 行で切れる・右端の列の幅）を確かめる。Linux の CI で動く。③ Windows のランナーで、WPF のホストを `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=<port>` で起動し、Playwright の `ConnectOverCDPAsync` で WebView2 につなぐ少数のテスト（起動・表が出る・WAM のハンドルが取れる、出典 5・7） | 画面の判断の多くが bUnit で速く確かめられる（今は FlaUI の UI テストでしか確かめられない部分）。② は本物のブラウザーのエンジン（WebView2 と同じ Chromium 系）で、FlaUI より速く安定した操作ができる。③ で WebView2 の中でも同じに動くことを確かめる | テストの段が 3 つになる。② は Edge の WebView2 そのものではない（③ で補う）。WebView2 の CDP の接続は、Playwright の文書の例が Node.js で、.NET の手順は自分で書く |
 | B | ① bUnit と、今と同じ FlaUI の UI テスト（WebView2 の中身は UI Automation の木に出る） | 今の UI テストの作りと道具を引き継げる | FlaUI からの DOM の操作は、UI Automation の木を通すため遅く、ドラッグ・変換中の入力の合成は今と同じく難しい |
 | C | ① bUnit だけ | 最も簡単 | CSS（幅・6 行・ツールチップ）・ドラッグ・本物の入力を確かめられない |
 
@@ -147,11 +147,33 @@ CI（`ci.yml`）には、試作用のジョブ `blazor-prototype`（ubuntu: ② 
 10. Microsoft Learn「Quickstart: Send and Handle App Notifications」（マニフェストの `toastNotificationActivation`・`comServer`）https://learn.microsoft.com/windows/apps/develop/notifications/app-notifications/app-notifications-quickstart
 11. Microsoft Learn「Use browser developer tools with ASP.NET Core Blazor Hybrid」（`AddBlazorWebViewDeveloperTools`、Ctrl+Shift+I）https://learn.microsoft.com/aspnet/core/blazor/hybrid/developer-tools
 
-## 12. 決定事項
+## 12. 決定事項（オーナーの回答、2026-10-30）
 | No. | 論点 | 決定 |
 |---|---|---|
-| Q1 | ホスト（3 章） | 未定（推奨: A、WPF の BlazorWebView） |
-| Q2 | 表の部品（4 章） | 未定（推奨: A、自作の HTML の表） |
-| Q3 | Core の ViewModel との結び方（5 章） | 未定（推奨: A、薄い基底のコンポーネント） |
-| Q4 | テストの方法（6 章） | 未定（推奨: A、bUnit・Playwright〔テスト用のホスト〕・WebView2 への CDP の接続） |
-| Q5 | 試作のプロジェクトの構成と CI（7 章） | 未定（推奨: 7 章の案） |
+| Q1 | ホスト（3 章） | **A: WPF の BlazorWebView**（推奨どおり） |
+| Q2 | 表の部品（4 章） | **A: 自作の HTML の表**（推奨どおり） |
+| Q3 | Core の ViewModel との結び方（5 章） | **A: 薄い基底のコンポーネント**（推奨どおり） |
+| Q4 | テストの方法（6 章） | **A: bUnit・Playwright〔テスト用のホスト〕・WebView2 への CDP の接続**（推奨どおり） |
+| Q5 | 試作のプロジェクトの構成と CI（7 章） | **7 章の案**（推奨どおり） |
+
+## 13. 試作の作り（2026-10-30）
+| プロジェクト | 中身 |
+|---|---|
+| `src/TTDeployTool.Controller.Desktop.Blazor`（`net10.0`。`TTDeployTool.sln`） | `Watcher`・`ViewModelComponent`（Q3）。表: `DataTable<TRow, TItem>`（見出しのボタン・▽・つまみ・ドラッグ・チェックボックス・右クリックのメニュー・Ctrl+C）・`FilterPopup`（▽ の値と件数・探す・並べ替え）・`FilterBar`・`TextFilterBox`・`Pager`。決まり: `HtmlTableRules`（3 回で既定の順・列の移動と幅・右端の列の幅・左上のチェックボックスの状態）。画面: `DeploymentsPage`・`JobsPage`・`PrototypeApp`。`PrototypeSession`（Fixtures のモックで `MainViewModel` を組み立て、サインインして一覧を読む）。JavaScript は `wwwroot/table.js`（約 70 行: つまみのドラッグ・Alt+矢印・6 行で切れたときのツールチップ・変換の始まりと終わり・入力欄への書き戻し）、見た目は `wwwroot/app.css`（Windows 11 の色と文字に寄せる。ダークモード対応） |
+| `src/TTDeployTool.Controller.Desktop.Blazor.Wpf`（Windows） | 窓・BlazorWebView・通知領域（`H.NotifyIcon.Wpf`）・WPF のクリップボード。WinUI 3 のアプリの `WamSignInService`・`AppNotificationService`・`StartupTaskService`・`DpapiSecretProtector` を**ファイルを変えずにリンクして**ビルドする。`--check <ファイル>`（MSIX ではアプリのデータの `check-request`）で、Windows との連携を確かめて JSON に書く（`IntegrationCheck`。トークンは取らない） |
+| `src/TTDeployTool.Controller.Desktop.Blazor.Package` | .wapproj と、試作用のマニフェスト（名前 `TTDeployTool.BlazorPrototype`。通知の起動とサインイン時の起動は本番と同じ登録） |
+| `tests/TTDeployTool.Controller.Desktop.Blazor.Tests`（`TTDeployTool.sln`） | bUnit（2.13.3）のテスト 31 件。対象のプロジェクトの行・分岐とも 100%（coverlet。CI の `blazor-prototype` ジョブで、100% でなければ失敗にする） |
+| `tests/TTDeployTool.Controller.Desktop.Blazor.TestHost` | テスト用のホスト（Blazor Server。プリレンダーしない。コピーした文字を `/test/clipboard` で返す） |
+| `tests/TTDeployTool.Controller.Desktop.Blazor.BrowserTests` | ② `BrowserHostTests` 11 件（Linux の Chromium）・③ `WebView2Tests` 1 件（Windows。WPF のホストに CDP でつなぐ） |
+| CI（`ci.yml`） | `blazor-prototype`（ubuntu: 網羅率・②）と `blazor-prototype-windows`（windows: WPF のビルド・連携の確認〔パッケージにしない・MSIX〕・③・.wapproj の MSIX の作成と導入・起動時間とメモリ〔`.github/scripts/measure-desktop-app.ps1`。WinUI 3 のアプリのモックのビルドと同じ手順〕）。既存のジョブは変えない |
+
+### 13.1 作って分かったこと
+| 項目 | 内容 |
+|---|---|
+| 日本語の変換中の入力 | 入力欄を Blazor の値の結び付け（`value="@text"` と `@oninput`）にすると、打つたびに描き直しで入力欄に値を入れ直すため、変換が切れるおそれがある。試作では値を結び付けず（最初の値だけ）、Core の文字が外から変わったとき（「絞り込みをすべて外す」）だけ JavaScript で入れる。変換の始まりと終わりは `compositionstart`/`compositionend` を JavaScript で受け、Core の `TextFilterInput` に渡す（WinUI の画面と同じ決まり）。Playwright で、CDP の `Input.imeSetComposition`（変換中）・`Input.insertText`（確定）で確かめた（変換中は 1.2 秒待っても絞り込まず、文字とフォーカスはそのまま。確定の 0.4 秒後に絞り込み、続けて打てる） |
+| Alt+← | WebView（Chromium）では「戻る」に当たるため、見出しの Alt+矢印は JavaScript で止める（`preventDefault`） |
+| つまみ | 見出しの右端からはみ出すと、隣の見出し（`position: sticky` の重なり）の下に隠れてつかめなかった（Playwright で分かった）。見出しの内側に置いた |
+| 右端の列 | 幅を指定しない列に残りを配る HTML の表の決まり（`table-layout: fixed`）で、「右端の列が残りの幅いっぱい・最小の幅は初期の幅」が CSS だけでできる。右端の列を動かしたら、新しい右端の列が伸び、動かした列は最小の幅になる（WinUI の余白の列・`CellsHorizontalOffset` の扱いが要らない） |
+| 見出し | すべてボタン（並べ替えない列は Tab で届く文字）で、`aria-sort` を持つ。Tab で見出しと ▽ に届き、Enter で並べ替え・▽ を開ける（WinUI.TableView では届かなかった） |
+| JavaScript からの呼び出し | つまみ・Alt+矢印は `[JSInvokable]` の .NET のメソッドを呼ぶだけで、判断は .NET 側（bUnit で確かめる）。JavaScript の行は網羅率の対象にしていない（Playwright で操作として確かめる） |
+| 決まりの場所 | 並べ替え・絞り込み・ページ・列の配置の保存・コピーの文字は、すべて今の Core のまま使えた（Core は 1 行も変えていない）。足した決まりは `HtmlTableRules`（3 回で既定の順・列の移動など）だけ |
