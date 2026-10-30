@@ -261,32 +261,80 @@ public sealed class AppSession : IDisposable
     }
 
     /// <summary>
-    /// マウスで <paramref name="from"/> から <paramref name="to"/> までドラッグする（少しずつ動かす。表の部品は、動かした量でドラッグを始めるため）。
-    /// <paramref name="during"/> は、離す前に呼ぶ（ドラッグの途中の画面を撮るなど）。
+    /// マウスで <paramref name="from"/> から <paramref name="to"/> までドラッグする。カーソルの位置を置き換える移動（SetCursorPos）は、ボタンを押したままの
+    /// 移動として表の部品に届かなかった（CI の UI テスト、run 41075835148）ため、移動も Windows の入力（SendInput）で送る。少し手前から境目に近づけて
+    /// 止め（表の部品は、境目に入ったときにつかめる形〔カーソル〕にする）、押してから少しずつ動かす。<paramref name="during"/> は、離す前に呼ぶ。
     /// </summary>
     public static void Drag(System.Drawing.Point from, System.Drawing.Point to, Action? during = null)
     {
-        // 少し手前から近づけ、境目の上で止める（表の部品は、マウスが境目に入ったときにつかめる形〔カーソル〕にする）
-        FlaUI.Core.Input.Mouse.Position = new System.Drawing.Point(from.X - 10, from.Y);
-        Thread.Sleep(200);
         for (var x = from.X - 10; x <= from.X; x++)
         {
-            FlaUI.Core.Input.Mouse.Position = new System.Drawing.Point(x, from.Y);
+            SendMouse(new System.Drawing.Point(x, from.Y), MouseMove);
             Thread.Sleep(20);
         }
         Thread.Sleep(300);
-        FlaUI.Core.Input.Mouse.Down(FlaUI.Core.Input.MouseButton.Left);
+        SendMouse(from, MouseLeftDown);
         Thread.Sleep(300);
         for (var i = 1; i <= 30; i++)
         {
-            FlaUI.Core.Input.Mouse.Position = new System.Drawing.Point(from.X + (to.X - from.X) * i / 30, from.Y + (to.Y - from.Y) * i / 30);
+            SendMouse(new System.Drawing.Point(from.X + (to.X - from.X) * i / 30, from.Y + (to.Y - from.Y) * i / 30), MouseMove);
             Thread.Sleep(30);
         }
         Thread.Sleep(300);
         during?.Invoke();
-        FlaUI.Core.Input.Mouse.Up(FlaUI.Core.Input.MouseButton.Left);
+        SendMouse(to, MouseLeftUp);
         Thread.Sleep(500);
     }
+
+    private const uint MouseMove = 0x0001;
+    private const uint MouseLeftDown = 0x0002;
+    private const uint MouseLeftUp = 0x0004;
+    private const uint MouseAbsolute = 0x8000;
+    private const uint MouseVirtualDesk = 0x4000;
+
+    // 画面の点（ピクセル）へ、絶対の位置（0〜65535）の移動とボタンを送る
+    private static void SendMouse(System.Drawing.Point point, uint flags)
+    {
+        var left = GetSystemMetrics(76);
+        var top = GetSystemMetrics(77);
+        var width = Math.Max(1, GetSystemMetrics(78) - 1);
+        var height = Math.Max(1, GetSystemMetrics(79) - 1);
+        var input = new Input
+        {
+            Type = 0,
+            Mouse = new MouseInput
+            {
+                X = (point.X - left) * 65535 / width,
+                Y = (point.Y - top) * 65535 / height,
+                Flags = flags | MouseMove | MouseAbsolute | MouseVirtualDesk,
+            },
+        };
+        SendInput(1, [input], System.Runtime.InteropServices.Marshal.SizeOf<Input>());
+    }
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct MouseInput
+    {
+        public int X;
+        public int Y;
+        public uint MouseData;
+        public uint Flags;
+        public uint Time;
+        public IntPtr ExtraInfo;
+    }
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct Input
+    {
+        public uint Type;
+        public MouseInput Mouse;
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+    private static extern uint SendInput(uint count, Input[] inputs, int size);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern int GetSystemMetrics(int index);
 
     /// <summary>キーボードで、修飾キーと一緒にキーを押す（Ctrl+C など）。</summary>
     public static void Press(params FlaUI.Core.WindowsAPI.VirtualKeyShort[] keys)
