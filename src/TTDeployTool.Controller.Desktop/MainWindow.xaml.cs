@@ -50,6 +50,7 @@ public sealed partial class MainWindow : Window
         var jobs = viewModel.JobList;
         _jobsTable = new TableBinder<JobViewModel>(JobsList, jobs.Filters, viewModel.JobsLayout, jobs, row => row as JobViewModel, JobListViewModel.CanSortBy,
             () => jobs.SortColumn, () => jobs.SortDescending, jobs.SortBy, jobs.ClearSort);
+        JobsList.CellDoubleTapped += OnJobCellDoubleTapped;
         _deploymentsTable.BindText(DeploymentsText);
         _jobsTable.BindText(JobsText);
         CreateTray();
@@ -127,9 +128,11 @@ public sealed partial class MainWindow : Window
             _ = ViewModel.OpenJobAsync(job);
     }
 
-    private void OnJobDoubleTapped(object sender, Microsoft.UI.Xaml.Input.DoubleTappedRoutedEventArgs e)
+    // 行のダブルクリックで、そのジョブの実行状況の画面を開く。表のセルは、読み取り専用の表ではダブルクリックを処理済みにして外に伝えないため
+    // （TableViewCell.OnDoubleTapped）、表の CellDoubleTapped で受ける（モックの UI テストで分かった。desktop-ui-tests.md の 6.3）
+    private void OnJobCellDoubleTapped(object? sender, WinUI.TableView.TableViewCellDoubleTappedEventArgs e)
     {
-        if ((e.OriginalSource as FrameworkElement)?.DataContext is JobViewModel job)
+        if (e.Item is JobViewModel job)
             _ = ViewModel.OpenJobAsync(job);
     }
 

@@ -564,7 +564,7 @@
                         <!-- 表（WinUI.TableView）: 見出しを押すと並べ替え、▽ で値を選んで絞り込み、境目のドラッグで幅、見出しのドラッグで順序。左上の角で今のページの行をすべて選ぶ -->
                         <tv:TableView x:Name="JobsList" AutomationProperties.AutomationId="Jobs.List" AutomationProperties.Name="ジョブの一覧" ItemsSource="{x:Bind ViewModel.JobList.Items}"
                                       AutoGenerateColumns="False" SelectionMode="Multiple" CornerButtonMode="SelectAll" IsReadOnly="True" CanGroupColumns="False" ShowFilterItemsCount="True"
-                                      CanReorderColumns="True" CanResizeColumns="True" MaxHeight="640" SelectionChanged="OnJobsSelectionChanged" DoubleTapped="OnJobDoubleTapped">
+                                      CanReorderColumns="True" CanResizeColumns="True" MaxHeight="640" SelectionChanged="OnJobsSelectionChanged">
                             <tv:TableView.Columns>
                                 <tv:TableViewTemplateColumn Header="種類" Tag="Kind">
                                     <tv:TableViewTemplateColumn.CellTemplate><DataTemplate x:DataType="vm:JobViewModel">

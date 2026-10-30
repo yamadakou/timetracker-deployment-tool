@@ -37,8 +37,10 @@ public class MockInputTests
     {
         OpenJobs(app);
         var kind = Header(app, "種類");
-        // 見出しの右の境目をドラッグして広げる（境目の当たり判定は見出しの上の方だけ。下の方は「…」のボタン）
-        AppSession.Drag(new Point(kind.Right - 1, kind.Y + 3), new Point(kind.Right + 60, kind.Y + 3));
+        // 境目をドラッグして広げる。「…」のボタンが見出しの高さいっぱいにあると、見出しの右の端ではつかめない（TableViewColumnHeader の
+        // IsCursorInRightResizeArea）ため、右隣の見出しの左の端でつかむ（右端の列は、右隣の余白の列の左の端でつかむ）
+        var next = Header(app, "サブスクリプション");
+        AppSession.Drag(new Point(next.X + 2, next.Y + next.Height / 2), new Point(next.X + 62, next.Y + next.Height / 2));
         AppSession.WaitUntil(() => Header(app, "種類").Width >= kind.Width + 40, "境目のドラッグで列が広がる");
         var widened = Header(app, "種類").Width;
         // 見出しをドラッグして、リソースグループ / アプリ名 の位置に動かす
@@ -137,6 +139,9 @@ public class MockInputTests
         // 最後の列（結果）は残りの幅いっぱいで、その右に余白の列（縦のスクロールバーの分）がある
         last.Width.Should().BeGreaterThanOrEqualTo(320, "最後の列は初期の幅（320）より狭くならない");
         (table.Right - last.Right).Should().BeInRange(8, 60, "右端の列の右に余白があり、スクロールバーにかからない");
+        // 右端の列の幅は、右隣の余白の列の左の端でつかんで変えられる（評価版 0.1.71 では変えられなかった）
+        AppSession.Drag(new Point(last.Right + 2, last.Y + last.Height / 2), new Point(last.Right - 38, last.Y + last.Height / 2));
+        AppSession.WaitUntil(() => Header(app, "結果").Width <= last.Width - 25, "右端の列の幅を変えられる");
     }, jobsLayout:
     [
         // 列を狭くし、最後の列（結果。0 = 残りの幅いっぱい）が残りの幅で広がるようにする（CI の画面は 1024 × 768）
