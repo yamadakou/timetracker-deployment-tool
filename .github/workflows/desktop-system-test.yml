@@ -89,6 +89,15 @@ jobs:
       shell: pwsh
       run: ./.github/scripts/remove-expired-deployments.ps1 -SubscriptionId $env:TT_UITEST_SUBSCRIPTION_ID
 
+    # テストの直前にサインインし直す。OIDC のサインインはトークンを更新できず、期限切れの削除に時間がかかると、アプリの Azure CLI のサインインが
+    # 「AADSTS700024: Client assertion is not within its valid time range」で失敗する（run 41090642172。削除に 12 分かかった）
+    - name: Azure login for the UI test (OIDC)
+      uses: azure/login@v3
+      with:
+        client-id: ${{ vars.AZURE_CLIENT_ID }}
+        tenant-id: ${{ vars.AZURE_TENANT_ID }}
+        subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
     - name: UI test on Azure
       run: >
         dotnet test --project tests/TTDeployTool.Controller.Desktop.UITests --
