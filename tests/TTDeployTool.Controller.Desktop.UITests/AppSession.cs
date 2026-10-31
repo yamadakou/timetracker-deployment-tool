@@ -374,6 +374,51 @@ public sealed class AppSession : IDisposable
             timeoutMessage: $"要素 {automationId} が見つかりませんでした。").Result!;
 
     /// <summary>
+    /// TimePicker（24 時間）の時刻を <paramref name="hour"/>:<paramref name="minute"/> にする（モックの UI テストだけが使う）。時刻の欄を押して開く選択の画面の
+    /// 時・分の列（LoopingSelector）で、選ばれている値から上下の矢印キーで目的の値まで回し、「✓」（AcceptButton）で閉じる。
+    /// </summary>
+    public void SetTime(string pickerId, int hour, int minute)
+    {
+        var picker = Find(pickerId);
+        var button = picker.FindFirstDescendant(cf => cf.ByControlType(ControlType.Button)) ?? picker;
+        if (button.Patterns.Invoke.TryGetPattern(out var invoke))
+            invoke.Invoke();
+        else
+            Click(new System.Drawing.Point(picker.BoundingRectangle.X + picker.BoundingRectangle.Width / 2, picker.BoundingRectangle.Bottom - 10));
+        var accept = FindAnywhere("AcceptButton");
+        Spin("HourLoopingSelector", hour, 24);
+        Spin("MinuteLoopingSelector", minute, 60);
+        accept.Patterns.Invoke.Pattern.Invoke();
+        WaitUntil(() => Window.FindFirstDescendant(cf => cf.ByAutomationId("AcceptButton")) == null, "時刻の選択の画面が閉じる");
+    }
+
+    // 時刻の選択の画面の列を、選ばれている値が target になるまで回す（count は値の数。近い向きに回す）
+    private void Spin(string selectorId, int target, int count)
+    {
+        for (var i = 0; i <= count; i++)
+        {
+            var selector = FindAnywhere(selectorId);
+            var current = SelectedValue(selector);
+            if (current == target)
+                return;
+            selector.Focus();
+            var forward = ((target - current) % count + count) % count;
+            Press(forward <= count / 2 ? FlaUI.Core.WindowsAPI.VirtualKeyShort.DOWN : FlaUI.Core.WindowsAPI.VirtualKeyShort.UP);
+        }
+        throw new InvalidOperationException($"{selectorId} を {target} にできませんでした（今の値: {SelectedValue(FindAnywhere(selectorId))}）。");
+    }
+
+    private static int SelectedValue(AutomationElement selector)
+    {
+        var selected = selector.Patterns.Selection.TryGetPattern(out var selection) ? selection.Selection.Value.FirstOrDefault() : null;
+        selected ??= selector.FindAllDescendants().FirstOrDefault(e => e.Patterns.SelectionItem.TryGetPattern(out var item) && item.IsSelected.Value);
+        var name = selected?.Properties.Name.ValueOrDefault;
+        return int.TryParse(name, out var value) ? value
+            : throw new InvalidOperationException($"{selector.Properties.AutomationId.ValueOrDefault} の選ばれている値を読めませんでした（{name ?? "なし"}。子: "
+                + string.Join(", ", selector.FindAllChildren().Take(8).Select(c => c.Properties.Name.ValueOrDefault)) + "）。");
+    }
+
+    /// <summary>
     /// 表の行の数（今のページの行）。表は見えている行の分しか行の要素を作らない（仮想化）ため、子の数ではなく Grid パターンの行の数で読む
     /// （CI の UI テスト、run 41066697432: 20 行のうち 11 行しか子に無かった）。
     /// </summary>

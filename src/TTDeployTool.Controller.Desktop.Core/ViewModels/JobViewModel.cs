@@ -59,6 +59,7 @@ public sealed class JobViewModel : ObservableObject
     private string? _startError;
     private string? _note;
     private string? _copyMessage;
+    private string? _rescheduleMessage;
     private DateTimeOffset _editDate;
     private TimeSpan _editTime;
 
@@ -84,7 +85,7 @@ public sealed class JobViewModel : ObservableObject
         CancelCommand = new AsyncCommand(() => Run(q => q.Cancel(this)), () => _queue != null && State is DesktopJobState.Scheduled or DesktopJobState.Waiting or DesktopJobState.Paused);
         PauseCommand = new AsyncCommand(() => Run(q => q.Pause(this)), () => _queue != null && State is DesktopJobState.Scheduled or DesktopJobState.Waiting);
         ResumeCommand = new AsyncCommand(() => Run(q => q.Resume(this)), () => _queue != null && State == DesktopJobState.Paused);
-        RescheduleCommand = new AsyncCommand(() => Run(q => q.Reschedule(this, EditScheduledAt)), () => _queue != null && State is DesktopJobState.Scheduled or DesktopJobState.Paused);
+        RescheduleCommand = new AsyncCommand(() => Run(q => RescheduleMessage = q.Reschedule(this, EditScheduledAt)), () => _queue != null && State is DesktopJobState.Scheduled or DesktopJobState.Paused);
         StopCommand = new AsyncCommand(() => Run(q => q.Stop(this)), () => _queue != null && State == DesktopJobState.Running);
         CopyCommand = new AsyncCommand(() =>
         {
@@ -173,6 +174,13 @@ public sealed class JobViewModel : ObservableObject
     {
         get => _copyMessage;
         private set => SetProperty(ref _copyMessage, value);
+    }
+
+    /// <summary>予定の変更の誤り（今と同じか前の時刻を断った理由。変えられたら null）。</summary>
+    public string? RescheduleMessage
+    {
+        get => _rescheduleMessage;
+        private set => SetProperty(ref _rescheduleMessage, value);
     }
 
     /// <summary>ジョブの内容（題名・状態・手順・結果・エラー・注意・ログ）の Markdown。</summary>

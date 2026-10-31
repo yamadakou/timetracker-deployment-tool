@@ -75,6 +75,8 @@
                         <DatePicker AutomationProperties.AutomationId="Job.EditDate" Header="予定の日付" Date="{x:Bind EditDate, Mode=TwoWay}" />
                         <TimePicker AutomationProperties.AutomationId="Job.EditTime" Header="時刻" ClockIdentifier="24HourClock" Time="{x:Bind EditTime, Mode=TwoWay}" />
                         <Button AutomationProperties.AutomationId="Job.Reschedule" Content="予定を変える" VerticalAlignment="Bottom" Command="{x:Bind RescheduleCommand}" />
+                        <TextBlock AutomationProperties.AutomationId="Job.RescheduleMessage" VerticalAlignment="Bottom" TextWrapping="Wrap"
+                                   Foreground="{ThemeResource SystemFillColorCriticalBrush}" Text="{x:Bind RescheduleMessage, Mode=OneWay}" />
                     </StackPanel>
                 </StackPanel>
             </DataTemplate>
