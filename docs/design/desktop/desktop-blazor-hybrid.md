@@ -2,7 +2,7 @@
 
 - 対象ブランチ: `feature/desktop-blazor-hybrid`（`feature/desktop-app` の 6123da3 から）。既存の WinUI 3 のアプリ（`src/TTDeployTool.Controller.Desktop`）とそのテスト・CI は変えず、試作は別のプロジェクトとして足す
 - 関連: [`desktop-tables.md`](desktop-tables.md)（表の仕様と、WinUI.TableView の不具合・回避策。9・10 章）・[`desktop-ui-tests.md`](desktop-ui-tests.md)（UI テスト。6.2・6.3）・[`desktop-app.md`](desktop-app.md)（サインイン・通知・MSIX）・[`desktop-app-store.md`](desktop-app-store.md)
-- 状況: 論点 Q1〜Q5 はオーナーの回答ですべて推奨どおりに決定（2026-10-30。12 章）。試作を実装し（13 章）、CI で確かめた（14 章）。比較と推奨は 10 章（移るかはオーナーの判断を待つ）
+- 状況: 論点 Q1〜Q5・Q7 はオーナーの回答で推奨どおりに決定（12 章）。試作を実装し（13 章）、CI（14 章）と、移行で機能が落ちないかを CI とオーナーの実機（15 章。通知を含めすべて OK、2026-10-31）で確かめた。比較と推奨は 10 章（移るか〔Q6〕はオーナーの判断を待つ）
 - 一次情報の確認日: 2026-10-30（出典は 11 章）
 - 記録: `docs/REVIEW_ISSUES.md` の No.79
 
@@ -133,7 +133,7 @@ CI（`ci.yml`）には、試作用のジョブ `blazor-prototype`（ubuntu: ② 
 | テストのしやすさ | 画面の側は単体テストが届かず、FlaUI の UI テスト（Windows・MSIX の導入が要る・遅い・ドラッグや変換中の入力の合成が難しい） | 画面の部品の単体テスト（bUnit 31 件、約 3 秒、Linux）で行・分岐とも 100%。ブラウザーでの本物の入力のテスト（Playwright 11 件、約 40 秒、Linux）で、ドラッグ・変換中の入力・6 行の表示・ツールチップ・右クリックまで確かめた。WebView2 の中のテスト（1 件、約 10 秒）も CDP でつながった | **移る方が良い** |
 | 起動 | 窓が出るまで 1.9〜2.5 秒 | 窓が出るまで 0.6〜0.7 秒（パッケージにしない）・0.5〜0.8 秒（MSIX）。起動から表が出るまで 3.6〜5.6 秒（WebView2 に CDP でつなぐ時間を含む） | 同等（窓は早いが、画面が出るまでは WebView2 の起動を待つ） |
 | メモリ | 1 プロセス。Working Set 156 MB・プライベート 49 MB | 7 プロセス（アプリと msedgewebview2.exe 6 つ）。Working Set 446〜465 MB・プライベート 145〜153 MB（Working Set には Edge と共有する部分を含む） | **WinUI 3 の方が少ない**（プライベートで約 100 MB 多い） |
-| Windows との連携 | 実装済み | WAM（窓のハンドル）・通知領域・DPAPI・サインイン時の起動（MSIX）は、今の実装のファイルを変えずに使えた。通知（`AppNotificationManager.IsSupported`）は、パッケージにしない・MSIX のどちらも false で、まだ確かめ切れていない（14 章） | 通知だけ要確認 |
+| Windows との連携 | 実装済み | 今のアプリが Windows に頼る機能をすべて、今の実装のファイルのまま（またはほぼそのまま）使えた（15 章）。通知は CI のランナーでは確かめられず、オーナーの実機（Windows 11）で、出す・押してウィンドウが出る・終わった後に押して起動する、まで確かめた（15.2） | **機能は落ちない** |
 | 配布 | 単一プロジェクトの MSIX・x64 と arm64 のバンドル・Store への提出の流れができている | .wapproj で MSIX にまとめ、導入して動いた（x64 だけ。124 MB。.NET と Windows App SDK を含む自己完結）。arm64・バンドル・Store への提出は作り直しと確認が要る。WebView2 Runtime（Windows 11 は OS に含まれる）が要る | WinUI 3 の方が手間が無い |
 | 移行の費用（見込み） | なし | 画面の書き直し（`MainWindow.xaml` 715 行・ウィザードなど 9 画面。表の部品は試作のものを使う）3〜5 日、ホスト・MSIX・リリースのワークフロー 2〜3 日、UI テストを Playwright に置き換え 2〜3 日。Core（ViewModel と単体テスト）はそのまま | 約 2 週間 |
 | リスク | TableView の新しい不具合。Microsoft の TableView は実験版（desktop-tables.md の 9.2） | メモリ、通知、arm64 と Store、WAM の窓が前に出るか（実機）、WebView2 の無い Windows 10 の PC | — |
@@ -142,8 +142,8 @@ CI（`ci.yml`）には、試作用のジョブ `blazor-prototype`（ubuntu: ② 
 **Blazor Hybrid（WPF のホスト）に移る**ことを勧める。理由は、今いちばん手間がかかっている表の不具合と、画面の側を自動で確かめられないことの 2 つが、どちらも作りから無くなるため（試作で、回避策 0 件・画面の部品の網羅率 100%・本物の入力のテストが Linux で動く、を確かめた）。メモリが約 100 MB 増えることは、常駐するアプリとしては受け入れられる範囲と考える（オーナーの判断）。
 
 移る前に確かめること（どれも移ると決めた後の最初の作業とする）:
-1. 通知: WPF のホストで `AppNotificationManager` が使えない理由を調べ、使えなければ WinRT の `ToastNotificationManager` に替える（MSIX ならパッケージの ID で使える）
-2. 実機: WAM のサインインの窓がアプリの前に出ること・日本語の変換中の入力・見た目（`desktop-app-check.md` と同じ確認）
+1. 通知: ✔ オーナーの実機で、今の `AppNotificationService`（Windows App SDK）のまま、出す・押してウィンドウが出る・終わった後に押して起動する、を確かめた（15.2。代わりの OS の通知の API も動いた）
+2. 実機: 日本語の変換中の入力・サインイン時の起動・2 つ目の起動は ✔（15.2）。WAM のサインインの窓がアプリの前に出ること（試作はサインインしないため未確認）と、移った後の画面の見た目は、移行の実機の確認（`desktop-app-check.md` と同じ）で確かめる
 3. 配布: .wapproj での arm64 とバンドル、Store への提出の形（`desktop-app-store.md` の流れの作り直し）
 
 WinUI 3 のまま続ける場合は、Microsoft の TableView の安定版が出たら乗り換えを検討する（desktop-tables.md の 9.2）。
@@ -221,8 +221,8 @@ WinUI 3 のまま続ける場合は、Microsoft の TableView の安定版が出
 | サインイン時の起動（登録・状態） | `StartupTaskService`（WinRT の `StartupTask`） | 同じファイル | パッケージが要る（Unavailable）／✔ 無効 → 有効 → 無効にできた |
 | 起動の種類（サインイン時の起動か） | `AppInstance.GetActivatedEventArgs().Kind` | 同じ | ✔ Launch を読めた（サインイン時の起動そのものは実機） |
 | WAM のサインイン | `WamSignInService`（窓のハンドル） | 同じファイル（`WindowInteropHelper`） | ✔／✔（トークンは取っていない。サインインの窓が前に出るかは実機） |
-| Windows の通知を出す・許可の状態 | `AppNotificationService`（Windows App SDK の `AppNotificationManager`） | 同じファイル | **確かめ切れない**（下の 15.1） |
-| 通知を押してウィンドウを出す | `NotificationInvoked`・`Register` を起動の種類を読む前に | 同じ順 | **確かめ切れない**（同上） |
+| Windows の通知を出す・許可の状態 | `AppNotificationService`（Windows App SDK の `AppNotificationManager`） | 同じファイル | CI では確かめられない（15.1）。**実機で ✔**（15.2） |
+| 通知を押してウィンドウを出す | `NotificationInvoked`・`Register` を起動の種類を読む前に | 同じ順 | CI では確かめられない。**実機で ✔**（動いているとき・終わった後とも。15.2） |
 | フォルダーの選択 | WinRT の `FolderPicker`（窓のハンドル） | WPF の `OpenFolderDialog`（.NET 8 以降） | ✔ 作れる（選ぶ操作は人） |
 | 確認のダイアログ | WinUI の `ContentDialog` | 画面（Razor）のダイアログか WPF の `MessageBox`（作るのは移行のとき） | Windows に頼らない |
 | クリップボード | WinRT の `Clipboard`（履歴に残さない） | WPF の `Clipboard`（試作）。WinRT のものも WPF から使える | ✔（WebView2 のテストの Ctrl+C） |
@@ -245,7 +245,21 @@ WinUI 3 のまま続ける場合は、Microsoft の TableView の安定版が出
 - WinUI 3 のアプリでは、同じ `AppNotificationService`（自己完結の Windows App SDK）で、オーナーの実機で通知が出て押せることを確かめている（REVIEW_ISSUES の No.61 など）
 - 実機で使えなかった場合の代わり: OS の通知の API（WinRT の `ToastNotificationManager`）は MSIX の WPF のホストで Enabled だったため、`INotificationService` をこの API で作り直せる（押したときの起動は、マニフェストの `toastNotificationActivation` と COM の受け口を自分で受ける）
 
-### 15.2 実機での確認（オーナーの判断で案 A、2026-10-30）
-試作の MSIX（CI の成果物 `ttdeploytool-blazor-prototype-msix`。その実行だけの証明書で署名し、公開鍵の `.cer` を添える）をオーナーの PC に入れ、通知領域の確認のメニュー（`ManualCheck`）で、通知を出す・押してウィンドウが出る（Windows App SDK と、代わりの OS の通知の API の両方）・サインイン時の起動を確かめる。手順と結果の見方は [`desktop-blazor-hybrid-check.md`](desktop-blazor-hybrid-check.md)。結果を待つ
+### 15.2 実機での確認（オーナーの判断で案 A。2026-10-31 に確認）
+試作の MSIX（CI の成果物 `ttdeploytool-blazor-prototype-msix`、run 41147397707。その実行だけの証明書で署名し、公開鍵の `.cer` を添えた）をオーナーの PC（Windows 11）に入れ、通知領域の確認のメニュー（`ManualCheck`）で確かめた。手順は [`desktop-blazor-hybrid-check.md`](desktop-blazor-hybrid-check.md) の 3 章。**オーナーの回答: 1〜10 すべて OK**。
+
+| # | 確かめたこと | 結果 |
+|---|---|---|
+| 1・6 | 通知の許可の状態（Windows App SDK と OS の通知の API） | ✔ |
+| 2 | 閉じると隠れて通知領域に残る | ✔ |
+| 3・4 | 今のアプリと同じ通知（Windows App SDK）が出て、押すとウィンドウが出て引数（`job=job-manual&page=status`）を受け取る | ✔ |
+| 5 | 代わりの OS の通知の API の通知が出て、押すとウィンドウが出る | ✔ |
+| 7 | アプリを終えた後に通知を押すと、アプリが起動する | ✔ |
+| 8 | サインイン時の起動を有効にし、サインインし直すと起動し、起動の種類が StartupTask。無効に戻せる | ✔ |
+| 9 | 2 つ目の起動が 1 つ目に渡る | ✔ |
+| 10 | 日本語の変換中は絞り込まず、確定の後に絞り込み、続けて打てる | ✔ |
+
+- 結論: WPF のホストでも、今の通知の実装（Windows App SDK）をそのまま使える。CI での `Unsupported` は、ランナー（Windows Server 2025）に通知の仕組みが無いためだった（15.1 の見立てどおり）。代わりの作りは要らない
+- これで、今のアプリが Windows に頼る機能のうち、移行で落ちるものは見つからなかった。残るのは、WAM のサインインの窓が前に出ること（試作はサインインしない）と、移った後の見た目で、移行の実機の確認で確かめる
 
 出典 12: Microsoft Learn「AppNotificationManager.IsSupported Method」（Windows App SDK 2.0。プッシュ通知の API が使えるか。自己完結のアプリでは Singleton パッケージへの依存に注意）https://learn.microsoft.com/windows/windows-app-sdk/api/winrt/microsoft.windows.appnotifications.appnotificationmanager.issupported（2026-10-30 に確認）
