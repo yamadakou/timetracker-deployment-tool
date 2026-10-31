@@ -85,4 +85,42 @@ public sealed class MockSystemTests
         await Assertions.Expect(page.RowWith("Jobs", "Target", "rg-mock-06 / app06").Locator("td[data-key='State']")).ToContainTextAsync("予定");
         (await page.Rows("Jobs").AllInnerTextsAsync()).Should().NotContain(t => t.Contains(newest), "消した記録は戻らない");
     }
+
+    [Fact]
+    public async Task Schedule_Times_Not_After_Now_Should_Be_Refused_On_Every_Screen()
+    {
+        // 予定の時刻を今の分にすると、どの画面でも「今より後にしてください」で断る（No.80。境界の値は Core の ScheduleBoundaryTests）。
+        // 予定の日付は今から 1 時間後の日のため、日をまたぐ時間帯（23 時台）は確かめられない
+        if (DateTime.Now.AddMinutes(70).Date != DateTime.Now.Date)
+            Assert.Skip("予定の日付の既定が明日になる時間帯のため確かめない");
+        await using var host = await WithFixtureAsync();
+        var page = host.Page;
+        await page.SignInAsync();
+        await page.LoadAsync();
+        await page.PageSizeAsync("deployments", "50");
+
+        // 削除の画面: 「予定に追加」の理由に出る
+        await page.OpenDeletionAsync("app03");
+        await page.SetNowAsync("Delete.ScheduleTime");
+        await Assertions.Expect(page.Id("Delete.Blocked")).ToHaveTextAsync(new System.Text.RegularExpressions.Regex("は、今より後にしてください。$"));
+
+        // 予定を入れたジョブ（1 時間後）を、ジョブの一覧で選んで今の時刻に変えようとすると断る。
+        // 削除の画面の予定の時刻は、別のデプロイを開いても前の値（今の時刻）が残るため、1 時間後に入れ直す
+        await page.OpenDeletionAsync("app06");
+        await page.Id("Delete.ScheduleTime").FillAsync(DateTime.Now.AddHours(1).ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture));
+        await page.ClickIdAsync("Delete.Schedule");
+        await Assertions.Expect(page.Id("Panel.Jobs")).ToBeVisibleAsync();
+        await page.RowWith("Jobs", "Target", "rg-mock-06 / app06").ClickAsync();
+        await page.SetNowAsync("Jobs.ScheduleTime");
+        await page.ClickIdAsync("Jobs.RescheduleSelected");
+        await Assertions.Expect(page.Id("Jobs.Message")).ToHaveTextAsync(new System.Text.RegularExpressions.Regex("は、今より後にしてください。$"));
+
+        // 実行状況の画面のジョブ 1 件の「予定を変える」も断り、予定のまま残す
+        await page.ClickIdAsync("Jobs.Detail");
+        await Assertions.Expect(page.Id("Panel.Status")).ToBeVisibleAsync();
+        await page.SetNowAsync("Job.EditTime");
+        await page.ClickIdAsync("Job.Reschedule");
+        await Assertions.Expect(page.Id("Job.RescheduleMessage")).ToHaveTextAsync(new System.Text.RegularExpressions.Regex("は、今より後にしてください。$"));
+        (await page.Id("Job.Status").TextContentAsync()).Should().StartWith("予定", "すぐ実行にしない");
+    }
 }

@@ -77,14 +77,7 @@ internal static class Ui
     /// <summary>デプロイの一覧の行から削除の画面を開き、今すぐ削除するか、予定に追加する（予定は既定の 1 時間後。WinUI の MockUiTests.Delete）。</summary>
     public static async Task DeleteAsync(this IPage page, string appName, bool schedule)
     {
-        await page.ShowAsync("Deployments");
-        if (await page.Id("Deployments.ClearSelection").IsEnabledAsync())
-            await page.ClickIdAsync("Deployments.ClearSelection");
-        await page.RowWith("Deployments", "AppName", appName).ClickAsync();
-        await page.ClickIdAsync("Deployments.Delete");
-        await Assertions.Expect(page.Id("Panel.Delete")).ToBeVisibleAsync();
-        await Assertions.Expect(page.Id("Delete.ConfirmAppName")).ToBeVisibleAsync();
-        await page.Id("Delete.ConfirmAppName").FillAsync(appName);
+        await page.OpenDeletionAsync(appName);
         if (schedule)
         {
             await page.ClickIdAsync("Delete.Schedule");
@@ -96,6 +89,23 @@ internal static class Ui
             await Assertions.Expect(page.Id("Panel.Status")).ToBeVisibleAsync();
         }
     }
+
+    /// <summary>デプロイの一覧の行から削除の画面を開き、計画を作ってアプリ名を入れる（「今すぐ削除」「予定に追加」が押せる状態。WinUI の MockUiTests.OpenDeletion）。</summary>
+    public static async Task OpenDeletionAsync(this IPage page, string appName)
+    {
+        await page.ShowAsync("Deployments");
+        if (await page.Id("Deployments.ClearSelection").IsEnabledAsync())
+            await page.ClickIdAsync("Deployments.ClearSelection");
+        await page.RowWith("Deployments", "AppName", appName).ClickAsync();
+        await page.ClickIdAsync("Deployments.Delete");
+        await Assertions.Expect(page.Id("Panel.Delete")).ToBeVisibleAsync();
+        await Assertions.Expect(page.Id("Delete.ConfirmAppName")).ToBeVisibleAsync();
+        await page.Id("Delete.ConfirmAppName").FillAsync(appName);
+    }
+
+    /// <summary>時刻の欄に、今の時刻（時と分）を入れる（WinUI の AppSession.SetTime）。</summary>
+    public static Task SetNowAsync(this IPage page, string id) =>
+        page.Id(id).FillAsync(DateTime.Now.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture));
 
     /// <summary>条件が満たされるまで待つ（WinUI の AppSession.WaitUntil）。</summary>
     public static async Task WaitUntilAsync(Func<Task<bool>> condition, string because, TimeSpan? timeout = null)

@@ -323,10 +323,10 @@ WinUI 3 版の UI テストとの対応（名前は同じ。中身の違い）:
   - Core の `ScheduleBoundaryTests`（22 件）: `ScheduleInput`、日をまたぐ場合、ジョブの一覧の「選んだジョブの予定を変える」、デプロイの「予定に追加」（押す前の理由の表示と、押しても登録しないこと）
   - bUnit の `ScheduleBoundaryScreenTests`（10 件）: ジョブの一覧と削除の画面の欄から、ブラウザーと同じ秒の付いた値で入れる（bUnit は 67 件、行・分岐とも 100%）
 - 見つかった食い違いと対応（オーナーの判断で案 A。2026-10-31）: 実行状況の画面のジョブ 1 件の「予定を変える」（`JobViewModel.RescheduleCommand`）は、今より前の時刻も受け付け、予定はすぐ実行になっていた（ジョブの一覧のまとめての変更や「予定に追加」と違う）。他と同じく断るようにした
-  - Core: 今以前の判断と文を `ScheduleTime.PastError` に 1 つにし、`ScheduleInput.Error` とジョブ 1 件の変更で使う。断ったら予定は変えず（一時停止のままも変えない）、理由を `JobViewModel.RescheduleError` に出す。正しい時刻で変えると消える
-  - 画面: Blazor 版はジョブの表示（`JobView`）の「予定を変える」の下に理由を出す（`Job.RescheduleError`）
-  - テスト: Core の `ScheduleBoundaryTests` に、ジョブ 1 件の変更の境界（7 件）と、一時停止のジョブで昨日の日付を断ってから変えられること（1 件）を足した（30 件）。bUnit の `ScheduleBoundaryScreenTests` に、ジョブの表示の境界（5 件）を足した（15 件。bUnit は 72 件、行・分岐とも 100%）
-  - WinUI 3 版: Core は同じため、このブランチの WinUI 3 のアプリも断るようになるが、理由の表示（XAML）はこのブランチでは変えない（WinUI 3 のアプリは変えない決まり）。WinUI 3 版のセッションに、同じ変更と理由の表示を依頼した
+  - Core は WinUI 3 版（`feature/desktop-app` のコミット 7028972、No.80）に揃えた（オーナーの判断で案 A。WinUI 3 版のセッションと行き違いで別の形に直していたため、元のブランチの形にした）: 今以前の判断と文は `ScheduleInput.ErrorOf`、`JobQueue.Reschedule` が断って理由を返し（変えたら null。予定・状態・変更日時を変えない）、理由は `JobViewModel.RescheduleMessage`。Core とそのテストは `feature/desktop-app` と同じ（違うのは Blazor 版で足した `FixtureApp.cs` だけ）
+  - 画面: Blazor 版はジョブの表示（`JobView`）の「予定を変える」の下に理由を出す（`Job.RescheduleMessage`。WinUI 3 版の AutomationId と同じ）
+  - テスト: Core の `ScheduleBoundaryTests` は WinUI 3 版のもの（ジョブ 1 件の変更の境界・削除とまとめての削除の理由の表示を含む）。bUnit の `ScheduleBoundaryScreenTests` にジョブの表示の境界（5 件）を足した（15 件。bUnit は 72 件、行・分岐とも 100%）。Playwright の `MockSystemTests` に、WinUI 3 版に足された「どの画面でも今の時刻を断る」を移した（削除の画面・ジョブの一覧・実行状況の画面）
+  - 注意: 削除の画面の予定の時刻は Core に 1 つだけあり、別のデプロイの削除を開いても前の値が残る（今までの動き）。そのため、上のテストは、別のデプロイを予定に追加する前に時刻を入れ直す（WinUI 3 版の同じテストはこのために CI で失敗しており〔run 41213571067〕、WinUI 3 版のセッションに伝えた）
 
 ### 16.5 残り
 - Q6（移るか）はオーナーの判断待ち。移ると決めたら、リリース（`release.yml`）・評価版（Desktop Preview）を WPF のホストの MSIX に替え、パッケージの名前（今は `TTDeployTool.BlazorPrototype`）とアプリのデータのフォルダーを本番のものにし、`AzureUiTests` を WebView2 への CDP のテストに置き換える

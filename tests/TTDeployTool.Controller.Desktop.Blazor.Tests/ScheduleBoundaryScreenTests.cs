@@ -120,12 +120,12 @@ public sealed class ScheduleBoundaryScreenTests
         if (accepted)
         {
             job.ScheduledAt.Should().Be(TestApp.Now.AddMinutes(minutes));
-            view.FindAll("[data-id='Job.RescheduleError']").Should().BeEmpty();
+            view.FindAll("[data-id='Job.RescheduleMessage']").Should().BeEmpty();
         }
         else
         {
             job.ScheduledAt.Should().Be(before, "予定は変えない");
-            view.Find("[data-id='Job.RescheduleError']").TextContent.Should().EndWith("は、今より後にしてください。");
+            view.Find("[data-id='Job.RescheduleMessage']").TextContent.Should().EndWith("は、今より後にしてください。");
         }
     }
 }
