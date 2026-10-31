@@ -96,4 +96,36 @@ public sealed class ScheduleBoundaryScreenTests
             app.ViewModel.Jobs.Should().OnlyContain(j => j.IsRecord, "登録しない");
         }
     }
+
+    [Theory]
+    [MemberData(nameof(Boundaries))]
+    public async Task Rescheduling_One_Job_Should_Accept_Only_Times_After_Now(int nowSeconds, int minutes, bool accepted)
+    {
+        using var app = await SignedInAsync(nowSeconds);
+        var list = app.ViewModel.Deployments;
+        list.SetSelection([list.Rows.First(r => r.AppName == "app00")]);
+        await list.DeleteSelectedCommand.ExecuteAsync();
+        await app.ViewModel.Deletion.PlanCommand.ExecuteAsync();
+        app.ViewModel.Deletion.ConfirmAppName = "app00";
+        await app.ViewModel.Deletion.ScheduleCommand.ExecuteAsync();
+        var job = app.ViewModel.Jobs.Single(j => !j.IsRecord);
+        var before = job.ScheduledAt;
+
+        // 実行状況の画面のジョブの表示（JobView）
+        var view = app.Context.Render<Components.JobView>(p => p.Add(x => x.Job, job));
+        view.Find("[data-id='Job.EditDate']").Change(Day(app));
+        view.Find("[data-id='Job.EditTime']").Change(TimeText(minutes));
+        view.Find("[data-id='Job.Reschedule']").Click();
+
+        if (accepted)
+        {
+            job.ScheduledAt.Should().Be(TestApp.Now.AddMinutes(minutes));
+            view.FindAll("[data-id='Job.RescheduleError']").Should().BeEmpty();
+        }
+        else
+        {
+            job.ScheduledAt.Should().Be(before, "予定は変えない");
+            view.Find("[data-id='Job.RescheduleError']").TextContent.Should().EndWith("は、今より後にしてください。");
+        }
+    }
 }

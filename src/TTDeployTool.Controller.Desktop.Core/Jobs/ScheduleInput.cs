@@ -32,5 +32,5 @@ public sealed class ScheduleInput : ObservableObject
     public DateTimeOffset At => ScheduleTime.Combine(Date, TimeOfDay);
 
     /// <summary>予定の時刻の誤り（今より前なら、その旨）。誤りが無ければ null。</summary>
-    public string? Error => At <= _time.GetUtcNow() ? $"予定の時刻（{At.ToLocalTime():MM/dd HH:mm}）は、今より後にしてください。" : null;
+    public string? Error => ScheduleTime.PastError(At, _time.GetUtcNow());
 }

@@ -322,7 +322,11 @@ WinUI 3 版の UI テストとの対応（名前は同じ。中身の違い）:
 - 境界値の単体テスト（オーナーの依頼）: 予定の時刻は分まで（秒は 0）で、今より後だけを受け付ける。今の 1 分前・今と同じ分・1 分後を、今が分の始め・途中・終わりの場合で、時刻を止めて確かめる
   - Core の `ScheduleBoundaryTests`（22 件）: `ScheduleInput`、日をまたぐ場合、ジョブの一覧の「選んだジョブの予定を変える」、デプロイの「予定に追加」（押す前の理由の表示と、押しても登録しないこと）
   - bUnit の `ScheduleBoundaryScreenTests`（10 件）: ジョブの一覧と削除の画面の欄から、ブラウザーと同じ秒の付いた値で入れる（bUnit は 67 件、行・分岐とも 100%）
-- 見つかった食い違い（未対応。オーナーの判断待ち）: 実行状況の画面のジョブ 1 件の「予定を変える」（`JobViewModel.RescheduleCommand` → `JobQueue.Reschedule`）は、今より前の時刻も受け付ける（予定はすぐ実行になる）。ジョブの一覧のまとめての変更や「予定に追加」と違う。Core の動きのため、WinUI 3 版も同じ
+- 見つかった食い違いと対応（オーナーの判断で案 A。2026-10-31）: 実行状況の画面のジョブ 1 件の「予定を変える」（`JobViewModel.RescheduleCommand`）は、今より前の時刻も受け付け、予定はすぐ実行になっていた（ジョブの一覧のまとめての変更や「予定に追加」と違う）。他と同じく断るようにした
+  - Core: 今以前の判断と文を `ScheduleTime.PastError` に 1 つにし、`ScheduleInput.Error` とジョブ 1 件の変更で使う。断ったら予定は変えず（一時停止のままも変えない）、理由を `JobViewModel.RescheduleError` に出す。正しい時刻で変えると消える
+  - 画面: Blazor 版はジョブの表示（`JobView`）の「予定を変える」の下に理由を出す（`Job.RescheduleError`）
+  - テスト: Core の `ScheduleBoundaryTests` に、ジョブ 1 件の変更の境界（7 件）と、一時停止のジョブで昨日の日付を断ってから変えられること（1 件）を足した（30 件）。bUnit の `ScheduleBoundaryScreenTests` に、ジョブの表示の境界（5 件）を足した（15 件。bUnit は 72 件、行・分岐とも 100%）
+  - WinUI 3 版: Core は同じため、このブランチの WinUI 3 のアプリも断るようになるが、理由の表示（XAML）はこのブランチでは変えない（WinUI 3 のアプリは変えない決まり）。WinUI 3 版のセッションに、同じ変更と理由の表示を依頼した
 
 ### 16.5 残り
 - Q6（移るか）はオーナーの判断待ち。移ると決めたら、リリース（`release.yml`）・評価版（Desktop Preview）を WPF のホストの MSIX に替え、パッケージの名前（今は `TTDeployTool.BlazorPrototype`）とアプリのデータのフォルダーを本番のものにし、`AzureUiTests` を WebView2 への CDP のテストに置き換える

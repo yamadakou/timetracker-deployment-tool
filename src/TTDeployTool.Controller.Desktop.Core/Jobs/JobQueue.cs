@@ -200,6 +200,9 @@ public sealed class JobQueue : ObservableObject, IDisposable
         Change(job, job.ScheduledAt is { } at && at > _time.GetUtcNow() ? DesktopJobState.Scheduled : DesktopJobState.Waiting, job.ScheduledAt, "再開しました");
 
     // 一時停止中なら一時停止のまま、時刻だけを変える
+    /// <summary>今の時刻（ジョブ 1 件の予定の変更で、今より後かを確かめる）。</summary>
+    internal DateTimeOffset Now => _time.GetUtcNow();
+
     internal void Reschedule(JobViewModel job, DateTimeOffset scheduledAt)
     {
         job.ChangedAt = _time.GetUtcNow();

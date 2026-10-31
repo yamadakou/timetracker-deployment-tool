@@ -115,4 +115,51 @@ public sealed class ScheduleBoundaryTests
             h.Main.Queue.HasActive.Should().BeFalse();
         }
     }
+
+    [Theory]
+    [MemberData(nameof(Boundaries))]
+    public async Task Rescheduling_One_Job_Should_Change_It_Only_After_Now(int nowSeconds, int minutes, bool accepted)
+    {
+        // 実行状況の画面のジョブ 1 件の「予定を変える」も、ジョブの一覧・予定に追加と同じ決まり（オーナーの判断で案 A。2026-10-31）
+        var time = new FakeTimeProvider(Minute.AddSeconds(nowSeconds));
+        var h = await new Harness(time: time).ReadyAsync();
+        var job = h.Main.Queue.Register(JobKind.Delete, new JobTarget("sub", "rg", "demo"), Minute.AddHours(1), () => new TaskCompletionSource<Job>().Task);
+        job.EditDate = Minute;
+        job.EditTime = Minute.TimeOfDay + TimeSpan.FromMinutes(minutes);
+
+        await job.RescheduleCommand.ExecuteAsync();
+
+        if (accepted)
+        {
+            job.ScheduledAt.Should().Be(Minute.AddMinutes(minutes));
+            job.RescheduleError.Should().BeNull();
+        }
+        else
+        {
+            job.ScheduledAt.Should().Be(Minute.AddHours(1), "予定は変えない（すぐ実行にもしない）");
+            job.State.Should().Be(DesktopJobState.Scheduled);
+            job.RescheduleError.Should().Be($"予定の時刻（{Minute.AddMinutes(minutes).ToLocalTime():MM/dd HH:mm}）は、今より後にしてください。");
+        }
+    }
+
+    [Fact]
+    public async Task A_Paused_Job_Should_Refuse_The_Past_And_Clear_The_Reason_After_A_Good_Time()
+    {
+        var time = new FakeTimeProvider(Minute);
+        var h = await new Harness(time: time).ReadyAsync();
+        var job = h.Main.Queue.Register(JobKind.Delete, new JobTarget("sub", "rg", "demo"), Minute.AddHours(1), () => new TaskCompletionSource<Job>().Task);
+        await job.PauseCommand.ExecuteAsync();
+        job.EditDate = Minute.AddDays(-1);
+        job.EditTime = Minute.TimeOfDay + TimeSpan.FromHours(2);
+
+        await job.RescheduleCommand.ExecuteAsync();
+        job.RescheduleError.Should().NotBeNull("時刻が今より後でも、日付が昨日なら今より前");
+        job.State.Should().Be(DesktopJobState.Paused);
+
+        job.EditDate = Minute;
+        await job.RescheduleCommand.ExecuteAsync();
+        job.RescheduleError.Should().BeNull();
+        job.ScheduledAt.Should().Be(Minute.AddHours(2));
+        job.State.Should().Be(DesktopJobState.Paused, "一時停止のまま");
+    }
 }
