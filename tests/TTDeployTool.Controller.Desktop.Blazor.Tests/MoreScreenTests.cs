@@ -55,7 +55,7 @@ public sealed class MoreScreenTests
         page.WaitForAssertion(() => app.Dialogs.Pending.Should().NotBeNull());
         await page.InvokeAsync(() => app.Dialogs.Answer(true));
         for (var i = 0; i < 100 && (list.BatchBusy.IsBusy || list.BatchMessage == null); i++)
-            await Task.Delay(50);
+            await Task.Delay(50, Xunit.TestContext.Current.CancellationToken);
         app.Dialogs.Pending.Should().BeNull();
         list.BatchMessage.Should().NotBeNull();
     }

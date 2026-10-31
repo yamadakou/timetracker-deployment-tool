@@ -1,8 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
-    Blazor Hybrid の試作の画面を、ブラウザーで本物の入力（マウス・キーボード・ドラッグ・日本語の変換）で確かめるテスト（Playwright。docs/design/desktop/desktop-blazor-hybrid.md の 6、Q4 の A）。
+    Blazor Hybrid 版の画面を、ブラウザーで本物の入力（マウス・キーボード・ドラッグ・日本語の変換）で確かめるテスト（Playwright。docs/design/desktop/desktop-blazor-hybrid.md の 6、Q4 の A）。
     ② BrowserHostTests: テスト用のホスト（TTDeployTool.Controller.Desktop.Blazor.TestHost）を起動して、Chromium で操作する（Linux で動く）。
-    ③ WebView2Tests: WPF のホスト（Windows）を起動し、WebView2 に CDP でつなぐ（環境変数 TT_BLAZOR_WPF_EXE があるときだけ。無ければスキップ）
+    UiTests/: WinUI 3 版の UI テスト（CiUiTests・MockUiTests・MockInputTests・MockSystemTests）と同じ内容を、テスト用のホストで確かめる（Linux で動く）。
+    ③ WebView2Tests: WPF のホストのテスト用のビルド（Windows）を起動し、WebView2 に CDP でつなぐ（環境変数 TT_BLAZOR_WPF_EXE があるときだけ。無ければスキップ）
   -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -23,5 +24,7 @@
   <ItemGroup>
     <!-- ホストは別のプロセスで起動するため、先にビルドするだけ（参照はしない） -->
     <ProjectReference Include="..\TTDeployTool.Controller.Desktop.Blazor.TestHost\TTDeployTool.Controller.Desktop.Blazor.TestHost.csproj" ReferenceOutputAssembly="false" />
+    <!-- 起動の前に置くモックのデータ（WinUI 3 版の UI テストと同じ形） -->
+    <ProjectReference Include="..\..\src\TTDeployTool.Controller.Desktop.Fixtures\TTDeployTool.Controller.Desktop.Fixtures.csproj" />
   </ItemGroup>
 </Project>

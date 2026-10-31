@@ -4,6 +4,7 @@
 - 対象: CI（`ci.yml` の `blazor-prototype-windows` ジョブ）の成果物 `ttdeploytool-blazor-prototype-msix`（7 日で消える）。評価版（Desktop Preview）とは別のアプリ（`TTDeployTool.BlazorPrototype`）で、今の TTDeployTool と並べて入る
 - 試作のデータは Fixtures のモックだけで、サインインせず、Azure には届かない
 - 記録: `docs/REVIEW_ISSUES.md` の No.79
+- **済み（2026-10-31。すべて OK）**: この手順は、試作の MSIX（run 41147397707）のためのもの。確認の後、WinUI 3 版と同じ機能を実装したため（設計書の 16 章）、通知領域の確認のメニュー（`ManualCheck`）は外し、成果物の MSIX は本番の部品（サインインは WAM・Azure は本物）になった。この手順は記録として残す
 
 ## 1. 受け取るもの
 CI の実行の **Summary** の下の **Artifacts** から `ttdeploytool-blazor-prototype-msix` を取り出し、展開する。

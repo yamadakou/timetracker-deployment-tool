@@ -25,11 +25,15 @@ public sealed class BrowserHost : IAsyncDisposable
     public IPage Page { get; private set; } = default!;
 
     private bool _signIn = true;
+    private bool _sample = true;
 
     /// <param name="signIn">開いた後に、モックのアカウントでサインインしてデプロイの一覧を開く（false ならサインインの画面のまま）</param>
-    public static async Task<BrowserHost> StartAsync(int width = 1600, int height = 1000, bool signIn = true)
+    /// <param name="prepare">起動の前に、アプリのデータのフォルダーにモックのデータなどを置く（あれば見本〔--sample〕は使わない。WinUI 3 版の UI テストの WithFixture と同じ）</param>
+    public static async Task<BrowserHost> StartAsync(int width = 1600, int height = 1000, bool signIn = true, Action<string>? prepare = null)
     {
-        var host = new BrowserHost { _signIn = signIn };
+        var host = new BrowserHost { _signIn = signIn, _sample = prepare == null };
+        Directory.CreateDirectory(host._data);
+        prepare?.Invoke(host._data);
         await host.LaunchHostAsync();
         host._playwright = await Playwright.CreateAsync();
         host._browser = await host._playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
@@ -43,13 +47,24 @@ public sealed class BrowserHost : IAsyncDisposable
     /// <summary>最後にコピーした文字。</summary>
     public Task<string> ClipboardAsync() => _http.GetStringAsync($"{Url}/test/clipboard");
 
-    /// <summary>ホストを止めて、同じデータのフォルダーで起動し直し、開き直す（アプリの起動し直しの代わり）。</summary>
-    public async Task RestartAsync()
+    /// <summary>ウィンドウを閉じたときの動き（Exit か Hide。WPF のホストと同じ Core の判断）。</summary>
+    public Task<string> CloseActionAsync() => _http.GetStringAsync($"{Url}/test/close");
+
+    /// <summary>Dry-run の保存先（フォルダーの選択で返すフォルダー）。</summary>
+    public string DryRunFolder => Path.Combine(_data, "dryrun");
+
+    /// <summary>アプリが書いた、外の機能の記録（通知・開いたフォルダーと URL・サインイン時の起動）。</summary>
+    public IReadOnlyList<(string Kind, string Text)> Events() =>
+        Fixtures.FixtureEvents.Read(Path.Combine(_data, Fixtures.FixtureEvents.FileName));
+
+    /// <summary>ホストを止めて、同じデータのフォルダーで起動し直し、開き直す（アプリの起動し直しの代わり。<paramref name="signIn"/> なら、またサインインする）。</summary>
+    public async Task RestartAsync(bool? signIn = null)
     {
         var size = Page.ViewportSize!;
         await Page.CloseAsync();
         StopHost();
         await LaunchHostAsync();
+        _signIn = signIn ?? _signIn;
         await OpenAsync(size.Width, size.Height);
     }
 
@@ -100,8 +115,14 @@ public sealed class BrowserHost : IAsyncDisposable
         // ホストは、このテストと同じ構成（Debug・Release）でビルドしたもの
         var dll = Path.Combine(AppContext.BaseDirectory.Replace("Blazor.BrowserTests", "Blazor.TestHost"), "TTDeployTool.Controller.Desktop.Blazor.TestHost.dll");
         var start = new ProcessStartInfo("dotnet") { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
-        foreach (var arg in new[] { dll, "--urls", Url, "--data", _data, "--sample", "true", "--folder", Path.Combine(_data, "dryrun") })
+        Directory.CreateDirectory(DryRunFolder);
+        foreach (var arg in new[] { dll, "--urls", Url, "--data", _data, "--folder", DryRunFolder })
             start.ArgumentList.Add(arg);
+        if (_sample)
+        {
+            start.ArgumentList.Add("--sample");
+            start.ArgumentList.Add("true");
+        }
         // ビルドの出力から動かすため、静的なファイル（_content・_framework）の場所の一覧を使う
         start.Environment["ASPNETCORE_ENVIRONMENT"] = "Development";
         _process = Process.Start(start)!;

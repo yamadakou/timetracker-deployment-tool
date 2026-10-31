@@ -339,10 +339,11 @@ jobs:
         dotnet build tests/TTDeployTool.Controller.Desktop.Blazor.BrowserTests --configuration Release
         pwsh tests/TTDeployTool.Controller.Desktop.Blazor.BrowserTests/bin/Release/net10.0/playwright.ps1 install --with-deps chromium
 
+    # 画面の UX のテスト（BrowserHostTests）と、WinUI 3 版の UI テストと同じ内容のテスト（UiTests/）。WebView2Tests は Windows のジョブで動かす
     - name: Browser tests (Playwright)
       run: >
         dotnet test --project tests/TTDeployTool.Controller.Desktop.Blazor.BrowserTests --configuration Release --no-build --
-        --filter-class TTDeployTool.Controller.Desktop.Blazor.BrowserTests.BrowserHostTests
+        --filter-not-class TTDeployTool.Controller.Desktop.Blazor.BrowserTests.WebView2Tests
         --output detailed --report-xunit-trx --results-directory=TestResults
 
     - name: Upload test results
@@ -395,6 +396,15 @@ jobs:
           Format-List TimeCreated, Id, ProviderName, Message | Out-String -Width 300 | Write-Host
         Get-Content $report
         "TT_BLAZOR_WPF_EXE=$exe" >> $env:GITHUB_ENV
+
+    # テスト用のビルド（/p:UiTestMock=true。Fixtures のモックのサインインと Azure）を別のフォルダーに作り、WebView2 のテストと計測に使う（WinUI 3 のアプリの比べる相手も同じモックのビルド）
+    - name: Build the WPF host for tests (mock)
+      shell: pwsh
+      run: |
+        msbuild src/TTDeployTool.Controller.Desktop.Blazor.Wpf/TTDeployTool.Controller.Desktop.Blazor.Wpf.csproj /restore /p:Configuration=Release /p:Platform=x64 `
+          /p:UiTestMock=true /p:OutDir=${{ github.workspace }}\BlazorMock\
+        if ($LASTEXITCODE -ne 0) { throw "テスト用のビルドに失敗しました" }
+        "TT_BLAZOR_WPF_EXE=${{ github.workspace }}\BlazorMock\ttdeploytool-blazor.exe" >> $env:GITHUB_ENV
 
     - name: WebView2 test (Playwright over CDP)
       env:

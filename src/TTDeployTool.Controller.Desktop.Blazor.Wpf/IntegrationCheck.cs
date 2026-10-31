@@ -1,7 +1,6 @@
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Automation;
-using System.Windows.Interop;
 using Azure.Identity;
 using Azure.Identity.Broker;
 using Microsoft.Web.WebView2.Core;
@@ -31,7 +30,7 @@ internal static class IntegrationCheck
             ["dataDirectory"] = HostSettings.DataDirectory,
             ["activationKind"] = App.ActivationKind,
         };
-        var hwnd = new WindowInteropHelper(window).Handle;
+        var hwnd = window.Handle;
         Try(report, "windowHandle", () => hwnd != IntPtr.Zero);
         Try(report, "wamSignInService", () =>
         {
@@ -42,18 +41,20 @@ internal static class IntegrationCheck
         });
         Try(report, "webView2Runtime", () => CoreWebView2Environment.GetAvailableBrowserVersionString());
         Try(report, "trayIcon", () => window.Tray.IsCreated);
+        Try(report, "trayToolTip", () => window.Tray.ToolTipText);
         Try(report, "dpapi", () =>
         {
             var protector = new DpapiSecretProtector();
             return protector.Unprotect(protector.Protect("試作の確認")) == "試作の確認";
         });
         Try(report, "folderDialog", () => new Microsoft.Win32.OpenFolderDialog { Title = "フォルダーを選ぶ" }.Title.Length > 0);
-        report["tableRows"] = await TryAsync(async () => await TableRowsAsync(window));
+        report["shellRendered"] = await TryAsync(async () => await ShellRenderedAsync(window));
 
-        // 閉じると隠れて通知領域に残り、通知領域から出せる
-        Try(report, "closeHidesToTray", () =>
+        // 閉じたときの動き（ジョブも期限のあるデプロイも無ければ終了する。WinUI のアプリと同じ Core の判断）と、隠したウィンドウを通知領域から出せること
+        Try(report, "closeAction", () => window.Session.ViewModel.RequestClose().ToString());
+        Try(report, "trayRestoresWindow", () =>
         {
-            window.Close();
+            window.Hide();
             var hidden = !window.IsVisible;
             window.ShowFromTray();
             return hidden && window.IsVisible;
@@ -127,16 +128,16 @@ internal static class IntegrationCheck
         await File.WriteAllTextAsync(path, JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true }));
     }
 
-    // 画面（Razor）が表を描いたか（MSIX にまとめたとき、画面のファイルがパッケージに入っているか）。60 秒まで待つ
-    private static async Task<object?> TableRowsAsync(MainWindow window)
+    // 画面（Razor）がサインインの画面を描いたか（MSIX にまとめたとき、画面のファイルがパッケージに入っているか）。60 秒まで待つ
+    private static async Task<object?> ShellRenderedAsync(MainWindow window)
     {
         for (var i = 0; i < 120; i++)
         {
-            if (window.Core is { } core && int.TryParse(await core.ExecuteScriptAsync("document.querySelectorAll('tbody tr').length"), out var rows) && rows > 0)
-                return rows;
+            if (window.Core is { } core && await core.ExecuteScriptAsync("document.querySelector(\"[data-id='Panel.Target']\") !== null") == "true")
+                return true;
             await Task.Delay(500);
         }
-        return 0;
+        return false;
     }
 
     // 画面に出た通知（トースト）を、名前に通知の題を含む要素から探して押す。見つからなければ、見えた最上位の窓の名前を返す（調べるため）

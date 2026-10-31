@@ -263,3 +263,53 @@ WinUI 3 のまま続ける場合は、Microsoft の TableView の安定版が出
 - これで、今のアプリが Windows に頼る機能のうち、移行で落ちるものは見つからなかった。残るのは、WAM のサインインの窓が前に出ること（試作はサインインしない）と、移った後の見た目で、移行の実機の確認で確かめる
 
 出典 12: Microsoft Learn「AppNotificationManager.IsSupported Method」（Windows App SDK 2.0。プッシュ通知の API が使えるか。自己完結のアプリでは Singleton パッケージへの依存に注意）https://learn.microsoft.com/windows/windows-app-sdk/api/winrt/microsoft.windows.appnotifications.appnotificationmanager.issupported（2026-10-30 に確認）
+
+## 16. WinUI 3 版と同じ機能の実装（オーナーの依頼、2026-10-31）
+オーナーの依頼「Blazor Hybrid 版に、今の WinUI 3 版と同じ機能を実装する」。進め方はオーナーの回答（すべて推奨どおり）:
+
+| 論点 | 決定 |
+|---|---|
+| 作る場所 | 試作のプロジェクト（`Desktop.Blazor`・`Desktop.Blazor.Wpf`・`Desktop.Blazor.Package`）を育てる。WinUI 3 のアプリ・テスト・CI はそのまま並べて残す |
+| モック | Fixtures のモックは、テスト用のビルド（`/p:UiTestMock=true`）・テスト用のホスト・画面の単体テストだけで使う（WinUI 3 のアプリと同じ） |
+| UI テスト | WinUI 3 版の UI テスト（`CiUiTests`・`MockUiTests`・`MockInputTests`・`MockSystemTests`）を、同じ内容で Playwright に移す |
+| リリース | `release.yml`・評価版（Desktop Preview）は今回は変えない（Store に出すのは WinUI 3 のアプリのまま） |
+
+### 16.1 作り
+- **画面（`Desktop.Blazor`。Razor Class Library、Linux でビルドとテスト）**: WinUI 3 のアプリの `MainWindow.xaml` の画面を、同じ Core の ViewModel（`MainViewModel` とその子。Core は変えない）で作り直した。名前（`data-id`）は WinUI の AutomationId と同じ（例: `Nav.Deployments`・`Deployments.Load`・`Delete.ConfirmAppName`・`Job.Title`）
+  - `Shell/DesktopShell.razor`: 画面の根。上の帯（Store の更新・終わっていないジョブ）、左のメニュー（サインインするまでデプロイの一覧・新しくデプロイは押せない。設定は下に離す）、Core の `Pages` の名前での画面の切り替え（`NavigationRequested` で、メニューに無い実行状況・削除・まとめての削除も開く）、確かめるダイアログ
+  - `Shell/DesktopSession.cs`: 画面とホストが共有する状態（`MainViewModel`・ダイアログ・クリップボード・Store の更新があるか）。始めの処理（`StartAsync`）は 1 回だけで、ホストが中身を決める（サインイン時の起動では `StartAsync(atStartup: true)`）
+  - `Shell/BlazorDialogService.cs`・`ConfirmDialog.razor`: `IDialogService` の確かめるダイアログ（既定のボタンは「キャンセル」・Esc でキャンセル。WinUI の ContentDialog と同じ）。フォルダーの選択はホストの部品（WPF の `OpenFolderDialog`）
+  - `Screens/`: サインイン・新しくデプロイ（① 対象〜⑤ 確認と実行、完了の表示）・デプロイの一覧（まとめての期限・グループ・削除、1 行の詳細とパスワード）・削除・まとめての削除・実行状況・ジョブの一覧（サインインするまで操作は押せない。詳細とダブルクリックで実行状況）・Dry-run・設定（同時に実行する数・Windows との連携・診断用のログ）
+  - `Components/`: 入力欄（日本語の変換を切らないよう、描き直しで値を入れ直さない。13.1）・チェックボックス・一覧から選ぶ・日付と時刻・コマンドのボタン（押せるかは `CanExecute`）・処理中の表示・誤りと注意の帯・ジョブの表示（進み具合・ログ・取り消し・一時停止・再開・停止・予定の変更）
+- **WPF のホスト（`Desktop.Blazor.Wpf`）**: WinUI 3 のアプリの `App.xaml.cs`・`MainWindow.xaml.cs` と同じ部品と動き
+  - 診断用のログ（`DiagnosticLog`。Azure SDK のイベントと処理されなかった例外）、通知を押したときの受け口（そのジョブを開く）、単一起動と 2 つ目の起動の受け渡し（`Program.cs`）
+  - `MainViewModel` の部品: WAM のサインイン・Azure・通知・サインイン時の起動・DPAPI・クリップボード（履歴とほかの PC に残さない）は WinUI 3 のアプリのファイルをそのままリンク。既定のアプリで開く（`SystemLauncher`）は同じ中身をホストに置いた（WinUI のファイルは ContentDialog と同じファイルにあるため）
+  - 閉じたとき: Core の `RequestClose` で、終わっていないジョブか期限のあるデプロイがあれば隠して通知領域に残り、無ければ終了する。通知領域のアイコンは、押すと開き、メニューは「開く」「終了」（終了は `ConfirmExitAsync` で確かめる）、ツールチップはジョブの状況
+  - Windows のサインイン時に起動されたら、ウィンドウを出さずに始めの処理だけ動かす（`DesktopSession.StartAsync` は 1 回だけのため、後で通知領域から開くと同じ状態の画面を描く）
+  - Store の更新の確認は、上の帯に出す
+  - テスト用のビルド（`/p:UiTestMock=true`）だけ `FixtureApp`（Fixtures のモックで `MainViewModel` を組み立てる。WinUI 3 のアプリの `UITEST_MOCK` と同じ部品）を使い、環境変数 `TT_BLAZOR_DATA_DIRECTORY` でアプリのデータのフォルダーを変えられる
+  - 試作の確認のメニュー（`ManualCheck`）は、実機の確認が終わったため外した（15.2）。CI の連携の確認（`IntegrationCheck`）は残し、「表の行」の代わりに「画面の根が出たか」・閉じたときの判断・通知領域から出せるかを確かめる
+- **テスト用のホスト（`Desktop.Blazor.TestHost`）**: WPF のホストのテスト用のビルドと同じ部品（`FixtureApp`・`DiagnosticLog`）で、`DesktopShell` を Blazor Server で出す。`/test/clipboard`（最後にコピーした文字）と `/test/close`（閉じたときの Core の判断）をテストに返す
+
+### 16.2 テスト
+| テスト | 中身 | 件数 |
+|---|---|---|
+| bUnit（`Desktop.Blazor.Tests`） | 画面の根・各画面・部品。モックの `MainViewModel` で、入力が Core に届くことと表示を確かめる | 56 件。`Desktop.Blazor` の行・分岐とも 100%（CI の閾値） |
+| Playwright（`BrowserHostTests`） | 表の UX（9 章。▽・ドラッグ・6 行・変換中の入力・キーボード・コピー） | 11 件（ジョブのダブルクリックは、実行状況の画面を開くように変えた） |
+| Playwright（`UiTests/`） | WinUI 3 版の UI テストと同じ内容（下の表） | 21 件 |
+| WebView2（`WebView2Tests`） | WPF のホストのテスト用のビルドを CDP で操作（モックでサインインし、表・並べ替え・絞り込み・幅・コピー） | 1 件（Windows の CI） |
+| 連携の確認（`IntegrationCheck`） | 15 章のもの（MSIX と、パッケージにしない exe） | CI |
+
+WinUI 3 版の UI テストとの対応（名前は同じ。中身の違い）:
+- `CiUiTests`（10 件）: 「ウィンドウの題とログ」はページの題とログのフォルダー、「閉じてもジョブが無ければ確かめない」は `/test/close` が Exit を返すこと（ウィンドウを閉じる動きは、WPF のホストの `OnClosing` が同じ Core の判断を使う）。「2 つ目の起動」はブラウザーでは確かめられないため移さず、WPF のホストの MSIX の連携の確認（`reactivations`）で確かめる
+- `MockUiTests`（3 件）・`MockSystemTests`（4 件）: 同じ。起動し直しは、テスト用のホストを同じデータのフォルダーで起動し直す
+- `MockInputTests`（4 件）: 同じ。ただし、右端の列は残りの幅いっぱいのまま、つまみで最小の幅を変える（WinUI 版は右隣の余白の列の左の端でつかむ）。左のメニューを畳む操作は無いため、ウィンドウを広くした
+
+### 16.3 CI
+- `blazor-prototype`（ubuntu）: bUnit の行・分岐 100% と、Playwright の `BrowserHostTests` と `UiTests/`（`WebView2Tests` を除くすべて）
+- `blazor-prototype-windows`: 本番のビルドで連携の確認・MSIX、テスト用のビルド（`/p:UiTestMock=true`。別のフォルダー）で WebView2 のテストと計測（比べる相手の WinUI 3 のアプリもモックのビルド）
+- 本物の Azure でのシステムテストは、Q7 のとおりまだ作らない（移ると決めたら `AzureUiTests` を置き換える）
+
+### 16.4 残り
+- Q6（移るか）はオーナーの判断待ち。移ると決めたら、リリース（`release.yml`）・評価版（Desktop Preview）を WPF のホストの MSIX に替え、パッケージの名前（今は `TTDeployTool.BlazorPrototype`）とアプリのデータのフォルダーを本番のものにし、`AzureUiTests` を WebView2 への CDP のテストに置き換える
+- 実機での確認（WAM のサインインの窓が前に出ること・見た目）は、移ると決めた後の評価版で行う
