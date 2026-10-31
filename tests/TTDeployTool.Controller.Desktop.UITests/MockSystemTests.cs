@@ -101,17 +101,11 @@ public class MockSystemTests
         Load(app);
         app.Select("Deployments.PageSize", "50");
 
-        // 削除の画面: 「予定に追加」の理由に出る
-        OpenDeletion(app, "app03");
-        var now = DateTime.Now;
-        app.SetTime("Delete.ScheduleTime", now.Hour, now.Minute);
-        app.WaitForText("Delete.Blocked", t => t.EndsWith("は、今より後にしてください。", StringComparison.Ordinal), "削除の予定を今の時刻では入れられない");
-
         // 予定を入れたジョブ（1 時間後）を、ジョブの一覧で選んで今の時刻に変えようとすると断る
         Delete(app, "app06", schedule: true);
         var target = "rg-mock-06 / app06";
         app.SelectRowWith("Jobs.List", "Job.Target", target);
-        now = DateTime.Now;
+        var now = DateTime.Now;
         app.SetTime("Jobs.ScheduleTime", now.Hour, now.Minute);
         app.Invoke("Jobs.RescheduleSelected");
         app.WaitForText("Jobs.Message", t => t.EndsWith("は、今より後にしてください。", StringComparison.Ordinal), "ジョブの一覧で、今の時刻への予定の変更を断る");
@@ -124,5 +118,11 @@ public class MockSystemTests
         app.Invoke("Job.Reschedule");
         app.WaitForText("Job.RescheduleMessage", t => t.EndsWith("は、今より後にしてください。", StringComparison.Ordinal), "実行状況の画面で、今の時刻への予定の変更を断る");
         app.TextOf("Job.Status").Should().StartWith("予定", "すぐ実行にしない");
+
+        // 削除の画面: 「予定に追加」の理由に出る（削除の画面は入れた時刻を覚えるため、予定を入れた後に確かめる）
+        OpenDeletion(app, "app03");
+        now = DateTime.Now;
+        app.SetTime("Delete.ScheduleTime", now.Hour, now.Minute);
+        app.WaitForText("Delete.Blocked", t => t.EndsWith("は、今より後にしてください。", StringComparison.Ordinal), "削除の予定を今の時刻では入れられない");
     });
 }
