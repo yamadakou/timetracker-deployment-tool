@@ -309,6 +309,7 @@ WinUI 3 版の UI テストとの対応（名前は同じ。中身の違い）:
 - `blazor-prototype`（ubuntu）: bUnit の行・分岐 100% と、Playwright の `BrowserHostTests` と `UiTests/`（`WebView2Tests` を除くすべて）
 - `blazor-prototype-windows`: 本番のビルドで連携の確認・MSIX、テスト用のビルド（`/p:UiTestMock=true`。別のフォルダー）で WebView2 のテストと計測（比べる相手の WinUI 3 のアプリもモックのビルド）
 - 本物の Azure でのシステムテストは、Q7 のとおりまだ作らない（移ると決めたら `AzureUiTests` を置き換える）
+- 結果（run 41202310595、2026-10-31）: 全ジョブ成功（WinUI 3 のアプリの `desktop`・`desktop-ui` を含む）。連携の確認は、パッケージにしない exe と MSIX のどちらも画面の根が出て、閉じたときの判断は Exit（ジョブが無い）、通知領域から出せる。MSIX でサインイン時の起動の登録と解除・2 つ目の起動の受け渡し（ウィンドウが出る）も可。通知はランナーに仕組みが無く Unavailable（15.1・15.2 のとおり、実機では OK）。WebView2 のテスト（テスト用のビルド）は成功し、起動から画面の根まで 6.3 秒・モックでサインインして表まで 6.8 秒（CDP の接続を含む）。計測: Blazor の窓 0.9 秒・プライベート 142 MB、WinUI 3 は 1.4 秒・50 MB（目安）
 
 ### 16.4 残り
 - Q6（移るか）はオーナーの判断待ち。移ると決めたら、リリース（`release.yml`）・評価版（Desktop Preview）を WPF のホストの MSIX に替え、パッケージの名前（今は `TTDeployTool.BlazorPrototype`）とアプリのデータのフォルダーを本番のものにし、`AzureUiTests` を WebView2 への CDP のテストに置き換える
