@@ -1,19 +1,36 @@
 @using System.Globalization
+@implements IAsyncDisposable
 
-@* 日付と時刻（WinUI の画面の DatePicker・TimePicker。予定の日時・期限日） *@
+@* 日付と時刻（WinUI の画面の DatePicker・TimePicker。予定の日時・期限日）。
+   入力欄（TextInput）と同じく、描き直しで値を入れ直さない（打っている途中に値を入れると、ブラウザーの欄が打った桁を捨てる。例: 分に「34」と打つと「03」になる）。
+   選んだ値は Core に渡し、Core の値が外から変わったとき（初期値に戻す・テンプレートなど）だけ JavaScript で入れる（同じ値なら入れない） *@
 <label class="tt-field">
     <span>@DateLabel</span>
-    <input type="date" data-id="@($"{Id}Date")" value="@Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)" disabled="@Disabled" @onchange="SetDate" />
+    <input type="date" @ref="_dateBox" data-id="@($"{Id}Date")" value="@_initialDate" disabled="@Disabled" @onchange="SetDate" />
 </label>
 @if (TimeChanged.HasDelegate)
 {
     <label class="tt-field">
         <span>時刻</span>
-        <input type="time" data-id="@($"{Id}Time")" value="@Time.ToString(@"hh\:mm", CultureInfo.InvariantCulture)" disabled="@Disabled" @onchange="SetTime" />
+        <input type="time" @ref="_timeBox" data-id="@($"{Id}Time")" value="@_initialTime" disabled="@Disabled" @onchange="SetTime" />
     </label>
 }
 
 @code {
+    // 時刻の欄は、Blazor の JavaScript が秒を付けて渡す（"23:35" → "23:35:00"。blazor.web.js・blazor.webview.js の change の値）。付けない場合も受ける
+    private static readonly string[] TimeFormats = ["HH:mm:ss", "HH:mm"];
+
+    private ElementReference _dateBox;
+    private ElementReference _timeBox;
+    private string _initialDate = "";
+    private string _initialTime = "";
+    private DateTimeOffset _date;
+    private TimeSpan _time;
+    private Task<IJSObjectReference>? _module;
+
+    [Inject]
+    private IJSRuntime JS { get; set; } = default!;
+
     /// <summary>名前の頭（日付は「…Date」、時刻は「…Time」）。</summary>
     [Parameter]
     public string Id { get; set; } = "";
@@ -37,14 +54,48 @@
     [Parameter]
     public bool Disabled { get; set; }
 
-    // 日付の欄は、日付だけを変える（時刻とタイムゾーンの差は今の値のまま。WinUI の DatePicker と同じ）
-    private Task SetDate(ChangeEventArgs e) =>
-        DateOnly.TryParseExact((string?)e.Value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day)
-            ? DateChanged.InvokeAsync(new DateTimeOffset(day.ToDateTime(TimeOnly.FromTimeSpan(Date.TimeOfDay)), Date.Offset))
-            : Task.CompletedTask;
+    private static string DateText(DateTimeOffset date) => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
-    private Task SetTime(ChangeEventArgs e) =>
-        TimeOnly.TryParseExact((string?)e.Value, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var time)
-            ? TimeChanged.InvokeAsync(time.ToTimeSpan())
-            : Task.CompletedTask;
+    private static string TimeText(TimeSpan time) => time.ToString(@"hh\:mm", CultureInfo.InvariantCulture);
+
+    protected override void OnInitialized()
+    {
+        (_date, _time) = (Date, Time);
+        (_initialDate, _initialTime) = (DateText(Date), TimeText(Time));
+        _module = Tables.JsModule.ImportAsync(JS);
+    }
+
+    // Core の値が、この欄で選んだ値と違えば（外から変わった）、欄に入れる
+    protected override async Task OnParametersSetAsync()
+    {
+        if (DateText(Date) != DateText(_date))
+        {
+            _date = Date;
+            await Tables.JsModule.InvokeQuietlyAsync(_module!, "setValue", _dateBox, DateText(Date));
+        }
+        if (Time != _time)
+        {
+            _time = Time;
+            await Tables.JsModule.InvokeQuietlyAsync(_module!, "setValue", _timeBox, TimeText(Time));
+        }
+    }
+
+    // 日付の欄は、日付だけを変える（時刻とタイムゾーンの差は今の値のまま。WinUI の DatePicker と同じ）
+    private Task SetDate(ChangeEventArgs e)
+    {
+        if (!DateOnly.TryParseExact((string?)e.Value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day))
+            return Task.CompletedTask;
+        _date = new DateTimeOffset(day.ToDateTime(TimeOnly.FromTimeSpan(Date.TimeOfDay)), Date.Offset);
+        return DateChanged.InvokeAsync(_date);
+    }
+
+    private Task SetTime(ChangeEventArgs e)
+    {
+        if (!TimeOnly.TryParseExact((string?)e.Value, TimeFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var time))
+            return Task.CompletedTask;
+        _time = time.ToTimeSpan();
+        return TimeChanged.InvokeAsync(_time);
+    }
+
+    public ValueTask DisposeAsync() => Tables.JsModule.DisposeQuietlyAsync(_module!);
 }

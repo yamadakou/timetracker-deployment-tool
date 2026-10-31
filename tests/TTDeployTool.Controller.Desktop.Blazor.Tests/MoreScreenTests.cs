@@ -72,7 +72,8 @@ public sealed class MoreScreenTests
         page.FindAll("tbody tr")[jobs.Items.IndexOf(job)].Click();
         var at = TestApp.Now.AddHours(6).ToLocalTime();
         page.Find("[data-id='Jobs.ScheduleDate']").Change(at.ToString("yyyy-MM-dd"));
-        page.Find("[data-id='Jobs.ScheduleTime']").Change(at.ToString("HH:mm"));
+        // ブラウザー（Blazor の JavaScript）は、時刻の欄の値に秒を付けて渡す
+        page.Find("[data-id='Jobs.ScheduleTime']").Change(at.ToString("HH:mm:00"));
         jobs.Schedule.TimeOfDay.Should().Be(new TimeSpan(at.Hour, at.Minute, 0));
         page.Find("[data-id='Jobs.RescheduleSelected']").Click();
         page.WaitForAssertion(() => job.ScheduledAt!.Value.ToLocalTime().Hour.Should().Be(at.Hour));
@@ -155,5 +156,29 @@ public sealed class MoreScreenTests
         var input = app.Context.Render<TextInput>(p => p.Add(x => x.Id, "x").Add(x => x.Value, "a").Add(x => x.ValueChanged, EventCallback.Factory.Create<string>(this, v => value = v)));
         input.Find("input").Input(new ChangeEventArgs { Value = null });
         value.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Date_And_Time_Should_Not_Be_Written_Back_While_Typing_But_Follow_Outside_Changes()
+    {
+        using var app = new TestApp();
+        var schedule = app.ViewModel.JobList.Schedule;
+        var page = app.Context.Render<DateTimeInput>(p => p
+            .Add(x => x.Id, "s")
+            .Add(x => x.Date, schedule.Date).Add(x => x.DateChanged, EventCallback.Factory.Create<DateTimeOffset>(this, d => schedule.Date = d))
+            .Add(x => x.Time, schedule.TimeOfDay).Add(x => x.TimeChanged, EventCallback.Factory.Create<TimeSpan>(this, t => schedule.TimeOfDay = t)));
+        int Writes() => app.Module.Invocations.Count(i => i.Identifier == "setValue");
+
+        // 欄で選んだ値は Core に届き、描き直しても欄には入れ直さない（打っている途中の桁を捨てないため）
+        page.Find("[data-id='sTime']").Change("10:34:00");
+        page.Find("[data-id='sDate']").Change("2026-11-02");
+        page.Render(p => p.Add(x => x.Date, schedule.Date).Add(x => x.Time, schedule.TimeOfDay));
+        schedule.TimeOfDay.Should().Be(new TimeSpan(10, 34, 0));
+        schedule.Date.Day.Should().Be(2);
+        Writes().Should().Be(0);
+
+        // Core の値が外から変わったら、欄に入れる
+        page.Render(p => p.Add(x => x.Date, schedule.Date.AddDays(1)).Add(x => x.Time, new TimeSpan(9, 5, 0)));
+        app.Module.Invocations.Where(i => i.Identifier == "setValue").Select(i => (string)i.Arguments[1]!).Should().Equal("2026-11-03", "09:05");
     }
 }

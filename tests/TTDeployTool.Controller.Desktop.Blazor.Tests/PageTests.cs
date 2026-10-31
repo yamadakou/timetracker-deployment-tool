@@ -69,7 +69,7 @@ public sealed class PageTests : IDisposable
         Id(page, "Delete.ConfirmAppName").Input("app00");
         var at = TestApp.Now.AddHours(3).ToLocalTime();
         Id(page, "Delete.ScheduleDate").Change(at.ToString("yyyy-MM-dd"));
-        Id(page, "Delete.ScheduleTime").Change(at.ToString("HH:mm"));
+        Id(page, "Delete.ScheduleTime").Change(at.ToString("HH:mm:00"));
         Id(page, "Delete.ScheduleNote").TextContent.Should().Be(SystemStatusViewModel.DeletionScheduleNote);
         Id(page, "Delete.Schedule").Click();
         page.WaitForAssertion(() => _app.ViewModel.Queue.HasActive.Should().BeTrue());
