@@ -57,4 +57,50 @@ public sealed class ScheduleInputTests
         await page.ClickIdAsync("Delete.Schedule");
         await Assertions.Expect(page.RowWith("Jobs", "Target", "rg-mock-08 / app08").Locator("td[data-key='State']")).ToContainTextAsync(typed);
     }
+
+    // 今の時刻と、今より前の時刻（今日の 00:00。日をまたぐ直前でも今より前）は、エラーで予定を変えない（オーナーの確認、2026-10-31）
+    public static TheoryData<string> PastTimes => new() { "now", "00:00" };
+
+    private static async Task SetDateTimeAsync(IPage page, string id, string time)
+    {
+        var now = DateTime.Now;
+        await page.Id($"{id}Date").FillAsync(now.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+        await page.Id($"{id}Time").FillAsync(time == "now" ? now.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture) : time);
+    }
+
+    [Theory]
+    [MemberData(nameof(PastTimes))]
+    public async Task Rescheduling_To_Now_Or_Earlier_Should_Be_Refused(string time)
+    {
+        await using var host = await WithFixtureAsync();
+        var page = host.Page;
+        await page.SignInAsync();
+        await page.LoadAsync();
+        await page.DeleteAsync("app06", schedule: true);
+        var row = page.RowWith("Jobs", "Target", "rg-mock-06 / app06");
+        var state = await row.CellTextAsync("State");
+        await row.ClickAsync();
+        await SetDateTimeAsync(page, "Jobs.Schedule", time);
+        await page.ClickIdAsync("Jobs.RescheduleSelected");
+        await page.ExpectTextAsync("Jobs.Message", "は、今より後にしてください。");
+        (await row.CellTextAsync("State")).Should().Be(state, "予定は変わらない");
+    }
+
+    [Theory]
+    [MemberData(nameof(PastTimes))]
+    public async Task Scheduling_A_Deletion_At_Now_Or_Earlier_Should_Be_Refused(string time)
+    {
+        await using var host = await WithFixtureAsync();
+        var page = host.Page;
+        await page.SignInAsync();
+        await page.LoadAsync();
+        await page.RowWith("Deployments", "AppName", "app08").ClickAsync();
+        await page.ClickIdAsync("Deployments.Delete");
+        await page.Id("Delete.ConfirmAppName").FillAsync("app08");
+        await SetDateTimeAsync(page, "Delete.Schedule", time);
+        await page.ExpectTextAsync("Delete.Blocked", "「予定に追加」: 予定の時刻");
+        await page.ClickIdAsync("Delete.Schedule");
+        await page.ExpectTextAsync("Delete.Error", "は、今より後にしてください。");
+        await Assertions.Expect(page.Id("Panel.Delete")).ToBeVisibleAsync();
+    }
 }

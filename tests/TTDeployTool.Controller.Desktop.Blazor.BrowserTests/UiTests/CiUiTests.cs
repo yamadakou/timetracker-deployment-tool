@@ -88,6 +88,8 @@ public sealed class CiUiTests
         var page = host.Page;
         await page.ShowAsync("AppSettings");
         var select = page.Id("Settings.Concurrency");
+        // 画面を開いた直後は、まだ選択肢を描いていないことがあるため、描くまで待つ
+        await Assertions.Expect(select.Locator("option")).ToHaveCountAsync(4);
         (await select.Locator("option").AllTextContentsAsync()).Should().Equal("1", "2", "3", "4");
         (await select.EvaluateAsync<string>("s => s.options[s.selectedIndex].text")).Should().Be("2", "既定は 2");
         await select.SelectOptionAsync(new SelectOptionValue { Label = "3" });
