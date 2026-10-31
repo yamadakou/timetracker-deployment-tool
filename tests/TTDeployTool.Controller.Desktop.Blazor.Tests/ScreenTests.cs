@@ -1,7 +1,6 @@
 using Bunit;
 using FluentAssertions;
 using Microsoft.AspNetCore.Components;
-using Microsoft.Extensions.DependencyInjection;
 using TTDeployTool.Controller.Desktop.Blazor.Screens;
 using TTDeployTool.Controller.Desktop.Core.ViewModels;
 using TTDeployTool.Controller.Desktop.Fixtures;
@@ -16,10 +15,10 @@ public sealed class ScreenTests : IDisposable
     public void Dispose() => _app.Dispose();
 
     private IRenderedComponent<DeploymentsPage> Deployments() =>
-        _app.Context.Render<DeploymentsPage>(p => p.Add(x => x.Model, _app.ViewModel.Deployments).Add(x => x.Layout, _app.ViewModel.DeploymentsLayout));
+        _app.Context.Render<DeploymentsPage>(p => p.Add(x => x.Model, _app.ViewModel));
 
     private IRenderedComponent<JobsPage> Jobs() =>
-        _app.Context.Render<JobsPage>(p => p.Add(x => x.Model, _app.ViewModel.JobList).Add(x => x.Layout, _app.ViewModel.JobsLayout).Add(x => x.Clipboard, _app.Clipboard));
+        _app.Context.Render<JobsPage>(p => p.Add(x => x.Model, _app.ViewModel).Add(x => x.Clipboard, _app.Clipboard));
 
     [Fact]
     public async Task Text_Filter_Should_Wait_For_Composition_And_A_Pause()
@@ -82,7 +81,7 @@ public sealed class ScreenTests : IDisposable
     {
         // サインインしていないと、読めない（サブスクリプションがない）
         var page = Deployments();
-        page.Find("button.tt-primary").Click();
+        page.Find("[data-id='Deployments.Load']").Click();
         page.Find(".tt-error").TextContent.Should().Contain("サブスクリプションがありません");
 
         var done = new TaskCompletionSource();
@@ -113,71 +112,21 @@ public sealed class ScreenTests : IDisposable
         var first = page.FindAll("tbody tr")[0];
         first.QuerySelector("td[data-key='Result'] .tt-cell")!.TextContent.Should().Be(FixtureSamples.LongText);
         first.DoubleClick();
-        page.Find(".tt-detail h2").TextContent.Should().Be(_app.ViewModel.JobList.Items[0].Title);
-        page.Find(".tt-detail-result").TextContent.Should().Be(FixtureSamples.LongText);
-        page.Find(".tt-detail button").Click();
-        page.FindAll(".tt-detail").Should().BeEmpty();
+        _app.ViewModel.StatusJob.Should().BeSameAs(_app.ViewModel.JobList.Items[0]);
 
         // 結果の無い記録（成功・取り消し）
         page.Find("th[data-key='State'] button.tt-filter").Click();
         page.FindAll(".tt-popup-value").Select(v => v.TextContent).Should().Contain("取り消し");
         page.FindAll(".tt-popup-buttons button")[1].Click();
-        var canceled = _app.ViewModel.JobList.Items.First(j => j.ResultText == null);
-        page.FindAll("tbody tr")[_app.ViewModel.JobList.Items.IndexOf(canceled)].DoubleClick();
-        page.FindAll(".tt-detail-result").Should().BeEmpty();
+        _app.ViewModel.JobList.Items.Should().Contain(j => j.ResultText == null);
 
         page.FindAll("tbody tr")[0].Click();
-        page.Find("[data-selection='jobs']").TextContent.Should().Be("1 件を選んでいます。");
-        page.Find(".tt-bar button").Click();
+        page.Find("[data-id='Jobs.Selection']").TextContent.Should().Be("1 件を選んでいます。");
+        page.Find("[data-id='Jobs.Detail']").Click();
+        _app.ViewModel.StatusJob.Should().BeSameAs(_app.ViewModel.JobList.Items[0]);
+        page.Find("[data-id='Jobs.ClearSelection']").Click();
         _app.ViewModel.JobList.Selected.Should().BeEmpty();
         page.Find(".tt-pager select").Change("50");
         page.FindAll("tbody tr").Should().HaveCount(30);
-    }
-
-    [Fact]
-    public async Task App_Should_Sign_In_Load_And_Switch_Between_The_Lists()
-    {
-        var app = _app.Context.Render<PrototypeApp>();
-        app.WaitForAssertion(() => app.FindAll("tbody tr").Should().HaveCount(20));
-        app.Find("[data-account]").TextContent.Should().Be("mock-user@example.com");
-        var tabs = app.FindAll("[role=tab]");
-        tabs[0].GetAttribute("aria-selected").Should().Be("true");
-
-        tabs[1].Click();
-        app.Find("h1").TextContent.Should().Be("ジョブの一覧");
-        app.FindAll("[role=tab]")[1].GetAttribute("aria-selected").Should().Be("true");
-        app.FindAll("[role=tab]")[0].GetAttribute("aria-selected").Should().Be("false");
-        app.FindAll("[role=tab]")[0].Click();
-        app.Find("h1").TextContent.Should().Be("デプロイの一覧");
-        await Task.CompletedTask;
-    }
-
-    [Fact]
-    public void App_Should_Say_It_Is_Loading_Until_The_Start_Finishes()
-    {
-        using var other = new BunitContext();
-        other.JSInterop.Mode = JSRuntimeMode.Loose;
-        other.JSInterop.SetupModule(Tables.JsModule.Path).Mode = JSRuntimeMode.Loose;
-        other.Services.AddSingleton<TimeProvider>(_app.Time);
-        var start = new TaskCompletionSource();
-        other.Services.AddSingleton(new PrototypeSession(_app.ViewModel, null, _ => start.Task));
-        var app = other.Render<PrototypeApp>();
-        app.Find("main [role=status]").TextContent.Should().Be("モックのデータを読んでいます…");
-        start.SetResult();
-        app.WaitForAssertion(() => app.Find("h1").TextContent.Should().Be("デプロイの一覧"));
-    }
-
-    [Fact]
-    public void Services_Should_Build_A_Session_Per_Scope_And_Keep_A_Given_Clock()
-    {
-        var services = new ServiceCollection();
-        services.AddSingleton<TimeProvider>(_app.Time);
-        services.AddTTDeployToolPrototype(_app.Directory, _ => _app.Clipboard);
-        using var provider = services.BuildServiceProvider();
-        provider.GetRequiredService<TimeProvider>().Should().BeSameAs(_app.Time);
-        using var scope = provider.CreateScope();
-        var session = scope.ServiceProvider.GetRequiredService<PrototypeSession>();
-        session.ViewModel.Should().BeSameAs(scope.ServiceProvider.GetRequiredService<MainViewModel>());
-        session.Clipboard.Should().BeSameAs(_app.Clipboard);
     }
 }

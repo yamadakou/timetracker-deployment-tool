@@ -19,5 +19,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\TTDeployTool.Controller.Desktop.Blazor\TTDeployTool.Controller.Desktop.Blazor.csproj" />
+    <ProjectReference Include="..\..\src\TTDeployTool.Controller.Desktop.Fixtures\TTDeployTool.Controller.Desktop.Fixtures.csproj" />
   </ItemGroup>
 </Project>

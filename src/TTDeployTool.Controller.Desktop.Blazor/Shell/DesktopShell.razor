@@ -1,0 +1,109 @@
+@inherits ViewModelComponent
+
+@* 画面の根（WinUI の画面の MainWindow: 上の帯〔Store の更新・終わっていないジョブ〕、左のメニュー、画面〔Core の Pages の名前〕、確かめるダイアログ）。
+   メニューに無い画面（実行状況・削除・まとめての削除）は、ViewModel の NavigationRequested で開く（docs/design/desktop/desktop-wizard.md の 2） *@
+<div class="tt-app">
+    @if (Session.UpdateAvailable)
+    {
+        <div class="tt-banner tt-info" role="status" data-id="UpdateBar">
+            <span class="tt-strong">更新があります</span><span>Microsoft Store から新しい版を導入できます。</span>
+            <button type="button" data-id="UpdateBar.Close" aria-label="閉じる" @onclick="() => Session.UpdateAvailable = false">×</button>
+        </div>
+    }
+    @if (Model.HasRunningJob)
+    {
+        @* 終わっていないジョブの状況（どの画面にも出す。docs/design/desktop/desktop-jobs.md の 4.4） *@
+        <div class="tt-banner tt-info" role="status" data-id="Jobs.Banner">
+            <span class="tt-strong">ジョブ</span><span>@Model.Queue.Summary</span>
+            <button type="button" data-id="Jobs.BannerShow" @onclick="() => Navigate(Pages.Jobs)">ジョブを見る</button>
+        </div>
+    }
+    <div class="tt-main">
+        <nav class="tt-nav" aria-label="画面">
+            @foreach (var item in NavItems)
+            {
+                @if (item.Page == Pages.Settings)
+                {
+                    <span class="tt-nav-space"></span>
+                }
+                <button type="button" class="tt-nav-item" data-id="@item.Id" aria-current="@(_page == item.Page ? "page" : null)"
+                        disabled="@(item.NeedsSignIn && !Model.SignIn.IsSignedIn)" @onclick="() => Navigate(item.Page)">@item.Text</button>
+            }
+        </nav>
+        <main class="tt-content">
+            @switch (_page)
+            {
+                case Pages.Deployments:
+                    <DeploymentsPage Model="Model" Clipboard="Session.Clipboard" />
+                    break;
+                case Pages.Wizard:
+                    <WizardPage Model="Model" />
+                    break;
+                case Pages.Status:
+                    <StatusPage Model="Model" Back="Navigate" />
+                    break;
+                case Pages.Delete:
+                    <DeletePage Model="Model" Back="Navigate" />
+                    break;
+                case Pages.BatchDelete:
+                    <BatchDeletePage Model="Model" Back="Navigate" />
+                    break;
+                case Pages.DryRun:
+                    <DryRunPage Model="Model" />
+                    break;
+                case Pages.Jobs:
+                    <JobsPage Model="Model" Clipboard="Session.Clipboard" />
+                    break;
+                case Pages.Settings:
+                    <SettingsPage Model="Model" />
+                    break;
+                default:
+                    <SignInPage Model="Model" />
+                    break;
+            }
+        </main>
+    </div>
+    <ConfirmDialog Dialogs="Session.Dialogs" />
+</div>
+
+@code {
+    private string _page = Pages.Target;
+
+    [Inject]
+    private DesktopSession Session { get; set; } = default!;
+
+    private MainViewModel Model => Session.ViewModel;
+
+    /// <summary>今の画面（テストで確かめる）。</summary>
+    public string Page => _page;
+
+    protected override void OnInitialized()
+    {
+        Watch(Session, Model, Model.Queue, Model.SignIn);
+        Model.NavigationRequested += OnNavigationRequested;
+        _ = Session.StartAsync();
+    }
+
+    protected override void OnDispose() => Model.NavigationRequested -= OnNavigationRequested;
+
+    // ViewModel が画面を開くよう求めた（行の操作・サインアウト・通知から。Core の処理の続きで呼ばれる）
+    private void OnNavigationRequested(string page) => _ = InvokeAsync(() => Navigate(page));
+
+    private void Navigate(string page)
+    {
+        _page = page;
+        _ = Model.PageShownAsync(page);
+        StateHasChanged();
+    }
+
+    // 左のメニュー（デプロイの一覧・新しくデプロイは、サインインするまで押せない。No.63）。設定は下に離して置く
+    private static readonly (string Page, string Id, string Text, bool NeedsSignIn)[] NavItems =
+    [
+        (Pages.Target, "Nav.Target", "サインイン", false),
+        (Pages.Deployments, "Nav.Deployments", "デプロイの一覧", true),
+        (Pages.Wizard, "Nav.Wizard", "新しくデプロイ", true),
+        (Pages.Jobs, "Nav.Jobs", "ジョブの一覧", false),
+        (Pages.DryRun, "Nav.DryRun", "ローカル検証（Dry-run）", false),
+        (Pages.Settings, "Nav.AppSettings", "設定", false),
+    ];
+}

@@ -1,0 +1,36 @@
+@inherits ViewModelComponent
+
+@* ローカル検証（Dry-run。WinUI の画面の DryRunPanel。サインインは不要） *@
+<section class="tt-page tt-narrow" data-id="Panel.DryRun">
+    <h1>ローカル検証（Dry-run）</h1>
+    <p>次の内容で docker-compose.yml と .env を保存します（「新しくデプロイ」と同じ入力です）。Azure には接続しません（サインインは不要です）。</p>
+    <SelectField TItem="string" Id="DryRun.DbType" Label="DB 種別" Items="SettingsViewModel.DbTypes" Value="Settings.DbType" ValueChanged="v => Settings.DbType = v" />
+    <TextInput Id="DryRun.DbName" Label="DB 名" Value="@Settings.DbName" ValueChanged="v => Settings.DbName = v" Css="tt-wide" />
+    <TextInput Id="DryRun.TtTag" Label="timetracker イメージのタグ（空なら既定のタグ）" Placeholder="@Settings.DefaultTag" Value="@Settings.TtTag" ValueChanged="v => Settings.TtTag = v" Css="tt-wide" />
+    <TextInput Id="DryRun.DbPassword" Type="password" Label="DB のパスワード（8 文字以上）" Value="@Settings.DbPassword" ValueChanged="v => Settings.DbPassword = v" Css="tt-wide" />
+    <TextInput Id="DryRun.TrackerPassword" Type="password" Label="Timetracker のパスワード（8 文字以上）" Value="@Settings.TrackerPassword" ValueChanged="v => Settings.TrackerPassword = v" Css="tt-wide" />
+    <Message Id="DryRun.EnvWarning" Text="@DryRun.EnvWarning" Kind="MessageKind.Caution" />
+    <CommandButton Id="DryRun.Save" Command="DryRun.SaveCommand" Text="保存先を選んで保存" Css="tt-primary" />
+    <Message Id="DryRun.Error" Text="@DryRun.Error" />
+    <Lines Id="DryRun.Warnings" Items="DryRun.Warnings" Css="tt-caution" />
+    <Lines Id="DryRun.NextSteps" Items="DryRun.NextSteps" />
+    <CommandButton Id="DryRun.OpenFolder" Command="DryRun.OpenFolderCommand" Text="フォルダーを開く" />
+    @if (DryRun.HasComposeContent)
+    {
+        <label class="tt-field">
+            <span>docker-compose.yml</span>
+            <textarea class="tt-mono tt-compose" data-id="DryRun.Compose" readonly>@DryRun.ComposeContent</textarea>
+        </label>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public MainViewModel Model { get; set; } = default!;
+
+    private SettingsViewModel Settings => Model.Settings;
+
+    private DryRunViewModel DryRun => Model.DryRun;
+
+    protected override void OnInitialized() => Watch(Settings, DryRun, DryRun.Warnings, DryRun.NextSteps);
+}

@@ -1,47 +1,65 @@
 @using TTDeployTool.Application.Inventory
 @inherits ViewModelComponent
 
-@* デプロイの一覧（desktop-blazor-hybrid.md の 1。試作では、読み込み・選択・絞り込み・表・ページだけ。行の操作とまとめての操作は作らない） *@
-<section class="tt-page" aria-labelledby="deployments-title">
-    <h1 id="deployments-title">デプロイの一覧</h1>
+@* デプロイの一覧（WinUI の画面の DeploymentsPanel。Azure から集める。docs/design/desktop/desktop-jobs.md の 6.3・6.4、desktop-wizard.md の 7） *@
+<section class="tt-page" data-id="Panel.Deployments">
+    <h1>デプロイの一覧</h1>
+    <p>サインインしたアカウントで読めるサブスクリプションから、本ツールでデプロイした環境（別の PC・CLI・MCP サーバーでデプロイしたものを含む）を読みます。パスワードは「パスワードを表示」を押したときだけ Azure から読み、PC には保存しません。</p>
+    <CommandButton Id="Deployments.Load" Command="List.LoadCommand" Text="読み込む" />
+    <BusyView Id="Deployments.Busy" State="List.Busy" />
+    <Message Id="Deployments.Error" Text="@List.Error" />
+    <Lines Id="Deployments.Notices" Items="List.Notices" />
+
+    @* 選んだ行への操作（docs/design/desktop/desktop-wizard.md の 7） *@
     <div class="tt-bar">
-        <button type="button" class="tt-primary" disabled="@(!Model.LoadCommand.CanExecute(null))" @onclick="Model.LoadCommand.ExecuteAsync">読み込む</button>
-        @if (Model.Busy.IsBusy)
-        {
-            <span class="tt-busy" role="status">@Model.Busy.Text</span>
-        }
-        <span data-selection="deployments">@Model.SelectionText</span>
-        <button type="button" disabled="@(!Model.ClearSelectionCommand.CanExecute(null))" @onclick="Model.ClearSelectionCommand.ExecuteAsync">選択を外す</button>
+        <span data-id="Deployments.Selection">@List.SelectionText</span>
+        <CheckField Id="Deployments.BatchNoExpiry" Label="期限なし" Value="List.BatchNoExpiry" ValueChanged="v => List.BatchNoExpiry = v" />
+        <DateTimeInput Id="Deployments.BatchExpiry" DateLabel="期限日" Date="List.BatchExpiryDate" DateChanged="d => List.BatchExpiryDate = d" Disabled="List.BatchNoExpiry" />
+        <CommandButton Id="Deployments.ChangeExpiry" Command="List.ChangeSelectedExpiryCommand" Text="期限を変える" />
+        <CommandButton Id="Deployments.Delete" Command="List.DeleteSelectedCommand" Text="Azure から削除…" />
+        <CommandButton Id="Deployments.ClearSelection" Command="List.ClearSelectionCommand" Text="選択を外す" />
     </div>
-    @if (Model.Error is { } error)
-    {
-        <p class="tt-error" role="alert">@error</p>
-    }
-    @foreach (var notice in Model.Notices)
-    {
-        <p class="tt-notice">@notice</p>
-    }
-    <FilterBar TItem="DeploymentEntry" Filters="Model.Filters" Name="deployments" />
+    @* 選んだ行のグループをまとめて変える・外す（docs/design/common/deployment-groups.md の 5） *@
+    <div class="tt-bar">
+        <TextInput Id="Deployments.BatchGroup" Label="グループ名" Value="@List.BatchGroup" ValueChanged="v => List.BatchGroup = v" List="tt-batch-group-suggestions" />
+        <datalist id="tt-batch-group-suggestions">
+            @foreach (var group in List.BatchGroupSuggestions)
+            {
+                <option value="@group"></option>
+            }
+        </datalist>
+        <CommandButton Id="Deployments.ChangeGroup" Command="List.ChangeSelectedGroupCommand" Text="グループを変える" />
+        <CommandButton Id="Deployments.RemoveGroup" Command="List.RemoveSelectedGroupCommand" Text="グループを外す" />
+    </div>
+    <BusyView Id="Deployments.BatchBusy" State="List.BatchBusy" />
+    <p data-id="Deployments.BatchMessage">@List.BatchMessage</p>
+
+    <FilterBar TItem="DeploymentEntry" Filters="List.Filters" Name="deployments" />
     <DataTable TRow="DeploymentRowViewModel" TItem="DeploymentEntry" Source="_source" Label="デプロイの一覧" Clipboard="Clipboard" />
-    <Pager Name="deployments" Previous="Model.PreviousPageCommand" Next="Model.NextPageCommand" PageSizes="DeploymentListViewModel.PageSizes"
-           PageSize="Model.PageSize" PageSizeChanged="size => Model.PageSize = size" Text="@Model.PageText" />
+    <Pager Name="deployments" Previous="List.PreviousPageCommand" Next="List.NextPageCommand" PageSizes="DeploymentListViewModel.PageSizes"
+           PageSize="List.PageSize" PageSizeChanged="size => List.PageSize = size" Text="@List.PageText" />
+
+    @* 1 行だけ選んだときの詳細 *@
+    @if (List.Current is { } row)
+    {
+        <DeploymentDetail Row="row" />
+    }
 </section>
 
 @code {
     private TableSource<DeploymentRowViewModel, DeploymentEntry> _source = default!;
 
     [Parameter, EditorRequired]
-    public DeploymentListViewModel Model { get; set; } = default!;
-
-    [Parameter, EditorRequired]
-    public TableLayout Layout { get; set; } = default!;
+    public MainViewModel Model { get; set; } = default!;
 
     [Parameter]
     public IClipboardService? Clipboard { get; set; }
 
+    private DeploymentListViewModel List => Model.Deployments;
+
     protected override void OnInitialized()
     {
-        _source = TableSources.Deployments(Model, Layout);
-        Watch(Model, Model.Busy, Model.Notices, Model.LoadCommand, Model.ClearSelectionCommand);
+        _source = TableSources.Deployments(List, Model.DeploymentsLayout);
+        Watch(List, List.Busy, List.Notices, List.BatchBusy);
     }
 }

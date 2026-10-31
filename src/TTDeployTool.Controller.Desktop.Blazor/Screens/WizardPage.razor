@@ -1,0 +1,171 @@
+@using System.Globalization
+@inherits ViewModelComponent
+
+@* 新しくデプロイ（WinUI の画面の WizardPanel。docs/design/desktop/desktop-wizard.md の 3。入力は「設定」の ViewModel、計画と実行はデプロイの ViewModel） *@
+<section class="tt-page tt-narrow" data-id="Panel.Wizard">
+    <h1>新しくデプロイ</h1>
+    <p class="tt-strong" data-id="Wizard.Step">@Wizard.StepText</p>
+
+    @if (Wizard.IsCompleted)
+    {
+        @* 完了の表示: 進み具合と結果、続けて・新規（No.70） *@
+        <div data-id="Wizard.Completed">
+            <p class="tt-strong" data-id="Wizard.CompletedText">@Wizard.CompletedText</p>
+            <Message Id="Wizard.Error" Text="@Deployment.Error" Kind="MessageKind.Caution" />
+            <JobView Job="Wizard.RegisteredJob!" Mode="JobViewMode.Summary" />
+            <div class="tt-bar">
+                <CommandButton Id="Wizard.ShowJob" Command="Wizard.ShowJobCommand" Text="@Wizard.ShowJobText" Css="tt-primary" />
+                <CommandButton Id="Wizard.Continue" Command="Wizard.ContinueCommand" Text="続けてデプロイ（今の設定で ① から）" />
+                <CommandButton Id="Wizard.NewDeployment" Command="Wizard.NewDeploymentCommand" Text="新規デプロイ（初期値から）" />
+            </div>
+        </div>
+    }
+    else
+    {
+        @* どの画面にも出す: ①〜④のすべての入力の Markdown のコピーと、初期値に戻す（docs/design/desktop/desktop-settings.md） *@
+        <div class="tt-bar">
+            <CommandButton Id="Settings.CopyMarkdown" Command="Settings.CopyMarkdownCommand" Text="設定を Markdown でコピー" />
+            <CheckField Id="Settings.IncludePasswords" Label="パスワードも含める" Value="Settings.IncludePasswordsInCopy" ValueChanged="v => Settings.IncludePasswordsInCopy = v" />
+            <CommandButton Id="Settings.Reset" Command="Settings.ResetCommand" Text="初期値に戻す" />
+        </div>
+    }
+    <p data-id="Settings.Message">@Settings.Message</p>
+
+    @if (Wizard.IsTarget)
+    {
+        @* ① 対象 *@
+        <div class="tt-bar">
+            <SelectField TItem="TTDeployTool.Controller.Desktop.Core.Services.DeploymentTemplate" Id="Settings.Template" Label="テンプレート" Items="Settings.Templates"
+                         Value="Settings.SelectedTemplate" ValueChanged="t => Settings.SelectedTemplate = t" Display="t => t.Name" Empty="（テンプレートなし）" />
+            <CommandButton Id="Settings.ApplyTemplate" Command="Settings.ApplyTemplateCommand" Text="テンプレートから入力" />
+            <CommandButton Id="Settings.DeleteTemplate" Command="Settings.DeleteTemplateCommand" Text="テンプレートを削除" />
+        </div>
+        <div class="tt-bar">
+            <SelectField TItem="SubscriptionChoice" Id="Target.Subscription" Label="サブスクリプション" Items="Target.Subscriptions"
+                         Value="Target.SelectedSubscription" ValueChanged="s => Target.SelectedSubscription = s" Display="s => s.Display" />
+            <CommandButton Id="Target.Reload" Command="Target.LoadCommand" Text="読み直す" />
+        </div>
+        <TextInput Id="Target.ResourceGroup" Label="リソースグループ名（無ければ作成します）" Value="@Target.ResourceGroup" ValueChanged="v => Target.ResourceGroup = v" Css="tt-wide" />
+        <TextInput Id="Target.AppName" Label="アプリ名（リソース名の接頭辞）" Value="@Target.AppName" ValueChanged="v => Target.AppName = v" Css="tt-wide" />
+        <Message Id="Wizard.ActiveJobNotice" Text="@Wizard.ActiveJobNotice" Kind="MessageKind.Caution" />
+        <TextInput Id="Target.Location" Label="リージョン" Value="@Target.Location" ValueChanged="v => Target.Location = v" Css="tt-wide" />
+    }
+    else if (Wizard.IsDb)
+    {
+        @* ② DB *@
+        <SelectField TItem="string" Id="Settings.DbType" Label="DB 種別" Items="SettingsViewModel.DbTypes" Value="Settings.DbType" ValueChanged="v => Settings.DbType = v" />
+        <TextInput Id="Settings.DbName" Label="DB 名" Value="@Settings.DbName" ValueChanged="v => Settings.DbName = v" Css="tt-wide" />
+        <TextInput Id="Settings.TtTag" Label="timetracker イメージのタグ（空なら既定のタグ）" Placeholder="@Settings.DefaultTag" Value="@Settings.TtTag" ValueChanged="v => Settings.TtTag = v" Css="tt-wide" />
+        <SelectField TItem="PersistDbOption" Id="Settings.PersistDb" Label="DB のデータ" Items="SettingsViewModel.PersistDbOptions" Value="Settings.PersistDb" ValueChanged="v => Settings.PersistDb = v" Display="o => o.Label" />
+    }
+    else if (Wizard.IsPasswords)
+    {
+        @* ③ パスワード *@
+        <p>パスワードは保存しません（アプリを終了すると消えます。テンプレートにも保存しません）。</p>
+        <TextInput Id="Settings.DbPassword" Type="password" Label="DB のパスワード（8 文字以上）" Value="@Settings.DbPassword" ValueChanged="v => Settings.DbPassword = v" Css="tt-wide" />
+        <TextInput Id="Settings.TrackerPassword" Type="password" Label="Timetracker のパスワード（8 文字以上）" Value="@Settings.TrackerPassword" ValueChanged="v => Settings.TrackerPassword = v" Css="tt-wide" />
+    }
+    else if (Wizard.IsSpec)
+    {
+        @* ④ スペックと利用可能期限 *@
+        <p class="tt-strong">CPU（vCPU）とメモリ（Gi）</p>
+        <div class="tt-bar">
+            <TextInput Id="Settings.TtCpu" Label="Timetracker の CPU" Value="@Settings.TtCpu" ValueChanged="v => Settings.TtCpu = v" Css="tt-short" />
+            <TextInput Id="Settings.TtMemory" Label="Timetracker のメモリ" Value="@Settings.TtMemoryGi" ValueChanged="v => Settings.TtMemoryGi = v" Css="tt-short" />
+            <TextInput Id="Settings.DbCpu" Label="DB の CPU" Value="@Settings.DbCpu" ValueChanged="v => Settings.DbCpu = v" Css="tt-short" />
+            <TextInput Id="Settings.DbMemory" Label="DB のメモリ" Value="@Settings.DbMemoryGi" ValueChanged="v => Settings.DbMemoryGi = v" Css="tt-short" />
+            <TextInput Id="Settings.RedisCpu" Label="Redis の CPU" Value="@Settings.RedisCpu" ValueChanged="v => Settings.RedisCpu = v" Css="tt-short" />
+            <TextInput Id="Settings.RedisMemory" Label="Redis のメモリ" Value="@Settings.RedisMemoryGi" ValueChanged="v => Settings.RedisMemoryGi = v" Css="tt-short" />
+        </div>
+        <SelectField TItem="ExpiryOption" Id="Settings.Expiry" Label="利用可能期限日" Items="SettingsViewModel.ExpiryOptions" Value="Settings.Expiry" ValueChanged="v => Settings.Expiry = v" Display="o => o.Label" />
+        @if (Settings.IsExpiryDate)
+        {
+            <DateTimeInput Id="Settings.Expiry" DateLabel="期限日" Date="Settings.ExpiryDate" DateChanged="d => Settings.ExpiryDate = d" />
+        }
+        <p data-id="Settings.ExpiryNotice">@Settings.ExpiryNotice</p>
+        @* グループ（任意。デプロイの一覧のグループを候補に出す。docs/design/common/deployment-groups.md の 4） *@
+        <TextInput Id="Settings.Group" Label="グループ（任意）" Placeholder="例: 研修・営業部向け" Value="@Settings.Group" ValueChanged="v => Settings.Group = v" List="tt-group-suggestions" Css="tt-wide" />
+        <datalist id="tt-group-suggestions">
+            @foreach (var group in Settings.GroupSuggestions)
+            {
+                <option value="@group"></option>
+            }
+        </datalist>
+        <p data-id="Settings.GroupNotice">@SettingsViewModel.GroupNotice</p>
+    }
+    else if (Wizard.IsConfirm)
+    {
+        @* ⑤ 確認と実行（開くと計画を作る） *@
+        <p>「計画」は Azure を読むだけで、変更しません。内容を確かめてから「今すぐ実行」か「予定に追加」を押してください。</p>
+        <CommandButton Id="Deploy.Plan" Command="Deployment.PlanCommand" Text="計画し直す" />
+        <BusyView Id="Deploy.Busy" State="Deployment.Busy" />
+        <Message Id="Deploy.Error" Text="@Deployment.Error" />
+        @if (Deployment.HasPlan)
+        {
+            <ul class="tt-lines" data-id="Deploy.Operations">
+                @foreach (var operation in Deployment.Operations)
+                {
+                    <li class="@(operation.DataLoss ? "tt-critical" : null)">@operation.Action  @operation.Name（@operation.Resource）</li>
+                }
+            </ul>
+            <p>@Deployment.PersistDbText</p>
+            <p data-id="Deploy.Expiry">@Deployment.ExpiryText</p>
+            <p data-id="Deploy.Group">@Deployment.GroupText</p>
+            <p>@Deployment.PermissionText</p>
+            <p>@Deployment.EstimatedDuration</p>
+            <p>@(Deployment.ExpiresAt is { } expires ? $"計画の有効期限: {expires.ToLocalTime().ToString("HH:mm", CultureInfo.InvariantCulture)}" : null)</p>
+            <Lines Id="Deploy.Blockers" Items="Deployment.Blockers" Css="tt-critical" />
+            <Lines Id="Deploy.Warnings" Items="Deployment.Warnings" Css="tt-caution" />
+            @if (Deployment.RequiresDataLossAck)
+            {
+                <CheckField Id="Deploy.DataLossAck" Label="DB のデータが失われることを理解しました" Value="Deployment.DataLossAcknowledged" ValueChanged="v => Deployment.DataLossAcknowledged = v" />
+            }
+            <CommandButton Id="Deploy.Start" Command="Deployment.StartCommand" Text="今すぐ実行" Css="tt-primary" />
+            <div class="tt-bar">
+                <DateTimeInput Id="Deploy.Schedule" Date="Deployment.Schedule.Date" DateChanged="d => Deployment.Schedule.Date = d"
+                               Time="Deployment.Schedule.TimeOfDay" TimeChanged="t => Deployment.Schedule.TimeOfDay = t" />
+                <CommandButton Id="Deploy.Schedule" Command="Deployment.ScheduleCommand" Text="予定に追加" />
+            </div>
+            @if (Deployment.CanKeepSchedule)
+            {
+                <CheckField Id="Deploy.KeepSchedule" Label="予定をアプリの終了・再起動の後も残す（パスワードを暗号化してこの PC に保存）"
+                            Value="Deployment.KeepScheduleAfterRestart" ValueChanged="v => Deployment.KeepScheduleAfterRestart = v" />
+            }
+            <Message Id="Deploy.Blocked" Text="@Deployment.BlockedText" Kind="MessageKind.Caution" />
+            <p class="tt-subtle" data-id="Deploy.ScheduleNote">@Deployment.ScheduleNote</p>
+        }
+        <div class="tt-bar">
+            <TextInput Id="Settings.TemplateName" Label="テンプレートの名前" Value="@Settings.TemplateName" ValueChanged="v => Settings.TemplateName = v" />
+            <CommandButton Id="Settings.SaveTemplate" Command="Settings.SaveTemplateCommand" Text="この設定をテンプレートとして保存（パスワードは保存しません）" />
+        </div>
+    }
+
+    @if (Wizard.IsEditing)
+    {
+        @* この画面の誤りと警告（⑤ ではすべて）と、戻る・次へ *@
+        <Lines Id="Wizard.Errors" Items="Wizard.StepErrors" Css="tt-critical" />
+        <Lines Id="Wizard.Warnings" Items="Wizard.StepWarnings" Css="tt-caution" />
+        <div class="tt-bar">
+            <CommandButton Id="Wizard.Back" Command="Wizard.BackCommand" Text="戻る" />
+            <CommandButton Id="Wizard.Next" Command="Wizard.NextCommand" Text="次へ" Css="tt-primary" />
+            <span class="tt-caution" data-id="Wizard.Blocked">@Wizard.BlockedText</span>
+        </div>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public MainViewModel Model { get; set; } = default!;
+
+    private DeployWizardViewModel Wizard => Model.Wizard;
+
+    private SettingsViewModel Settings => Model.Settings;
+
+    private TargetViewModel Target => Model.Target;
+
+    private DeploymentViewModel Deployment => Model.Deployment;
+
+    protected override void OnInitialized() =>
+        Watch(Wizard, Wizard.StepErrors, Wizard.StepWarnings, Settings, Settings.Templates, Target, Target.Subscriptions, Deployment, Deployment.Operations,
+            Deployment.Blockers, Deployment.Warnings, Deployment.Schedule);
+}

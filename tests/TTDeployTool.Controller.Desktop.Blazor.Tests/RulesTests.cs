@@ -166,27 +166,3 @@ public sealed class JsModuleTests
         await JsModule.DisposeQuietlyAsync(module);
     }
 }
-
-public sealed class PrototypeTests
-{
-    [Fact]
-    public async Task Start_Should_Run_Once_And_Dialogs_Should_Decline()
-    {
-        using var app = new TestApp();
-        var runs = 0;
-        var session = new PrototypeSession(app.ViewModel, null, _ =>
-        {
-            runs++;
-            return Task.CompletedTask;
-        });
-
-        await session.StartAsync();
-        await session.StartAsync();
-
-        runs.Should().Be(1);
-        session.Clipboard.Should().BeNull();
-        var dialogs = new PrototypeDialogs();
-        (await dialogs.PickFolderAsync()).Should().BeNull();
-        (await dialogs.ConfirmAsync("t", "m", "c")).Should().BeFalse();
-    }
-}

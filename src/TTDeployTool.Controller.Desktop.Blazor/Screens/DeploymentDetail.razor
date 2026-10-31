@@ -1,0 +1,40 @@
+@inherits ViewModelComponent
+
+@* デプロイの一覧で 1 行だけ選んだときの詳細（URL・注意・DB とスペック・対象に入れる・状態を確認・パスワードを表示） *@
+<section class="tt-card" data-id="Deployments.Detail">
+    <p class="tt-strong">@Row.AppName（@Row.ResourceGroup）</p>
+    @if (Row.Url is { } url)
+    {
+        <button type="button" class="tt-link" data-id="Row.Url" disabled="@(!Row.OpenCommand.CanExecute(null))" @onclick="Row.OpenCommand.ExecuteAsync">@url</button>
+    }
+    <Message Id="Row.GroupWarning" Text="@Row.GroupWarning" Kind="MessageKind.Caution" />
+    <Message Id="Row.ExpiryWarning" Text="@Row.ExpiryWarning" Kind="MessageKind.Caution" />
+    <p>@Row.DbTypeText、@Row.PersistenceText、@Row.SpecText</p>
+    <div class="tt-bar">
+        <CommandButton Id="Row.UseAsTarget" Command="Row.UseAsTargetCommand" Text="対象に入れる" />
+        <CommandButton Id="Row.CheckStatus" Command="Row.CheckStatusCommand" Text="@Row.CheckStatusText" />
+        <CommandButton Id="Row.ShowPasswords" Command="Row.ShowPasswordsCommand" Text="パスワードを表示" />
+    </div>
+    @if (Row.HasPasswords)
+    {
+        <div class="tt-bar">
+            <span>DB のパスワード:</span><span class="tt-mono tt-noselect" data-id="Row.DbPassword">@Row.DbPasswordText</span>
+            <CommandButton Id="Row.CopyDbPassword" Command="Row.CopyDbPasswordCommand" Text="コピー" />
+        </div>
+        <div class="tt-bar">
+            <span>Timetracker のパスワード:</span><span class="tt-mono tt-noselect" data-id="Row.TrackerPassword">@Row.TrackerPasswordText</span>
+            <CommandButton Id="Row.CopyTrackerPassword" Command="Row.CopyTrackerPasswordCommand" Text="コピー" />
+        </div>
+        <CommandButton Id="Row.TogglePasswords" Command="Row.TogglePasswordsCommand" Text="表示する・伏せる" />
+    }
+    <BusyView Id="Row.Busy" State="Row.Busy" />
+    <p data-id="Row.Message">@Row.Message</p>
+    <Message Id="Row.Error" Text="@Row.Error" />
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public DeploymentRowViewModel Row { get; set; } = default!;
+
+    protected override void OnParametersSet() => Watcher.Sync([Row, Row.Busy, Row.OpenCommand]);
+}

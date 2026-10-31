@@ -1,0 +1,16 @@
+@* 誤り（Error）・注意（Caution）・お知らせ（Info）の帯。文字が無ければ出さない（WinUI の画面の InfoBar と、色つきの TextBlock） *@
+@if (!string.IsNullOrEmpty(Text))
+{
+    <p class="tt-message tt-@Kind.ToString().ToLowerInvariant()" role="@(Kind == MessageKind.Error ? "alert" : "status")" data-id="@Id">@Text</p>
+}
+
+@code {
+    [Parameter]
+    public string Id { get; set; } = "";
+
+    [Parameter]
+    public string? Text { get; set; }
+
+    [Parameter]
+    public MessageKind Kind { get; set; } = MessageKind.Error;
+}

@@ -1,0 +1,68 @@
+@inherits ViewModelComponent
+
+@* ジョブの進み具合・ログ・結果（WinUI の画面の JobTemplate・JobSummaryTemplate・JobRowTemplate） *@
+<section class="tt-job" data-id="@(Mode == JobViewMode.Summary ? "Wizard.Job" : "Status.Job")">
+    @if (Mode == JobViewMode.Summary)
+    {
+        <p data-id="WizardJob.Status">@Job.StatusText</p>
+        @if (Job.IsRunning)
+        {
+            <div class="tt-progress" role="progressbar" aria-label="実行中"></div>
+        }
+        <p data-id="WizardJob.Step">@Job.StepText</p>
+        <Message Id="WizardJob.Note" Text="@Job.Note" Kind="MessageKind.Caution" />
+        <Message Id="WizardJob.Error" Text="@Job.Error" />
+        <p>@Job.ExpirySummary</p>
+        @if (Job.Endpoint is { } endpoint)
+        {
+            <a href="@endpoint" target="_blank" data-id="WizardJob.Endpoint">@endpoint</a>
+        }
+    }
+    else
+    {
+        <h3><span data-id="Job.Title">@Job.Title</span>: <span data-id="Job.Status">@Job.StatusText</span></h3>
+        @if (Job.IsRunning)
+        {
+            <div class="tt-progress" role="progressbar" aria-label="実行中" data-id="Job.Progress"></div>
+        }
+        <p data-id="Job.Step">@Job.StepText</p>
+        <p data-id="Job.Times">@Job.TimesText</p>
+        <Message Id="Job.Note" Text="@Job.Note" Kind="MessageKind.Caution" />
+        <Message Id="Job.Error" Text="@Job.Error" />
+        <p>@Job.PersistenceSummary</p>
+        <p data-id="Job.Expiry">@Job.ExpirySummary</p>
+        <p>@Job.DeletionSummary</p>
+        @if (Job.Endpoint is { } endpoint)
+        {
+            <a href="@endpoint" target="_blank">@endpoint</a>
+        }
+        <Lines Id="Job.Logs" Items="Job.Logs" Css="tt-mono" />
+        <div class="tt-bar">
+            <CommandButton Id="Job.Copy" Command="Job.CopyCommand" Text="Markdown でコピー" />
+            <span>@Job.CopyMessage</span>
+        </div>
+        @if (Job.IsActive)
+        {
+            <div class="tt-bar">
+                <CommandButton Id="Job.Cancel" Command="Job.CancelCommand" Text="取り消し" />
+                <CommandButton Id="Job.Pause" Command="Job.PauseCommand" Text="一時停止" />
+                <CommandButton Id="Job.Resume" Command="Job.ResumeCommand" Text="再開" />
+                <CommandButton Id="Job.Stop" Command="Job.StopCommand" Text="停止（今の手順の後で止める）" />
+            </div>
+            <div class="tt-bar">
+                <DateTimeInput Id="Job.Edit" Date="Job.EditDate" DateChanged="d => Job.EditDate = d" Time="Job.EditTime" TimeChanged="t => Job.EditTime = t" />
+                <CommandButton Id="Job.Reschedule" Command="Job.RescheduleCommand" Text="予定を変える" />
+            </div>
+        }
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public JobViewModel Job { get; set; } = default!;
+
+    [Parameter]
+    public JobViewMode Mode { get; set; } = JobViewMode.Row;
+
+    protected override void OnParametersSet() => Watcher.Sync([Job, Job.Logs]);
+}

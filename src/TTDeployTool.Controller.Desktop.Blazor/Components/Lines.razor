@@ -1,0 +1,22 @@
+@* 文字の一覧（誤り・警告・注意・ログなど。読み上げで 1 行ずつ読めるよう、箇条書きにする） *@
+@if (Items.Count > 0)
+{
+    <ul class="tt-lines @Css" data-id="@Id">
+        @foreach (var line in Items)
+        {
+            <li>@line</li>
+        }
+    </ul>
+}
+
+@code {
+    [Parameter]
+    public string Id { get; set; } = "";
+
+    [Parameter]
+    public IReadOnlyCollection<string> Items { get; set; } = [];
+
+    /// <summary>tt-critical（誤り）・tt-caution（警告）・tt-mono（ログ）など。</summary>
+    [Parameter]
+    public string? Css { get; set; }
+}

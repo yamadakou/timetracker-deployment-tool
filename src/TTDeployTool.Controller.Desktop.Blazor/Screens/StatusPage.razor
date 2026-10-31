@@ -1,0 +1,46 @@
+@inherits ViewModelComponent
+
+@* 実行状況（今すぐ実行・今すぐ削除の後と、一覧の「状態を確認」・ジョブの「詳細」から開く。WinUI の画面の StatusPanel） *@
+<section class="tt-page tt-narrow" data-id="Panel.Status">
+    <h1>実行状況</h1>
+    <button type="button" data-id="Status.BackToList" @onclick="() => Back.InvokeAsync(Model.ReturnPage)">@Model.ReturnText</button>
+    @if (Model.StatusJob is { } job)
+    {
+        <JobView Job="job" Mode="JobViewMode.Row" />
+    }
+    <CommandButton Id="Deploy.OpenEndpoint" Command="Model.OpenEndpointCommand" Text="Timetracker を開く" />
+    <h2>Azure の状態</h2>
+    <div class="tt-bar">
+        <CommandButton Id="Status.Refresh" Command="Status.RefreshCommand" Text="読み直す" />
+        <CommandButton Id="Status.Copy" Command="Status.CopyCommand" Text="Markdown でコピー" />
+    </div>
+    <p data-id="Status.Message">@Status.Message</p>
+    <BusyView Id="Status.Busy" State="Status.Busy" />
+    <Message Id="Status.Error" Text="@Status.Error" />
+    <p data-id="Status.Summary">@Status.Summary</p>
+    <Message Id="Status.Note" Text="@Status.Note" Kind="MessageKind.Caution" />
+    <p data-id="Status.Persistence">@Status.PersistenceText</p>
+    @if (Status.Endpoint is { } endpoint)
+    {
+        <a href="@endpoint" target="_blank">@endpoint</a>
+    }
+    <ul class="tt-apps">
+        @foreach (var app in Status.Apps)
+        {
+            <li><span class="tt-strong">@app.Role: @app.Name</span><br />@app.State、@app.Resources、@app.Image</li>
+        }
+    </ul>
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public MainViewModel Model { get; set; } = default!;
+
+    /// <summary>「戻る」（開いた画面の名前）。</summary>
+    [Parameter]
+    public EventCallback<string> Back { get; set; }
+
+    private StatusViewModel Status => Model.Status;
+
+    protected override void OnInitialized() => Watch(Model, Status, Status.Apps);
+}

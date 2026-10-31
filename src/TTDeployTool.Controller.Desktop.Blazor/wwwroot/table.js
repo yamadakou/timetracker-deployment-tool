@@ -41,7 +41,8 @@ export function attach(root, dotnet) {
   });
   root.addEventListener('mouseover', e => {
     const cell = e.target.closest('.tt-cell');
-    if (!cell) return;
+    // 行の ViewModel がツールチップを持つセル（グループの食い違い・各アプリの状態）は、そのまま出す
+    if (!cell || cell.hasAttribute('data-tip')) return;
     if (cell.scrollHeight > cell.clientHeight + 1) cell.title = cell.textContent;
     else cell.removeAttribute('title');
   });

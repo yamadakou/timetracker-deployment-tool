@@ -25,6 +25,12 @@ public abstract class ViewModelComponent : ComponentBase, IDisposable
     public void Dispose()
     {
         Watcher.Dispose();
+        OnDispose();
         GC.SuppressFinalize(this);
+    }
+
+    /// <summary>購読を外すなど（派生のコンポーネント）。</summary>
+    protected virtual void OnDispose()
+    {
     }
 }

@@ -31,8 +31,7 @@ public sealed class DeploymentTableTests : IAsyncLifetime
 
     private IRenderedComponent<DeploymentsPage> Render(RecordingClipboard? clipboard = null) =>
         _app.Context.Render<DeploymentsPage>(p => p
-            .Add(x => x.Model, List)
-            .Add(x => x.Layout, _app.ViewModel.DeploymentsLayout)
+            .Add(x => x.Model, _app.ViewModel)
             .Add(x => x.Clipboard, clipboard ?? _app.Clipboard));
 
     private IReadOnlyList<IElement> Rows => _page.FindAll("tbody tr");
@@ -58,7 +57,7 @@ public sealed class DeploymentTableTests : IAsyncLifetime
         Header("Job").QuerySelector(".tt-nosort").Should().NotBeNull();
         _page.Find("table").GetAttribute("style").Should().Be("min-width: 1220px");
         _page.Find(".tt-page-text").TextContent.Should().Contain("1〜20 件目");
-        _page.Find(".tt-notice").TextContent.Should().Contain("Azure に反映されるまで");
+        _page.Find("[data-id='Deployments.Notices']").TextContent.Should().Contain("Azure に反映されるまで");
     }
 
     [Fact]
@@ -191,7 +190,7 @@ public sealed class DeploymentTableTests : IAsyncLifetime
         Rows[0].GetAttribute("aria-selected").Should().Be("true");
         Rows[0].ClassList.Should().Contain("tt-selected");
         _page.Find("thead input[type=checkbox]").GetAttribute("data-indeterminate").Should().Be("true");
-        _page.Find("[data-selection='deployments']").TextContent.Should().Be("2 件を選んでいます。");
+        _page.Find("[data-id='Deployments.Selection']").TextContent.Should().Be("2 件を選んでいます。");
 
         Rows[0].Click();
         List.Selected.Should().ContainSingle();
@@ -203,7 +202,7 @@ public sealed class DeploymentTableTests : IAsyncLifetime
         List.Selected.Should().BeEmpty();
 
         Rows[1].Click();
-        _page.Find(".tt-bar button:not(.tt-primary)").Click();
+        _page.Find("[data-id='Deployments.ClearSelection']").Click();
         List.Selected.Should().BeEmpty();
     }
 
@@ -279,7 +278,7 @@ public sealed class DeploymentTableTests : IAsyncLifetime
         _page.FindAll(".tt-menu button")[0].Click();
         _page.Find(".tt-status").TextContent.Should().Be("コピーできませんでした。もう一度試してください。");
 
-        var page = _app.Context.Render<DeploymentsPage>(p => p.Add(x => x.Model, List).Add(x => x.Layout, _app.ViewModel.DeploymentsLayout));
+        var page = _app.Context.Render<DeploymentsPage>(p => p.Add(x => x.Model, _app.ViewModel));
         page.FindAll("tbody tr")[0].QuerySelector("td[data-key='AppName']")!.ContextMenu(new MouseEventArgs());
         page.FindAll(".tt-menu button")[0].Click();
         page.Find(".tt-status").TextContent.Should().BeEmpty();

@@ -1,49 +1,58 @@
 @inherits ViewModelComponent
 
-@* ジョブの一覧（desktop-blazor-hybrid.md の 1）。行のダブルクリックで、そのジョブの詳細を出す（WinUI の画面では実行状況の画面を開く） *@
-<section class="tt-page" aria-labelledby="jobs-title">
-    <h1 id="jobs-title">ジョブの一覧</h1>
+@* ジョブの一覧（WinUI の画面の JobsPanel。docs/design/desktop/desktop-wizard.md の 7）。サインインしていなくても開ける（過去の記録を見るため。
+   ジョブの操作はサインインするまで押せない。No.78）。1 行だけ選んで「詳細」か、行のダブルクリックで、実行状況の画面を開く *@
+<section class="tt-page" data-id="Panel.Jobs">
+    <h1>ジョブの一覧</h1>
+    <p>このアプリで登録したデプロイ・削除です（予定・実行中・終わったもの）。終わったジョブは、アプリを終了しても記録として残します（180 日・500 件まで）。行を選ぶと、まとめて取り消し・一時停止・再開・予定の変更・記録から削除ができます。1 行だけ選んで「詳細」（または行をダブルクリック）で、進み具合・結果・ログを見られます。「記録から削除」は、この一覧と PC の記録を消すだけで、Azure のリソースは消しません（Azure から消すときは、デプロイの一覧の「Azure から削除…」）。</p>
     <div class="tt-bar">
-        <span data-selection="jobs">@Model.SelectionText</span>
-        <button type="button" disabled="@(!Model.ClearSelectionCommand.CanExecute(null))" @onclick="Model.ClearSelectionCommand.ExecuteAsync">選択を外す</button>
+        <span data-id="Jobs.Count">@Jobs.CountText</span>
+        <CommandButton Id="Jobs.DeleteFinishedRecords" Command="Jobs.DeleteFinishedRecordsCommand" Text="終わったジョブを記録から削除" Disabled="!SignedIn" />
     </div>
-    <FilterBar TItem="JobViewModel" Filters="Model.Filters" Name="jobs" />
-    <DataTable TRow="JobViewModel" TItem="JobViewModel" Source="_source" Label="ジョブの一覧" Clipboard="Clipboard" OnRowDoubleClick="Open" />
-    <Pager Name="jobs" Previous="Model.PreviousPageCommand" Next="Model.NextPageCommand" PageSizes="JobListViewModel.PageSizes"
-           PageSize="Model.PageSize" PageSizeChanged="size => Model.PageSize = size" Text="@Model.CountText" />
-    @if (_detail is { } job)
+    @if (!SignedIn)
     {
-        <section class="tt-detail" aria-label="ジョブの詳細">
-            <h2>@job.Title</h2>
-            <p>@job.StatusText</p>
-            <p>@job.TimesText</p>
-            @if (job.ResultText is { } result)
-            {
-                <p class="tt-detail-result">@result</p>
-            }
-            <button type="button" @onclick="() => _detail = null">閉じる</button>
-        </section>
+        <p data-id="Jobs.SignInNote">サインインするまで、ジョブの操作（取り消し・一時停止・再開・予定の変更・記録から削除）はできません。一覧と詳細は見られます。</p>
     }
+    @* 選んだ行への操作 *@
+    <div class="tt-bar">
+        <span data-id="Jobs.Selection">@Jobs.SelectionText</span>
+        <button type="button" data-id="Jobs.Detail" disabled="@(!Jobs.HasCurrent)" @onclick="() => Open(Jobs.Current!)">詳細</button>
+        <CommandButton Id="Jobs.CancelSelected" Command="Jobs.CancelSelectedCommand" Text="取り消し" Disabled="!SignedIn" />
+        <CommandButton Id="Jobs.PauseSelected" Command="Jobs.PauseSelectedCommand" Text="一時停止" Disabled="!SignedIn" />
+        <CommandButton Id="Jobs.ResumeSelected" Command="Jobs.ResumeSelectedCommand" Text="再開" Disabled="!SignedIn" />
+        <CommandButton Id="Jobs.DeleteSelectedRecords" Command="Jobs.DeleteSelectedRecordsCommand" Text="記録から削除" Disabled="!SignedIn" />
+        <CommandButton Id="Jobs.ClearSelection" Command="Jobs.ClearSelectionCommand" Text="選択を外す" />
+    </div>
+    <div class="tt-bar">
+        <DateTimeInput Id="Jobs.Schedule" Date="Jobs.Schedule.Date" DateChanged="d => Jobs.Schedule.Date = d" Time="Jobs.Schedule.TimeOfDay" TimeChanged="t => Jobs.Schedule.TimeOfDay = t" Disabled="!SignedIn" />
+        <CommandButton Id="Jobs.RescheduleSelected" Command="Jobs.RescheduleSelectedCommand" Text="選んだジョブの予定を変える" Disabled="!SignedIn" />
+    </div>
+    <p data-id="Jobs.Message">@Jobs.Message</p>
+    <FilterBar TItem="JobViewModel" Filters="Jobs.Filters" Name="jobs" />
+    <DataTable TRow="JobViewModel" TItem="JobViewModel" Source="_source" Label="ジョブの一覧" Clipboard="Clipboard" OnRowDoubleClick="Open" />
+    <Pager Name="jobs" Previous="Jobs.PreviousPageCommand" Next="Jobs.NextPageCommand" PageSizes="JobListViewModel.PageSizes"
+           PageSize="Jobs.PageSize" PageSizeChanged="size => Jobs.PageSize = size" Text="@Jobs.CountText" />
 </section>
 
 @code {
     private TableSource<JobViewModel, JobViewModel> _source = default!;
-    private JobViewModel? _detail;
 
     [Parameter, EditorRequired]
-    public JobListViewModel Model { get; set; } = default!;
-
-    [Parameter, EditorRequired]
-    public TableLayout Layout { get; set; } = default!;
+    public MainViewModel Model { get; set; } = default!;
 
     [Parameter]
     public IClipboardService? Clipboard { get; set; }
 
+    private JobListViewModel Jobs => Model.JobList;
+
+    private bool SignedIn => Model.SignIn.IsSignedIn;
+
     protected override void OnInitialized()
     {
-        _source = TableSources.Jobs(Model, Layout);
-        Watch(Model, Model.ClearSelectionCommand);
+        _source = TableSources.Jobs(Jobs, Model.JobsLayout);
+        Watch(Jobs, Jobs.Schedule, Model.SignIn);
     }
 
-    private void Open(JobViewModel job) => _detail = job;
+    // 実行状況の画面で開く（WinUI の画面の「詳細」と、行のダブルクリック）
+    private Task Open(JobViewModel job) => Model.OpenJobAsync(job);
 }

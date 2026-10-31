@@ -1,0 +1,18 @@
+@using TTDeployTool.Controller.Desktop.Core.Mvvm
+@inherits ViewModelComponent
+
+@* 処理中の表示（WinUI の画面の ProgressRing と文字） *@
+@if (State.IsBusy)
+{
+    <div class="tt-busy" role="status"><span class="tt-spinner" aria-hidden="true"></span><span data-id="@Id">@State.Text</span></div>
+}
+
+@code {
+    [Parameter]
+    public string Id { get; set; } = "";
+
+    [Parameter, EditorRequired]
+    public BusyState State { get; set; } = default!;
+
+    protected override void OnInitialized() => Watch(State);
+}

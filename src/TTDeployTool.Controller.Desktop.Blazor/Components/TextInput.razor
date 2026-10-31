@@ -1,0 +1,68 @@
+@implements IAsyncDisposable
+
+@* 文字の入力欄（desktop-blazor-hybrid.md の 13.1）。Core の値を描き直しで入力欄に入れ直さない（日本語の変換の途中に値を入れると変換が切れるため）。
+   打つたびに Core に渡し、Core の値が外から変わったとき（初期値に戻す・テンプレートから入力など）だけ JavaScript で入れる。
+   Core が前後の空白を除くときは、入力中のため書き戻さない（Core の TableRules.WriteBack。WinUI の画面と同じ） *@
+<label class="tt-field @Css">
+    <span>@Label</span>
+    <input type="@Type" @ref="_box" data-id="@Id" value="@_initial" placeholder="@Placeholder" list="@List" autocomplete="off" @oninput="OnInput" />
+</label>
+
+@code {
+    private ElementReference _box;
+    private string _initial = "";
+    private string _text = "";
+    private Task<IJSObjectReference>? _module;
+
+    [Inject]
+    private IJSRuntime JS { get; set; } = default!;
+
+    /// <summary>入力欄の名前（テストが探す。WinUI の画面の AutomationId と同じ）。</summary>
+    [Parameter]
+    public string Id { get; set; } = "";
+
+    [Parameter]
+    public string Label { get; set; } = "";
+
+    /// <summary>text か password。</summary>
+    [Parameter]
+    public string Type { get; set; } = "text";
+
+    [Parameter]
+    public string? Placeholder { get; set; }
+
+    /// <summary>入力の候補（datalist の id）。</summary>
+    [Parameter]
+    public string? List { get; set; }
+
+    [Parameter]
+    public string? Css { get; set; }
+
+    [Parameter]
+    public string Value { get; set; } = "";
+
+    [Parameter]
+    public EventCallback<string> ValueChanged { get; set; }
+
+    protected override void OnInitialized()
+    {
+        _initial = _text = Value;
+        _module = Tables.JsModule.ImportAsync(JS);
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!TableRules.WriteBack(_text, Value))
+            return;
+        _text = Value;
+        await Tables.JsModule.InvokeQuietlyAsync(_module!, "setValue", _box, _text);
+    }
+
+    private async Task OnInput(ChangeEventArgs e)
+    {
+        _text = (string?)e.Value ?? "";
+        await ValueChanged.InvokeAsync(_text);
+    }
+
+    public ValueTask DisposeAsync() => Tables.JsModule.DisposeQuietlyAsync(_module!);
+}

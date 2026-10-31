@@ -1,0 +1,46 @@
+@typeparam TItem
+
+@* 一覧から選ぶ（WinUI の画面の ComboBox。値は一覧の番号で受け渡す） *@
+<label class="tt-field">
+    <span>@Label</span>
+    <select data-id="@Id" disabled="@Disabled" @onchange="Changed">
+        @if (Value is null)
+        {
+            <option value="" selected>@Empty</option>
+        }
+        @for (var i = 0; i < Items.Count; i++)
+        {
+            <option value="@i" selected="@(EqualityComparer<TItem>.Default.Equals(Items[i], Value))">@Display(Items[i])</option>
+        }
+    </select>
+</label>
+
+@code {
+    [Parameter]
+    public string Id { get; set; } = "";
+
+    [Parameter]
+    public string Label { get; set; } = "";
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<TItem> Items { get; set; } = [];
+
+    [Parameter]
+    public TItem? Value { get; set; }
+
+    [Parameter]
+    public EventCallback<TItem> ValueChanged { get; set; }
+
+    [Parameter]
+    public Func<TItem, string> Display { get; set; } = item => $"{item}";
+
+    /// <summary>まだ選んでいないときの表示。</summary>
+    [Parameter]
+    public string Empty { get; set; } = "（選んでください）";
+
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    private Task Changed(ChangeEventArgs e) =>
+        int.TryParse((string?)e.Value, out var index) ? ValueChanged.InvokeAsync(Items[index]) : Task.CompletedTask;
+}

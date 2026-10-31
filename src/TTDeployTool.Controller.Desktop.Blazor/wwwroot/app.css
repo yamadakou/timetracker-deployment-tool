@@ -29,12 +29,52 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 .tt-primary:hover:not(:disabled) { background: var(--tt-accent); filter: brightness(1.1); }
 input[type=text], input[type=search], input[type=date], select { background: var(--tt-card); border: 1px solid var(--tt-line); border-radius: 4px; padding: 4px 8px; }
 
-.tt-header { display: flex; align-items: center; gap: 16px; padding: 8px 16px; background: var(--tt-card); border-bottom: 1px solid var(--tt-line); }
-.tt-title { font-weight: 600; }
-.tt-tabs { display: flex; gap: 4px; }
-.tt-tabs [aria-selected=true] { border-color: var(--tt-accent); box-shadow: inset 0 -2px var(--tt-accent); }
-.tt-account { margin-left: auto; color: var(--tt-subtle); }
-main { padding: 12px 16px; }
+.tt-app { display: flex; flex-direction: column; height: 100vh; }
+.tt-banner { display: flex; align-items: center; gap: 12px; padding: 8px 16px; border-bottom: 1px solid var(--tt-line); }
+.tt-banner.tt-info { background: var(--tt-selected); }
+.tt-main { display: flex; flex: 1 1 auto; min-height: 0; }
+/* 左のメニュー（WinUI の NavigationView の左の形） */
+.tt-nav { display: flex; flex-direction: column; gap: 2px; width: 220px; flex: none; padding: 8px; background: var(--tt-bg); border-right: 1px solid var(--tt-line); }
+.tt-nav-item { text-align: left; border: 0; background: none; padding: 8px 12px; border-radius: 4px; }
+.tt-nav-item[aria-current=page] { background: var(--tt-card); box-shadow: inset 3px 0 var(--tt-accent); font-weight: 600; }
+.tt-nav-space { flex: 1 1 auto; }
+.tt-content { flex: 1 1 auto; min-width: 0; overflow: auto; padding: 16px 24px; }
+.tt-narrow { max-width: 900px; }
+.tt-page h2 { font-size: 16px; font-weight: 600; margin: 16px 0 8px; }
+.tt-page p { margin: 6px 0; overflow-wrap: anywhere; }
+.tt-strong { font-weight: 600; }
+.tt-subtle { color: var(--tt-subtle); }
+.tt-critical { color: var(--tt-critical); }
+.tt-caution { color: var(--tt-caution); }
+.tt-mono { font-family: Consolas, "Cascadia Mono", monospace; }
+.tt-noselect { user-select: none; }
+.tt-select { user-select: text; }
+.tt-lines { margin: 6px 0; padding-left: 20px; }
+.tt-lines.tt-mono { list-style: none; padding-left: 0; font-size: 13px; }
+.tt-message { padding: 8px 12px; border-radius: 4px; border: 1px solid var(--tt-line); }
+.tt-message.tt-error { color: var(--tt-critical); border-color: var(--tt-critical); }
+.tt-message.tt-caution { color: var(--tt-caution); }
+.tt-message.tt-info { background: var(--tt-selected); }
+.tt-busy { display: flex; align-items: center; gap: 8px; color: var(--tt-subtle); }
+.tt-spinner { width: 16px; height: 16px; border: 2px solid var(--tt-line); border-top-color: var(--tt-accent); border-radius: 50%; animation: tt-spin 1s linear infinite; }
+@keyframes tt-spin { to { transform: rotate(360deg); } }
+.tt-progress { height: 4px; background: linear-gradient(90deg, var(--tt-line), var(--tt-accent), var(--tt-line)); background-size: 200% 100%; animation: tt-flow 1.2s linear infinite; border-radius: 2px; }
+@keyframes tt-flow { to { background-position: -200% 0; } }
+.tt-wide input { width: 480px; max-width: 100%; }
+.tt-short input { width: 140px; }
+.tt-check-field { display: flex; align-items: center; gap: 6px; margin: 6px 0; }
+.tt-card { margin-top: 12px; padding: 12px; background: var(--tt-card); border: 1px solid var(--tt-line); border-radius: 6px; }
+.tt-link { border: 0; background: none; padding: 0; color: var(--tt-accent); text-decoration: underline; }
+.tt-apps { list-style: none; padding: 0; }
+.tt-apps li { margin: 6px 0; }
+.tt-compose { width: 100%; min-height: 200px; }
+.tt-job { padding-bottom: 12px; border-bottom: 1px solid var(--tt-line); }
+.tt-job h3 { font-size: 14px; font-weight: 600; margin: 8px 0; }
+.tt-modal-back { position: fixed; inset: 0; background: rgba(0,0,0,.3); z-index: 30; }
+.tt-modal { position: fixed; z-index: 31; top: 30%; left: 50%; transform: translateX(-50%); width: min(520px, 90vw); padding: 20px 24px; background: var(--tt-card);
+  border: 1px solid var(--tt-line); border-radius: 8px; box-shadow: 0 16px 32px rgba(0,0,0,.2); }
+.tt-modal h2 { font-size: 18px; margin: 0 0 12px; }
+.tt-modal-buttons { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
 .tt-page h1 { font-size: 20px; font-weight: 600; margin: 4px 0 12px; }
 .tt-bar, .tt-filters, .tt-pager, .tt-table-foot { display: flex; flex-wrap: wrap; align-items: end; gap: 8px 12px; margin: 8px 0; }
 .tt-field { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--tt-subtle); }

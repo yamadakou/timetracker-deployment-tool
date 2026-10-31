@@ -1,0 +1,26 @@
+@using TTDeployTool.Controller.Desktop.Core.Mvvm
+@inherits ViewModelComponent
+
+@* Core のコマンドのボタン（押せるかは CanExecute。押せなくなったら描き直す） *@
+<button type="button" class="@Css" data-id="@Id" disabled="@(!Command.CanExecute(null) || Disabled)" @onclick="Command.ExecuteAsync">@Text</button>
+
+@code {
+    [Parameter]
+    public string Id { get; set; } = "";
+
+    [Parameter, EditorRequired]
+    public AsyncCommand Command { get; set; } = default!;
+
+    [Parameter]
+    public string Text { get; set; } = "";
+
+    /// <summary>tt-primary（主なボタン）など。</summary>
+    [Parameter]
+    public string? Css { get; set; }
+
+    /// <summary>コマンドとは別に押せなくする（サインインするまでなど）。</summary>
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    protected override void OnParametersSet() => Watcher.Sync([Command]);
+}

@@ -193,7 +193,7 @@ public sealed class BrowserHostTests
     {
         await using var host = await BrowserHost.StartAsync();
         var page = host.Page;
-        await page.Locator("[role=tab]", new() { HasText = "ジョブの一覧" }).ClickAsync();
+        await page.Locator("[data-id='Nav.Jobs']").ClickAsync();
         var cell = page.Locator("tbody tr").First.Locator("td[data-key='Result'] .tt-cell");
         await cell.WaitForAsync();
         var lines = await cell.EvaluateAsync<double>("c => c.clientHeight / parseFloat(getComputedStyle(c).lineHeight)");
@@ -245,15 +245,15 @@ public sealed class BrowserHostTests
         var corner = page.Locator("thead input[type=checkbox]");
 
         await page.Locator("tbody tr").Nth(3).ClickAsync();
-        await Assertions.Expect(page.Locator("[data-selection='deployments']")).ToHaveTextAsync("1 件を選んでいます。");
+        await Assertions.Expect(page.Locator("[data-id='Deployments.Selection']")).ToHaveTextAsync("1 件を選んでいます。");
         await Assertions.Expect(corner).ToHaveJSPropertyAsync("indeterminate", true);
 
         await corner.ClickAsync();
-        await Assertions.Expect(page.Locator("[data-selection='deployments']")).ToHaveTextAsync("20 件を選んでいます。");
+        await Assertions.Expect(page.Locator("[data-id='Deployments.Selection']")).ToHaveTextAsync("20 件を選んでいます。");
         await Assertions.Expect(corner).ToBeCheckedAsync();
         await Assertions.Expect(corner).ToHaveJSPropertyAsync("indeterminate", false);
         await corner.ClickAsync();
-        await Assertions.Expect(page.Locator("[data-selection='deployments']")).ToHaveTextAsync("行を選ぶと、まとめて操作できます。");
+        await Assertions.Expect(page.Locator("[data-id='Deployments.Selection']")).ToHaveTextAsync("行を選ぶと、まとめて操作できます。");
     }
 
     [Fact]
@@ -261,12 +261,13 @@ public sealed class BrowserHostTests
     {
         await using var host = await BrowserHost.StartAsync();
         var page = host.Page;
-        await page.Locator("[role=tab]", new() { HasText = "ジョブの一覧" }).ClickAsync();
+        await page.Locator("[data-id='Nav.Jobs']").ClickAsync();
         var row = page.Locator("tbody tr").Nth(2);
         var target = await row.Locator("td[data-key='Target']").TextContentAsync();
         await row.DblClickAsync();
-        await Assertions.Expect(page.Locator(".tt-detail h2")).ToContainTextAsync(target!.Split(" / ")[1]);
-        await page.Locator(".tt-detail button").ClickAsync();
-        await Assertions.Expect(page.Locator(".tt-detail")).ToHaveCountAsync(0);
+        await Assertions.Expect(page.Locator("[data-id='Panel.Status']")).ToBeVisibleAsync();
+        await Assertions.Expect(page.Locator("[data-id='Job.Title']")).ToContainTextAsync(target!.Split(" / ")[1]);
+        await page.Locator("[data-id='Status.BackToList']").ClickAsync();
+        await Assertions.Expect(page.Locator("[data-id='Panel.Jobs']")).ToBeVisibleAsync();
     }
 }

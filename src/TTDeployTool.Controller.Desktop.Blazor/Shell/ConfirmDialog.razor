@@ -1,0 +1,28 @@
+@inherits ViewModelComponent
+
+@* 確かめるダイアログ（BlazorDialogService）。既定のボタンは「キャンセル」（WinUI の画面と同じ） *@
+@if (Dialogs.Pending is { } request)
+{
+    <div class="tt-modal-back"></div>
+    <div class="tt-modal" role="dialog" aria-modal="true" aria-labelledby="tt-modal-title" data-id="Dialog" @onkeydown="OnKeyDown">
+        <h2 id="tt-modal-title" data-id="Dialog.Title">@request.Title</h2>
+        <p data-id="Dialog.Message">@request.Message</p>
+        <div class="tt-modal-buttons">
+            <button type="button" class="tt-primary" data-id="Dialog.Confirm" @onclick="() => Dialogs.Answer(true)">@request.ConfirmText</button>
+            <button type="button" data-id="Dialog.Cancel" autofocus @onclick="() => Dialogs.Answer(false)">キャンセル</button>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public BlazorDialogService Dialogs { get; set; } = default!;
+
+    protected override void OnInitialized() => Watch(Dialogs);
+
+    private void OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+            Dialogs.Answer(false);
+    }
+}

@@ -1,0 +1,24 @@
+@inherits ViewModelComponent
+
+@* サインイン（WinUI の画面の TargetPanel。サブスクリプションは「新しくデプロイ」の ① で選ぶ。docs/design/desktop/desktop-wizard.md の 2） *@
+<section class="tt-page tt-narrow" data-id="Panel.Target">
+    <h1>Azure へのサインイン</h1>
+    <p data-id="SignIn.Account">@Model.SignIn.AccountDisplay</p>
+    <div class="tt-bar">
+        <CommandButton Id="SignIn.SignIn" Command="Model.SignIn.SignInCommand" Text="サインイン" Css="tt-primary" />
+        <CommandButton Id="SignIn.SignOut" Command="Model.SignIn.SignOutCommand" Text="サインアウト" />
+    </div>
+    <BusyView Id="SignIn.Busy" State="Model.SignIn.Busy" />
+    <Message Id="SignIn.Error" Text="@Model.SignIn.Error" />
+    <p>サインインすると「デプロイの一覧」が使えます。デプロイ先のサブスクリプションは「新しくデプロイ」で選びます。</p>
+    <BusyView Id="Target.Busy" State="Model.Target.Busy" />
+    <Lines Id="Target.Notices" Items="Model.Target.Notices" />
+    <Message Id="Target.Error" Text="@Model.Target.Error" />
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public MainViewModel Model { get; set; } = default!;
+
+    protected override void OnInitialized() => Watch(Model.SignIn, Model.Target, Model.Target.Notices);
+}

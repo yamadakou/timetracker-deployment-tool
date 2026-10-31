@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <!--
-    Blazor Hybrid の試作の画面を、ブラウザーで動かすテスト用のホスト（Blazor Server。docs/design/desktop/desktop-blazor-hybrid.md の 6、Q4 の A の ②）。
+    Blazor Hybrid 版の画面を、ブラウザーで動かすテスト用のホスト（Blazor Server。docs/design/desktop/desktop-blazor-hybrid.md の 6、Q4 の A の ②）。
     画面の部品は WPF のホストと同じもの。Playwright のテスト（TTDeployTool.Controller.Desktop.Blazor.BrowserTests）が起動して、Linux の Chromium で操作する。
     データは Fixtures のモックだけ（本物の Azure に届かない）。コピーした文字は /test/clipboard で返す
   -->
@@ -12,5 +12,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\TTDeployTool.Controller.Desktop.Blazor\TTDeployTool.Controller.Desktop.Blazor.csproj" />
+    <ProjectReference Include="..\..\src\TTDeployTool.Controller.Desktop.Fixtures\TTDeployTool.Controller.Desktop.Fixtures.csproj" />
   </ItemGroup>
 </Project>

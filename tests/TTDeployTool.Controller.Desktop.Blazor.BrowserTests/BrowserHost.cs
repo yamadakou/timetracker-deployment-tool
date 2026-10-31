@@ -7,7 +7,7 @@ namespace TTDeployTool.Controller.Desktop.Blazor.BrowserTests;
 
 /// <summary>
 /// テスト用のホストを、空いているポートと新しいアプリのデータのフォルダーで起動し、Chromium で開く。<see cref="RestartAsync"/> は、同じフォルダーで起動し直す
-/// （保存した列の配置で始まることを確かめる）。Chromium は Playwright の既定の場所のもの（環境変数 TT_CHROMIUM_PATH があれば、そのファイル）。
+/// （保存した列の配置で始まることを確かめる）。モックのデータは見本（--sample: デプロイ 45 件・終わったジョブの記録 30 件）。Chromium は Playwright の既定の場所のもの（環境変数 TT_CHROMIUM_PATH があれば、そのファイル）。
 /// </summary>
 public sealed class BrowserHost : IAsyncDisposable
 {
@@ -19,11 +19,17 @@ public sealed class BrowserHost : IAsyncDisposable
 
     public string Url { get; private set; } = "";
 
+    /// <summary>アプリのデータのフォルダー（モックの通知などの記録・Dry-run の保存先 dryrun を含む）。</summary>
+    public string DataDirectory => _data;
+
     public IPage Page { get; private set; } = default!;
 
-    public static async Task<BrowserHost> StartAsync(int width = 1600, int height = 1000)
+    private bool _signIn = true;
+
+    /// <param name="signIn">開いた後に、モックのアカウントでサインインしてデプロイの一覧を開く（false ならサインインの画面のまま）</param>
+    public static async Task<BrowserHost> StartAsync(int width = 1600, int height = 1000, bool signIn = true)
     {
-        var host = new BrowserHost();
+        var host = new BrowserHost { _signIn = signIn };
         await host.LaunchHostAsync();
         host._playwright = await Playwright.CreateAsync();
         host._browser = await host._playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
@@ -62,7 +68,26 @@ public sealed class BrowserHost : IAsyncDisposable
     {
         Page = await _browser!.NewPageAsync(new BrowserNewPageOptions { Locale = "ja-JP", ViewportSize = new ViewportSize { Width = width, Height = height } });
         await Page.GotoAsync(Url);
-        await Page.Locator("tbody tr").First.WaitForAsync();
+        await Page.Locator("[data-id='Panel.Target']").WaitForAsync();
+        if (_signIn)
+            await SignInAndOpenDeploymentsAsync(Page);
+    }
+
+    /// <summary>モックのアカウントでサインインし、デプロイの一覧を開いて行が出るまで待つ（読み込まれていなければ「読み込む」を押す）。</summary>
+    public static async Task SignInAndOpenDeploymentsAsync(IPage page)
+    {
+        await page.Locator("[data-id='SignIn.SignIn']").ClickAsync();
+        await Assertions.Expect(page.Locator("[data-id='SignIn.Account']")).ToHaveTextAsync("mock-user@example.com");
+        await page.Locator("[data-id='Nav.Deployments']").ClickAsync();
+        try
+        {
+            await page.Locator("tbody tr").First.WaitForAsync(new() { Timeout = 5000 });
+        }
+        catch (TimeoutException)
+        {
+            await page.Locator("[data-id='Deployments.Load']").ClickAsync();
+            await page.Locator("tbody tr").First.WaitForAsync();
+        }
     }
 
     private async Task LaunchHostAsync()
@@ -75,7 +100,7 @@ public sealed class BrowserHost : IAsyncDisposable
         // ホストは、このテストと同じ構成（Debug・Release）でビルドしたもの
         var dll = Path.Combine(AppContext.BaseDirectory.Replace("Blazor.BrowserTests", "Blazor.TestHost"), "TTDeployTool.Controller.Desktop.Blazor.TestHost.dll");
         var start = new ProcessStartInfo("dotnet") { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
-        foreach (var arg in new[] { dll, "--urls", Url, "--data", _data })
+        foreach (var arg in new[] { dll, "--urls", Url, "--data", _data, "--sample", "true", "--folder", Path.Combine(_data, "dryrun") })
             start.ArgumentList.Add(arg);
         // ビルドの出力から動かすため、静的なファイル（_content・_framework）の場所の一覧を使う
         start.Environment["ASPNETCORE_ENVIRONMENT"] = "Development";

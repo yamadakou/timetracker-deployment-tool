@@ -66,7 +66,8 @@
                         {
                             var key = column.Key;
                             <td data-key="@key" @oncontextmenu="e => OpenMenu(row, key, e)" @oncontextmenu:preventDefault>
-                                <div class="tt-cell">@Source.CellText(row, key)</div>
+                                @{ var cell = Source.Cell(row, key); }
+                                <div class="tt-cell @cell.Css" title="@cell.ToolTip" data-tip="@(cell.ToolTip is null ? null : "")">@cell.Text</div>
                             </td>
                         }
                     </tr>

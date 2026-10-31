@@ -1,0 +1,48 @@
+@inherits ViewModelComponent
+
+@* まとめて Azure から削除（計画を並べ、件数を入力して確認。WinUI の画面の BatchDeletePanel。docs/design/desktop/desktop-wizard.md の 7、Q10） *@
+<section class="tt-page tt-narrow" data-id="Panel.BatchDelete">
+    <h1>まとめて Azure から削除</h1>
+    <button type="button" data-id="BatchDelete.BackToList" @onclick="() => Back.InvokeAsync(Pages.Deployments)">デプロイの一覧に戻る</button>
+    <p>選んだデプロイごとに、本ツールで作ったリソースだけを削除します。下の指定は、すべてのデプロイに当てます。計画に誤りがあるもの・ジョブがあるものは外します。</p>
+    <CheckField Id="BatchDelete.KeepDbData" Label="DB のデータを残す（ストレージアカウントを削除しない。料金がかかり続けます）" Value="Batch.KeepDbData" ValueChanged="v => Batch.KeepDbData = v" />
+    <CheckField Id="BatchDelete.DeleteResourceGroup" Label="リソースグループも削除する（本ツールのリソースを削除した後に、中が空になる場合だけ。元に戻せません）"
+                Value="Batch.DeleteResourceGroup" ValueChanged="v => Batch.DeleteResourceGroup = v" />
+    <CommandButton Id="BatchDelete.Plan" Command="Batch.PlanCommand" Text="計画し直す" />
+    <BusyView Id="BatchDelete.Busy" State="Batch.Busy" />
+    <ul class="tt-apps" data-id="BatchDelete.Items">
+        @foreach (var item in Batch.Items)
+        {
+            <li>
+                <span class="tt-strong">@item.Title</span><br />@item.Summary
+                @if (item.IsExcluded)
+                {
+                    <br /><span class="tt-caution">@item.Excluded</span>
+                }
+            </li>
+        }
+    </ul>
+    <Message Id="BatchDelete.Error" Text="@Batch.Error" />
+    <p data-id="BatchDelete.ConfirmText">@Batch.ConfirmText</p>
+    <TextInput Id="BatchDelete.ConfirmCount" Label="削除する件数" Value="@Batch.ConfirmCount" ValueChanged="v => Batch.ConfirmCount = v" Css="tt-short" />
+    <CommandButton Id="BatchDelete.Start" Command="Batch.StartCommand" Text="今すぐ削除" Css="tt-primary" />
+    <div class="tt-bar">
+        <DateTimeInput Id="BatchDelete.Schedule" Date="Batch.Schedule.Date" DateChanged="d => Batch.Schedule.Date = d"
+                       Time="Batch.Schedule.TimeOfDay" TimeChanged="t => Batch.Schedule.TimeOfDay = t" />
+        <CommandButton Id="BatchDelete.Schedule" Command="Batch.ScheduleCommand" Text="予定に追加" />
+    </div>
+    <Message Id="BatchDelete.Blocked" Text="@Batch.BlockedText" Kind="MessageKind.Caution" />
+    <p class="tt-subtle" data-id="BatchDelete.ScheduleNote">@SystemStatusViewModel.DeletionScheduleNote</p>
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public MainViewModel Model { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback<string> Back { get; set; }
+
+    private BatchDeletionViewModel Batch => Model.BatchDeletion;
+
+    protected override void OnInitialized() => Watch(Batch, Batch.Items, Batch.Schedule);
+}

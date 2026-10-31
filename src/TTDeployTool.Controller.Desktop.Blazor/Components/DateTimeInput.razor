@@ -1,0 +1,50 @@
+@using System.Globalization
+
+@* 日付と時刻（WinUI の画面の DatePicker・TimePicker。予定の日時・期限日） *@
+<label class="tt-field">
+    <span>@DateLabel</span>
+    <input type="date" data-id="@($"{Id}Date")" value="@Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)" disabled="@Disabled" @onchange="SetDate" />
+</label>
+@if (TimeChanged.HasDelegate)
+{
+    <label class="tt-field">
+        <span>時刻</span>
+        <input type="time" data-id="@($"{Id}Time")" value="@Time.ToString(@"hh\:mm", CultureInfo.InvariantCulture)" disabled="@Disabled" @onchange="SetTime" />
+    </label>
+}
+
+@code {
+    /// <summary>名前の頭（日付は「…Date」、時刻は「…Time」）。</summary>
+    [Parameter]
+    public string Id { get; set; } = "";
+
+    [Parameter]
+    public string DateLabel { get; set; } = "予定の日付";
+
+    [Parameter]
+    public DateTimeOffset Date { get; set; }
+
+    [Parameter]
+    public EventCallback<DateTimeOffset> DateChanged { get; set; }
+
+    [Parameter]
+    public TimeSpan Time { get; set; }
+
+    /// <summary>無ければ時刻の欄を出さない。</summary>
+    [Parameter]
+    public EventCallback<TimeSpan> TimeChanged { get; set; }
+
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    // 日付の欄は、日付だけを変える（時刻とタイムゾーンの差は今の値のまま。WinUI の DatePicker と同じ）
+    private Task SetDate(ChangeEventArgs e) =>
+        DateOnly.TryParseExact((string?)e.Value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day)
+            ? DateChanged.InvokeAsync(new DateTimeOffset(day.ToDateTime(TimeOnly.FromTimeSpan(Date.TimeOfDay)), Date.Offset))
+            : Task.CompletedTask;
+
+    private Task SetTime(ChangeEventArgs e) =>
+        TimeOnly.TryParseExact((string?)e.Value, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var time)
+            ? TimeChanged.InvokeAsync(time.ToTimeSpan())
+            : Task.CompletedTask;
+}
