@@ -312,6 +312,90 @@ public class ExpiryWatcherTests
         h.Main.Expiry.NextCheckAt.Should().Be(time.GetUtcNow() + ExpiryWatcher.RefreshInterval);
     }
 
+    // 期限: 2026-11-01（東京）の終わり = 2026-11-01 14:59:59 UTC
+    private static readonly DateTimeOffset NovemberFirst = DeploymentExpiry.EndOfDay(new DateOnly(2026, 11, 1), TokyoTime.Zone);
+
+    private static DateTimeOffset Tokyo(int month, int day, int hour, int minute, int second) => new(2026, month, day, hour, minute, second, TimeSpan.FromHours(9));
+
+    /// <summary>今（東京）・出す通知の題（null なら出さない）・削除のジョブを登録するか。</summary>
+    public static TheoryData<DateTimeOffset, string?, bool> NoticeBoundaries => new()
+    {
+        // 3 日前の通知は、期限まで 3 日以内になってから（10/29 23:59:59 から）
+        { Tokyo(10, 29, 23, 59, 58), null, false },
+        { Tokyo(10, 29, 23, 59, 59), "利用可能期限が近づいています", false },
+        { Tokyo(10, 30, 23, 59, 59), "利用可能期限が近づいています", false },
+        // 前日の通知は、期限日の前の日の 0:00 から（オーナーの実機の確認、2026-11-01。前は期限まで 24 時間を切ってからで、実質当日だった）
+        { Tokyo(10, 31, 0, 0, 0), "利用可能期限は明日までです", false },
+        { Tokyo(10, 31, 23, 59, 59), "利用可能期限は明日までです", false },
+        // 前日に動いていなければ、当日の起動で「今日まで」（11/1 に「明日まで」と出ていた）
+        { Tokyo(11, 1, 0, 0, 0), "利用可能期限は今日までです", false },
+        { Tokyo(11, 1, 23, 59, 58), "利用可能期限は今日までです", false },
+        // 期限の時刻になったら、通知ではなく削除
+        { Tokyo(11, 1, 23, 59, 59), null, true },
+    };
+
+    [Theory]
+    [MemberData(nameof(NoticeBoundaries))]
+    public async Task The_Notice_Should_Follow_The_Calendar_Day_Of_The_Expiry(DateTimeOffset now, string? title, bool deleted)
+    {
+        _time.Now = now.ToUniversalTime();
+        var h = new Harness(time: _time);
+        var expires = DeploymentExpiry.FormatTag(NovemberFirst);
+        h.Azure.RecordsByTenant["t1"] = Listed("demo", expires);
+        h.Azure.Deployed();
+        SetAzureExpiry(h, expires);
+        await h.ReadyAsync();
+
+        var notices = h.Notifications.Shown.Where(n => n.Title.StartsWith("利用可能期限", StringComparison.Ordinal) && n.JobId == null).ToList();
+        if (title == null)
+            notices.Should().BeEmpty();
+        else
+        {
+            notices.Should().ContainSingle().Which.Title.Should().Be(title);
+            notices[0].Message.Should().Contain("の利用可能期限は 2026-11-01 です。");
+        }
+        h.Main.Jobs.Any(j => j.IsExpiryDeletion).Should().Be(deleted);
+    }
+
+    [Fact]
+    public async Task The_Last_Day_Notice_Should_Be_Shown_Once_From_The_Day_Before_And_Not_Again_On_The_Day()
+    {
+        // 10/30 20:00（東京）: 3 日前の通知を出し、次の確認は前日の 0:00（6 時間後の読み直しより早い）
+        var time = new FakeTimeProvider(Tokyo(10, 30, 20, 0, 0));
+        time.SetLocalTimeZone(TokyoTime.Zone);
+        var h = new Harness(time: time);
+        var expires = DeploymentExpiry.FormatTag(NovemberFirst);
+        h.Azure.RecordsByTenant["t1"] = Listed("demo", expires);
+        await h.ReadyAsync();
+        h.Notifications.Shown.Should().ContainSingle().Which.Title.Should().Be("利用可能期限が近づいています");
+        h.Main.Expiry.NextCheckAt.Should().Be(Tokyo(10, 31, 0, 0, 0) + ExpiryWatcher.Margin);
+
+        // 前日の 0:00 の少し後に「明日まで」を出す。当日になっても、同じ期限の前日の通知は出し直さない
+        time.Advance(TimeSpan.FromHours(4) + ExpiryWatcher.Margin);
+        await h.Main.Expiry.Checking;
+        h.Notifications.Shown.Should().HaveCount(2);
+        h.Notifications.Shown[1].Title.Should().Be("利用可能期限は明日までです");
+        time.Advance(TimeSpan.FromDays(1));
+        await h.Main.Expiry.CheckAsync();
+        h.Notifications.Shown.Should().HaveCount(2);
+        h.Main.Dispose();
+    }
+
+    [Fact]
+    public async Task An_Expiry_Not_At_The_End_Of_The_Day_Should_Use_Its_Calendar_Day()
+    {
+        // 期限が 11/01 09:00（東京。ポータルでの書き換えなど）でも、前日は 10/31 の 0:00 から、当日は「今日まで」
+        var expiresAt = Tokyo(11, 1, 9, 0, 0);
+        foreach (var (now, title) in new[] { (Tokyo(10, 30, 23, 59, 59), "利用可能期限が近づいています"), (Tokyo(10, 31, 0, 0, 0), "利用可能期限は明日までです"), (Tokyo(11, 1, 8, 59, 59), "利用可能期限は今日までです") })
+        {
+            _time.Now = now.ToUniversalTime();
+            var h = new Harness(time: _time);
+            h.Azure.RecordsByTenant["t1"] = Listed("demo", DeploymentExpiry.FormatTag(expiresAt));
+            await h.ReadyAsync();
+            h.Notifications.Shown.Should().ContainSingle().Which.Title.Should().Be(title, $"今は {now:MM/dd HH:mm:ss}");
+        }
+    }
+
     [Fact]
     public async Task Without_Near_Expiries_The_List_Should_Be_Read_Again_Every_Six_Hours()
     {
