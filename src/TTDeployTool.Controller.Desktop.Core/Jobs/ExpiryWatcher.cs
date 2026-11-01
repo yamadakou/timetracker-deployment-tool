@@ -13,7 +13,7 @@ namespace TTDeployTool.Controller.Desktop.Core.Jobs;
 public sealed class DeletionSkippedException(string message) : InvalidOperationException(message);
 
 /// <summary>
-/// 利用可能期限の確認（docs/design/desktop/desktop-jobs.md の 6.2・6.5、D21）。サインインできたときにデプロイの一覧を読み、期限の 3 日前と前日に通知し、
+/// 利用可能期限の確認（docs/design/desktop/desktop-jobs.md の 6.2・6.5、D7・D21）。サインインできたときにデプロイの一覧を読み、期限の 3 日前と前日に通知し、
 /// 期限を過ぎたものは確認なしで削除のジョブを登録する。次の確認は、読んだ一覧の中で最も近い時刻（期限・3 日前・前日）か、
 /// 外の変化（別の PC・CLI・MCP サーバーでのデプロイや期限の変更）を拾うための <see cref="RefreshInterval"/> ごとの読み直しの、早い方に合わせる。
 /// 一覧の中身が変わったとき（このアプリでのデプロイ・削除・期限の変更）も合わせ直す。サインインしていない間は確認しない。
@@ -32,8 +32,8 @@ public sealed class ExpiryWatcher : IDisposable
     /// <summary>「3 日前」の通知を出す、期限までの時間。</summary>
     public static readonly TimeSpan SoonNotice = TimeSpan.FromDays(3);
 
-    /// <summary>「前日」の通知を出す、期限までの時間。</summary>
-    public static readonly TimeSpan LastDayNotice = TimeSpan.FromDays(1);
+    // 「前日」の通知は、期限日（PC の時刻帯）の前の日の 0:00 から出す（<see cref="LastDayStart"/>。期限まで 24 時間を切ってからでは、
+    // 期限が 23:59:59 のため実質当日の通知になり、題も「明日まで」と食い違っていた。オーナーの実機の確認、2026-11-01）
 
     private readonly DeploymentListViewModel _list;
     private readonly JobQueue _queue;
@@ -117,11 +117,13 @@ public sealed class ExpiryWatcher : IDisposable
         var notices = _preferences.ExpiryNotices.Where(n => !IsPast(n, now)).ToList();
         foreach (var entry in _list.Entries.Where(e => e.ExpiryKind == ExpiryKind.Date))
         {
-            var left = entry.ExpiresAt!.Value - now;
-            if (left <= TimeSpan.Zero)
+            var expiresAt = entry.ExpiresAt!.Value;
+            if (expiresAt <= now)
                 RegisterDeletion(entry, now);
-            else if (left <= SoonNotice)
-                Notify(entry, left <= LastDayNotice ? "1d" : "3d", notices);
+            else if (now >= LastDayStart(expiresAt))
+                Notify(entry, "1d", notices, now);
+            else if (expiresAt - now <= SoonNotice)
+                Notify(entry, "3d", notices, now);
         }
         if (!notices.SequenceEqual(_preferences.ExpiryNotices))
             _preferences.ExpiryNotices = notices;
@@ -136,7 +138,7 @@ public sealed class ExpiryWatcher : IDisposable
         var now = _time.GetUtcNow();
         var next = _list.Entries
             .Where(e => e.ExpiryKind == ExpiryKind.Date)
-            .SelectMany(e => new[] { e.ExpiresAt!.Value - SoonNotice, e.ExpiresAt.Value - LastDayNotice, e.ExpiresAt.Value })
+            .SelectMany(e => new[] { e.ExpiresAt!.Value - SoonNotice, LastDayStart(e.ExpiresAt.Value), e.ExpiresAt.Value })
             .Where(at => at > now && at < _refreshAt)
             .Select(at => at + Margin)
             .DefaultIfEmpty(_refreshAt)
@@ -146,6 +148,23 @@ public sealed class ExpiryWatcher : IDisposable
         _timer.Change(TimeSpan.FromTicks(Math.Max(0, (next - now).Ticks)), Timeout.InfiniteTimeSpan);
     }
 
+    /// <summary>「前日」の通知を出し始める時刻（期限日〔PC の時刻帯〕の前の日の 0:00）。</summary>
+    internal DateTimeOffset LastDayStart(DateTimeOffset expiresAt)
+    {
+        var previous = LocalDate(expiresAt).AddDays(-1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
+        return new DateTimeOffset(previous, _time.LocalTimeZone.GetUtcOffset(previous));
+    }
+
+    private DateOnly LocalDate(DateTimeOffset at) => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(at, _time.LocalTimeZone).DateTime);
+
+    // 通知の題（期限日と今日〔PC の時刻帯〕の日付の差で決める）
+    private string NoticeTitle(DateTimeOffset expiresAt, DateTimeOffset now) => (LocalDate(expiresAt).DayNumber - LocalDate(now).DayNumber) switch
+    {
+        0 => "利用可能期限は今日までです",
+        1 => "利用可能期限は明日までです",
+        _ => "利用可能期限が近づいています",
+    };
+
     // 出した通知の記録: サブスクリプション/リソースグループ/アプリ名/種類/そのときの期限（UTC）。期限が変われば別のものになる
     private static string NoticeKey(DeploymentEntry entry, string kind) =>
         $"{entry.SubscriptionId}/{entry.ResourceGroup}/{entry.AppName}/{kind}/{DeploymentExpiry.FormatTag(entry.ExpiresAt!.Value)}".ToLowerInvariant();
@@ -154,7 +173,7 @@ public sealed class ExpiryWatcher : IDisposable
     private static bool IsPast(string notice, DateTimeOffset now) =>
         !DeploymentExpiry.TryParseTag(notice[(notice.LastIndexOf('/') + 1)..].ToUpperInvariant(), out var at) || at <= now;
 
-    private void Notify(DeploymentEntry entry, string kind, List<string> notices)
+    private void Notify(DeploymentEntry entry, string kind, List<string> notices, DateTimeOffset now)
     {
         var key = NoticeKey(entry, kind);
         if (notices.Contains(key))
@@ -163,7 +182,7 @@ public sealed class ExpiryWatcher : IDisposable
         var date = TimeZoneInfo.ConvertTime(entry.ExpiresAt!.Value, _time.LocalTimeZone).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
         _logger.LogInformation("利用可能期限が近いことを通知します: {ResourceGroup} / {AppName}（{Kind}）", entry.ResourceGroup, entry.AppName, kind);
         _notifications?.Show(new AppNotice(
-            kind == "1d" ? "利用可能期限は明日までです" : "利用可能期限が近づいています",
+            NoticeTitle(entry.ExpiresAt!.Value, now),
             $"{entry.AppName}（{entry.ResourceGroup}）の利用可能期限は {date} です。期限を過ぎると、このアプリが DB のデータも含めて削除します。" +
             "延ばすには、デプロイの一覧で期限を変えてください。",
             Page: Pages.Deployments));
