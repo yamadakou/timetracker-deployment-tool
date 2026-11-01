@@ -12,7 +12,7 @@
                 @for (var i = 0; i < _layout.Count; i++)
                 {
                     var width = HtmlTableRules.WidthOf(_layout, i, Source.FillMinWidth);
-                    <col data-key="@_layout[i].Key" style="@(width is { } w ? $"width: {Px(w)}" : null)" />
+                    <col @key="_layout[i].Key" data-key="@_layout[i].Key" style="@(width is { } w ? $"width: {Px(w)}" : null)" />
                 }
             </colgroup>
             <thead>
@@ -26,7 +26,7 @@
                         var key = column.Key;
                         var header = Source.Filters.Column(key).Header;
                         var filtered = Source.Filters.IsFiltered(key);
-                        <th scope="col" data-key="@key" aria-sort="@AriaSort(key)" class="@(filtered ? "tt-filtered" : null)"
+                        <th @key="key" scope="col" data-key="@key" aria-sort="@AriaSort(key)" class="@(filtered ? "tt-filtered" : null)"
                             style="@(key == _layout[^1].Key ? $"min-width: {Px(HtmlTableRules.LastMinWidth(_layout, Source.FillMinWidth))}" : null)"
                             @ondragover:preventDefault @ondrop="() => Drop(key)">
                             <div class="tt-head" draggable="true" @ondragstart="() => _dragKey = key">
@@ -65,7 +65,7 @@
                         @foreach (var column in _layout)
                         {
                             var key = column.Key;
-                            <td data-key="@key" @oncontextmenu="e => OpenMenu(row, key, e)" @oncontextmenu:preventDefault>
+                            <td @key="key" data-key="@key" @oncontextmenu="e => OpenMenu(row, key, e)" @oncontextmenu:preventDefault>
                                 @{ var cell = Source.Cell(row, key); }
                                 <div class="tt-cell @cell.Css" title="@cell.ToolTip" data-tip="@(cell.ToolTip is null ? null : "")">@cell.Text</div>
                             </td>

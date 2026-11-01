@@ -163,6 +163,17 @@ public sealed class BrowserHostTests
         // Alt+← で前のページに戻らない（画面はそのまま）
         page.Url.Should().StartWith(host.Url);
 
+        // 続けて押すと、同じ列をさらに動かす（動かした後も、その列の見出しにフォーカスがある。オーナーの実機の確認、2026-11-01:
+        // 前は描き直しでフォーカスが元の位置〔右隣にあった列〕に残り、2 回目でその列が動いて元の順序に戻った）
+        await page.Keyboard.PressAsync("Alt+Shift+ArrowRight");
+        await page.Keyboard.PressAsync("Alt+Shift+ArrowRight");
+        await Assertions.Expect(page.Locator("thead th[data-key]").Nth(2)).ToHaveAttributeAsync("data-key", "ResourceGroup");
+        (await HeaderKeys(page)).Should().StartWith(["Subscription", "AppName", "ResourceGroup", "Group"]);
+        (await page.EvaluateAsync<string?>("() => document.activeElement?.closest('th')?.dataset.key")).Should().Be("ResourceGroup");
+        await page.Keyboard.PressAsync("Alt+Shift+ArrowLeft");
+        await page.Keyboard.PressAsync("Alt+Shift+ArrowLeft");
+        await Assertions.Expect(page.Locator("thead th[data-key]").First).ToHaveAttributeAsync("data-key", "ResourceGroup");
+
         // Tab で ▽ に移り、Enter で開いて Esc で閉じる
         await page.Keyboard.PressAsync("Tab");
         await page.Keyboard.PressAsync("Enter");

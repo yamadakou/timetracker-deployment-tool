@@ -299,6 +299,8 @@ public sealed class DeploymentTableTests : IAsyncLifetime
         await table.InvokeAsync(() => table.Instance.ColumnNudged("Unknown", 1));
         await table.InvokeAsync(() => table.Instance.ColumnShifted("AppName", -1));
         HeaderKeys.Take(3).Should().Equal("Subscription", "AppName", "ResourceGroup");
+        // 動かした列の見出しにフォーカスを戻す（続けて押すと、同じ列をさらに動かす）
+        _app.Module.Invocations.Should().Contain(i => i.Identifier == "focusHead" && (string)i.Arguments[1]! == "AppName");
 
         // 見出しのドラッグ（ドラッグしないで落としても変えない）
         Header("Job").Drop(new DragEventArgs());

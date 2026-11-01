@@ -49,6 +49,11 @@ export function attach(root, dotnet) {
   sync(root);
 }
 
+// 列を動かした後、その列の見出しにフォーカスを戻す（見出しのボタンか、並べ替えない列の見出しの文字）
+export function focusHead(root, key) {
+  root.querySelector(`[data-head-key="${CSS.escape(key)}"]`)?.focus();
+}
+
 // 左上のチェックボックスの「一部を選んだ」（HTML の属性では出せない）
 export function sync(root) {
   for (const box of root.querySelectorAll('input[data-indeterminate]')) {

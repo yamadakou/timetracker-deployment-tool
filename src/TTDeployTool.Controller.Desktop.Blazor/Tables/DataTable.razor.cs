@@ -21,6 +21,7 @@ public partial class DataTable<TRow, TItem> : IAsyncDisposable
     private TableRows<TItem>? _rows;
     private string? _filterKey;
     private string? _dragKey;
+    private string? _focusKey;
     private (TRow Row, string Key, double X, double Y)? _menu;
     private string? _message;
     private Task<IJSObjectReference> _module = default!;
@@ -75,6 +76,12 @@ public partial class DataTable<TRow, TItem> : IAsyncDisposable
             await (await _module).InvokeVoidAsync("attach", _root, _self);
         else
             await (await _module).InvokeVoidAsync("sync", _root);
+        // キーボードで動かした列の見出しに、フォーカスを戻す（続けて Alt+Shift+←/→ を押すと、同じ列をさらに動かす。オーナーの実機の確認、2026-11-01）
+        if (_focusKey is { } key)
+        {
+            _focusKey = null;
+            await (await _module).InvokeVoidAsync("focusHead", _root, key);
+        }
     }
 
     /// <summary>つまみのドラッグで幅を変えた（JavaScript から）。</summary>
@@ -92,9 +99,13 @@ public partial class DataTable<TRow, TItem> : IAsyncDisposable
         ColumnResized(key, current + step * HtmlTableRules.KeyboardStep);
     }
 
-    /// <summary>見出しのボタンで Alt+Shift+←/→（JavaScript から）。列を 1 つ動かす。</summary>
+    /// <summary>見出しのボタンで Alt+Shift+←/→（JavaScript から）。列を 1 つ動かし、描き直した後もその列の見出しにフォーカスを置く。</summary>
     [JSInvokable]
-    public void ColumnShifted(string key, int step) => SaveLayout(HtmlTableRules.Shift(_layout, key, step));
+    public void ColumnShifted(string key, int step)
+    {
+        _focusKey = key;
+        SaveLayout(HtmlTableRules.Shift(_layout, key, step));
+    }
 
     // Blazor は IAsyncDisposable を持つコンポーネントの Dispose を呼ばないため、ここで購読も外す
     public async ValueTask DisposeAsync()
