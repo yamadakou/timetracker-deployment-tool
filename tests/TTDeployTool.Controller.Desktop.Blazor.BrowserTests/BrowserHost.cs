@@ -25,6 +25,7 @@ public sealed class BrowserHost : IAsyncDisposable
     public IPage Page { get; private set; } = default!;
 
     private bool _signIn = true;
+    private ICDPSession? _coverage;
     private bool _sample = true;
 
     /// <param name="signIn">開いた後に、モックのアカウントでサインインしてデプロイの一覧を開く（false ならサインインの画面のまま）</param>
@@ -61,6 +62,7 @@ public sealed class BrowserHost : IAsyncDisposable
     public async Task RestartAsync(bool? signIn = null)
     {
         var size = Page.ViewportSize!;
+        await SaveCoverageAsync();
         await Page.CloseAsync();
         StopHost();
         await LaunchHostAsync();
@@ -70,6 +72,7 @@ public sealed class BrowserHost : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        await SaveCoverageAsync();
         if (_browser != null)
             await _browser.DisposeAsync();
         _playwright?.Dispose();
@@ -82,10 +85,32 @@ public sealed class BrowserHost : IAsyncDisposable
     private async Task OpenAsync(int width, int height)
     {
         Page = await _browser!.NewPageAsync(new BrowserNewPageOptions { Locale = "ja-JP", ViewportSize = new ViewportSize { Width = width, Height = height } });
+        await StartCoverageAsync();
         await Page.GotoAsync(Url);
         await Page.Locator("[data-id='Panel.Target']").WaitForAsync();
         if (_signIn)
             await SignInAndOpenDeploymentsAsync(Page);
+    }
+
+    // 画面の JavaScript（table.js）の網羅率（環境変数 TT_JS_COVERAGE_DIR があるときだけ。Chromium の CDP の Profiler で、どのブロックを通ったかを取り、
+    // ページを閉じる前にそのフォルダーに書く。.github/scripts/js-coverage.py がまとめて、通っていないブロックを数える。オーナーの依頼、2026-11-02）
+    private async Task StartCoverageAsync()
+    {
+        if (Environment.GetEnvironmentVariable("TT_JS_COVERAGE_DIR") is not { Length: > 0 })
+            return;
+        _coverage = await Page.Context.NewCDPSessionAsync(Page);
+        await _coverage.SendAsync("Profiler.enable");
+        await _coverage.SendAsync("Profiler.startPreciseCoverage", new Dictionary<string, object> { ["callCount"] = true, ["detailed"] = true });
+    }
+
+    private async Task SaveCoverageAsync()
+    {
+        if (_coverage == null || Environment.GetEnvironmentVariable("TT_JS_COVERAGE_DIR") is not { Length: > 0 } directory)
+            return;
+        var result = await _coverage.SendAsync("Profiler.takePreciseCoverage");
+        _coverage = null;
+        Directory.CreateDirectory(directory);
+        await File.WriteAllTextAsync(Path.Combine(directory, $"{Guid.NewGuid():N}.json"), result?.GetRawText() ?? "{}");
     }
 
     /// <summary>モックのアカウントでサインインし、デプロイの一覧を開いて行が出るまで待つ（読み込まれていなければ「読み込む」を押す）。</summary>

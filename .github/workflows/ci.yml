@@ -334,17 +334,31 @@ jobs:
         coverlet "$dll" --target dotnet --targetargs "exec $dll" --include "[TTDeployTool.Controller.Desktop.Blazor]*" \
           --threshold 100 --threshold-type line --threshold-type branch --format cobertura --output TestResults/blazor-coverage.cobertura.xml
 
+    # Core（WinUI 3 版と Blazor Hybrid 版が共有する ViewModel など）の行・分岐の網羅率 100%（オーナーの依頼、2026-11-02。前は測っておらず、分岐が 98.28% だった）
+    - name: Coverage of the desktop Core
+      run: |
+        dotnet build tests/TTDeployTool.Controller.Desktop.Core.Tests --configuration Release
+        dll=tests/TTDeployTool.Controller.Desktop.Core.Tests/bin/Release/net10.0/TTDeployTool.Controller.Desktop.Core.Tests.dll
+        coverlet "$dll" --target dotnet --targetargs "exec $dll" --include "[TTDeployTool.Controller.Desktop.Core]*" \
+          --threshold 100 --threshold-type line --threshold-type branch --format cobertura --output TestResults/core-coverage.cobertura.xml
+
     - name: Install Playwright browser
       run: |
         dotnet build tests/TTDeployTool.Controller.Desktop.Blazor.BrowserTests --configuration Release
         pwsh tests/TTDeployTool.Controller.Desktop.Blazor.BrowserTests/bin/Release/net10.0/playwright.ps1 install --with-deps chromium
 
     # 画面の UX のテスト（BrowserHostTests）と、WinUI 3 版の UI テストと同じ内容のテスト（UiTests/）。WebView2Tests は Windows のジョブで動かす
+    # 画面の JavaScript（table.js）の網羅率も、このテストで取る（Chromium の CDP の Profiler。V8 のブロック網羅で 100%。オーナーの依頼、2026-11-02）
     - name: Browser tests (Playwright)
+      env:
+        TT_JS_COVERAGE_DIR: ${{ github.workspace }}/TestResults/js-coverage
       run: >
         dotnet test --project tests/TTDeployTool.Controller.Desktop.Blazor.BrowserTests --configuration Release --no-build --
         --filter-not-class TTDeployTool.Controller.Desktop.Blazor.BrowserTests.WebView2Tests
         --output detailed --report-xunit-trx --results-directory=TestResults
+
+    - name: Coverage of the JavaScript (table.js)
+      run: python3 .github/scripts/js-coverage.py TestResults/js-coverage src/TTDeployTool.Controller.Desktop.Blazor/wwwroot/table.js --threshold 100
 
     - name: Upload test results
       if: always()

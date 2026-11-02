@@ -188,9 +188,57 @@ public sealed class BrowserHostTests
         await page.Mouse.UpAsync();
         (await HeaderKeys(page)).Should().StartWith(["Subscription", "Group", "ResourceGroup", "AppName", "State"]);
 
+        // ドラッグの途中で取り消された（ウィンドウの外へ出たときなど。pointercancel）ら、動かさずに線を消す
+        await page.Mouse.MoveAsync(app.X + 5, app.Y + app.Height / 2);
+        await page.Mouse.DownAsync();
+        await page.Mouse.MoveAsync(state.X + state.Width / 2, state.Y + state.Height / 2, new() { Steps = 8 });
+        await Assertions.Expect(Header(page, "State")).ToHaveClassAsync(new System.Text.RegularExpressions.Regex("tt-drop-after"));
+        await page.EvaluateAsync("() => window.dispatchEvent(new PointerEvent('pointercancel'))");
+        (await page.Locator("thead th.tt-dragging, thead th.tt-drop-before, thead th.tt-drop-after").CountAsync()).Should().Be(0);
+        await page.Mouse.UpAsync();
+        (await HeaderKeys(page)).Should().StartWith(["Subscription", "Group", "ResourceGroup", "AppName", "State"]);
+
         // 次の本物の click は捨てない
         await Header(page, "AppName").Locator("button.tt-sort").ClickAsync();
         await Assertions.Expect(Header(page, "AppName")).ToHaveAttributeAsync("aria-sort", "ascending");
+    }
+
+    /// <summary>押してから動かした距離（横・縦）と、ドラッグになるか（ならなければ並べ替えのボタンを押したことになる）。境目は 6 ピクセル。</summary>
+    [Theory]
+    [InlineData(5, 0, false)]
+    [InlineData(6, 0, true)]
+    [InlineData(-6, 0, true)]
+    [InlineData(0, 5, false)]
+    [InlineData(0, 6, true)]
+    public async Task Header_Drag_Should_Start_From_Six_Pixels(int dx, int dy, bool drags)
+    {
+        await using var host = await BrowserHost.StartAsync();
+        var page = host.Page;
+        var text = (await Header(page, "Group").Locator(".tt-head-text").BoundingBoxAsync())!;
+        var x = text.X + 10;
+        var y = text.Y + text.Height / 2;
+        await page.Mouse.MoveAsync(x, y);
+        await page.Mouse.DownAsync();
+        await page.Mouse.MoveAsync(x + dx, y + dy);
+        (await Header(page, "Group").EvaluateAsync<bool>("h => h.classList.contains('tt-dragging')")).Should().Be(drags);
+        await page.Mouse.UpAsync();
+        await Assertions.Expect(Header(page, "Group")).ToHaveAttributeAsync("aria-sort", drags ? "none" : "ascending");
+        (await HeaderKeys(page)).Should().Equal("Subscription", "ResourceGroup", "AppName", "Group", "State", "ExpiresAt", "DeployedAt", "Job");
+    }
+
+    [Fact]
+    public async Task Grip_Should_Stop_At_The_Minimum_Width()
+    {
+        // つまみを左へ大きく引いても、最小の幅（60 ピクセル）で止める。動かしている間も、保存した後も
+        await using var host = await BrowserHost.StartAsync();
+        var page = host.Page;
+        var grip = (await Header(page, "ResourceGroup").Locator(".tt-grip").BoundingBoxAsync())!;
+        await page.Mouse.MoveAsync(grip.X + grip.Width / 2, grip.Y + grip.Height / 2);
+        await page.Mouse.DownAsync();
+        await page.Mouse.MoveAsync(grip.X - 300, grip.Y + grip.Height / 2, new() { Steps = 5 });
+        (await page.Locator("col[data-key='ResourceGroup']").GetAttributeAsync("style")).Should().Be("width: 60px;");
+        await page.Mouse.UpAsync();
+        await Assertions.Expect(page.Locator("col[data-key='ResourceGroup']")).ToHaveAttributeAsync("style", "width: 60px");
     }
 
     [Fact]
