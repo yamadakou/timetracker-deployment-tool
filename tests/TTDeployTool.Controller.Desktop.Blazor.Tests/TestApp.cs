@@ -94,11 +94,20 @@ public sealed class TestApp : IDisposable
 
     public void Dispose()
     {
-        // 今すぐ実行したジョブが、まだ記録（job-history.json）を書いていることがあるため、終わるまで待ってからフォルダーを消す
-        ViewModel.Queue.WhenIdleAsync().Wait(TimeSpan.FromSeconds(30));
         Context.Dispose();
         ViewModel.Dispose();
-        if (System.IO.Directory.Exists(Directory))
-            System.IO.Directory.Delete(Directory, recursive: true);
+        // 今すぐ実行したジョブが、まだ記録（job-history.json）を書いていることがあるため、消せなければ少し待って消し直す
+        // （網羅率を測りながら流すと遅くなり、たまに消せなかった。予定のジョブは終わらないため、ジョブの終わりは待たない）
+        for (var attempt = 1; System.IO.Directory.Exists(Directory); attempt++)
+        {
+            try
+            {
+                System.IO.Directory.Delete(Directory, recursive: true);
+            }
+            catch (IOException) when (attempt < 50)
+            {
+                Thread.Sleep(100);
+            }
+        }
     }
 }
