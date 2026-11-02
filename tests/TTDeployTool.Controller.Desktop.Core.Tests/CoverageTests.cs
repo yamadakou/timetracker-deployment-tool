@@ -372,4 +372,22 @@ public class CoverageTests
         h.Azure.Credentials[^2].Should().BeOfType<TenantScopedCredential>().Which.TenantId.Should().Be("t1");
         h.Azure.Credentials[^1].Should().BeSameAs(h.SignIn.Credential, "一覧に無ければテナントが分からないため、アカウントのテナントで操作する");
     }
+
+    [Fact]
+    public async Task A_Deployment_Result_Without_An_Expiry_Should_Keep_The_Listed_Expiry()
+    {
+        // 結果に期限が無いデプロイが終わっても、一覧の行は前の期限のまま（前は期限があることを前提にしており、例外になった。2026-11-02）
+        var h = await LoadedAsync(Deployment("sub", "rg", "demo", "2026-11-23T14:59:59Z"));
+        var jobs = new JobManager(new InMemoryJobStore(), TimeProvider.System, NullLogger<JobManager>.Instance);
+        var job = h.Main.Queue.Register(JobKind.Deploy, new JobTarget("sub", "rg", "demo"), null, () => Task.FromResult(jobs.TryStart(JobKind.Deploy,
+            new JobTarget("sub", "rg", "demo"), "local", _ => Task.FromResult<object?>(new DeploymentResult("rg", "demo-env", "demo-tt", "demo-db", "demo-redis", "https://new.example.io"))).Job!));
+
+        await job.Finished;
+        await h.Main.Queue.WhenIdleAsync();
+
+        job.StatusText.Should().Be("完了");
+        var row = h.Main.Deployments.Rows.Single();
+        (row.Entry.ExpiryKind, row.Entry.ExpiresAt).Should().Be((ExpiryKind.Date, DateTimeOffset.Parse("2026-11-23T14:59:59Z", System.Globalization.CultureInfo.InvariantCulture)));
+        row.Url!.ToString().Should().Be("https://new.example.io/", "URL とデプロイ日は、終わったデプロイのものにする");
+    }
 }

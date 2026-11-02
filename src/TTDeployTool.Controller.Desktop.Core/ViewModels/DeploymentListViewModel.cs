@@ -450,15 +450,11 @@ public sealed class DeploymentListViewModel : ObservableObject
         {
             case DeploymentResult r:
                 var at = Time.GetUtcNow();
-                // デプロイの実行は、必ず期限を記録する（DeploymentRunner）
-                var expiry = r.Expiry!;
-                Remember(t.Subscription, t.ResourceGroup, t.AppName, e => Deployed(e, Placeholder(t.Subscription, t.ResourceGroup, t.AppName, r)) with
+                Remember(t.Subscription, t.ResourceGroup, t.AppName, e => WithExpiry(Deployed(e, Placeholder(t.Subscription, t.ResourceGroup, t.AppName, r)) with
                 {
                     Url = r.TimetrackerUrl ?? e?.Url,
                     DeployedAt = at,
-                    ExpiryKind = expiry.ExpiresAt == null ? ExpiryKind.None : ExpiryKind.Date,
-                    ExpiresAt = expiry.ExpiresAt,
-                });
+                }, r.Expiry));
                 break;
             case DeletionOutcome d:
                 var gone = d.Deleted.Concat(d.AlreadyDeleted).ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -466,6 +462,12 @@ public sealed class DeploymentListViewModel : ObservableObject
                 break;
         }
     }
+
+    // デプロイで決めた期限を重ねる。結果に期限が無ければ（デスクトップアプリのデプロイは必ず記録するが、型の上では無いこともある）、
+    // 一覧の期限は変えない（前は期限があることを前提にしており、無ければ例外になった。2026-11-02）
+    private static DeploymentEntry WithExpiry(DeploymentEntry entry, ExpiryDecision? expiry) => expiry == null
+        ? entry
+        : entry with { ExpiryKind = expiry.ExpiresAt == null ? ExpiryKind.None : ExpiryKind.Date, ExpiresAt = expiry.ExpiresAt };
 
     private static DeploymentEntry Placeholder(string subscriptionId, string resourceGroup, string appName, DeploymentResult r) => new(
         subscriptionId, resourceGroup, appName, null, null, null, ExpiryKind.Missing, null,
