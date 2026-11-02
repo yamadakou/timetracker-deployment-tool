@@ -95,9 +95,13 @@ public sealed class WebView2Tests
             await page.Mouse.MoveAsync(target.X + target.Width / 2, target.Y + target.Height / 2, new() { Steps = 8 });
             await page.Mouse.UpAsync();
             await Assertions.Expect(page.Locator("thead th[data-key]").Nth(1)).ToHaveAttributeAsync("data-key", "Group");
-            await page.Locator("th[data-key='State'] button.tt-filter").ClickAsync();
-            await page.Locator(".tt-popup [data-move='left']").ClickAsync();
+            // ドラッグの後は「サブスクリプション・グループ・リソースグループ・アプリ名・状態」。▽ の「左へ移動」で、状態は 5 番目から 4 番目へ
             await Assertions.Expect(page.Locator("thead th[data-key]").Nth(4)).ToHaveAttributeAsync("data-key", "State");
+            await page.Locator("th[data-key='State'] button.tt-filter").ClickAsync();
+            await Assertions.Expect(page.Locator(".tt-popup")).ToBeVisibleAsync();
+            await page.Locator(".tt-popup [data-move='left']").ClickAsync();
+            await Assertions.Expect(page.Locator("thead th[data-key]").Nth(3)).ToHaveAttributeAsync("data-key", "State");
+            await Assertions.Expect(page.Locator("thead th[data-key]").Nth(4)).ToHaveAttributeAsync("data-key", "AppName");
             await page.Keyboard.PressAsync("Escape");
             await page.Locator(".tt-reset").ClickAsync();
             await Assertions.Expect(page.Locator("thead th[data-key]").Nth(1)).ToHaveAttributeAsync("data-key", "ResourceGroup");
