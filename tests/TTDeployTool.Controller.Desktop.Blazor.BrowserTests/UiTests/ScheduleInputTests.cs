@@ -28,6 +28,7 @@ public sealed class ScheduleInputTests
         await page.DeleteAsync("app06", schedule: true);
         var row = page.RowWith("Jobs", "Target", "rg-mock-06 / app06");
         await row.ClickAsync();
+        await page.ScheduleInAnHourAsync("Jobs.Schedule");
         var before = await page.Id("Jobs.ScheduleTime").InputValueAsync();
         var minutes = before.EndsWith("34", StringComparison.Ordinal) ? "36" : "34";
         await TypeMinutesAsync(page, "Jobs.ScheduleTime", minutes);
@@ -49,6 +50,7 @@ public sealed class ScheduleInputTests
         await page.RowWith("Deployments", "AppName", "app08").ClickAsync();
         await page.ClickIdAsync("Deployments.Delete");
         await page.Id("Delete.ConfirmAppName").FillAsync("app08");
+        await page.ScheduleInAnHourAsync("Delete.Schedule");
         var before = await page.Id("Delete.ScheduleTime").InputValueAsync();
         var minutes = before.EndsWith("34", StringComparison.Ordinal) ? "36" : "34";
         await TypeMinutesAsync(page, "Delete.ScheduleTime", minutes);
@@ -56,6 +58,30 @@ public sealed class ScheduleInputTests
         typed.Should().Be($"{before[..3]}{minutes}");
         await page.ClickIdAsync("Delete.Schedule");
         await Assertions.Expect(page.RowWith("Jobs", "Target", "rg-mock-08 / app08").Locator("td[data-key='State']")).ToContainTextAsync(typed);
+    }
+
+    [Fact]
+    public async Task The_Schedule_Should_Start_At_The_Next_Minute_Whenever_A_Page_Opens()
+    {
+        // 予定の欄の既定は、画面を開いたときの次の分（オーナーの依頼、2026-11-02 の案 A）。分の変わり目で開いた場合に備え、開く前と後の次の分のどちらかを受ける
+        await using var host = await WithFixtureAsync();
+        var page = host.Page;
+        await page.SignInAsync();
+        await page.LoadAsync();
+        foreach (var (open, id) in new (Func<Task>, string)[]
+        {
+            (() => page.OpenDeletionAsync("app03"), "Delete.Schedule"),
+            (() => page.ShowAsync("Jobs"), "Jobs.Schedule"),
+            (() => page.OpenDeletionAsync("app05"), "Delete.Schedule"),
+        })
+        {
+            var before = NextMinute();
+            await open();
+            var shown = (await page.Id($"{id}Date").InputValueAsync(), await page.Id($"{id}Time").InputValueAsync());
+            shown.Should().BeOneOf([before, NextMinute()], id);
+            // 次に開いたときに入れ直すことを確かめるため、別の値にしておく
+            await page.ScheduleInAnHourAsync(id);
+        }
     }
 
     // 今の時刻と、今より前の時刻（今日の 00:00。日をまたぐ直前でも今より前）は、エラーで予定を変えない（オーナーの確認、2026-10-31）

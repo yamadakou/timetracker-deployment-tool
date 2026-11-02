@@ -63,6 +63,91 @@ public sealed class ScheduleBoundaryTests
         input.Error.Should().BeNull();
     }
 
+    /// <summary>今（UTC。テストのタイムゾーンの差は 0 とは限らないため、ローカルで比べる）と、既定の予定（今の次の分）。</summary>
+    public static TheoryData<string, string> NextMinutes => new()
+    {
+        { "2026-10-20T09:00:00Z", "2026-10-20T09:01:00Z" },
+        { "2026-10-20T09:00:01Z", "2026-10-20T09:01:00Z" },
+        { "2026-10-20T09:00:59Z", "2026-10-20T09:01:00Z" },
+        { "2026-10-20T23:59:30Z", "2026-10-21T00:00:00Z" },
+        { "2026-12-31T23:59:59Z", "2027-01-01T00:00:00Z" },
+    };
+
+    [Theory]
+    [MemberData(nameof(NextMinutes))]
+    public void Schedule_Input_Should_Start_At_The_Next_Minute(string now, string expected)
+    {
+        // 予定の初期値は今の次の分（オーナーの依頼、2026-11-02 の案 A）。今の分は断るため、受け付ける最も早い時刻にする
+        var time = new FakeTimeProvider(DateTimeOffset.Parse(now, System.Globalization.CultureInfo.InvariantCulture));
+        var input = new ScheduleInput(time);
+        input.At.Should().Be(NextMinuteOf(time));
+        input.Error.Should().BeNull("初期値はそのまま受け付ける");
+        if (time.LocalTimeZone.BaseUtcOffset == TimeSpan.Zero)
+            input.At.Should().Be(DateTimeOffset.Parse(expected, System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    private static DateTimeOffset NextMinuteOf(TimeProvider time)
+    {
+        var now = time.GetLocalNow();
+        return new DateTimeOffset(now.Year, now.Month, now.Day, now.Hour, now.Minute, 0, now.Offset).AddMinutes(1);
+    }
+
+    [Fact]
+    public void Schedule_Input_Should_Reset_To_The_Next_Minute_Of_The_Time_Now()
+    {
+        var time = new FakeTimeProvider(Minute);
+        var input = new ScheduleInput(time) { Date = Minute.AddDays(3), TimeOfDay = TimeSpan.FromHours(5) };
+        time.Advance(TimeSpan.FromMinutes(42.5));
+        input.Error.Should().BeNull("3 日後は今より後");
+
+        input.ResetToNextMinute();
+        input.At.Should().Be(NextMinuteOf(time));
+        input.Error.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Showing_A_Page_With_A_Schedule_Should_Reset_It_To_The_Next_Minute()
+    {
+        // 予定の欄のある画面を開くたびに、今の次の分に入れ直す。実行状況の画面のジョブ 1 件の「予定を変える」は、そのジョブの予定のまま
+        var time = new FakeTimeProvider(Minute);
+        var h = await new Harness(time: time).ReadyAsync();
+        var job = h.Main.Queue.Register(JobKind.Delete, new JobTarget("sub", "rg", "demo"), Minute.AddHours(3), () => new TaskCompletionSource<Job>().Task);
+        var inputs = new (string Page, ScheduleInput Input)[]
+        {
+            (Pages.Wizard, h.Main.Deployment.Schedule), (Pages.Delete, h.Main.Deletion.Schedule), (Pages.BatchDelete, h.Main.BatchDeletion.Schedule), (Pages.Jobs, h.Main.JobList.Schedule),
+        };
+        foreach (var (_, input) in inputs)
+            (input.Date, input.TimeOfDay) = (Minute.AddDays(1), TimeSpan.FromHours(5));
+        time.Advance(TimeSpan.FromMinutes(90.5));
+
+        foreach (var (page, input) in inputs)
+        {
+            await h.Main.PageShownAsync(page);
+            input.At.Should().Be(NextMinuteOf(time), page);
+        }
+        await h.Main.PageShownAsync(Pages.Status);
+        job.EditScheduledAt.Should().Be(Minute.AddHours(3), "ジョブ 1 件の予定の欄は変えない");
+    }
+
+    [Fact]
+    public async Task Reaching_The_Confirm_Step_Should_Reset_The_Deployment_Schedule()
+    {
+        // 新しくデプロイの予定の欄は ⑤ 確認と実行にある。①〜④ の入力に時間がかかっても、⑤ に進んだときの次の分にする
+        var time = new FakeTimeProvider(Minute);
+        var h = await new Harness(time: time).ReadyAsync();
+        h.Azure.ResourceGroup = null;
+        var wizard = h.Main.Wizard;
+        for (var i = 0; i < 3; i++)
+            await wizard.NextCommand.ExecuteAsync();
+        time.Advance(TimeSpan.FromMinutes(12.5));
+        h.Main.Deployment.Schedule.Error.Should().NotBeNull("開いたときの次の分は、もう過ぎている");
+
+        await wizard.NextCommand.ExecuteAsync();
+        wizard.IsConfirm.Should().BeTrue();
+        h.Main.Deployment.Schedule.At.Should().Be(NextMinuteOf(time));
+        h.Main.Deployment.BlockedText.Should().BeNull("予定に追加できる");
+    }
+
     [Theory]
     [MemberData(nameof(Boundaries))]
     public async Task Rescheduling_Selected_Jobs_Should_Change_Them_Only_After_Now(int nowSeconds, int minutes, bool accepted)

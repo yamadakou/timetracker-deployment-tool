@@ -365,7 +365,9 @@ public sealed class JobQueueTests : IDisposable
     public void Schedule_Inputs_Should_Combine_The_Date_And_Time_And_Reject_The_Past()
     {
         var input = new ScheduleInput(_time);
-        var local = _time.GetLocalNow().AddHours(1);
+        // 既定は今の次の分（分の途中なら切り捨てて 1 分後）
+        var now = _time.GetLocalNow();
+        var local = new DateTimeOffset(now.Year, now.Month, now.Day, now.Hour, now.Minute, 0, now.Offset).AddMinutes(1);
         input.Date.Date.Should().Be(local.Date);
         input.TimeOfDay.Should().Be(new TimeSpan(local.Hour, local.Minute, 0));
         input.Error.Should().BeNull();

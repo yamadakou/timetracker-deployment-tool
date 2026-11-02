@@ -90,7 +90,7 @@ public sealed class MockSystemTests
     public async Task Schedule_Times_Not_After_Now_Should_Be_Refused_On_Every_Screen()
     {
         // 予定の時刻を今の分にすると、どの画面でも「今より後にしてください」で断る（No.80。境界の値は Core の ScheduleBoundaryTests）。
-        // 予定の日付は今から 1 時間後の日のため、日をまたぐ時間帯（23 時台）は確かめられない
+        // 予定を入れるジョブは 1 時間後の日時にし、今の時刻は時刻の欄だけに入れるため、日をまたぐ時間帯（22:50 から）は確かめられない
         if (DateTime.Now.AddMinutes(70).Date != DateTime.Now.Date)
             Assert.Skip("予定の日付の既定が明日になる時間帯のため確かめない");
         await using var host = await WithFixtureAsync();
@@ -104,12 +104,8 @@ public sealed class MockSystemTests
         await page.SetNowAsync("Delete.ScheduleTime");
         await Assertions.Expect(page.Id("Delete.Blocked")).ToHaveTextAsync(new System.Text.RegularExpressions.Regex("は、今より後にしてください。$"));
 
-        // 予定を入れたジョブ（1 時間後）を、ジョブの一覧で選んで今の時刻に変えようとすると断る。
-        // 削除の画面の予定の時刻は、別のデプロイを開いても前の値（今の時刻）が残るため、1 時間後に入れ直す
-        await page.OpenDeletionAsync("app06");
-        await page.Id("Delete.ScheduleTime").FillAsync(DateTime.Now.AddHours(1).ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture));
-        await page.ClickIdAsync("Delete.Schedule");
-        await Assertions.Expect(page.Id("Panel.Jobs")).ToBeVisibleAsync();
+        // 予定を入れたジョブ（1 時間後）を、ジョブの一覧で選んで今の時刻に変えようとすると断る
+        await page.DeleteAsync("app06", schedule: true);
         await page.RowWith("Jobs", "Target", "rg-mock-06 / app06").ClickAsync();
         await page.SetNowAsync("Jobs.ScheduleTime");
         await page.ClickIdAsync("Jobs.RescheduleSelected");

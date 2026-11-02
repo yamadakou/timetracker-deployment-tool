@@ -335,8 +335,31 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             ? "利用可能期限のあるデプロイを確かめる（期限の前の通知と、期限での削除）ため"
             : null;
 
-    /// <summary>画面を開いたとき（画面の側から）。「設定」の画面なら、Windows との連携の状態を読み直す。</summary>
-    public Task PageShownAsync(string page) => page == Pages.Settings ? Integration.RefreshAsync() : Task.CompletedTask;
+    /// <summary>
+    /// 画面を開いたとき（画面の側から）。「設定」の画面なら、Windows との連携の状態を読み直す。予定の欄のある画面（新しくデプロイ・削除・まとめての削除・ジョブの一覧）なら、
+    /// 予定の日時を今の次の分に入れ直す（実行状況の画面のジョブ 1 件の「予定を変える」は、そのジョブの予定のまま。オーナーの判断、2026-11-02 の案 A）。
+    /// </summary>
+    public Task PageShownAsync(string page)
+    {
+        switch (page)
+        {
+            case Pages.Settings:
+                return Integration.RefreshAsync();
+            case Pages.Wizard:
+                Deployment.Schedule.ResetToNextMinute();
+                break;
+            case Pages.Delete:
+                Deletion.Schedule.ResetToNextMinute();
+                break;
+            case Pages.BatchDelete:
+                BatchDeletion.Schedule.ResetToNextMinute();
+                break;
+            case Pages.Jobs:
+                JobList.Schedule.ResetToNextMinute();
+                break;
+        }
+        return Task.CompletedTask;
+    }
 
     /// <summary>
     /// アプリを終了してよいか（通知領域の「終了」）。終わっていないジョブがあれば確認する（終了すると実行中のジョブは止まり、予定・待機中のジョブは消える）。

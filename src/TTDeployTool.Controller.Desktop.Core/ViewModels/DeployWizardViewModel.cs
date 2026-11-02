@@ -199,9 +199,12 @@ public sealed class DeployWizardViewModel : ObservableObject
         OnPropertyChanged(nameof(IsConfirm));
         BackCommand.RaiseCanExecuteChanged();
         Refresh();
-        // 確認の画面を開いたら、今の入力で計画を作る（入力を変えると計画は消える）
+        // 確認の画面を開いたら、予定の日時を今の次の分に入れ直し、今の入力で計画を作る（入力を変えると計画は消える）
         if (step == WizardStep.Confirm)
+        {
+            _deployment.Schedule.ResetToNextMinute();
             await _deployment.PlanCommand.ExecuteAsync();
+        }
     }
 
     private void Refresh()

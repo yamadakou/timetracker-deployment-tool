@@ -74,12 +74,16 @@ internal static class Ui
         await Assertions.Expect(page.PageText("deployments")).ToContainTextAsync($"全 {Deployments} 件");
     }
 
-    /// <summary>デプロイの一覧の行から削除の画面を開き、今すぐ削除するか、予定に追加する（予定は既定の 1 時間後。WinUI の MockUiTests.Delete）。</summary>
+    /// <summary>
+    /// デプロイの一覧の行から削除の画面を開き、今すぐ削除するか、予定に追加する（予定は 1 時間後。WinUI の MockUiTests.Delete。
+    /// 予定の既定は今の次の分のため、テストの間に実行にならないよう入れ直す）。
+    /// </summary>
     public static async Task DeleteAsync(this IPage page, string appName, bool schedule)
     {
         await page.OpenDeletionAsync(appName);
         if (schedule)
         {
+            await page.ScheduleInAnHourAsync("Delete.Schedule");
             await page.ClickIdAsync("Delete.Schedule");
             await Assertions.Expect(page.Id("Panel.Jobs")).ToBeVisibleAsync();
         }
@@ -101,6 +105,22 @@ internal static class Ui
         await Assertions.Expect(page.Id("Panel.Delete")).ToBeVisibleAsync();
         await Assertions.Expect(page.Id("Delete.ConfirmAppName")).ToBeVisibleAsync();
         await page.Id("Delete.ConfirmAppName").FillAsync(appName);
+    }
+
+    /// <summary>予定の日付と時刻の欄（名前の頭が <paramref name="id"/>）に、今から 1 時間後（分まで）を入れる。</summary>
+    public static async Task ScheduleInAnHourAsync(this IPage page, string id)
+    {
+        var at = DateTime.Now.AddHours(1);
+        await page.Id($"{id}Date").FillAsync(at.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+        await page.Id($"{id}Time").FillAsync(at.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    /// <summary>今の次の分（予定の欄の既定）を、日付と時刻の欄の値の形（"yyyy-MM-dd"・"HH:mm"）で。</summary>
+    public static (string Date, string Time) NextMinute()
+    {
+        var now = DateTime.Now;
+        var next = new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, 0, now.Kind).AddMinutes(1);
+        return (next.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), next.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture));
     }
 
     /// <summary>時刻の欄に、今の時刻（時と分）を入れる（WinUI の AppSession.SetTime）。</summary>
