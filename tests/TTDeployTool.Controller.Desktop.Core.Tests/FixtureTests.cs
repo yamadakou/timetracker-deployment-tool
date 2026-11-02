@@ -90,8 +90,9 @@ public class FixtureTests
     [Fact]
     public async Task The_App_Should_List_The_Deployments_And_Keep_A_Deletion_Running_Until_Stopped()
     {
-        // 書き込み 1 回に 0.3 秒（実行中のまま見せ、停止は次の手順の境目で効く）
-        var data = Data with { WriteDelaySeconds = 0.3 };
+        // 書き込み 1 回に 0.3 秒（実行中のまま見せ、停止は次の手順の境目で効く）。
+        // 本物の時刻で動かすため、データの期限も今を基にする（決まった日を基にすると、日が経つと期限を過ぎ、期限での削除のジョブが同時に実行できる数を埋める）
+        var data = FixtureSamples.Data(25, DateTimeOffset.UtcNow) with { WriteDelaySeconds = 0.3 };
         var main = new MainViewModel(new FixtureSignInService(() => data), new FixtureAzureClients(data), new FakeDialogs(), new FakeLauncher(), TimeProvider.System,
             NullLoggerFactory.Instance, TimeSpan.FromMilliseconds(5), new InMemoryAppPreferences(), null, new FakeClipboard(), null, null, new InMemoryJobHistory());
 
