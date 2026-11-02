@@ -93,7 +93,12 @@ input[type=text], input[type=search], input[type=date], select { background: var
 .tt-table .tt-check { width: 40px; padding: 6px 4px 6px 12px; }
 .tt-table tbody tr:hover { background: var(--tt-hover); }
 .tt-table tbody tr.tt-selected { background: var(--tt-selected); }
-.tt-head { display: flex; align-items: center; gap: 2px; min-width: 0; cursor: grab; }
+.tt-head { display: flex; align-items: center; gap: 2px; min-width: 0; cursor: grab; user-select: none; touch-action: none; }
+/* 見出しのドラッグ: 動かしている列は薄く、入る位置（離した見出しの左か右）を線で示す */
+.tt-table thead th.tt-dragging { opacity: 0.5; }
+.tt-table thead th.tt-drop-before { box-shadow: inset 3px 0 var(--tt-accent); }
+.tt-table thead th.tt-drop-after { box-shadow: inset -3px 0 var(--tt-accent); }
+.tt-popup-move { display: flex; gap: 4px; margin-bottom: 8px; }
 .tt-sort { flex: 1 1 auto; min-width: 0; display: flex; gap: 4px; justify-content: space-between; background: none; border: 0; padding: 2px 4px; font-weight: 600; text-align: left; }
 .tt-head-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tt-nosort { flex: 1 1 auto; padding: 2px 4px; }

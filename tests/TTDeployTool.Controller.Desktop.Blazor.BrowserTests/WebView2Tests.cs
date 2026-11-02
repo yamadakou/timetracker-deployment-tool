@@ -86,6 +86,22 @@ public sealed class WebView2Tests
             await page.Keyboard.PressAsync("Alt+ArrowRight");
             await Assertions.Expect(page.Locator("col[data-key='ResourceGroup']")).ToHaveAttributeAsync("style", $"width: {before + 16:0}px");
             await page.Locator(".tt-reset").ClickAsync();
+
+            // 見出しのドラッグ（ポインターのイベント。ブラウザーの標準のドラッグは、この WebView2 では働かなかった）と、▽ の「左へ移動」
+            var group = (await page.Locator("th[data-key='Group'] .tt-head-text").BoundingBoxAsync())!;
+            var target = (await page.Locator("th[data-key='ResourceGroup']").BoundingBoxAsync())!;
+            await page.Mouse.MoveAsync(group.X + 5, group.Y + group.Height / 2);
+            await page.Mouse.DownAsync();
+            await page.Mouse.MoveAsync(target.X + target.Width / 2, target.Y + target.Height / 2, new() { Steps = 8 });
+            await page.Mouse.UpAsync();
+            await Assertions.Expect(page.Locator("thead th[data-key]").Nth(1)).ToHaveAttributeAsync("data-key", "Group");
+            await page.Locator("th[data-key='State'] button.tt-filter").ClickAsync();
+            await page.Locator(".tt-popup [data-move='left']").ClickAsync();
+            await Assertions.Expect(page.Locator("thead th[data-key]").Nth(4)).ToHaveAttributeAsync("data-key", "State");
+            await page.Keyboard.PressAsync("Escape");
+            await page.Locator(".tt-reset").ClickAsync();
+            await Assertions.Expect(page.Locator("thead th[data-key]").Nth(1)).ToHaveAttributeAsync("data-key", "ResourceGroup");
+
             await page.Locator("tbody tr").Nth(0).Locator("td.tt-check input").CheckAsync();
             await page.Locator(".tt-table-scroll").FocusAsync();
             await page.Keyboard.PressAsync("Control+C");

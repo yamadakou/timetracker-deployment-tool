@@ -10,6 +10,10 @@
             <button type="button" @onclick="OnClearSort">並べ替えを解除</button>
         </div>
     }
+    <div class="tt-popup-move">
+        <button type="button" data-move="left" disabled="@(!CanMoveLeft)" @onclick="() => OnMove.InvokeAsync(-1)">左へ移動</button>
+        <button type="button" data-move="right" disabled="@(!CanMoveRight)" @onclick="() => OnMove.InvokeAsync(1)">右へ移動</button>
+    </div>
     <input type="search" class="tt-popup-search" placeholder="検索" aria-label="値を探す" value="@_search" @oninput="Search" />
     <label class="tt-popup-all">
         <input type="checkbox" checked="@AllVisibleChecked" @onchange="ToggleAll" />（すべて選択）
@@ -58,6 +62,18 @@
 
     [Parameter]
     public EventCallback OnClose { get; set; }
+
+    /// <summary>列を左（-1）・右（1）へ 1 つ動かす。</summary>
+    [Parameter]
+    public EventCallback<int> OnMove { get; set; }
+
+    /// <summary>左へ動かせるか（いちばん左の列でない）。</summary>
+    [Parameter]
+    public bool CanMoveLeft { get; set; }
+
+    /// <summary>右へ動かせるか（いちばん右の列でない）。</summary>
+    [Parameter]
+    public bool CanMoveRight { get; set; }
 
     private bool AllVisibleChecked => _visible.All(v => _checked.Contains(v.Value));
 

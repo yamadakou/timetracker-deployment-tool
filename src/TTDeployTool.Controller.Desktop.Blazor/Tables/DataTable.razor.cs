@@ -20,7 +20,6 @@ public partial class DataTable<TRow, TItem> : IAsyncDisposable
     private TableSource<TRow, TItem>? _watched;
     private TableRows<TItem>? _rows;
     private string? _filterKey;
-    private string? _dragKey;
     private string? _focusKey;
     private (TRow Row, string Key, double X, double Y)? _menu;
     private string? _message;
@@ -99,6 +98,10 @@ public partial class DataTable<TRow, TItem> : IAsyncDisposable
         ColumnResized(key, current + step * HtmlTableRules.KeyboardStep);
     }
 
+    /// <summary>見出しを別の列の見出しまでドラッグした（JavaScript から）。<paramref name="key"/> の列を <paramref name="target"/> の列の位置に動かす。</summary>
+    [JSInvokable]
+    public void ColumnMoved(string key, string target) => SaveLayout(HtmlTableRules.Move(_layout, key, target));
+
     /// <summary>見出しのボタンで Alt+Shift+←/→（JavaScript から）。列を 1 つ動かし、描き直した後もその列の見出しにフォーカスを置く。</summary>
     [JSInvokable]
     public void ColumnShifted(string key, int step)
@@ -158,12 +161,8 @@ public partial class DataTable<TRow, TItem> : IAsyncDisposable
 
     private void CloseFilter() => _filterKey = null;
 
-    private void Drop(string target)
-    {
-        if (_dragKey is { } moved)
-            SaveLayout(HtmlTableRules.Move(_layout, moved, target));
-        _dragKey = null;
-    }
+    // ▽ の「左へ移動」「右へ移動」（▽ は開いたまま。続けて押せる）
+    private void MoveFromMenu(string key, int step) => SaveLayout(HtmlTableRules.Shift(_layout, key, step));
 
     private void Toggle(TRow row)
     {

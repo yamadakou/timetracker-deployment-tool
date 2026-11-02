@@ -146,6 +146,71 @@ public sealed class BrowserHostTests
     }
 
     [Fact]
+    public async Task Header_Drag_Should_Show_Where_The_Column_Goes_And_Not_Sort()
+    {
+        // 見出しのドラッグはポインターのイベントで受ける（ブラウザーの標準のドラッグは、WPF のホストの WebView2 では働かなかった。オーナーの実機の確認、2026-11-01）
+        await using var host = await BrowserHost.StartAsync();
+        var page = host.Page;
+        var group = (await Header(page, "Group").Locator(".tt-head-text").BoundingBoxAsync())!;
+        var target = (await Header(page, "ResourceGroup").BoundingBoxAsync())!;
+
+        // 少し動かしただけ（6 ピクセルより短い）なら、並べ替えのボタンを押したことになる
+        await page.Mouse.MoveAsync(group.X + 5, group.Y + group.Height / 2);
+        await page.Mouse.DownAsync();
+        await page.Mouse.MoveAsync(group.X + 8, group.Y + group.Height / 2);
+        await page.Mouse.UpAsync();
+        await Assertions.Expect(Header(page, "Group")).ToHaveAttributeAsync("aria-sort", "ascending");
+        await Header(page, "Subscription").Locator("button.tt-sort").ClickAsync();
+        await Assertions.Expect(Header(page, "Subscription")).ToHaveAttributeAsync("aria-sort", "ascending");
+
+        // ドラッグの途中は、動かす列を薄くし、入る位置（左へ動かすなら離す見出しの左）に線を出す
+        await page.Mouse.MoveAsync(group.X + 5, group.Y + group.Height / 2);
+        await page.Mouse.DownAsync();
+        await page.Mouse.MoveAsync(target.X + target.Width / 2, target.Y + target.Height / 2, new() { Steps = 8 });
+        await Assertions.Expect(Header(page, "Group")).ToHaveClassAsync(new System.Text.RegularExpressions.Regex("tt-dragging"));
+        await Assertions.Expect(Header(page, "ResourceGroup")).ToHaveClassAsync(new System.Text.RegularExpressions.Regex("tt-drop-before"));
+        await page.Mouse.UpAsync();
+
+        await Assertions.Expect(page.Locator("thead th[data-key]").Nth(1)).ToHaveAttributeAsync("data-key", "Group");
+        (await HeaderKeys(page)).Should().StartWith(["Subscription", "Group", "ResourceGroup", "AppName"]);
+        (await page.Locator("thead th.tt-dragging, thead th.tt-drop-before, thead th.tt-drop-after").CountAsync()).Should().Be(0, "離したら線を消す");
+        (await SortOf(page, "Group")).Should().Be("none", "ドラッグの後に、並べ替えのボタンを押したことにしない");
+        (await SortOf(page, "Subscription")).Should().Be("ascending");
+
+        // 右へ動かすときは、離す見出しの右に線を出す。表の外で離すと、動かさない
+        var state = (await Header(page, "State").BoundingBoxAsync())!;
+        var app = (await Header(page, "AppName").Locator(".tt-head-text").BoundingBoxAsync())!;
+        await page.Mouse.MoveAsync(app.X + 5, app.Y + app.Height / 2);
+        await page.Mouse.DownAsync();
+        await page.Mouse.MoveAsync(state.X + state.Width / 2, state.Y + state.Height / 2, new() { Steps = 8 });
+        await Assertions.Expect(Header(page, "State")).ToHaveClassAsync(new System.Text.RegularExpressions.Regex("tt-drop-after"));
+        await page.Mouse.MoveAsync(state.X + state.Width / 2, state.Y + 400, new() { Steps = 4 });
+        await page.Mouse.UpAsync();
+        (await HeaderKeys(page)).Should().StartWith(["Subscription", "Group", "ResourceGroup", "AppName", "State"]);
+
+        // 次の本物の click は捨てない
+        await Header(page, "AppName").Locator("button.tt-sort").ClickAsync();
+        await Assertions.Expect(Header(page, "AppName")).ToHaveAttributeAsync("aria-sort", "ascending");
+    }
+
+    [Fact]
+    public async Task Filter_Menu_Should_Move_The_Column_And_Stay_Open()
+    {
+        await using var host = await BrowserHost.StartAsync();
+        var page = host.Page;
+        await Header(page, "State").Locator("button.tt-filter").ClickAsync();
+        await page.Locator(".tt-popup [data-move='left']").ClickAsync();
+        await page.Locator(".tt-popup [data-move='left']").ClickAsync();
+        await Assertions.Expect(page.Locator("thead th[data-key]").Nth(2)).ToHaveAttributeAsync("data-key", "State");
+        await Assertions.Expect(page.Locator(".tt-popup")).ToBeVisibleAsync();
+        await page.Keyboard.PressAsync("Escape");
+
+        // 起動し直しても残る
+        await host.RestartAsync();
+        (await HeaderKeys(host.Page)).Should().StartWith(["Subscription", "ResourceGroup", "State", "AppName", "Group"]);
+    }
+
+    [Fact]
     public async Task Keyboard_Should_Reach_The_Headers_To_Sort_Resize_And_Move_Columns()
     {
         await using var host = await BrowserHost.StartAsync();

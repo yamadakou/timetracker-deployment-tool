@@ -302,10 +302,10 @@ public sealed class DeploymentTableTests : IAsyncLifetime
         // 動かした列の見出しにフォーカスを戻す（続けて押すと、同じ列をさらに動かす）
         _app.Module.Invocations.Should().Contain(i => i.Identifier == "focusHead" && (string)i.Arguments[1]! == "AppName");
 
-        // 見出しのドラッグ（ドラッグしないで落としても変えない）
-        Header("Job").Drop(new DragEventArgs());
-        Header("Job").QuerySelector(".tt-head")!.DragStart(new DragEventArgs());
-        Header("Subscription").Drop(new DragEventArgs());
+        // 見出しのドラッグ（JavaScript から。同じ列の上で離しても変えない）
+        await table.InvokeAsync(() => table.Instance.ColumnMoved("Job", "Job"));
+        HeaderKeys[^1].Should().Be("Job");
+        await table.InvokeAsync(() => table.Instance.ColumnMoved("Job", "Subscription"));
         HeaderKeys.Should().Equal("Job", "Subscription", "AppName", "ResourceGroup", "Group", "State", "ExpiresAt", "DeployedAt");
         // 動かした右端の列（幅 0）は最小の幅になり、新しい右端の列が残りの幅いっぱいに伸びる
         _page.Find("col[data-key='Job']").GetAttribute("style").Should().Be("width: 176px");
@@ -356,5 +356,29 @@ public sealed class DeploymentTableTests : IAsyncLifetime
         List.Filters.Text = "app00";
         _page.WaitForAssertion(() => Rows.Should().HaveCount(1));
         _page.RenderCount.Should().BeGreaterThan(renders);
+    }
+
+    [Fact]
+    public void The_Filter_Menu_Should_Move_The_Column_Left_And_Right_And_Stay_Open()
+    {
+        // ▽ の「左へ移動」「右へ移動」（ドラッグもキーボードも使わずに順序を変える。オーナーの判断で案 A、2026-11-02）
+        Header("ResourceGroup").QuerySelector("button.tt-filter")!.Click();
+        _page.Find(".tt-popup [data-move='right']").Click();
+        HeaderKeys.Take(3).Should().Equal("Subscription", "AppName", "ResourceGroup");
+        _page.Find(".tt-popup [data-move='right']").Click();
+        HeaderKeys.Take(4).Should().Equal("Subscription", "AppName", "Group", "ResourceGroup");
+        _page.FindAll(".tt-popup").Should().ContainSingle("続けて押せるよう、▽ は開いたまま");
+        _page.Find(".tt-popup [data-move='left']").Click();
+        HeaderKeys.Take(3).Should().Equal("Subscription", "AppName", "ResourceGroup");
+        _app.ViewModel.DeploymentsLayout.Current.Select(c => c.Key).Take(3).Should().Equal("Subscription", "AppName", "ResourceGroup");
+
+        // いちばん左の列は左へ、いちばん右の列は右へ動かせない
+        _page.Find("button.tt-reset").Click();
+        Header("Subscription").QuerySelector("button.tt-filter")!.Click();
+        _page.Find(".tt-popup [data-move='left']").HasAttribute("disabled").Should().BeTrue();
+        _page.Find(".tt-popup [data-move='right']").HasAttribute("disabled").Should().BeFalse();
+        Header("Job").QuerySelector("button.tt-filter")!.Click();
+        _page.Find(".tt-popup [data-move='right']").HasAttribute("disabled").Should().BeTrue();
+        _page.Find(".tt-popup [data-move='left']").HasAttribute("disabled").Should().BeFalse();
     }
 }
