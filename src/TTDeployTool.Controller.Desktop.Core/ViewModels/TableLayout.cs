@@ -21,8 +21,13 @@ public sealed class TableLayout(string name, IReadOnlyList<TableColumnLayout> de
             if (!preferences.TableLayouts.TryGetValue(name, out var saved))
                 return defaults;
             var known = saved.Where(s => defaults.Any(d => d.Key == s.Key)).DistinctBy(s => s.Key).ToList();
-            foreach (var (column, index) in defaults.Select((d, i) => (d, i)).Where(x => known.All(k => k.Key != x.d.Key)))
-                known.Insert(Math.Min(index, known.Count), column);
+            // 保存した配置に無い列を、初期値の位置に入れる（ラムダの中のラムダは、通らない分岐をコンパイラが作るため、ループで書く）
+            var keys = known.Select(k => k.Key).ToHashSet();
+            for (var index = 0; index < defaults.Count; index++)
+            {
+                if (keys.Add(defaults[index].Key))
+                    known.Insert(Math.Min(index, known.Count), defaults[index]);
+            }
             return known;
         }
     }

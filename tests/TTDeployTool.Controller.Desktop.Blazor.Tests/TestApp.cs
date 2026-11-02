@@ -43,6 +43,8 @@ public sealed class TestApp : IDisposable
     public TestApp(int deployments = 45, int records = 30, Func<FixtureData, FixtureData>? data = null, bool secrets = false,
         Func<IReadOnlyList<JobRecord>, IReadOnlyList<JobRecord>>? history = null)
     {
+        // 待つ上限（既定は 1 秒）。網羅率を測りながら動かすと遅くなり、たまに 1 秒を超えた（条件を満たせばすぐ次に進む）
+        BunitContext.DefaultWaitTimeout = TimeSpan.FromSeconds(10);
         Directory = Path.Combine(Path.GetTempPath(), "ttdeploytool-blazor-tests", Guid.NewGuid().ToString("N"));
         Context.JSInterop.Mode = JSRuntimeMode.Loose;
         Module = Context.JSInterop.SetupModule(JsModule.Path);
@@ -92,6 +94,8 @@ public sealed class TestApp : IDisposable
 
     public void Dispose()
     {
+        // 今すぐ実行したジョブが、まだ記録（job-history.json）を書いていることがあるため、終わるまで待ってからフォルダーを消す
+        ViewModel.Queue.WhenIdleAsync().Wait(TimeSpan.FromSeconds(30));
         Context.Dispose();
         ViewModel.Dispose();
         if (System.IO.Directory.Exists(Directory))

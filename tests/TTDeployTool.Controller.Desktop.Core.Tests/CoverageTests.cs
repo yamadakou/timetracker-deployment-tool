@@ -211,6 +211,21 @@ public class CoverageTests
 
         row.HasPasswords.Should().BeFalse();
         (row.DbPasswordText, row.TrackerPasswordText).Should().Be(((string?)null, (string?)null));
+        // クリップボードがあっても、読む前はどちらのパスワードもコピーできない
+        row.CopyDbPasswordCommand.CanExecute(null).Should().BeFalse();
+        row.CopyTrackerPasswordCommand.CanExecute(null).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Copied_Rows_Should_Show_The_Deployed_Day_Or_That_There_Is_No_Record()
+    {
+        // デプロイ日の列のコピーの文字（記録があれば日付、無ければ「記録なし」）
+        var h = await LoadedAsync(Deployment("sub", "rg", "demo", deployed: "2026-10-21T01:30:00Z"), Deployment("sub", "rg", "old"));
+        var list = h.Main.Deployments;
+        var rows = new TableRows<DeploymentEntry>(list.Filters, r => (r as DeploymentRowViewModel)?.Entry);
+
+        rows.CopyText(list.Rows, ["AppName", "DeployedAt"], headers: true).Split("\r\n")
+            .Should().Equal("アプリ名\tデプロイ日", "demo\t2026-10-21", "old\t記録なし");
     }
 
     [Fact]
