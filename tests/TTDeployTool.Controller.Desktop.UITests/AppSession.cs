@@ -392,6 +392,20 @@ public sealed class AppSession : IDisposable
         WaitUntil(() => Window.FindFirstDescendant(cf => cf.ByAutomationId("AcceptButton")) == null, "時刻の選択の画面が閉じる");
     }
 
+    /// <summary>
+    /// 予定の時刻の欄（TimePicker）を、テストの間に実行にならない後の時刻にする。予定の時刻の初期値は今の次の分のため（No.83）、
+    /// 既定のまま「予定に追加」すると約 1 分後に実行になる。日付の欄は今日のままにするため、日をまたがない時刻（1 時間後か、今日の 23:59）を選ぶ。
+    /// 23:56 より後は、日付が変わるまで待ってから 1 時間後にする（日付の欄は画面を開いたときの日付のため、呼ぶ側で画面を開き直す）。
+    /// </summary>
+    public void ScheduleLater(string timePickerId)
+    {
+        var now = DateTime.Now;
+        if (now.Hour == 23 && now.Minute >= 56)
+            throw new InvalidOperationException("日付が変わる直前のため、予定の時刻を後にできません（テストを実行し直してください）。");
+        var later = now.AddHours(1).Date == now.Date ? now.AddHours(1) : now.Date.AddHours(23).AddMinutes(59);
+        SetTime(timePickerId, later.Hour, later.Minute);
+    }
+
     // 時刻の選択の画面の列を、選ばれている値が target になるまで回す（count は値の数。近い向きに回す）
     private void Spin(string selectorId, int target, int count)
     {

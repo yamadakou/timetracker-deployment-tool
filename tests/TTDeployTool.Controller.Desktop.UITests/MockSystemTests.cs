@@ -94,9 +94,9 @@ public class MockSystemTests
     public void Schedule_Times_Not_After_Now_Should_Be_Refused_On_Every_Screen() => WithFixture(app =>
     {
         // 予定の時刻を今の分にすると、どの画面でも「今より後にしてください」で断る（No.80。境界の値は Core の ScheduleBoundaryTests）。
-        // 予定の日付は今から 1 時間後の日のため、日をまたぐ時間帯（23 時台）は確かめられない
-        if (DateTime.Now.AddMinutes(70).Date != DateTime.Now.Date)
-            Assert.Skip("予定の日付の既定が明日になる時間帯のため確かめない");
+        // 予定の日付の初期値は今の次の分の日（No.83）。日付が変わる直前は、予定を後の時刻にできない（AppSession.ScheduleLater）ため確かめない
+        if (DateTime.Now.Hour == 23 && DateTime.Now.Minute >= 50)
+            Assert.Skip("日付が変わる直前のため確かめない");
         SignIn(app);
         Load(app);
         app.Select("Deployments.PageSize", "50");

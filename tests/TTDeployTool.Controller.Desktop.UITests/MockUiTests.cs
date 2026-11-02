@@ -173,12 +173,13 @@ public class MockUiTests
         app.WaitForText("Deployments.Page", t => t.Contains($"全 {Deployments} 件"), "モックのデプロイが一覧に出る");
     }
 
-    // デプロイの一覧の行から削除の画面を開き、今すぐ削除するか、予定に追加する（予定は今から 1 時間後）
+    // デプロイの一覧の行から削除の画面を開き、今すぐ削除するか、予定に追加する（予定は後の時刻。初期値の次の分のままでは、テストの間に実行になる）
     internal static void Delete(AppSession app, string appName, bool schedule)
     {
         OpenDeletion(app, appName);
         if (schedule)
         {
+            app.ScheduleLater("Delete.ScheduleTime");
             app.Invoke("Delete.Schedule");
             app.Find("Panel.Jobs");
         }

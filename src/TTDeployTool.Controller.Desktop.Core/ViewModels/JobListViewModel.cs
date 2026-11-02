@@ -124,7 +124,7 @@ public sealed class JobListViewModel : ObservableObject
             : $"{_pageIndex * PageSize + 1}〜{Math.Min((_pageIndex + 1) * PageSize, _matchedCount)} 件目を表示（" +
               (_matchedCount == _queue.Jobs.Count ? $"全 {_matchedCount} 件" : $"絞り込んだ {_matchedCount} 件 / 全 {_queue.Jobs.Count} 件") +
               $"）・{_pageIndex + 1} / {PageCount} ページ" +
-              (_queue.Summary is { Length: > 0 } summary ? $"（終わっていないもの: {summary}）" : "");
+              (_queue.Summary.Length > 0 ? $"（終わっていないもの: {_queue.Summary}）" : "");
 
     /// <summary>1 ページの行の数（20・50・100。デプロイの一覧と同じ）。</summary>
     public int PageSize
