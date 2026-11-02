@@ -166,6 +166,17 @@ public class FixtureTests
         (await gateway.EnvironmentStorageExistsAsync(sub, "rg-mock-00", "app00-env", DbPersistence.StorageName)).Should().BeFalse();
         (await persisted.EnvironmentStorageExistsAsync(sub, "rg-mock-00", "app00-env", DbPersistence.StorageName)).Should().BeTrue();
 
+        // Container App の状態の無いリソース・Environment の無いリソースグループ（データの書き忘れ）: 状態とストレージは無しとして答える
+        var bareDb = app with { App = null };
+        var bare = new FixtureGateway(data with
+        {
+            Resources = [.. data.Resources.Where(r => r != app && r.Type != ManagedResourceRecord.EnvironmentType), bareDb],
+        });
+        (await bare.ListContainerAppsAsync(sub, "rg-mock-00")).Should().Contain(a => a.Name == "app00-db" && a.EnvironmentId == null && a.StorageNames == null);
+        var details = (await bare.ListContainerAppDetailsAsync(sub, "rg-mock-00")).Single(a => a.Name == "app00-db");
+        (details.ProvisioningState, details.RunningStatus, details.Image, details.Cpu, details.Memory, details.Fqdn).Should().Be(((string?)null, (string?)null, (string?)null, (double?)null, (string?)null, (string?)null));
+        (await bare.EnvironmentStorageExistsAsync(sub, "rg-mock-00", "app00-env", DbPersistence.StorageName)).Should().BeFalse();
+
         // 書き込みは、決めた時間を待ってから終わる（削除は「削除した」、Environment・Container App の作成は例外）。取り消せる
         var slow = new FixtureGateway(data with { WriteDelaySeconds = 0.05 });
         var tags = new Dictionary<string, string>();

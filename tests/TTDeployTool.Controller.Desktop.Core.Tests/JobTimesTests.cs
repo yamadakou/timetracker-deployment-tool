@@ -129,6 +129,21 @@ public class JobTimesTests
         list.Items.Should().HaveCount(4, "同じ値なら変えない");
     }
 
+    [Theory]
+    [InlineData("2026-10-19T14:59:59Z", false)] // 日本時間 10/19 23:59:59（前の日の最後）
+    [InlineData("2026-10-19T15:00:00Z", true)]  // 日本時間 10/20 00:00:00（その日の始め）
+    [InlineData("2026-10-20T14:59:59Z", true)]  // 日本時間 10/20 23:59:59（その日の最後）
+    [InlineData("2026-10-20T15:00:00Z", false)] // 日本時間 10/21 00:00:00（次の日の始め）
+    public void A_Day_Should_Include_Its_Whole_Day_In_The_Time_Zone(string utc, bool included)
+    {
+        // 境界: 「この日から」「この日まで」は、指定したタイムゾーンの日付の 0:00:00〜23:59:59 を含む（UTC の日付では比べない）
+        var japan = TimeZoneInfo.CreateCustomTimeZone("JST", TimeSpan.FromHours(9), "JST", "JST");
+        var day = new DateTimeOffset(2026, 10, 20, 0, 0, 0, TimeSpan.FromHours(9));
+        var filter = new DateRangeFilter(japan) { From = day, To = day };
+
+        filter.Matches(DateTimeOffset.Parse(utc, System.Globalization.CultureInfo.InvariantCulture)).Should().Be(included);
+    }
+
     [Fact]
     public void A_Filter_Without_A_Table_Should_Still_Match()
     {

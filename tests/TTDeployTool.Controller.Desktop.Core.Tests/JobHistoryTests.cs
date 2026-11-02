@@ -156,6 +156,20 @@ public sealed class JobHistoryTests : IDisposable
     }
 
     [Fact]
+    public void Records_Should_Be_Kept_For_Exactly_The_Retention_Period()
+    {
+        // 境界: 終わってからちょうど 180 日のものは残し、それより 1 秒古いものは除く
+        var stored = new CountingJobHistory().With(
+            [Record("edge", _time.Now - JobHistory.RetentionPeriod), Record("older", _time.Now - JobHistory.RetentionPeriod - TimeSpan.FromSeconds(1))]);
+
+        var h = new Harness(time: _time);
+        var main = new MainViewModel(h.SignIn, h.Azure, h.Dialogs, h.Launcher, _time, Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance,
+            history: stored);
+
+        main.Jobs.Select(j => j.TargetText).Should().Equal("rg / edge");
+    }
+
+    [Fact]
     public async Task Deleting_Records_Should_Remove_Only_Finished_Jobs_After_Confirming()
     {
         var history = new InMemoryJobHistory { Records = [Record("a", _time.Now.AddDays(-2)), Record("b", _time.Now.AddDays(-1))] };
