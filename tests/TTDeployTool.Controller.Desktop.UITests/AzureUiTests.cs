@@ -189,6 +189,8 @@ public class AzureUiTests
             Next(app, "④");
             app.Invoke("Wizard.Next");
             AppSession.WaitUntil(() => app.Exists("Deploy.Schedule") && app.IsEnabled("Deploy.Schedule"), "2 つ目の対象の計画が表示されませんでした。", LoadTimeout);
+            // 予定の時刻の初期値は今の次の分のため（No.83）、後の時刻にしてから入れる（既定のままでは 1 分後に本物のデプロイが始まる）
+            app.ScheduleLater("Deploy.ScheduleTime");
             app.Invoke("Deploy.Schedule");
             WizardStep(app, "完了");
             app.TextOf("Wizard.ShowJob").Should().Be("ジョブの一覧を見る");

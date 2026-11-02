@@ -374,6 +374,65 @@ public sealed class AppSession : IDisposable
             timeoutMessage: $"要素 {automationId} が見つかりませんでした。").Result!;
 
     /// <summary>
+    /// TimePicker（24 時間）の時刻を <paramref name="hour"/>:<paramref name="minute"/> にする（モックの UI テストだけが使う）。時刻の欄を押して開く選択の画面の
+    /// 時・分の列（LoopingSelector）で、選ばれている値から上下の矢印キーで目的の値まで回し、「✓」（AcceptButton）で閉じる。
+    /// </summary>
+    public void SetTime(string pickerId, int hour, int minute)
+    {
+        var picker = Find(pickerId);
+        var button = picker.FindFirstDescendant(cf => cf.ByControlType(ControlType.Button)) ?? picker;
+        if (button.Patterns.Invoke.TryGetPattern(out var invoke))
+            invoke.Invoke();
+        else
+            Click(new System.Drawing.Point(picker.BoundingRectangle.X + picker.BoundingRectangle.Width / 2, picker.BoundingRectangle.Bottom - 10));
+        var accept = FindAnywhere("AcceptButton");
+        Spin("HourLoopingSelector", hour, 24);
+        Spin("MinuteLoopingSelector", minute, 60);
+        accept.Patterns.Invoke.Pattern.Invoke();
+        WaitUntil(() => Window.FindFirstDescendant(cf => cf.ByAutomationId("AcceptButton")) == null, "時刻の選択の画面が閉じる");
+    }
+
+    /// <summary>
+    /// 予定の時刻の欄（TimePicker）を、テストの間に実行にならない後の時刻にする。予定の時刻の初期値は今の次の分のため（No.83）、
+    /// 既定のまま「予定に追加」すると約 1 分後に実行になる。日付の欄は今日のままにするため、日をまたがない時刻（1 時間後か、今日の 23:59）を選ぶ。
+    /// 23:56 より後は、日付が変わるまで待ってから 1 時間後にする（日付の欄は画面を開いたときの日付のため、呼ぶ側で画面を開き直す）。
+    /// </summary>
+    public void ScheduleLater(string timePickerId)
+    {
+        var now = DateTime.Now;
+        if (now.Hour == 23 && now.Minute >= 56)
+            throw new InvalidOperationException("日付が変わる直前のため、予定の時刻を後にできません（テストを実行し直してください）。");
+        var later = now.AddHours(1).Date == now.Date ? now.AddHours(1) : now.Date.AddHours(23).AddMinutes(59);
+        SetTime(timePickerId, later.Hour, later.Minute);
+    }
+
+    // 時刻の選択の画面の列を、選ばれている値が target になるまで回す（count は値の数。近い向きに回す）
+    private void Spin(string selectorId, int target, int count)
+    {
+        for (var i = 0; i <= count; i++)
+        {
+            var selector = FindAnywhere(selectorId);
+            var current = SelectedValue(selector);
+            if (current == target)
+                return;
+            selector.Focus();
+            var forward = ((target - current) % count + count) % count;
+            Press(forward <= count / 2 ? FlaUI.Core.WindowsAPI.VirtualKeyShort.DOWN : FlaUI.Core.WindowsAPI.VirtualKeyShort.UP);
+        }
+        throw new InvalidOperationException($"{selectorId} を {target} にできませんでした（今の値: {SelectedValue(FindAnywhere(selectorId))}）。");
+    }
+
+    private static int SelectedValue(AutomationElement selector)
+    {
+        var selected = selector.Patterns.Selection.TryGetPattern(out var selection) ? selection.Selection.Value.FirstOrDefault() : null;
+        selected ??= selector.FindAllDescendants().FirstOrDefault(e => e.Patterns.SelectionItem.TryGetPattern(out var item) && item.IsSelected.Value);
+        var name = selected?.Properties.Name.ValueOrDefault;
+        return int.TryParse(name, out var value) ? value
+            : throw new InvalidOperationException($"{selector.Properties.AutomationId.ValueOrDefault} の選ばれている値を読めませんでした（{name ?? "なし"}。子: "
+                + string.Join(", ", selector.FindAllChildren().Take(8).Select(c => c.Properties.Name.ValueOrDefault)) + "）。");
+    }
+
+    /// <summary>
     /// 表の行の数（今のページの行）。表は見えている行の分しか行の要素を作らない（仮想化）ため、子の数ではなく Grid パターンの行の数で読む
     /// （CI の UI テスト、run 41066697432: 20 行のうち 11 行しか子に無かった）。
     /// </summary>

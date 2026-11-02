@@ -173,8 +173,25 @@ public class MockUiTests
         app.WaitForText("Deployments.Page", t => t.Contains($"全 {Deployments} 件"), "モックのデプロイが一覧に出る");
     }
 
-    // デプロイの一覧の行から削除の画面を開き、今すぐ削除するか、予定に追加する（予定は今から 1 時間後）
+    // デプロイの一覧の行から削除の画面を開き、今すぐ削除するか、予定に追加する（予定は後の時刻。初期値の次の分のままでは、テストの間に実行になる）
     internal static void Delete(AppSession app, string appName, bool schedule)
+    {
+        OpenDeletion(app, appName);
+        if (schedule)
+        {
+            app.ScheduleLater("Delete.ScheduleTime");
+            app.Invoke("Delete.Schedule");
+            app.Find("Panel.Jobs");
+        }
+        else
+        {
+            app.Invoke("Delete.Start");
+            app.Find("Panel.Status");
+        }
+    }
+
+    // デプロイの一覧の行から削除の画面を開き、計画を作ってアプリ名を入れる（「今すぐ削除」「予定に追加」が押せる状態）
+    internal static void OpenDeletion(AppSession app, string appName)
     {
         app.Show("Deployments");
         if (app.IsEnabled("Deployments.ClearSelection"))
@@ -185,16 +202,6 @@ public class MockUiTests
         app.Find("Delete.ConfirmAppName");
         AppSession.WaitUntil(() => app.IsEnabled("Delete.Plan"), "削除の計画ができる");
         app.SetText("Delete.ConfirmAppName", appName);
-        if (schedule)
-        {
-            app.Invoke("Delete.Schedule");
-            app.Find("Panel.Jobs");
-        }
-        else
-        {
-            app.Invoke("Delete.Start");
-            app.Find("Panel.Status");
-        }
     }
 
     /// <summary>CI のウィンドウは狭いため、最大化して表の列と詳細を画面に入れる（画面の外のセルは、UI Automation の位置が 0 になる）。</summary>
