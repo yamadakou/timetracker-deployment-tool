@@ -230,7 +230,7 @@
 | 部品 | Desktop.Core に `JobRecord`（保存する 1 件）・`IJobHistoryFile`（`FileJobHistory` と `InMemoryJobHistory`）・`JobHistory`（終わったジョブの保存と、起動時に戻す）を加える。`JobViewModel` は、記録から作ったもの（`IsRecord`）では記録の値を出す。`JobQueue` は、登録・予定の変更・実行の開始・終わったときの日時を記録する。日時の絞り込みは `DateRangeFilter` |
 
 ## 7. テスト
-- `Desktop.Core`: ジョブの予定・待機・一時停止・取り消し・停止・同時実行の上限・同じ対象の拒否・計画し直しての比較（違えば失敗）を、偽の時刻（`TimeProvider`）と偽の Azure で確かめる。分岐網羅率 100%
+- `Desktop.Core`: ジョブの予定・待機・一時停止・取り消し・停止・同時実行の上限・同じ対象の拒否・計画し直しての比較（違えば失敗）を、偽の時刻（`TimeProvider`）と偽の Azure で確かめる。行と分岐の網羅率 100%（2026-11-02 に測ると分岐が 98% 台に下がっていたため、テストを足して 100% に戻し、CI〔`ci.yml` の `build` ジョブの「Coverage of the desktop Core」。coverlet で Core と Fixtures〕で 100% を下回ると失敗にした。No.82）
 - Application: `IProgress<string>` を渡したときに段階が順に届くこと、渡さないときに今と同じこと。停止の要求で次の手順に進まないこと（MCP の既存のテストはそのまま通る）
 - UI テスト（CI）: P1（エラーの領域が消える）、処理中の表示が出て消えること（Dry-run の保存）、ジョブの画面と帯の表示（ジョブが無い状態）
 - UI テスト（半自動。Azure）: 2 つの対象を登録し、同時に実行されること、同じ対象を計画できないこと、予定の取り消し、停止

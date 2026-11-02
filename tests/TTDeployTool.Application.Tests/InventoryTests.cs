@@ -58,6 +58,20 @@ public class DeploymentCatalogTests
     }
 
     [Fact]
+    public void Apps_Without_A_Snapshot_Should_Be_Listed_Without_Their_State()
+    {
+        // Resource Graph の結果に Container App の状態が無いもの（読めなかった列）: 名前だけ出し、URL・状態・DB の永続化は無しとする
+        ManagedResourceRecord Bare(string name) => new($"/subscriptions/s1/resourceGroups/rg/providers/Microsoft.App/containerApps/{name}", name,
+            ManagedResourceRecord.ContainerAppType, "s1", "rg", "", Tags("demo"));
+
+        var e = DeploymentCatalog.Build([Bare("demo-tt"), Bare("demo-db"), Bare("demo-redis")]).Should().ContainSingle().Subject;
+
+        (e.Location, e.Url, e.DbPersisted).Should().Be(((string?)null, (string?)null, false));
+        e.Timetracker.Should().Be(new AppEntry("demo-tt", null, null, null, null, null));
+        e.Db.Should().Be(new AppEntry("demo-db", null, null, null, null, null));
+    }
+
+    [Fact]
     public void Expiry_Should_Come_From_The_First_App_With_The_Tag()
     {
         var entries = DeploymentCatalog.Build(

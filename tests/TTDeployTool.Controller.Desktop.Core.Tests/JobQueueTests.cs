@@ -166,6 +166,29 @@ public sealed class JobQueueTests : IDisposable
         await job.Finished;
     }
 
+    [Theory]
+    [InlineData(59, false)]
+    [InlineData(60, true)]
+    public async Task A_Late_Start_Should_Be_Noted_From_One_Minute(int lateSeconds, bool noted)
+    {
+        // 予定より LateThreshold（1 分）以上遅れて始めたときだけ、その旨を残す（境界: 59 秒は残さず、1 分ちょうどは残す）
+        var work = new Work();
+        var at = _time.GetUtcNow().AddMinutes(1);
+        var job = Register("demo", work, at);
+        await job.PauseCommand.ExecuteAsync();
+        _time.Advance(TimeSpan.FromMinutes(1) + TimeSpan.FromSeconds(lateSeconds));
+
+        await job.ResumeCommand.ExecuteAsync();
+
+        await Until(() => job.State == DesktopJobState.Running);
+        if (noted)
+            job.Note.Should().StartWith($"予定（{at.ToLocalTime():MM/dd HH:mm}）より 1 分遅れて実行しました");
+        else
+            job.Note.Should().BeNull();
+        work.Release.SetResult();
+        await job.Finished;
+    }
+
     [Fact]
     public async Task Jobs_Past_Their_Time_Should_Run_When_Resumed_And_Say_They_Were_Late()
     {

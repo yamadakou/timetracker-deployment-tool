@@ -98,4 +98,23 @@ public class ResourceGraphDeploymentDirectoryTests
         result.Should().BeEmpty();
         _arm.Verify(a => a.GetTenants(), Times.Never);
     }
+
+    [Fact]
+    public void Parse_Should_Fill_Empty_Values_When_Columns_Are_Missing()
+    {
+        // 列が無い行（tostring で取り出す前の形や、API の変化に備える）: 文字は空、数値・タグ・アプリの状態は無し
+        var rows = ResourceGraphDeploymentDirectory.Parse(BinaryData.FromString("""
+            [
+              {},
+              { "type": "microsoft.app/containerapps", "name": "demo-tt" }
+            ]
+            """)).ToList();
+
+        rows.Should().HaveCount(2);
+        (rows[0].Id, rows[0].Name, rows[0].Type, rows[0].SubscriptionId, rows[0].ResourceGroup, rows[0].Location).Should().Be(("", "", "", "", "", ""));
+        rows[0].Tags.Should().BeEmpty();
+        rows[0].App.Should().BeNull();
+        rows[1].Tags.Should().BeEmpty();
+        rows[1].App.Should().BeEquivalentTo(new ContainerAppSnapshot(null, null, null, null, null, null, []));
+    }
 }

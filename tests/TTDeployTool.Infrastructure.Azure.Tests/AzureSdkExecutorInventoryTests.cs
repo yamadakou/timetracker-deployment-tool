@@ -383,8 +383,9 @@ public class AzureSdkExecutorInventoryTests
         app.Setup(a => a.GetSecretsAsync(It.IsAny<CancellationToken>())).Returns(Pageable(
             ArmAppContainersModelFactory.ContainerAppSecret("db-password", "DbPassw0rd!", null, null),
             ArmAppContainersModelFactory.ContainerAppSecret("app-password", "TrackerPass!", null, null),
-            // Key Vault を参照するシークレットは値が返らない
-            ArmAppContainersModelFactory.ContainerAppSecret("kv", null, "System", new Uri("https://kv.example/secrets/x"))));
+            // Key Vault を参照するシークレットは値が返らない。名前の無いもの（API の型の上ではありうる）も読まない
+            ArmAppContainersModelFactory.ContainerAppSecret("kv", null, "System", new Uri("https://kv.example/secrets/x")),
+            ArmAppContainersModelFactory.ContainerAppSecret(null, "NoName!", null, null)));
         _apps.Setup(c => c.GetIfExistsAsync("app-tt", It.IsAny<CancellationToken>())).ReturnsAsync(Found(app.Object));
         _apps.Setup(c => c.GetIfExistsAsync("missing", It.IsAny<CancellationToken>())).ReturnsAsync(NotFound<ContainerAppResource>());
 
@@ -433,5 +434,31 @@ public class AzureSdkExecutorInventoryTests
         id!.ToString().Should().Be(
             $"/subscriptions/{SubscriptionId}/resourceGroups/{RgName}/providers/Microsoft.Storage/storageAccounts/ttapp12345678/providers/Microsoft.Resources/tags/default");
         tag.VerifyAll();
+    }
+
+    [Theory]
+    [InlineData("app", "/providers/Microsoft.App/containerApps/app-tt")]
+    [InlineData("storage", "/providers/Microsoft.Storage/storageAccounts/ttapp12345678")]
+    public async Task Delete_Tags_Should_Remove_Only_The_Given_Tags_Through_The_Tags_Api(string kind, string path)
+    {
+        // グループを外す（No.77）: 指定した名前と値の組のタグだけを、タグの API の Delete で消す（ほかのタグとリソースの設定は変えない）
+        var tag = new Mock<TagResource>();
+        ResourceIdentifier? id = null;
+        TagResourcePatch? sent = null;
+        _arm.Setup(a => a.GetTagResource(It.IsAny<ResourceIdentifier>())).Callback<ResourceIdentifier>(i => id = i).Returns(tag.Object);
+        tag.Setup(t => t.UpdateAsync(WaitUntil.Completed, It.IsAny<TagResourcePatch>(), It.IsAny<CancellationToken>()))
+            .Callback<WaitUntil, TagResourcePatch, CancellationToken>((_, patch, _) => sent = patch)
+            .ReturnsAsync(Mock.Of<ArmOperation<TagResource>>());
+        var tags = new Dictionary<string, string> { [DeploymentGroup.Key] = "研修" };
+
+        if (kind == "app")
+            await Sut().DeleteContainerAppTagsAsync(SubscriptionId, RgName, "app-tt", tags, Ct);
+        else
+            await Sut().DeleteStorageAccountTagsAsync(SubscriptionId, RgName, "ttapp12345678", tags, Ct);
+
+        id!.ToString().Should().Be($"/subscriptions/{SubscriptionId}/resourceGroups/{RgName}{path}/providers/Microsoft.Resources/tags/default");
+        sent!.PatchMode.Should().Be(TagPatchMode.Delete);
+        sent.TagValues.Should().Equal(tags);
+        _apps.Verify(c => c.CreateOrUpdateAsync(It.IsAny<WaitUntil>(), It.IsAny<string>(), It.IsAny<ContainerAppData>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }

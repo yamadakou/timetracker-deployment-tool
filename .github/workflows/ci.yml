@@ -74,6 +74,18 @@ jobs:
     - name: Test
       run: dotnet test TTDeployTool.sln --configuration Release --no-build --verbosity normal
 
+    # デスクトップアプリの Core（WinUI 3 版と Blazor Hybrid 版が共有する ViewModel など）と UI テスト用のモック（Fixtures）の
+    # 行・分岐の網羅率 100%（オーナーの依頼、2026-11-02。No.82。前は CI で測っておらず、分岐が 98% 台に下がっていた）
+    - name: Coverage of the desktop Core
+      shell: bash
+      run: |
+        mkdir -p TestResults
+        dotnet tool install coverlet.console --version 10.1.0 --tool-path .tools
+        dll=tests/TTDeployTool.Controller.Desktop.Core.Tests/bin/Release/net10.0/TTDeployTool.Controller.Desktop.Core.Tests.dll
+        .tools/coverlet "$dll" --target dotnet --targetargs "exec $dll" \
+          --include "[TTDeployTool.Controller.Desktop.Core]*" --include "[TTDeployTool.Controller.Desktop.Fixtures]*" \
+          --threshold 100 --threshold-type line --threshold-type branch --format cobertura --output TestResults/desktop-core-coverage.cobertura.xml
+
   # MCP サーバー（HTTP）の配置とロールの割り当てのスクリプト（scripts/*.ps1）を、az を模擬に置き換えて確かめる（Pester）。
   # 管理者が実行する Windows の PowerShell 7 で動かす
   scripts:
