@@ -394,4 +394,5 @@ WinUI 3 版の UI テストとの対応（名前は同じ。中身の違い）:
 - Core の変更のため、WinUI 3 版のセッションに同じ仕様の反映を頼む（画面のボタンは WinUI 3 版のセッションが置く）
 - 実機の確認: 手順書の 12b
 - CI の結果（run 41669248222、2026-11-03）: 全ジョブ成功。オーナーの依頼で、WinUI 3 版のセッションに同じ仕様の反映（Core の取り込みと、WinUI 3 の画面の 3 つのボタンと理由の表示）を頼んだ
+- WinUI 3 版のセッションが取り込んだ（`feature/desktop-app` の cce8b19・16a9cb8。Core と Core.Tests は同じ。CI run 41675892333 は全ジョブ成功）。WinUI 3 の画面では、2 行を選んで `JobList.Current` が null になったとき、x:Bind が前の行の理由の文を残していた（FallbackValue で直した）と知らせを受けた。Blazor 版は描き直しで消えることを bUnit（`RedeployScreenTests`）で確かめた
 

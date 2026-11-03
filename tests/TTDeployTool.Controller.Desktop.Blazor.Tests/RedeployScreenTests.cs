@@ -68,6 +68,13 @@ public sealed class RedeployScreenTests : IDisposable
         Id(page, "Jobs.Redeploy").HasAttribute("disabled").Should().BeTrue();
         jobs.SetSelection([Deletion]);
         page.WaitForAssertion(() => page.FindAll("[data-id='Jobs.RedeployNote']").Should().BeEmpty());
+
+        // 2 行を選ぶと（Current が無い）、前の行の理由を残さず、押せない（WinUI 3 版では前の文が残っていた。WinUI 3 版のセッションから、2026-11-03）
+        jobs.SetSelection([OldDeployment]);
+        page.WaitForAssertion(() => page.FindAll("[data-id='Jobs.RedeployNote']").Should().ContainSingle());
+        jobs.SetSelection([OldDeployment, WithSettings]);
+        page.WaitForAssertion(() => page.FindAll("[data-id='Jobs.RedeployNote']").Should().BeEmpty());
+        Id(page, "Jobs.Redeploy").HasAttribute("disabled").Should().BeTrue();
     }
 
     [Fact]
