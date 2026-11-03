@@ -367,6 +367,15 @@ public sealed class SettingsViewModel : ObservableObject
     private Task ApplyTemplateAsync()
     {
         var t = SelectedTemplate!;
+        Apply(t, $"テンプレート「{t.Name}」を入力しました（パスワードはそのままです）。");
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// 入力の写し（テンプレート・デプロイのジョブの設定）を入力に入れる（パスワードは変えない）。<paramref name="message"/> の後に、サブスクリプションを変えられなかった旨を足す。
+    /// </summary>
+    internal void Apply(DeploymentTemplate t, string message)
+    {
         var notes = new List<string>();
         if (t.SubscriptionId != null && !string.Equals(t.SubscriptionId, _target.SelectedSubscription?.SubscriptionId, StringComparison.OrdinalIgnoreCase)
             && !_target.Select(t.SubscriptionId, t.ResourceGroup, t.AppName))
@@ -388,8 +397,7 @@ public sealed class SettingsViewModel : ObservableObject
         if (t.ExpiryDate != null && DateOnly.TryParseExact(t.ExpiryDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
             ExpiryDate = Midnight(date);
         Group = t.Group ?? "";
-        Message = string.Join(" ", new[] { $"テンプレート「{t.Name}」を入力しました（パスワードはそのままです）。" }.Concat(notes));
-        return Task.CompletedTask;
+        Message = string.Join(" ", new[] { message }.Concat(notes));
     }
 
     private async Task DeleteTemplateAsync()

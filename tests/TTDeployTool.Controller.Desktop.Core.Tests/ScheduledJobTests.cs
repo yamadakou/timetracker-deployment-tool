@@ -245,6 +245,7 @@ public class ScheduledJobTests
         var restarted = await RestartedAsync(h);
         var job = restarted.Main.Queue.Jobs.Should().ContainSingle().Subject;
         (job.IsDeployment, job.State, job.ScheduledAt, job.SavedDeployment).Should().Be((true, DesktopJobState.Scheduled, InAnHour, deployment));
+        job.Settings.Should().Be(DeploymentTemplate.From(deployment.Options), "戻した予定にも、「この設定で新しくデプロイ」の設定を持たせる");
         restarted.Notifications.Shown.Should().Contain(n => n.Title == "前回の予定を戻しました" && !n.Message.Contains("一時停止"));
 
         // 予定の時刻になると、復号した設定で計画を作り直して実行する。始めたら保存から消す

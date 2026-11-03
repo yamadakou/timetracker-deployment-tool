@@ -219,7 +219,7 @@ public class MockUiTests
     /// <paramref name="layout"/> なら、保存した列の配置（ジョブの一覧。既定は結果の列を左に。<paramref name="jobsLayout"/> で変えられる）も置く。
     /// </summary>
     internal static void WithFixture(Action<AppSession> test, Func<FixtureData, FixtureData>? data = null, bool layout = true, IReadOnlyList<TableColumnLayout>? jobsLayout = null,
-        [System.Runtime.CompilerServices.CallerMemberName] string name = "")
+        Func<IReadOnlyList<JobRecord>, IReadOnlyList<JobRecord>>? history = null, [System.Runtime.CompilerServices.CallerMemberName] string name = "")
     {
         var directory = AppSession.DataDirectory();
         Directory.CreateDirectory(directory);
@@ -229,7 +229,8 @@ public class MockUiTests
             File.Delete(file);
         var fixture = FixtureSamples.Data(Deployments, now) with { WriteDelaySeconds = 120 };
         File.WriteAllText(files[0], (data?.Invoke(fixture) ?? fixture).ToJson());
-        new FileJobHistory(files[1]).Records = FixtureSamples.JobRecords(Records, now);
+        var records = FixtureSamples.JobRecords(Records, now);
+        new FileJobHistory(files[1]).Records = history?.Invoke(records) ?? records;
         // 保存した列の配置を当てる（ジョブの一覧の結果の列を、種類の次に置く。CI のウィンドウは狭く、右端の列は画面の外になるため）
         if (layout)
             new FilePreferences(files[2]).TableLayouts = new Dictionary<string, IReadOnlyList<TableColumnLayout>>

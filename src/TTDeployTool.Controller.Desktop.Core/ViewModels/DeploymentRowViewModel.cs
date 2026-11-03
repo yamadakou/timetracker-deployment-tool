@@ -53,6 +53,8 @@ public sealed class DeploymentRowViewModel : ObservableObject
             return Task.CompletedTask;
         }, () => Url != null);
         UseAsTargetCommand = new AsyncCommand(() => _owner.UseAsTargetAsync(_entry, Pages.Wizard), () => !HasActiveJob);
+        RedeployCommand = new AsyncCommand(() => _owner.LastDeploymentWithSettings(_entry)!.RedeployCommand.ExecuteAsync(),
+            () => !HasActiveJob && _owner.LastDeploymentWithSettings(_entry) != null);
         // 実行状況の画面は、その対象のジョブがあればジョブも出す（「戻る」はデプロイの一覧。No.63・No.69）
         CheckStatusCommand = new AsyncCommand(() => _owner.UseAsTargetAsync(_entry, Pages.Status));
         DeleteCommand = new AsyncCommand(() => _owner.UseAsTargetAsync(_entry, Pages.Delete), () => !HasActiveJob);
@@ -73,6 +75,12 @@ public sealed class DeploymentRowViewModel : ObservableObject
 
     /// <summary>対象に入れて、デプロイのウィザードを開く（再デプロイのため）。</summary>
     public AsyncCommand UseAsTargetCommand { get; }
+
+    /// <summary>
+    /// その対象の最後のデプロイのジョブの設定を「新しくデプロイ」に読み込んで開く（オーナーの依頼、2026-11-03。パスワードは入れ直す）。
+    /// 設定のあるデプロイのジョブ（この機能より後に登録したもの）が無いか、終わっていないジョブがあれば押せない。
+    /// </summary>
+    public AsyncCommand RedeployCommand { get; }
 
     /// <summary>対象に入れて、実行状況の画面で読む（同じ対象の終わっていないジョブがあれば、そのジョブも出す）。</summary>
     public AsyncCommand CheckStatusCommand { get; }

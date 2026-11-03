@@ -280,6 +280,13 @@
                         <Button AutomationProperties.AutomationId="Status.BackToList" Content="{x:Bind ViewModel.ReturnText, Mode=OneWay}" Click="OnBackFromStatus" />
                         <ContentControl AutomationProperties.AutomationId="Status.Job" Content="{x:Bind ViewModel.StatusJob, Mode=OneWay}" ContentTemplate="{StaticResource JobRowTemplate}"
                                         Visibility="{x:Bind ViewModel.HasStatusJob, Mode=OneWay}" />
+                        <!-- 終わったデプロイのジョブの設定を「新しくデプロイ」に読み込む（No.84。サインインするまで押せない。設定の無い記録は理由を出す） -->
+                        <ContentControl IsTabStop="False" IsEnabled="{x:Bind ViewModel.SignIn.IsSignedIn, Mode=OneWay}">
+                            <Button AutomationProperties.AutomationId="Status.Redeploy" Content="この設定で新しくデプロイ" Command="{x:Bind ViewModel.StatusJob.RedeployCommand, Mode=OneWay}"
+                                    Visibility="{x:Bind ViewModel.StatusJob.CanRedeploy, Mode=OneWay}" />
+                        </ContentControl>
+                        <TextBlock AutomationProperties.AutomationId="Status.RedeployNote" TextWrapping="Wrap" Foreground="{ThemeResource SystemFillColorCautionBrush}"
+                                   Text="{x:Bind ViewModel.StatusJob.RedeployNote, Mode=OneWay}" />
                         <Button AutomationProperties.AutomationId="Deploy.OpenEndpoint" Content="Timetracker を開く" Command="{x:Bind ViewModel.OpenEndpointCommand}" />
                         <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Azure の状態" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
@@ -425,6 +432,7 @@
                                 </StackPanel>
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <Button AutomationProperties.AutomationId="Row.UseAsTarget" Content="対象に入れる" Command="{x:Bind ViewModel.Deployments.Current.UseAsTargetCommand, Mode=OneWay}" />
+                                    <Button AutomationProperties.AutomationId="Row.Redeploy" Content="最後のデプロイの設定で新しくデプロイ" Command="{x:Bind ViewModel.Deployments.Current.RedeployCommand, Mode=OneWay}" />
                                     <Button AutomationProperties.AutomationId="Row.CheckStatus" Content="{x:Bind ViewModel.Deployments.Current.CheckStatusText, Mode=OneWay}" Command="{x:Bind ViewModel.Deployments.Current.CheckStatusCommand, Mode=OneWay}" />
                                     <Button AutomationProperties.AutomationId="Row.ShowPasswords" Content="パスワードを表示" Command="{x:Bind ViewModel.Deployments.Current.ShowPasswordsCommand, Mode=OneWay}" />
                                 </StackPanel>
@@ -543,7 +551,15 @@
                                 </StackPanel>
                             </ContentControl>
                             <Button AutomationProperties.AutomationId="Jobs.ClearSelection" Content="選択を外す" Command="{x:Bind ViewModel.JobList.ClearSelectionCommand}" />
+                            <!-- 1 行だけ選んだ、終わったデプロイのジョブの設定を「新しくデプロイ」に読み込む（No.84。サインインするまで押せない） -->
+                            <ContentControl IsTabStop="False" IsEnabled="{x:Bind ViewModel.SignIn.IsSignedIn, Mode=OneWay}">
+                                <ContentControl IsTabStop="False" IsEnabled="{x:Bind ViewModel.JobList.HasCurrent, Mode=OneWay}">
+                                    <Button AutomationProperties.AutomationId="Jobs.Redeploy" Content="この設定で新しくデプロイ" Command="{x:Bind ViewModel.JobList.Current.RedeployCommand, Mode=OneWay}" />
+                                </ContentControl>
+                            </ContentControl>
                         </StackPanel>
+                        <TextBlock AutomationProperties.AutomationId="Jobs.RedeployNote" TextWrapping="Wrap" Foreground="{ThemeResource SystemFillColorCautionBrush}"
+                                   Text="{x:Bind ViewModel.JobList.Current.RedeployNote, Mode=OneWay}" />
                         <ContentControl IsTabStop="False" IsEnabled="{x:Bind ViewModel.SignIn.IsSignedIn, Mode=OneWay}">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <DatePicker AutomationProperties.AutomationId="Jobs.ScheduleDate" Header="予定の日付" Date="{x:Bind ViewModel.JobList.Schedule.Date, Mode=TwoWay}" />
