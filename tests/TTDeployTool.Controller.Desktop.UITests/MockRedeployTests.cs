@@ -31,6 +31,13 @@ public class MockRedeployTests
         },
     ];
 
+    // 行を選ぶと選択に足されるため、先に外す（2 行を選ぶと「この設定で新しくデプロイ」は押せない）
+    private static void ClearJobSelection(AppSession app)
+    {
+        if (app.IsEnabled("Jobs.ClearSelection"))
+            app.Invoke("Jobs.ClearSelection");
+    }
+
     // 「新しくデプロイ」の ① に、記録の設定が入ったこと
     private static void ShouldOpenTheWizardWithTheSettings(AppSession app)
     {
@@ -52,8 +59,9 @@ public class MockRedeployTests
         SignIn(app);
         Load(app);
 
-        // 1. ジョブの一覧で 1 行だけ選ぶ
+        // 1. ジョブの一覧で 1 行だけ選ぶ（選んだ行は、サインインの前のまま残る）
         app.Show("Jobs");
+        ClearJobSelection(app);
         app.SelectRowWith("Jobs.List", "Job.Target", Newest);
         AppSession.WaitUntil(() => app.IsEnabled("Jobs.Redeploy"), "設定のある終わったデプロイのジョブは押せる");
         app.Invoke("Jobs.Redeploy");
@@ -61,11 +69,13 @@ public class MockRedeployTests
 
         // 設定の無い記録は押せず、理由を出す
         app.Show("Jobs");
+        ClearJobSelection(app);
         app.SelectRowWith("Jobs.List", "Job.Target", WithoutSettings);
         app.WaitForText("Jobs.RedeployNote", t => t.Contains("設定が残っていない"), "設定の無い記録は理由を出す");
         app.IsEnabled("Jobs.Redeploy").Should().BeFalse();
 
         // 2. 実行状況の画面
+        ClearJobSelection(app);
         app.SelectRowWith("Jobs.List", "Job.Target", Newest);
         app.Invoke("Jobs.Detail");
         app.Find("Panel.Status");

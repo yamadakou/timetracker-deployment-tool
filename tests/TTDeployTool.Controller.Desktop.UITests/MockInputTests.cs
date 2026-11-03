@@ -85,7 +85,9 @@ public class MockInputTests
         // 行を 2 つ選び、右クリック →「選んだ行を Markdown 形式でコピー」
         app.SelectRowWith(Table, "Job.Target", Newest);
         app.SelectRowWith(Table, "Job.Target", Second);
-        AppSession.Click(Middle(Cell(app.RowWith(Table, "Job.Target", Second), "Job.Kind").BoundingRectangle), right: true);
+        // 選んだ行のどれを右クリックしても、選んだ行が対象。1 行だけ選んだときに出る注意（No.84）で表が下にずれるため、上の行（いちばん新しい行）を押す
+        AppSession.WaitUntil(() => app.TextOf("Jobs.Selection") == "2 件を選んでいます。", "2 行を選ぶ");
+        AppSession.Click(Middle(Cell(app.RowWith(Table, "Job.Target", Newest), "Job.Kind").BoundingRectangle), right: true);
         MenuItem(app, "選んだ行を Markdown 形式でコピー").Patterns.Invoke.Pattern.Invoke();
         AppSession.WaitUntil(() => AppSession.Clipboard().StartsWith("| 種類 | ", StringComparison.Ordinal), "Markdown の表がコピーされる");
         var markdown = AppSession.Clipboard().Split('\n');
