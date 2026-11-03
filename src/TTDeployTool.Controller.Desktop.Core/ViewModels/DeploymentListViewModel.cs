@@ -718,12 +718,21 @@ public sealed class DeploymentListViewModel : ObservableObject
         return string.Join("\n", _entries.Select(column.ValueOf));
     }
 
-    // 今のページの行に、同じ対象の終わっていないジョブを入れる
+    // 今のページの行に、同じ対象の終わっていないジョブを入れる（「最後のデプロイの設定で新しくデプロイ」が押せるかも変わる）
     private void ShowJobs()
     {
         foreach (var row in Rows)
+        {
             row.SetActiveJob(_queue.ActiveFor(row.Entry.SubscriptionId, row.Entry.ResourceGroup, row.AppName));
+            row.RedeployCommand.RaiseCanExecuteChanged();
+        }
     }
+
+    /// <summary>その対象の、設定のある終わったデプロイのジョブのうち、最後に終わったもの（無ければ null）。</summary>
+    internal JobViewModel? LastDeploymentWithSettings(DeploymentEntry entry) => _queue.Jobs
+        .Where(j => j.CanRedeploy && j.IsFor(entry.SubscriptionId, entry.ResourceGroup, entry.AppName))
+        .OrderByDescending(j => j.FinishedAt)
+        .FirstOrDefault();
 
     private void SetFilter<T>(ref T field, T value, [System.Runtime.CompilerServices.CallerMemberName] string propertyName = "")
     {

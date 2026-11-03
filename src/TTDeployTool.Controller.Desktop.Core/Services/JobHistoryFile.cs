@@ -27,7 +27,8 @@ public sealed record JobRecord(
     IReadOnlyList<string> Logs,
     DateTimeOffset? RegisteredAt = null,
     DateTimeOffset? ChangedAt = null,
-    DateTimeOffset? StartedAt = null)
+    DateTimeOffset? StartedAt = null,
+    DeploymentTemplate? Settings = null)
 {
     [JsonIgnore]
     public JobTarget Target => new(Subscription, ResourceGroup, AppName);

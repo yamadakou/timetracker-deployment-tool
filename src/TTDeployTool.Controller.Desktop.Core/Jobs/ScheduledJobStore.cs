@@ -84,7 +84,8 @@ public sealed class ScheduledJobStore : ObservableObject
             // 予定の時刻を過ぎたもの（待機中だったものを含む）は、勝手に始めず、一時停止で戻す（D27・D28）
             var overdue = saved.ScheduledAt is not { } at || at <= now;
             _queue.Register(saved.Kind, saved.Target, saved.ScheduledAt, _starter(saved, options), saved: saved.Deletion, paused: saved.Paused || overdue,
-                savedDeployment: saved.Deployment, registeredAt: saved.RegisteredAt, changedAt: saved.ChangedAt);
+                savedDeployment: saved.Deployment, registeredAt: saved.RegisteredAt, changedAt: saved.ChangedAt,
+                settings: saved.Deployment is { } deployment ? DeploymentTemplate.From(deployment.Options) : null);
             restored.Add(saved with { Paused = saved.Paused || overdue });
         }
         _logger.LogInformation("前回の予定: {Restored} 件戻し（一時停止 {Paused} 件）、デプロイ {Lost} 件は戻せませんでした",

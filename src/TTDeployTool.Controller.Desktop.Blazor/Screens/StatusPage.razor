@@ -7,6 +7,12 @@
     @if (Model.StatusJob is { } job)
     {
         <JobView Job="job" Mode="JobViewMode.Row" />
+        @if (job.IsDeployment && !job.IsActive)
+        {
+            @* 終わったデプロイのジョブの設定を「新しくデプロイ」に読み込む（オーナーの依頼、2026-11-03） *@
+            <CommandButton Id="Job.Redeploy" Command="job.RedeployCommand" Text="この設定で新しくデプロイ" Disabled="!Model.SignIn.IsSignedIn" />
+            <Message Id="Job.RedeployNote" Text="@job.RedeployNote" Kind="MessageKind.Caution" />
+        }
     }
     <CommandButton Id="Deploy.OpenEndpoint" Command="Model.OpenEndpointCommand" Text="Timetracker を開く" />
     <h2>Azure の状態</h2>

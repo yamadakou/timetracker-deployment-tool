@@ -104,6 +104,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         Wizard = new DeployWizardViewModel(Settings, Deployment, Target, Queue,
             job => job.ScheduledAt == null ? OpenJobAsync(job, Pages.Wizard) : ShowJobListAsync());
         JobList = new JobListViewModel(Queue, time, dialogs, id => Deployments.SubscriptionDisplay(id));
+        // デプロイのジョブの「この設定で新しくデプロイ」（ジョブの一覧・実行状況・デプロイの一覧。オーナーの依頼、2026-11-03）
+        Queue.Redeploy = RedeployAsync;
         // 表の列の幅と順序（幅 0 は残りの幅いっぱいに伸ばす列。docs/design/desktop/desktop-tables.md の 10.1）
         DeploymentsLayout = new TableLayout("deployments",
         [
@@ -431,6 +433,13 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         NavigationRequested?.Invoke(Pages.Status);
         if (selected)
             await Status.RefreshCommand.ExecuteAsync();
+    }
+
+    // デプロイのジョブの設定を入力に入れ、「新しくデプロイ」を ① から開く（パスワードは記録に残さないため、③ で入れ直す。入力済みならそのまま）
+    private async Task RedeployAsync(DeploymentTemplate settings)
+    {
+        Settings.Apply(settings, $"ジョブの設定（{settings.ResourceGroup} / {settings.AppName}）を入力しました。パスワードは記録に残していないため、③ で入れてください（入力済みなら、そのまま使います）。");
+        await OpenAsync(Pages.Wizard);
     }
 
     // まとめての削除の画面を開いて、選んだデプロイを計画する

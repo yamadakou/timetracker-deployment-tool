@@ -261,7 +261,7 @@ public sealed class DeploymentViewModel : ObservableObject
         try
         {
             _registered(_queue.Register(JobKind.Deploy, new JobTarget(options.Subscription, options.ResourceGroup, options.AppName), schedule?.At,
-                () => StartPlannedAsync(ticket, acknowledged, session), savedDeployment: saved));
+                () => StartPlannedAsync(ticket, acknowledged, session), savedDeployment: saved, settings: DeploymentTemplate.From(options)));
             // 登録した計画は使ったものとして、画面から外す（次は計画からやり直す）
             Ticket = null;
             Error = notSaved;

@@ -1,4 +1,5 @@
 using TTDeployTool.Controller.Desktop.Core.ViewModels;
+using TTDeployTool.Domain.Deployment;
 
 namespace TTDeployTool.Controller.Desktop.Core.Services;
 
@@ -25,7 +26,29 @@ public sealed record DeploymentTemplate(
     bool? PersistDb,
     ExpiryMode Expiry,
     string? ExpiryDate,
-    string? Group = null);
+    string? Group = null)
+{
+    /// <summary>
+    /// デプロイの設定（<paramref name="options"/>）から作る入力の写し（デプロイのジョブの記録に残し、「この設定で新しくデプロイ」で入力に戻す。パスワードは含めない）。
+    /// イメージタグが DB の種類の既定なら空（既定）にし、期限は yyyy-MM-dd なら日付、none なら期限なし、無ければ既定にする。
+    /// </summary>
+    public static DeploymentTemplate From(DeployOptions options)
+    {
+        var expiry = options.ExpiresOn switch
+        {
+            null => ExpiryMode.Default,
+            var none when string.Equals(none, DeploymentExpiry.None, StringComparison.OrdinalIgnoreCase) => ExpiryMode.None,
+            _ => ExpiryMode.Date,
+        };
+        return new DeploymentTemplate(
+            "", options.Subscription, options.ResourceGroup, options.AppName, options.Location, options.DbType, options.DbName,
+            options.TimetrackerTag == Defaults.GetDefaultTimetrackerTag(options.DbType) ? "" : options.TimetrackerTag,
+            Format(options.TimetrackerCpu), Format(options.TimetrackerMemoryGi), Format(options.DbCpu), Format(options.DbMemoryGi),
+            Format(options.RedisCpu), Format(options.RedisMemoryGi), options.PersistDb, expiry, expiry == ExpiryMode.Date ? options.ExpiresOn : null, options.Group);
+    }
+
+    private static string Format(double value) => value.ToString("0.0##", System.Globalization.CultureInfo.InvariantCulture);
+}
 
 /// <summary>アプリの設定のうち、保存するもの（秘密の情報は置かない）。画面の側でアプリのデータに保存する。</summary>
 public interface IAppPreferences

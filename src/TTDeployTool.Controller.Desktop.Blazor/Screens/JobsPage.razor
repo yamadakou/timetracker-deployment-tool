@@ -17,6 +17,8 @@
     <div class="tt-bar">
         <span data-id="Jobs.Selection">@Jobs.SelectionText</span>
         <button type="button" data-id="Jobs.Detail" disabled="@(!Jobs.HasCurrent)" @onclick="() => Open(Jobs.Current!)">詳細</button>
+        @* 1 行だけ選んだ、終わったデプロイのジョブの設定を「新しくデプロイ」に読み込む（オーナーの依頼、2026-11-03） *@
+        <button type="button" data-id="Jobs.Redeploy" disabled="@(Jobs.Current?.CanRedeploy != true || !SignedIn)" @onclick="() => Jobs.Current!.RedeployCommand.ExecuteAsync()">この設定で新しくデプロイ</button>
         <CommandButton Id="Jobs.CancelSelected" Command="Jobs.CancelSelectedCommand" Text="取り消し" Disabled="!SignedIn" />
         <CommandButton Id="Jobs.PauseSelected" Command="Jobs.PauseSelectedCommand" Text="一時停止" Disabled="!SignedIn" />
         <CommandButton Id="Jobs.ResumeSelected" Command="Jobs.ResumeSelectedCommand" Text="再開" Disabled="!SignedIn" />
@@ -28,6 +30,7 @@
         <CommandButton Id="Jobs.RescheduleSelected" Command="Jobs.RescheduleSelectedCommand" Text="選んだジョブの予定を変える" Disabled="!SignedIn" />
     </div>
     <p data-id="Jobs.Message">@Jobs.Message</p>
+    <Message Id="Jobs.RedeployNote" Text="@Jobs.Current?.RedeployNote" Kind="MessageKind.Caution" />
     <FilterBar TItem="JobViewModel" Filters="Jobs.Filters" Name="jobs" />
     <DataTable TRow="JobViewModel" TItem="JobViewModel" Source="_source" Label="ジョブの一覧" Clipboard="Clipboard" OnRowDoubleClick="Open" />
     <Pager Name="jobs" Previous="Jobs.PreviousPageCommand" Next="Jobs.NextPageCommand" PageSizes="JobListViewModel.PageSizes"

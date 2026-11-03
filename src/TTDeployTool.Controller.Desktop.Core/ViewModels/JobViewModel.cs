@@ -87,6 +87,7 @@ public sealed class JobViewModel : ObservableObject
         ResumeCommand = new AsyncCommand(() => Run(q => q.Resume(this)), () => _queue != null && State == DesktopJobState.Paused);
         RescheduleCommand = new AsyncCommand(() => Run(q => RescheduleMessage = q.Reschedule(this, EditScheduledAt)), () => _queue != null && State is DesktopJobState.Scheduled or DesktopJobState.Paused);
         StopCommand = new AsyncCommand(() => Run(q => q.Stop(this)), () => _queue != null && State == DesktopJobState.Running);
+        RedeployCommand = new AsyncCommand(() => _queue!.Redeploy!(Settings!), () => CanRedeploy);
         CopyCommand = new AsyncCommand(() =>
         {
             _queue!.Clipboard!.CopyText(ToMarkdown());
@@ -105,6 +106,7 @@ public sealed class JobViewModel : ObservableObject
         ChangedAt = record.ChangedAt;
         StartedAt = record.StartedAt;
         FinishedAt = record.FinishedAt;
+        Settings = record.Settings;
         foreach (var log in record.Logs)
             Logs.Add(log);
         _finished.TrySetResult();
@@ -167,7 +169,7 @@ public sealed class JobViewModel : ObservableObject
 
     /// <summary>終わったジョブの記録（<see cref="FinishedAt"/> があるときだけ呼ぶ）。</summary>
     internal JobRecord ToRecord() => new(_kind, _target.Subscription, _target.ResourceGroup, _target.AppName, IsExpiryDeletion, _scheduledAt, FinishedAt!.Value,
-        State, Error, Note, Endpoint?.ToString(), PersistenceSummary, ExpirySummary, DeletionSummary, [.. Logs], RegisteredAt, ChangedAt, StartedAt);
+        State, Error, Note, Endpoint?.ToString(), PersistenceSummary, ExpirySummary, DeletionSummary, [.. Logs], RegisteredAt, ChangedAt, StartedAt, Settings);
 
     /// <summary>コピーの結果。</summary>
     public string? CopyMessage
@@ -225,6 +227,23 @@ public sealed class JobViewModel : ObservableObject
 
     /// <summary>アプリを終了しても残すデプロイの計画（パスワードは暗号化。6.7。保存しないものと削除は null）。</summary>
     public SavedDeployment? SavedDeployment { get; init; }
+
+    /// <summary>
+    /// デプロイの入力の写し（パスワードは含めない。記録にも残す）。「この設定で新しくデプロイ」で入力に戻す（オーナーの依頼、2026-11-03）。
+    /// 削除と、この機能より前の記録は null。入れるのは JobQueue の登録と記録だけ（どちらも JobQueue がある）。
+    /// </summary>
+    public DeploymentTemplate? Settings { get; internal init; }
+
+    /// <summary>この設定で新しくデプロイできるか（設定のある、終わったデプロイのジョブ。完了・失敗・停止・取り消しのどれでも）。</summary>
+    public bool CanRedeploy => IsDeployment && !IsActive && Settings != null && _queue!.Redeploy != null;
+
+    /// <summary>終わったデプロイのジョブに設定が無いとき（この機能を足す前に登録したジョブ）、読み込めない理由。</summary>
+    public string? RedeployNote => IsDeployment && !IsActive && Settings == null
+        ? "このジョブの記録には設定が残っていないため（この機能を足す前に登録したジョブ）、「この設定で新しくデプロイ」は使えません。"
+        : null;
+
+    /// <summary>この設定を「新しくデプロイ」に読み込んで、① から開く（パスワードは入れ直す）。</summary>
+    public AsyncCommand RedeployCommand { get; }
 
     public ObservableCollection<string> Logs { get; } = [];
 
@@ -465,6 +484,9 @@ public sealed class JobViewModel : ObservableObject
         ResumeCommand.RaiseCanExecuteChanged();
         RescheduleCommand.RaiseCanExecuteChanged();
         StopCommand.RaiseCanExecuteChanged();
+        RedeployCommand.RaiseCanExecuteChanged();
+        OnPropertyChanged(nameof(CanRedeploy));
+        OnPropertyChanged(nameof(RedeployNote));
         if (!IsActive)
             _finished.TrySetResult();
     }

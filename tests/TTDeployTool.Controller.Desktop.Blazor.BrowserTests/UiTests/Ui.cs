@@ -140,16 +140,17 @@ internal static class Ui
 
     /// <summary>
     /// モックのデータ（<paramref name="data"/> で変えられる）と終わったジョブの記録を置いてテスト用のホストを起動する（サインインはしない。WinUI の MockUiTests.WithFixture）。
-    /// <paramref name="layout"/> なら、保存した列の配置（ジョブの一覧。既定は結果の列を左に。<paramref name="jobsLayout"/> で変えられる）も置く。
+    /// <paramref name="records"/> で、置く記録を変えられる。<paramref name="layout"/> なら、保存した列の配置（ジョブの一覧。既定は結果の列を左に。<paramref name="jobsLayout"/> で変えられる）も置く。
     /// </summary>
     public static Task<BrowserHost> WithFixtureAsync(Func<FixtureData, FixtureData>? data = null, bool layout = true, IReadOnlyList<TableColumnLayout>? jobsLayout = null,
-        int width = 1600, int height = 1000) =>
+        int width = 1600, int height = 1000, Func<IReadOnlyList<JobRecord>, IReadOnlyList<JobRecord>>? records = null) =>
         BrowserHost.StartAsync(width, height, signIn: false, prepare: directory =>
         {
             var now = DateTimeOffset.UtcNow;
             var fixture = FixtureSamples.Data(Deployments, now) with { WriteDelaySeconds = 120 };
             File.WriteAllText(Path.Combine(directory, FixtureData.FileName), (data?.Invoke(fixture) ?? fixture).ToJson());
-            new FileJobHistory(Path.Combine(directory, "job-history.json")).Records = FixtureSamples.JobRecords(Records, now);
+            var recorded = FixtureSamples.JobRecords(Records, now);
+            new FileJobHistory(Path.Combine(directory, "job-history.json")).Records = records?.Invoke(recorded) ?? recorded;
             if (layout)
             {
                 new FilePreferences(Path.Combine(directory, "preferences.json")).TableLayouts = new Dictionary<string, IReadOnlyList<TableColumnLayout>>

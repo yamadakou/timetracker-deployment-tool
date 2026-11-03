@@ -50,6 +50,9 @@ public sealed class JobQueue : ObservableObject, IDisposable
     /// <summary>ジョブの内容のコピー先（無ければ、ジョブの「コピー」は押せない）。</summary>
     public IClipboardService? Clipboard { get; init; }
 
+    /// <summary>デプロイのジョブの設定を「新しくデプロイ」に読み込んで開く（無ければ、ジョブの「この設定で新しくデプロイ」は押せない）。</summary>
+    public Func<DeploymentTemplate, Task>? Redeploy { get; set; }
+
     /// <summary>ジョブが終わったとき（完了・失敗・停止。取り消しは含めない）。画面のスレッドで呼ぶ。</summary>
     public event Action<JobViewModel>? Finished;
 
@@ -104,9 +107,10 @@ public sealed class JobQueue : ObservableObject, IDisposable
     /// <param name="savedDeployment">アプリを終了しても残すデプロイの計画（パスワードは暗号化。無ければ残さない）</param>
     /// <param name="registeredAt">最初に登録した日時（前回のアプリの予定を戻すとき。無ければ今）</param>
     /// <param name="changedAt">予定の時刻を変えた日時（前回のアプリの予定を戻すとき）</param>
+    /// <param name="settings">デプロイの入力の写し（パスワードは含めない。記録に残し、「この設定で新しくデプロイ」で使う）</param>
     public JobViewModel Register(
         JobKind kind, JobTarget target, DateTimeOffset? scheduledAt, Func<Task<Job>> starter, bool expiryDeletion = false, SavedDeletion? saved = null, bool paused = false,
-        SavedDeployment? savedDeployment = null, DateTimeOffset? registeredAt = null, DateTimeOffset? changedAt = null)
+        SavedDeployment? savedDeployment = null, DateTimeOffset? registeredAt = null, DateTimeOffset? changedAt = null, DeploymentTemplate? settings = null)
     {
         JobViewModel job;
         lock (_notifyGate)
@@ -117,7 +121,7 @@ public sealed class JobQueue : ObservableObject, IDisposable
             job = new JobViewModel(kind, target, scheduledAt, this, starter)
             {
                 Order = ++_order, IsExpiryDeletion = expiryDeletion, Saved = saved, SavedDeployment = savedDeployment, RegisteredAt = registeredAt ?? _time.GetUtcNow(),
-                ChangedAt = changedAt,
+                ChangedAt = changedAt, Settings = settings,
             };
             if (paused)
                 job.SetPending(DesktopJobState.Paused, scheduledAt, notify: false);
