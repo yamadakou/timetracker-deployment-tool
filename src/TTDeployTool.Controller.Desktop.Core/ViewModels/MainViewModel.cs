@@ -99,7 +99,9 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         // グループ名の入力の候補は、デプロイの一覧のグループ（docs/design/common/deployment-groups.md の 4）
         Settings.UseGroups(() => Deployments.GroupNames);
         Deployment = new DeploymentViewModel(new DeploymentWorkflow(plans, jobs, caller, logger, time), Target, Settings, Queue, Show, time, secrets);
-        Deletion = new DeletionViewModel(deletions, Target, Queue, Show, time, clipboard);
+        Deletion = new DeletionViewModel(deletions, Target, Queue, Show, time, clipboard, dialogs);
+        // まだ始めていない削除のジョブの「リソースグループも削除する」の変更（実行状況の画面。オーナーの依頼、2026-11-13）
+        Queue.ChangeDeletion = Deletion.ChangeResourceGroupAsync;
         DryRun = new DryRunViewModel(Settings, dialogs, launcher);
         Wizard = new DeployWizardViewModel(Settings, Deployment, Target, Queue,
             job => job.ScheduledAt == null ? OpenJobAsync(job, Pages.Wizard) : ShowJobListAsync());

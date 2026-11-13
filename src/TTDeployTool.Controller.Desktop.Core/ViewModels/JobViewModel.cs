@@ -61,6 +61,9 @@ public sealed class JobViewModel : ObservableObject
     private string? _copyMessage;
     private string? _rescheduleMessage;
     private DateTimeOffset _editDate;
+    private bool _editDeleteResourceGroup;
+    private SavedDeletion? _saved;
+    private string? _deletionMessage;
     private TimeSpan _editTime;
 
     /// <summary>始めたジョブを表示する。</summary>
@@ -88,6 +91,19 @@ public sealed class JobViewModel : ObservableObject
         RescheduleCommand = new AsyncCommand(() => Run(q => RescheduleMessage = q.Reschedule(this, EditScheduledAt)), () => _queue != null && State is DesktopJobState.Scheduled or DesktopJobState.Paused);
         StopCommand = new AsyncCommand(() => Run(q => q.Stop(this)), () => _queue != null && State == DesktopJobState.Running);
         RedeployCommand = new AsyncCommand(() => _queue!.Redeploy!(Settings!), () => CanRedeploy);
+        ChangeDeletionCommand = new AsyncCommand(async () =>
+        {
+            if (EditDeleteResourceGroup == Saved!.DeleteResourceGroup)
+            {
+                DeletionMessage = "削除の設定は変わっていません。";
+                return;
+            }
+            var reason = await _queue!.ChangeDeletion!(this, EditDeleteResourceGroup);
+            DeletionMessage = reason ?? $"削除の設定を変えました（{DeletionSettingsText}）。";
+            if (reason != null)
+                EditDeleteResourceGroup = Saved!.DeleteResourceGroup;
+            OnPropertyChanged(nameof(DeletionSettingsText));
+        }, () => CanChangeDeletion);
         CopyCommand = new AsyncCommand(() =>
         {
             _queue!.Clipboard!.CopyText(ToMarkdown());
@@ -193,7 +209,15 @@ public sealed class JobViewModel : ObservableObject
         ("ログ", Logs.Count == 0 ? null : "```\n" + string.Join("\n", Logs) + "\n```"));
 
     /// <summary>ジョブを始める処理（実行の直前の確認を含む）。</summary>
-    internal Func<Task<Job>>? Starter { get; }
+    internal Func<Task<Job>>? Starter { get; private set; }
+
+    // 削除のジョブの始め方と、保存する計画を入れ替える（JobQueue.ReplaceDeletion から）
+    internal void Replace(Func<Task<Job>> starter, SavedDeletion saved)
+    {
+        Starter = starter;
+        Saved = saved;
+        OnPropertyChanged(nameof(EditDeleteResourceGroup));
+    }
 
     /// <summary>登録した順（同じ状態なら、先に登録したものから始める）。</summary>
     internal long Order { get; init; }
@@ -223,7 +247,46 @@ public sealed class JobViewModel : ObservableObject
     public bool IsExpiryDeletion { get; init; }
 
     /// <summary>アプリを終了しても残す削除の計画（docs/design/desktop/desktop-jobs.md の 6.6。デプロイと期限での削除は null）。</summary>
-    public SavedDeletion? Saved { get; init; }
+    public SavedDeletion? Saved
+    {
+        get => _saved;
+        internal set
+        {
+            _saved = value;
+            _editDeleteResourceGroup = value?.DeleteResourceGroup == true;
+        }
+    }
+
+    /// <summary>
+    /// まだ始めていない削除のジョブの「リソースグループも削除する」を変えられるか（このアプリで登録した削除。期限での削除・リソースグループだけの削除は除く。
+    /// オーナーの依頼、2026-11-13）。
+    /// </summary>
+    public bool CanChangeDeletion => !IsDeployment && Saved != null && _target.AppName.Length > 0 && _queue?.ChangeDeletion != null
+        && State is DesktopJobState.Scheduled or DesktopJobState.Waiting or DesktopJobState.Paused;
+
+    /// <summary>削除の設定の今の値（リソースグループも削除するか。削除の設定を変えられないときは null）。</summary>
+    public string? DeletionSettingsText => Saved is { } saved && !IsDeployment
+        ? saved.DeleteResourceGroup
+            ? saved.DeletesResourceGroup ? "リソースグループも削除する" : "リソースグループも削除する（空にならなければ削除しない）"
+            : "リソースグループは残す"
+        : null;
+
+    /// <summary>「リソースグループも削除する」の入力（「削除の設定を変える」で反映する）。</summary>
+    public bool EditDeleteResourceGroup
+    {
+        get => _editDeleteResourceGroup;
+        set => SetProperty(ref _editDeleteResourceGroup, value);
+    }
+
+    /// <summary>削除の設定を変えた結果・断った理由（変えたら「変えました」）。</summary>
+    public string? DeletionMessage
+    {
+        get => _deletionMessage;
+        private set => SetProperty(ref _deletionMessage, value);
+    }
+
+    /// <summary>「リソースグループも削除する」を <see cref="EditDeleteResourceGroup"/> に変える（計画し直し、広げるときは確かめる）。</summary>
+    public AsyncCommand ChangeDeletionCommand { get; }
 
     /// <summary>アプリを終了しても残すデプロイの計画（パスワードは暗号化。6.7。保存しないものと削除は null）。</summary>
     public SavedDeployment? SavedDeployment { get; init; }
@@ -485,7 +548,9 @@ public sealed class JobViewModel : ObservableObject
         RescheduleCommand.RaiseCanExecuteChanged();
         StopCommand.RaiseCanExecuteChanged();
         RedeployCommand.RaiseCanExecuteChanged();
+        ChangeDeletionCommand.RaiseCanExecuteChanged();
         OnPropertyChanged(nameof(CanRedeploy));
+        OnPropertyChanged(nameof(CanChangeDeletion));
         OnPropertyChanged(nameof(RedeployNote));
         if (!IsActive)
             _finished.TrySetResult();
