@@ -3,15 +3,33 @@
 
 @* デプロイの一覧（WinUI の画面の DeploymentsPanel。Azure から集める。docs/design/desktop/desktop-jobs.md の 6.3・6.4、desktop-wizard.md の 7） *@
 <section class="tt-page" data-id="Panel.Deployments">
-    <h1>デプロイの一覧</h1>
-    <p>サインインしたアカウントで読めるサブスクリプションから、本ツールでデプロイした環境（別の PC・CLI・MCP サーバーでデプロイしたものを含む）を読みます。パスワードは「パスワードを表示」を押したときだけ Azure から読み、PC には保存しません。</p>
-    <CommandButton Id="Deployments.Load" Command="List.LoadCommand" Text="読み込む" />
+    <div class="tt-page-head">
+        <div>
+            <h1>デプロイの一覧</h1>
+            <p class="tt-page-sub">サインインしたアカウントで読めるサブスクリプションから、本ツールでデプロイした環境（別の PC・CLI・MCP サーバーでデプロイしたものを含む）を読みます。パスワードは「パスワードを表示」を押したときだけ Azure から読み、PC には保存しません。</p>
+        </div>
+        <CommandButton Id="Deployments.Load" Command="List.LoadCommand" Text="読み込む" IconName="refresh" Css="tt-primary" />
+    </div>
+    @* 件数のカード（推奨のデザイン。押すとその条件で絞り込む。もう一度押すと外す） *@
+    <div class="tt-cards">
+        <StatCard Id="Deployments.Card.All" IconName="cloud" Tone="info" Value="List.TotalCount" Label="デプロイ（すべて）"
+                  Pressed="List.QuickFilter == DeploymentQuickFilter.All" OnClick="() => List.QuickFilter = DeploymentQuickFilter.All" />
+        <StatCard Id="Deployments.Card.Expiring" IconName="clock" Tone="critical" Value="List.ExpiringSoonCount" Label="期限が 7 日以内" Action="絞り込む"
+                  Pressed="List.QuickFilter == DeploymentQuickFilter.ExpiringSoon" OnClick="() => Toggle(DeploymentQuickFilter.ExpiringSoon)" />
+        <StatCard Id="Deployments.Card.Jobs" IconName="jobs" Tone="info" Value="List.ActiveJobCount" Label="実行中・予定のジョブ" Action="開く"
+                  OnClick="() => Model.OpenAsync(Pages.Jobs)" />
+        <StatCard Id="Deployments.Card.Attention" IconName="warning" Tone="caution" Value="List.AttentionCount" Label="要確認（作りかけなど）" Action="絞り込む"
+                  Pressed="List.QuickFilter == DeploymentQuickFilter.Attention" OnClick="() => Toggle(DeploymentQuickFilter.Attention)" />
+    </div>
     <BusyView Id="Deployments.Busy" State="List.Busy" />
     <Message Id="Deployments.Error" Text="@List.Error" />
     <Lines Id="Deployments.Notices" Items="List.Notices" />
 
+    @* 1 行だけ選んだときは、右に詳細の面を出す（選んでいなければ、表を広く使う） *@
+    <div class="@(List.Current == null ? null : "tt-split")">
+    <div class="tt-split-main">
     @* 選んだ行への操作（docs/design/desktop/desktop-wizard.md の 7） *@
-    <div class="tt-bar">
+    <div class="tt-bar tt-surface tt-commandbar">
         <span data-id="Deployments.Selection">@List.SelectionText</span>
         <CheckField Id="Deployments.BatchNoExpiry" Label="期限なし" Value="List.BatchNoExpiry" ValueChanged="v => List.BatchNoExpiry = v" />
         <DateTimeInput Id="Deployments.BatchExpiry" DateLabel="期限日" Date="List.BatchExpiryDate" DateChanged="d => List.BatchExpiryDate = d" Disabled="List.BatchNoExpiry" />
@@ -20,7 +38,7 @@
         <CommandButton Id="Deployments.ClearSelection" Command="List.ClearSelectionCommand" Text="選択を外す" />
     </div>
     @* 選んだ行のグループをまとめて変える・外す（docs/design/common/deployment-groups.md の 5） *@
-    <div class="tt-bar">
+    <div class="tt-bar tt-surface tt-commandbar">
         <TextInput Id="Deployments.BatchGroup" Label="グループ名" Value="@List.BatchGroup" ValueChanged="v => List.BatchGroup = v" List="tt-batch-group-suggestions" />
         <datalist id="tt-batch-group-suggestions">
             @foreach (var group in List.BatchGroupSuggestions)
@@ -39,11 +57,13 @@
     <Pager Name="deployments" Previous="List.PreviousPageCommand" Next="List.NextPageCommand" PageSizes="DeploymentListViewModel.PageSizes"
            PageSize="List.PageSize" PageSizeChanged="size => List.PageSize = size" Text="@List.PageText" />
 
-    @* 1 行だけ選んだときの詳細 *@
+    </div>
+    @* 1 行だけ選んだときの詳細（推奨のデザイン: 右の面） *@
     @if (List.Current is { } row)
     {
         <DeploymentDetail Row="row" />
     }
+    </div>
 </section>
 
 @code {
@@ -56,6 +76,9 @@
     public IClipboardService? Clipboard { get; set; }
 
     private DeploymentListViewModel List => Model.Deployments;
+
+    // 件数のカード: 押したカードの条件で絞り込む。同じカードをもう一度押すと外す
+    private void Toggle(DeploymentQuickFilter filter) => List.QuickFilter = List.QuickFilter == filter ? DeploymentQuickFilter.All : filter;
 
     protected override void OnInitialized()
     {

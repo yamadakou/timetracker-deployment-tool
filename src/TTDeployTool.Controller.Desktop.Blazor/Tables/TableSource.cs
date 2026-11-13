@@ -40,7 +40,10 @@ public sealed record TableSource<TRow, TItem>(
 }
 
 /// <summary>セルの表示（<see cref="ToolTip"/> があれば、6 行で切れたかによらず出す。<see cref="Css"/> は色など）。</summary>
-public sealed record CellView(string? Text, string? ToolTip = null, string? Css = null);
+/// <param name="Sub">文字の後に薄く出す補足（CSS で描くため、セルの文字〔コピー・テスト〕には入らない。期限の「あと 3 日」）</param>
+/// <param name="Bar">セルの下のバーの長さ（0〜1。期限の残り。無ければ出さない）</param>
+/// <param name="BarCss">バーの色（tt-soon・tt-mid）</param>
+public sealed record CellView(string? Text, string? ToolTip = null, string? Css = null, string? Sub = null, double? Bar = null, string? BarCss = null);
 
 /// <summary>今の 2 つの一覧の表（列の配置は MainViewModel が持つ。右端の列の最小の幅は WinUI の画面と同じ。desktop-tables.md の 10.5）。</summary>
 public static class TableSources
@@ -60,19 +63,38 @@ public static class TableSources
         "ResourceGroup" => new(row.ResourceGroup),
         "AppName" => new(row.AppName, Css: "tt-strong"),
         "Group" => new(row.GroupText, row.GroupWarning),
-        "State" => new(row.StateText, row.StateDetail),
-        "ExpiresAt" => new(row.ExpiryText, Css: row.Level switch { ExpiryLevel.Expired => "tt-critical", ExpiryLevel.Soon => "tt-caution", _ => null }),
+        "State" => new(row.StateText, row.StateDetail, "tt-dot " + StateTone(row.State)),
+        "ExpiresAt" => new(row.ExpiryText, Css: "tt-exp " + row.Level switch { ExpiryLevel.Expired => "tt-critical", ExpiryLevel.Soon => "tt-caution", _ => "" },
+            Sub: row.DaysLeftText, Bar: row.DaysLeft == null ? null : row.ExpiryShare, BarCss: row.DaysLeft switch { <= DeploymentListViewModel.SoonDays => "tt-soon", <= 30 => "tt-mid", _ => null }),
         "DeployedAt" => new(row.DeployedText),
         _ => new(row.JobText, Css: "tt-caution"),
     };
 
-    // ジョブの一覧のセル（WinUI の画面と同じく、行の ViewModel の文字）
-    internal static CellView JobCell(JobViewModel job, string key) => new(key switch
+    // 状態の印の色（推奨のデザイン: 実行中は緑、処理中は青、一部だけは黄、失敗は赤、ほかは灰色）
+    internal static string StateTone(DeploymentState state) => state switch
+    {
+        DeploymentState.Running => "tt-ok",
+        DeploymentState.Processing or DeploymentState.Pending => "tt-info",
+        DeploymentState.Partial => "tt-warn",
+        DeploymentState.Failed => "tt-bad",
+        _ => "tt-muted",
+    };
+
+    // ジョブの状態の印の色（完了は緑、失敗は赤、実行中・予定は青、ほかは灰色）
+    internal static string JobTone(DesktopJobState state) => state switch
+    {
+        DesktopJobState.Succeeded => "tt-ok",
+        DesktopJobState.Failed => "tt-bad",
+        DesktopJobState.Canceled or DesktopJobState.Stopped => "tt-muted",
+        _ => "tt-info",
+    };
+
+    // ジョブの一覧のセル（WinUI の画面と同じく、行の ViewModel の文字。状態には印）
+    internal static CellView JobCell(JobViewModel job, string key) => key == "State" ? new(job.StatusText, Css: "tt-dot " + JobTone(job.State)) : new(key switch
     {
         "Kind" => job.KindText,
         "Subscription" => job.SubscriptionText,
         "Target" => job.TargetText,
-        "State" => job.StatusText,
         "Time" => job.TimeText,
         "RegisteredAt" => job.RegisteredText,
         "ChangedAt" => job.ChangedText,

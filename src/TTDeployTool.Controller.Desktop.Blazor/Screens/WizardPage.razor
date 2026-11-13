@@ -3,8 +3,15 @@
 
 @* 新しくデプロイ（WinUI の画面の WizardPanel。docs/design/desktop/desktop-wizard.md の 3。入力は「設定」の ViewModel、計画と実行はデプロイの ViewModel） *@
 <section class="tt-page tt-narrow" data-id="Panel.Wizard">
-    <h1>新しくデプロイ</h1>
-    <p class="tt-strong" data-id="Wizard.Step">@Wizard.StepText</p>
+    <div class="tt-page-head">
+        <div>
+            <h1>新しくデプロイ</h1>
+            <p class="tt-page-sub">TimeTracker の環境を Azure に作ります。入力は次へ進むたびに確かめます。<span class="tt-strong" data-id="Wizard.Step">@Wizard.StepText</span></p>
+        </div>
+    </div>
+    <Stepper Current="(int)Wizard.Step" Completed="Wizard.IsCompleted" />
+    <div class="tt-split">
+    <div class="tt-split-main tt-surface tt-section">
 
     @if (Wizard.IsCompleted)
     {
@@ -67,8 +74,11 @@
     }
     else if (Wizard.IsSpec)
     {
-        @* ④ スペックと利用可能期限 *@
-        <p class="tt-strong">CPU（vCPU）とメモリ（Gi）</p>
+        @* ④ スペックと利用可能期限（スペックは 3 つともスライダー。数値で入れる欄も残す） *@
+        <SpecSliderView Spec="Settings.TtSpec" Cost="Model.Cost" />
+        <SpecSliderView Spec="Settings.DbSpec" Cost="Model.Cost" />
+        <SpecSliderView Spec="Settings.RedisSpec" Cost="Model.Cost" />
+        <details class="tt-hint" data-id="Settings.SpecNumbers"><summary>数値で入れる（CPU は vCPU、メモリは Gi）</summary>
         <div class="tt-bar">
             <TextInput Id="Settings.TtCpu" Label="TimeTracker の CPU" Value="@Settings.TtCpu" ValueChanged="v => Settings.TtCpu = v" Css="tt-short" />
             <TextInput Id="Settings.TtMemory" Label="TimeTracker のメモリ" Value="@Settings.TtMemoryGi" ValueChanged="v => Settings.TtMemoryGi = v" Css="tt-short" />
@@ -77,6 +87,7 @@
             <TextInput Id="Settings.RedisCpu" Label="Redis の CPU" Value="@Settings.RedisCpu" ValueChanged="v => Settings.RedisCpu = v" Css="tt-short" />
             <TextInput Id="Settings.RedisMemory" Label="Redis のメモリ" Value="@Settings.RedisMemoryGi" ValueChanged="v => Settings.RedisMemoryGi = v" Css="tt-short" />
         </div>
+        </details>
         <SelectField TItem="ExpiryOption" Id="Settings.Expiry" Label="利用可能期限日" Items="SettingsViewModel.ExpiryOptions" Value="Settings.Expiry" ValueChanged="v => Settings.Expiry = v" Display="o => o.Label" />
         @if (Settings.IsExpiryDate)
         {
@@ -151,6 +162,13 @@
             <span class="tt-caution" data-id="Wizard.Blocked">@Wizard.BlockedText</span>
         </div>
     }
+    </div>
+    @* 料金の目安（完了の表示では出さない） *@
+    @if (!Wizard.IsCompleted)
+    {
+        <CostPanel Cost="Model.Cost" />
+    }
+    </div>
 </section>
 
 @code {

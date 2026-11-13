@@ -1,0 +1,45 @@
+@using TTDeployTool.Controller.Desktop.Core.Pricing
+@inherits ViewModelComponent
+
+@* 料金の目安（オーナーの依頼、2026-11-13: スペックと永続化の指定で、期限までの料金。単位は切り替えられ、既定は円） *@
+<aside class="tt-surface tt-aside tt-cost" data-id="Cost">
+    <h2>料金の目安
+        <span class="tt-units" role="group" aria-label="単位">
+            @foreach (var option in CostEstimateViewModel.CurrencyOptions)
+            {
+                <button type="button" data-id="@($"Cost.Unit.{option.Currency}")" aria-pressed="@(Cost.Currency == option ? "true" : "false")" @onclick="() => Cost.Currency = option">@option.Label</button>
+            }
+        </span>
+    </h2>
+    <div>
+        <div class="tt-subtle" data-id="Cost.Period">@Cost.PeriodText</div>
+        @if (Cost.TotalText is { } total)
+        {
+            <div><span class="tt-total" data-id="Cost.Total">@total</span> <span class="tt-subtle" data-id="Cost.PerDay">@Cost.PerDayText</span></div>
+        }
+    </div>
+    @if (Cost.Lines.Count > 0)
+    {
+        <div class="tt-stack" aria-hidden="true">
+            @foreach (var line in Cost.Lines)
+            {
+                <i style="width: @((line.Share * 100).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))%"></i>
+            }
+        </div>
+        <div data-id="Cost.Lines">
+            @foreach (var line in Cost.Lines)
+            {
+                <div class="tt-cost-row"><span>@line.Name（@line.Spec）</span><span>@line.Amount</span></div>
+            }
+        </div>
+    }
+    <p class="tt-hint" data-id="Cost.Saving">@Cost.SavingText</p>
+    <p class="tt-hint" data-id="Cost.Source">@Cost.SourceText</p>
+</aside>
+
+@code {
+    [Parameter, EditorRequired]
+    public CostEstimateViewModel Cost { get; set; } = default!;
+
+    protected override void OnParametersSet() => Watcher.Sync([Cost, Cost.Lines]);
+}

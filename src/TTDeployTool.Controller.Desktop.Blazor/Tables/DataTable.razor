@@ -68,7 +68,11 @@
                             var key = column.Key;
                             <td @key="key" data-key="@key" @oncontextmenu="e => OpenMenu(row, key, e)" @oncontextmenu:preventDefault>
                                 @{ var cell = Source.Cell(row, key); }
-                                <div class="tt-cell @cell.Css" title="@cell.ToolTip" data-tip="@(cell.ToolTip is null ? null : "")">@cell.Text</div>
+                                <div class="tt-cell @cell.Css" title="@cell.ToolTip" data-tip="@(cell.ToolTip is null ? null : "")" data-sub="@(cell.Bar == null ? cell.Sub : null)">@cell.Text@if (cell.Bar is { } bar)
+                                    {
+                                        @* 期限の残りのバーと「あと n 日」を 1 行に並べる（文字は CSS で描くため、セルの文字には入らない） *@
+                                        <span class="tt-exp-line" data-sub="@cell.Sub" aria-hidden="true"><span class="tt-bar-track @cell.BarCss"><i style="width: @((bar * 100).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))%"></i></span></span>
+                                    }</div>
                             </td>
                         }
                     </tr>
@@ -76,10 +80,11 @@
             </tbody>
         </table>
     </div>
+    @* 右クリックのメニュー（画面の右・下の端では、画面の内側に寄せる） *@
     @if (_menu is { } menu)
     {
         <div class="tt-overlay" @onclick="CloseMenu" @oncontextmenu="CloseMenu" @oncontextmenu:preventDefault></div>
-        <div class="tt-menu" role="menu" style="left: @Px(menu.X); top: @Px(menu.Y)" @onkeydown="OnMenuKeyDown">
+        <div class="tt-menu" role="menu" style="left: min(@Px(menu.X), calc(100vw - 300px)); top: min(@Px(menu.Y), calc(100vh - 130px))" @onkeydown="OnMenuKeyDown">
             <button type="button" role="menuitem" @onclick="CopyCell">この文字をコピー</button>
             <button type="button" role="menuitem" @onclick="() => CopyRows(markdown: false)">選んだ行をコピー</button>
             <button type="button" role="menuitem" @onclick="() => CopyRows(markdown: true)">選んだ行を Markdown 形式でコピー</button>

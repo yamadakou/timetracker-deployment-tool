@@ -3,8 +3,21 @@
 @* ジョブの一覧（WinUI の画面の JobsPanel。docs/design/desktop/desktop-wizard.md の 7）。サインインしていなくても開ける（過去の記録を見るため。
    ジョブの操作はサインインするまで押せない。No.78）。1 行だけ選んで「詳細」か、行のダブルクリックで、実行状況の画面を開く *@
 <section class="tt-page" data-id="Panel.Jobs">
-    <h1>ジョブの一覧</h1>
-    <p>このアプリで登録したデプロイ・削除です（予定・実行中・終わったもの）。終わったジョブは、アプリを終了しても記録として残します（180 日・500 件まで）。行を選ぶと、まとめて取り消し・一時停止・再開・予定の変更・記録から削除ができます。1 行だけ選んで「詳細」（または行をダブルクリック）で、進み具合・結果・ログを見られます。「記録から削除」は、この一覧と PC の記録を消すだけで、Azure のリソースは消しません（Azure から消すときは、デプロイの一覧の「Azure から削除…」）。</p>
+    <div class="tt-page-head">
+        <div>
+            <h1>ジョブの一覧</h1>
+            <p class="tt-page-sub">このアプリで登録したデプロイ・削除です（予定・実行中・終わったもの）。終わったジョブは、アプリを終了しても記録として残します（180 日・500 件まで）。行を選ぶと、まとめて取り消し・一時停止・再開・予定の変更・記録から削除ができます。1 行だけ選んで「詳細」（または行をダブルクリック）で、進み具合・結果・ログを見られます。「記録から削除」は、この一覧と PC の記録を消すだけで、Azure のリソースは消しません（Azure から消すときは、デプロイの一覧の「Azure から削除…」）。</p>
+        </div>
+    </div>
+    @* 件数のカード（推奨のデザイン。押すとその条件で絞り込む。もう一度押すと外す） *@
+    <div class="tt-cards">
+        <StatCard Id="Jobs.Card.Running" IconName="jobs" Tone="info" Value="Jobs.RunningCount" Label="実行中" Pressed="Jobs.QuickFilter == JobQuickFilter.Running" OnClick="() => Toggle(JobQuickFilter.Running)" />
+        <StatCard Id="Jobs.Card.Pending" IconName="clock" Tone="info" Value="Jobs.PendingCount" Label="予定・待機中・一時停止" Pressed="Jobs.QuickFilter == JobQuickFilter.Pending" OnClick="() => Toggle(JobQuickFilter.Pending)" />
+        <StatCard Id="Jobs.Card.Failed" IconName="bell" Tone="critical" Value="Jobs.RecentFailedCount" Label="失敗（7 日以内）" Action="絞り込む"
+                  Pressed="Jobs.QuickFilter == JobQuickFilter.RecentFailed" OnClick="() => Toggle(JobQuickFilter.RecentFailed)" />
+        <StatCard Id="Jobs.Card.Succeeded" IconName="check" Tone="ok" Value="Jobs.RecentSucceededCount" Label="完了（7 日以内）"
+                  Pressed="Jobs.QuickFilter == JobQuickFilter.RecentSucceeded" OnClick="() => Toggle(JobQuickFilter.RecentSucceeded)" />
+    </div>
     <div class="tt-bar">
         <span data-id="Jobs.Count">@Jobs.CountText</span>
         <CommandButton Id="Jobs.DeleteFinishedRecords" Command="Jobs.DeleteFinishedRecordsCommand" Text="終わったジョブを記録から削除" Disabled="!SignedIn" />
@@ -14,7 +27,7 @@
         <p data-id="Jobs.SignInNote">サインインするまで、ジョブの操作（取り消し・一時停止・再開・予定の変更・記録から削除）はできません。一覧と詳細は見られます。</p>
     }
     @* 選んだ行への操作 *@
-    <div class="tt-bar">
+    <div class="tt-bar tt-surface tt-commandbar">
         <span data-id="Jobs.Selection">@Jobs.SelectionText</span>
         <button type="button" data-id="Jobs.Detail" disabled="@(!Jobs.HasCurrent)" @onclick="() => Open(Jobs.Current!)">詳細</button>
         @* 1 行だけ選んだ、終わったデプロイのジョブの設定を「新しくデプロイ」に読み込む（オーナーの依頼、2026-11-03） *@
@@ -55,6 +68,9 @@
         _source = TableSources.Jobs(Jobs, Model.JobsLayout);
         Watch(Jobs, Jobs.Schedule, Model.SignIn);
     }
+
+    // 件数のカード: 押したカードの条件で絞り込む。同じカードをもう一度押すと外す
+    private void Toggle(JobQuickFilter filter) => Jobs.QuickFilter = Jobs.QuickFilter == filter ? JobQuickFilter.All : filter;
 
     // 実行状況の画面で開く（WinUI の画面の「詳細」と、行のダブルクリック）
     private Task Open(JobViewModel job) => Model.OpenJobAsync(job);

@@ -145,7 +145,9 @@ public partial class App : System.Windows.Application
             clipboard: new ClipboardService(),
             startupTask: new StartupTaskService(),
             secrets: new DpapiSecretProtector(),
-            history: new FileJobHistory(Path.Combine(HostSettings.DataDirectory, "job-history.json")));
+            history: new FileJobHistory(Path.Combine(HostSettings.DataDirectory, "job-history.json")),
+            // 料金の目安の単価は、Azure の公開の価格表から読む（読めなければアプリに入れた価格。オーナーの判断、2026-11-13 の案 1）
+            prices: new TTDeployTool.Controller.Desktop.Core.Pricing.AzureRetailPriceCatalog(new HttpClient { Timeout = TimeSpan.FromSeconds(15) }, TimeProvider.System));
 #endif
     }
 

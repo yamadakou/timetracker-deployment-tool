@@ -1,0 +1,33 @@
+@* 新しくデプロイの手順の帯（推奨のデザイン: 終わった手順は ✓、今の手順は強調）。完了の表示では、すべて ✓ *@
+<nav class="tt-surface tt-stepper" aria-label="手順" data-id="Wizard.Stepper">
+    @for (var i = 0; i < Names.Length; i++)
+    {
+        var step = i + 1;
+        var css = Completed || step < Current ? "tt-done" : step == Current ? "tt-current" : null;
+        <div class="tt-step @css" aria-current="@(css == "tt-current" ? "step" : null)">
+            <span class="tt-step-n">@if (css == "tt-done")
+                {
+                    <Icon Name="check" Size="14" />
+                }
+                else
+                {
+                    @step
+                }</span>@Names[i]
+        </div>
+        @if (step < Names.Length)
+        {
+            <div class="tt-step-bar @(Completed || step < Current ? "tt-done" : null)"></div>
+        }
+    }
+</nav>
+
+@code {
+    private static readonly string[] Names = ["対象", "DB", "パスワード", "スペックと期限", "確認と実行"];
+
+    /// <summary>今の手順（1〜5）。</summary>
+    [Parameter]
+    public int Current { get; set; }
+
+    [Parameter]
+    public bool Completed { get; set; }
+}

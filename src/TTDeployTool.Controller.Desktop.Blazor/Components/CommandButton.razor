@@ -2,7 +2,10 @@
 @inherits ViewModelComponent
 
 @* Core のコマンドのボタン（押せるかは CanExecute。押せなくなったら描き直す） *@
-<button type="button" class="@Css" data-id="@Id" disabled="@(!Command.CanExecute(null) || Disabled)" @onclick="Command.ExecuteAsync">@Text</button>
+<button type="button" class="@Css" data-id="@Id" disabled="@(!Command.CanExecute(null) || Disabled)" @onclick="Command.ExecuteAsync">@if (IconName != null)
+    {
+        <Icon Name="@IconName" Size="16" />
+    }@Text</button>
 
 @code {
     [Parameter]
@@ -13,6 +16,10 @@
 
     [Parameter]
     public string Text { get; set; } = "";
+
+    /// <summary>文字の前のアイコン（無ければ出さない）。</summary>
+    [Parameter]
+    public string? IconName { get; set; }
 
     /// <summary>tt-primary（主なボタン）など。</summary>
     [Parameter]

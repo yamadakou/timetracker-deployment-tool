@@ -20,6 +20,7 @@
     }
     <div class="tt-main">
         <nav class="tt-nav" aria-label="画面">
+            <div class="tt-brand"><span class="tt-brand-logo" aria-hidden="true"></span>TTDeployTool</div>
             @foreach (var item in NavItems)
             {
                 @if (item.Page == Pages.Settings)
@@ -27,8 +28,13 @@
                     <span class="tt-nav-space"></span>
                 }
                 <button type="button" class="tt-nav-item" data-id="@item.Id" aria-current="@(_page == item.Page ? "page" : null)"
-                        disabled="@(item.NeedsSignIn && !Model.SignIn.IsSignedIn)" @onclick="() => Navigate(item.Page)">@item.Text</button>
+                        disabled="@(item.NeedsSignIn && !Model.SignIn.IsSignedIn)" @onclick="() => Navigate(item.Page)"><Icon Name="@item.Icon" />@item.Text</button>
             }
+            @* サインインしたアカウント（推奨のデザイン: メニューの下） *@
+            <div class="tt-account" data-id="Nav.Account">
+                <span class="tt-avatar" aria-hidden="true">@Initials</span>
+                <span class="tt-account-text">@Model.SignIn.AccountDisplay</span>
+            </div>
         </nav>
         <main class="tt-content">
             @switch (_page)
@@ -97,13 +103,16 @@
     }
 
     // 左のメニュー（デプロイの一覧・新しくデプロイは、サインインするまで押せない。No.63）。設定は下に離して置く
-    private static readonly (string Page, string Id, string Text, bool NeedsSignIn)[] NavItems =
+    private static readonly (string Page, string Id, string Text, bool NeedsSignIn, string Icon)[] NavItems =
     [
-        (Pages.Target, "Nav.Target", "サインイン", false),
-        (Pages.Deployments, "Nav.Deployments", "デプロイの一覧", true),
-        (Pages.Wizard, "Nav.Wizard", "新しくデプロイ", true),
-        (Pages.Jobs, "Nav.Jobs", "ジョブの一覧", false),
-        (Pages.DryRun, "Nav.DryRun", "ローカル検証（Dry-run）", false),
-        (Pages.Settings, "Nav.AppSettings", "設定", false),
+        (Pages.Target, "Nav.Target", "サインイン", false, "signin"),
+        (Pages.Deployments, "Nav.Deployments", "デプロイの一覧", true, "list"),
+        (Pages.Wizard, "Nav.Wizard", "新しくデプロイ", true, "plus"),
+        (Pages.Jobs, "Nav.Jobs", "ジョブの一覧", false, "jobs"),
+        (Pages.DryRun, "Nav.DryRun", "ローカル検証（Dry-run）", false, "flask"),
+        (Pages.Settings, "Nav.AppSettings", "設定", false, "gear"),
     ];
+
+    // アカウントの頭文字（メールアドレスの先頭の 2 文字。サインインしていなければ「?」）
+    private string Initials => Model.SignIn.Account is { } account ? account.UserName[..Math.Min(2, account.UserName.Length)].ToUpperInvariant() : "?";
 }

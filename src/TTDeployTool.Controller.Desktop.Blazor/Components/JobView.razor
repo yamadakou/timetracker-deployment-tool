@@ -55,6 +55,22 @@
             </div>
             <Message Id="Job.RescheduleMessage" Text="@Job.RescheduleMessage" />
         }
+        @if (Job.DeletionSettingsText is { } settings)
+        {
+            @* 削除の設定（まだ始めていない削除のジョブは、リソースグループも削除するかを変えられる。オーナーの依頼、2026-11-13） *@
+            <div class="tt-card" data-id="Job.Deletion">
+                <div><span class="tt-subtle">削除の設定: </span><span data-id="Job.DeletionSettings">@settings</span></div>
+                @if (Job.CanChangeDeletion)
+                {
+                    <div class="tt-bar">
+                        <CheckField Id="Job.DeleteResourceGroup" Label="リソースグループも削除する（本ツールのリソースを削除した後に空になる場合だけ。元に戻せません）"
+                                    Value="Job.EditDeleteResourceGroup" ValueChanged="v => Job.EditDeleteResourceGroup = v" />
+                        <CommandButton Id="Job.ChangeDeletion" Command="Job.ChangeDeletionCommand" Text="削除の設定を変える" />
+                    </div>
+                }
+                <Message Id="Job.DeletionMessage" Text="@Job.DeletionMessage" Kind="MessageKind.Info" />
+            </div>
+        }
     }
 </section>
 

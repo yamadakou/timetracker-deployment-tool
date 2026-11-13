@@ -1,20 +1,60 @@
 @inherits ViewModelComponent
 
-@* デプロイの一覧で 1 行だけ選んだときの詳細（URL・注意・DB とスペック・対象に入れる・状態を確認・パスワードを表示） *@
-<section class="tt-card" data-id="Deployments.Detail">
-    <p class="tt-strong">@Row.AppName（@Row.ResourceGroup）</p>
+@* デプロイの一覧で 1 行だけ選んだときの詳細（推奨のデザイン: 右の面。期限の残りと「+7 日」「+30 日」、URL・注意・DB とスペック、操作、パスワード） *@
+<aside class="tt-surface tt-aside" data-id="Deployments.Detail">
+    <div>
+        <div class="tt-subtle">@Row.ResourceGroup · @Row.Subscription</div>
+        <h2>@(Row.Entry.IsResourceGroupOnly ? "（リソースグループだけ）" : Row.AppName) <span class="tt-dot @TableSources.StateTone(Row.State) tt-subtle" style="font-size: 12px; font-weight: 400">@DeploymentStates.Label(Row.State)</span></h2>
+    </div>
+    @if (Row.DaysLeftText is { } left)
+    {
+        @* 利用可能期限の残り（推奨のデザインの、案 B の期限の残りのバー） *@
+        <div data-id="Row.Expiry">
+            <div class="tt-subtle">利用可能期限</div>
+            <div class="tt-bar" style="justify-content: space-between; align-items: baseline; margin: 0">
+                <span class="tt-big @(Row.DaysLeft <= DeploymentListViewModel.SoonDays ? "tt-critical" : null)" data-id="Row.DaysLeft">@left</span>
+                <span class="tt-subtle">@Row.ExpiryText の終わりまで</span>
+            </div>
+            <span class="tt-bar-track tt-full @(Row.DaysLeft <= DeploymentListViewModel.SoonDays ? "tt-soon" : Row.DaysLeft <= 30 ? "tt-mid" : null)" aria-hidden="true"><i style="width: @((Row.ExpiryShare * 100).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))%"></i></span>
+        </div>
+    }
+    else if (!Row.Entry.IsResourceGroupOnly)
+    {
+        <div data-id="Row.Expiry"><span class="tt-subtle">利用可能期限: </span>@Row.ExpiryText</div>
+    }
+    @if (!Row.Entry.IsResourceGroupOnly)
+    {
+        <div class="tt-quick">
+            <CommandButton Id="Row.Extend7" Command="Row.Extend7Command" Text="+7 日" />
+            <CommandButton Id="Row.Extend30" Command="Row.Extend30Command" Text="+30 日" />
+        </div>
+    }
     @if (Row.Url is { } url)
     {
         <button type="button" class="tt-link" data-id="Row.Url" disabled="@(!Row.OpenCommand.CanExecute(null))" @onclick="Row.OpenCommand.ExecuteAsync">@url</button>
     }
     <Message Id="Row.GroupWarning" Text="@Row.GroupWarning" Kind="MessageKind.Caution" />
     <Message Id="Row.ExpiryWarning" Text="@Row.ExpiryWarning" Kind="MessageKind.Caution" />
-    <p>@Row.DbTypeText、@Row.PersistenceText、@Row.SpecText</p>
-    <div class="tt-bar">
+    @if (Row.Entry.IsResourceGroupOnly)
+    {
+        <p data-id="Row.StateText">@Row.StateText</p>
+    }
+    else
+    {
+        <dl class="tt-kv">
+            <dt>状態</dt><dd>@Row.StateText</dd>
+            <dt>DB</dt><dd>@Row.DbTypeText、@Row.PersistenceText</dd>
+            <dt>スペック</dt><dd>@Row.SpecText</dd>
+            <dt>グループ</dt><dd>@Row.GroupText</dd>
+            <dt>デプロイ日</dt><dd>@Row.DeployedText</dd>
+        </dl>
+    }
+    <div class="tt-actions">
         <CommandButton Id="Row.UseAsTarget" Command="Row.UseAsTargetCommand" Text="対象に入れる" />
-        <CommandButton Id="Row.Redeploy" Command="Row.RedeployCommand" Text="最後のデプロイの設定で新しくデプロイ" />
-        <CommandButton Id="Row.CheckStatus" Command="Row.CheckStatusCommand" Text="@Row.CheckStatusText" />
-        <CommandButton Id="Row.ShowPasswords" Command="Row.ShowPasswordsCommand" Text="パスワードを表示" />
+        <CommandButton Id="Row.Redeploy" Command="Row.RedeployCommand" Text="最後のデプロイの設定で新しくデプロイ" IconName="redo" />
+        <CommandButton Id="Row.CheckStatus" Command="Row.CheckStatusCommand" Text="@Row.CheckStatusText" IconName="cloud" />
+        <CommandButton Id="Row.ShowPasswords" Command="Row.ShowPasswordsCommand" Text="パスワードを表示" IconName="key" />
+        <CommandButton Id="Row.Delete" Command="Row.DeleteCommand" Text="Azure から削除…" IconName="trash" Css="tt-danger" />
     </div>
     @if (Row.HasPasswords)
     {
@@ -31,7 +71,7 @@
     <BusyView Id="Row.Busy" State="Row.Busy" />
     <p data-id="Row.Message">@Row.Message</p>
     <Message Id="Row.Error" Text="@Row.Error" />
-</section>
+</aside>
 
 @code {
     [Parameter, EditorRequired]

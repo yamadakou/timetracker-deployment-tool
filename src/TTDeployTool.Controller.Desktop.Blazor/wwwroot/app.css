@@ -1,47 +1,112 @@
-/* 試作の画面の見た目（Windows 11 の Fluent に寄せる。色と文字だけ。docs/design/desktop/desktop-blazor-hybrid.md の 4） */
+/* 画面の見た目（推奨のデザイン: 案 A〔Windows 11 の Fluent〕を基本に、案 B の件数のカードと期限の残りのバー。オーナーの判断、2026-11-13。
+   明るい画面と濃い色の画面は、Windows の設定〔アプリのモード〕に合わせて切り替える。docs/design/desktop/desktop-blazor-hybrid.md の 16.12） */
 :root {
+  color-scheme: light dark;
   --tt-font: "Segoe UI Variable Text", "Segoe UI", "Yu Gothic UI", "Meiryo UI", system-ui, sans-serif;
   --tt-bg: #f3f3f3;
+  --tt-bg-2: #eef2f7;
   --tt-card: #ffffff;
-  --tt-text: #1a1a1a;
-  --tt-subtle: #5c5c5c;
-  --tt-line: #e0e0e0;
+  --tt-card-2: #fafafa;
+  --tt-text: #1b1b1b;
+  --tt-subtle: #5f5f5f;
+  --tt-line: #e5e5e5;
+  --tt-line-2: #f0f0f0;
+  --tt-input-line: #8a8a8a;
   --tt-accent: #005fb8;
   --tt-accent-text: #ffffff;
-  --tt-selected: #e5f0fb;
+  --tt-accent-soft: #e6f0fa;
+  --tt-selected: #e6f0fa;
   --tt-hover: #f5f5f5;
+  --tt-ok: #0f7b0f;
+  --tt-ok-soft: #dff6dd;
   --tt-caution: #9d5d00;
+  --tt-caution-soft: #fff4ce;
   --tt-critical: #c42b1c;
+  --tt-critical-soft: #fde7e9;
+  --tt-muted: #8a8a8a;
+  --tt-shadow: 0 2px 6px rgba(0, 0, 0, .05);
+  --tt-radius: 8px;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --tt-bg: #202020; --tt-card: #2b2b2b; --tt-text: #ffffff; --tt-subtle: #c5c5c5; --tt-line: #3d3d3d;
-    --tt-accent: #60cdff; --tt-accent-text: #000000; --tt-selected: #1f3a52; --tt-hover: #323232; --tt-caution: #fce100; --tt-critical: #ff99a4;
+    --tt-bg: #202020; --tt-bg-2: #1c1f24; --tt-card: #2b2b2b; --tt-card-2: #262626; --tt-text: #ffffff; --tt-subtle: #c5c5c5; --tt-line: #3d3d3d;
+    --tt-line-2: #333333; --tt-input-line: #9a9a9a; --tt-accent: #60cdff; --tt-accent-text: #000000; --tt-accent-soft: #1f3a52; --tt-selected: #1f3a52;
+    --tt-hover: #323232; --tt-ok: #6ccb5f; --tt-ok-soft: #233a22; --tt-caution: #fce100; --tt-caution-soft: #433519; --tt-critical: #ff99a4;
+    --tt-critical-soft: #442726; --tt-muted: #9a9a9a; --tt-shadow: 0 2px 8px rgba(0, 0, 0, .35);
   }
 }
-html, body { margin: 0; background: var(--tt-bg); color: var(--tt-text); font: 14px/1.43 var(--tt-font); }
-button, input, select { font: inherit; color: inherit; }
-button { background: var(--tt-card); border: 1px solid var(--tt-line); border-radius: 4px; padding: 4px 12px; cursor: pointer; }
+html, body { margin: 0; background: var(--tt-bg); color: var(--tt-text); font: 14px/1.43 var(--tt-font); -webkit-font-smoothing: antialiased; }
+body { background: linear-gradient(135deg, var(--tt-bg-2), var(--tt-bg)); }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { display: inline-flex; align-items: center; gap: 6px; background: var(--tt-card); border: 1px solid var(--tt-line); border-radius: 5px; padding: 5px 12px; cursor: pointer; min-height: 32px; }
 button:hover:not(:disabled) { background: var(--tt-hover); }
 button:disabled { opacity: .45; cursor: default; }
-button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--tt-accent); outline-offset: 1px; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--tt-accent); outline-offset: 1px; }
 .tt-primary { background: var(--tt-accent); color: var(--tt-accent-text); border-color: var(--tt-accent); }
 .tt-primary:hover:not(:disabled) { background: var(--tt-accent); filter: brightness(1.1); }
-input[type=text], input[type=search], input[type=date], select { background: var(--tt-card); border: 1px solid var(--tt-line); border-radius: 4px; padding: 4px 8px; }
+.tt-danger { color: var(--tt-critical); }
+input[type=text], input[type=search], input[type=date], input[type=time], input[type=password], input[type=number], select, textarea {
+  background: var(--tt-card); border: 1px solid var(--tt-line); border-bottom: 2px solid var(--tt-input-line); border-radius: 5px; padding: 5px 10px; min-height: 22px; }
+input:focus, select:focus, textarea:focus { border-bottom-color: var(--tt-accent); }
+/* 時刻の欄は、左の余白を前と同じく狭くする（キーボードで分を打つテストが、欄の左からの位置で分を押す。12 時間の表示でも分に当たる） */
+input[type=date] { padding: 4px 8px; }
+input[type=time] { padding: 4px 2px; }
+input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--tt-accent); }
+input[type=range] { accent-color: var(--tt-accent); }
 
+/* 画面の根: 左のメニュー（アイコンと文字。下に設定とアカウント）と、右の画面 */
 .tt-app { display: flex; flex-direction: column; height: 100vh; }
 .tt-banner { display: flex; align-items: center; gap: 12px; padding: 8px 16px; border-bottom: 1px solid var(--tt-line); }
-.tt-banner.tt-info { background: var(--tt-selected); }
+.tt-banner.tt-info { background: var(--tt-accent-soft); }
 .tt-main { display: flex; flex: 1 1 auto; min-height: 0; }
-/* 左のメニュー（WinUI の NavigationView の左の形） */
-.tt-nav { display: flex; flex-direction: column; gap: 2px; width: 220px; flex: none; padding: 8px; background: var(--tt-bg); border-right: 1px solid var(--tt-line); }
-.tt-nav-item { text-align: left; border: 0; background: none; padding: 8px 12px; border-radius: 4px; }
-.tt-nav-item[aria-current=page] { background: var(--tt-card); box-shadow: inset 3px 0 var(--tt-accent); font-weight: 600; }
+.tt-nav { display: flex; flex-direction: column; gap: 2px; width: 220px; flex: none; padding: 12px 8px; }
+.tt-brand { display: flex; align-items: center; gap: 10px; padding: 4px 12px 14px; font-weight: 600; }
+.tt-brand-logo { width: 20px; height: 20px; border-radius: 5px; background: linear-gradient(135deg, #0078d4, #4cc2ff); }
+.tt-nav-item { position: relative; justify-content: flex-start; gap: 12px; text-align: left; border: 0; background: none; padding: 9px 12px; border-radius: 6px; }
+.tt-nav-item[aria-current=page] { background: var(--tt-hover); font-weight: 600; }
+.tt-nav-item[aria-current=page]::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 2px; background: var(--tt-accent); }
 .tt-nav-space { flex: 1 1 auto; }
-.tt-content { flex: 1 1 auto; min-width: 0; overflow: auto; padding: 16px 24px; }
-.tt-narrow { max-width: 900px; }
+.tt-account { display: flex; align-items: center; gap: 10px; padding: 10px 12px 4px; min-width: 0; }
+.tt-avatar { flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--tt-accent-soft); color: var(--tt-accent); display: grid; place-items: center; font-weight: 700; font-size: 12px; }
+.tt-account-text { min-width: 0; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tt-icon { flex: none; }
+.tt-content { flex: 1 1 auto; min-width: 0; overflow: auto; padding: 20px 24px 20px 8px; }
+.tt-narrow { max-width: 1240px; }
+
+/* 画面の部品: 見出し・面（カード）・操作の帯・件数のカード・左右の分割 */
+.tt-page h1 { font-size: 28px; font-weight: 600; letter-spacing: -.2px; margin: 0; }
+.tt-page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin: 4px 0 14px; }
+.tt-page-sub { color: var(--tt-subtle); font-size: 12.5px; margin: 4px 0 0; }
+.tt-page-head > button { flex: none; white-space: nowrap; }
 .tt-page h2 { font-size: 16px; font-weight: 600; margin: 16px 0 8px; }
 .tt-page p { margin: 6px 0; overflow-wrap: anywhere; }
+.tt-surface { background: var(--tt-card); border: 1px solid var(--tt-line); border-radius: var(--tt-radius); box-shadow: var(--tt-shadow); }
+.tt-section { padding: 16px 18px; margin-bottom: 14px; }
+.tt-commandbar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: 6px; margin-bottom: 14px; }
+.tt-commandbar > button, .tt-commandbar .tt-cmd { border-color: transparent; background: transparent; }
+.tt-commandbar > button.tt-primary { background: var(--tt-accent); border-color: var(--tt-accent); }
+.tt-sep { width: 1px; height: 20px; background: var(--tt-line); margin: 0 4px; }
+.tt-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+.tt-stat { display: flex; align-items: center; gap: 12px; padding: 12px 14px; text-align: left; justify-content: flex-start; min-height: 0;
+  background: var(--tt-card); border: 1px solid var(--tt-line); border-radius: var(--tt-radius); box-shadow: var(--tt-shadow); }
+.tt-stat[aria-pressed=true] { border-color: var(--tt-accent); box-shadow: inset 0 0 0 1px var(--tt-accent); }
+.tt-stat-icon { flex: none; width: 36px; height: 36px; border-radius: 8px; display: grid; place-items: center; }
+.tt-stat-value { font-size: 22px; font-weight: 600; line-height: 1.1; }
+.tt-stat-label { color: var(--tt-subtle); font-size: 12px; }
+.tt-stat > span:nth-child(2) { min-width: 0; }
+.tt-stat-go { margin-left: auto; color: var(--tt-accent); font-size: 12px; white-space: nowrap; }
+.tt-tone-info .tt-stat-icon { background: var(--tt-accent-soft); color: var(--tt-accent); }
+.tt-tone-critical .tt-stat-icon { background: var(--tt-critical-soft); color: var(--tt-critical); }
+.tt-tone-caution .tt-stat-icon { background: var(--tt-caution-soft); color: var(--tt-caution); }
+.tt-tone-ok .tt-stat-icon { background: var(--tt-ok-soft); color: var(--tt-ok); }
+.tt-split { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 14px; align-items: start; }
+.tt-split-main { min-width: 0; }
+.tt-aside { position: sticky; top: 0; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+.tt-aside h2 { font-size: 18px; margin: 0; }
+.tt-aside-empty { color: var(--tt-subtle); text-align: center; padding: 40px 12px; }
+@media (max-width: 1100px) { .tt-split { grid-template-columns: minmax(0, 1fr); } .tt-aside { position: static; } .tt-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* 文字の部品 */
 .tt-strong { font-weight: 600; }
 .tt-subtle { color: var(--tt-subtle); }
 .tt-critical { color: var(--tt-critical); }
@@ -50,11 +115,11 @@ input[type=text], input[type=search], input[type=date], select { background: var
 .tt-noselect { user-select: none; }
 .tt-select { user-select: text; }
 .tt-lines { margin: 6px 0; padding-left: 20px; }
-.tt-lines.tt-mono { list-style: none; padding-left: 0; font-size: 13px; }
-.tt-message { padding: 8px 12px; border-radius: 4px; border: 1px solid var(--tt-line); }
-.tt-message.tt-error { color: var(--tt-critical); border-color: var(--tt-critical); }
-.tt-message.tt-caution { color: var(--tt-caution); }
-.tt-message.tt-info { background: var(--tt-selected); }
+.tt-lines.tt-mono { list-style: none; padding-left: 0; font-size: 12.5px; }
+.tt-message { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 6px; border: 1px solid var(--tt-line); background: var(--tt-card); }
+.tt-message.tt-error { color: var(--tt-critical); background: var(--tt-critical-soft); border-color: transparent; }
+.tt-message.tt-caution { color: var(--tt-text); background: var(--tt-caution-soft); border-color: transparent; }
+.tt-message.tt-info { background: var(--tt-accent-soft); border-color: transparent; }
 .tt-busy { display: flex; align-items: center; gap: 8px; color: var(--tt-subtle); }
 .tt-spinner { width: 16px; height: 16px; border: 2px solid var(--tt-line); border-top-color: var(--tt-accent); border-radius: 50%; animation: tt-spin 1s linear infinite; }
 @keyframes tt-spin { to { transform: rotate(360deg); } }
@@ -62,23 +127,73 @@ input[type=text], input[type=search], input[type=date], select { background: var
 @keyframes tt-flow { to { background-position: -200% 0; } }
 .tt-wide input { width: 480px; max-width: 100%; }
 .tt-short input { width: 140px; }
-.tt-check-field { display: flex; align-items: center; gap: 6px; margin: 6px 0; }
-.tt-card { margin-top: 12px; padding: 12px; background: var(--tt-card); border: 1px solid var(--tt-line); border-radius: 6px; }
-.tt-link { border: 0; background: none; padding: 0; color: var(--tt-accent); text-decoration: underline; }
-.tt-apps { list-style: none; padding: 0; }
-.tt-apps li { margin: 6px 0; }
+.tt-check-field { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+.tt-card { margin-top: 12px; padding: 14px 16px; background: var(--tt-card); border: 1px solid var(--tt-line); border-radius: var(--tt-radius); box-shadow: var(--tt-shadow); }
+.tt-link { border: 0; background: none; padding: 0; min-height: 0; color: var(--tt-accent); text-decoration: none; overflow-wrap: anywhere; text-align: left; }
+.tt-link:hover:not(:disabled) { background: none; text-decoration: underline; }
+.tt-apps { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.tt-apps li { margin: 0; padding: 8px 10px; background: var(--tt-card-2); border-radius: 6px; }
 .tt-compose { width: 100%; min-height: 200px; }
 .tt-job { padding-bottom: 12px; border-bottom: 1px solid var(--tt-line); }
-.tt-job h3 { font-size: 14px; font-weight: 600; margin: 8px 0; }
+.tt-job h3 { font-size: 15px; font-weight: 600; margin: 8px 0; }
+.tt-kv { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 6px 10px; margin: 0; font-size: 12.5px; }
+.tt-kv dt { color: var(--tt-subtle); }
+.tt-kv dd { margin: 0; overflow-wrap: anywhere; }
+.tt-chip { display: inline-block; padding: 1px 8px; border-radius: 10px; background: var(--tt-hover); font-size: 11.5px; }
+.tt-big { font-size: 20px; font-weight: 600; }
+.tt-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.tt-actions > .tt-primary { flex: 1 1 100%; justify-content: center; }
+.tt-quick { display: flex; flex-wrap: wrap; gap: 6px; } .tt-quick button { min-height: 28px; padding: 2px 10px; font-size: 12px; }
+
+/* 状態の印（行の状態・ジョブの状態の色）と、期限の残りのバー（文字はセルの文字のまま、印とバーは CSS で描く） */
+.tt-dot::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; background: var(--tt-muted); }
+.tt-dot.tt-ok::before { background: var(--tt-ok); } .tt-dot.tt-info::before { background: var(--tt-accent); }
+.tt-dot.tt-warn::before { background: var(--tt-caution); } .tt-dot.tt-bad::before { background: var(--tt-critical); }
+.tt-bar-track { display: block; height: 4px; border-radius: 2px; background: var(--tt-line); overflow: hidden; margin-top: 5px; max-width: 120px; }
+.tt-bar-track > i { display: block; height: 100%; border-radius: 2px; background: var(--tt-ok); }
+.tt-bar-track.tt-soon > i { background: var(--tt-critical); } .tt-bar-track.tt-mid > i { background: var(--tt-caution); }
+.tt-bar-track.tt-full { max-width: none; height: 6px; }
+.tt-cell[data-sub]::after { content: "　" attr(data-sub); color: var(--tt-subtle); font-weight: 400; }
+.tt-cell.tt-exp { display: block; }
+.tt-exp-line { display: flex; align-items: center; gap: 8px; margin-top: 3px; }
+.tt-exp-line > .tt-bar-track { flex: 0 0 80px; margin: 0; }
+.tt-exp-line::after { content: attr(data-sub); color: var(--tt-subtle); font-size: 11.5px; white-space: nowrap; }
+
+/* 新しくデプロイ: 手順の帯・スペックのスライダー・料金の目安 */
+.tt-stepper { display: flex; align-items: center; padding: 16px 20px; margin-bottom: 14px; }
+.tt-step { display: flex; align-items: center; gap: 10px; color: var(--tt-subtle); white-space: nowrap; }
+.tt-step-n { width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--tt-line); display: grid; place-items: center; font-weight: 600; font-size: 12px; background: var(--tt-card); }
+.tt-step.tt-done .tt-step-n { background: var(--tt-accent); border-color: var(--tt-accent); color: var(--tt-accent-text); }
+.tt-step.tt-current { color: var(--tt-text); font-weight: 600; }
+.tt-step.tt-current .tt-step-n { border-color: var(--tt-accent); color: var(--tt-accent); box-shadow: 0 0 0 3px var(--tt-accent-soft); }
+.tt-step-bar { flex: 1 1 auto; height: 2px; background: var(--tt-line); margin: 0 14px; min-width: 16px; }
+.tt-step-bar.tt-done { background: var(--tt-accent); }
+.tt-spec { border: 1px solid var(--tt-line); border-radius: var(--tt-radius); padding: 12px 14px 10px; background: var(--tt-card-2); margin-bottom: 12px; }
+.tt-spec-head { display: flex; justify-content: space-between; align-items: baseline; }
+.tt-spec-value { color: var(--tt-accent); font-weight: 600; }
+.tt-spec input[type=range] { width: 100%; margin: 12px 0 2px; }
+.tt-ticks { display: flex; justify-content: space-between; color: var(--tt-muted); font-size: 11px; }
+.tt-spec-foot { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--tt-subtle); margin-top: 4px; }
+.tt-cost h2 { display: flex; justify-content: space-between; align-items: center; font-size: 15px; }
+.tt-units { display: inline-flex; border: 1px solid var(--tt-line); border-radius: 6px; overflow: hidden; }
+.tt-units button { border: 0; border-radius: 0; min-height: 26px; padding: 2px 10px; font-size: 12px; font-weight: 400; }
+.tt-units button[aria-pressed=true] { background: var(--tt-accent); color: var(--tt-accent-text); }
+.tt-total { font-size: 26px; font-weight: 600; }
+.tt-stack { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--tt-line); }
+.tt-stack > i { display: block; height: 100%; }
+.tt-stack > i:nth-child(1) { background: #005fb8; } .tt-stack > i:nth-child(2) { background: #4cc2ff; } .tt-stack > i:nth-child(3) { background: #8764b8; } .tt-stack > i:nth-child(4) { background: #c27c00; }
+.tt-cost-row { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; padding: 6px 0; border-bottom: 1px dashed var(--tt-line); }
+.tt-cost-row span:first-child { color: var(--tt-subtle); }
+
+/* 確かめるダイアログ */
 .tt-modal-back { position: fixed; inset: 0; background: rgba(0,0,0,.3); z-index: 30; }
 .tt-modal { position: fixed; z-index: 31; top: 30%; left: 50%; transform: translateX(-50%); width: min(520px, 90vw); padding: 20px 24px; background: var(--tt-card);
-  border: 1px solid var(--tt-line); border-radius: 8px; box-shadow: 0 16px 32px rgba(0,0,0,.2); }
+  border: 1px solid var(--tt-line); border-radius: 10px; box-shadow: 0 16px 32px rgba(0,0,0,.25); }
 .tt-modal h2 { font-size: 18px; margin: 0 0 12px; }
 .tt-modal-buttons { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
-.tt-page h1 { font-size: 20px; font-weight: 600; margin: 4px 0 12px; }
 .tt-bar, .tt-filters, .tt-pager, .tt-table-foot { display: flex; flex-wrap: wrap; align-items: end; gap: 8px 12px; margin: 8px 0; }
-.tt-field { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--tt-subtle); }
-.tt-field > input, .tt-field > select { font-size: 14px; color: var(--tt-text); }
+.tt-field { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--tt-text); font-weight: 500; }
+.tt-field > input, .tt-field > select { font-size: 14px; color: var(--tt-text); font-weight: 400; }
 .tt-inline { flex-direction: row; align-items: center; gap: 6px; }
 .tt-error { color: var(--tt-critical); }
 .tt-notice, .tt-hint, .tt-busy { color: var(--tt-subtle); }
@@ -86,13 +201,14 @@ input[type=text], input[type=search], input[type=date], select { background: var
 
 /* 表: 左のチェックボックスの列は固定の幅、右端の列は残りの幅いっぱい（table-layout: fixed で、幅を指定しない列に残りを配る）。
    ウィンドウが表の最小の幅より狭いときは、表の区画だけを横にスクロールする（列は縮めない） */
-.tt-table-scroll { overflow: auto; max-height: calc(100vh - 290px); min-height: 160px; background: var(--tt-card); border: 1px solid var(--tt-line); border-radius: 6px; }
+.tt-table-scroll { overflow: auto; max-height: calc(100vh - 340px); min-height: 160px; background: var(--tt-card); border: 1px solid var(--tt-line); border-radius: var(--tt-radius); box-shadow: var(--tt-shadow); }
 .tt-table { table-layout: fixed; width: 100%; border-collapse: separate; border-spacing: 0; }
-.tt-table th, .tt-table td { border-bottom: 1px solid var(--tt-line); padding: 6px 8px; text-align: left; vertical-align: top; overflow: hidden; }
-.tt-table thead th { position: sticky; top: 0; z-index: 1; background: var(--tt-card); font-weight: 600; overflow: visible; }
+.tt-table th, .tt-table td { border-bottom: 1px solid var(--tt-line-2); padding: 9px 10px; text-align: left; vertical-align: top; overflow: hidden; }
+.tt-table thead th { position: sticky; top: 0; z-index: 1; background: var(--tt-card-2); font-weight: 600; font-size: 12.5px; overflow: visible; border-bottom-color: var(--tt-line); }
 .tt-table .tt-check { width: 40px; padding: 6px 4px 6px 12px; }
 .tt-table tbody tr:hover { background: var(--tt-hover); }
 .tt-table tbody tr.tt-selected { background: var(--tt-selected); }
+.tt-table tbody tr.tt-selected td:first-child { box-shadow: inset 3px 0 var(--tt-accent); }
 .tt-head { display: flex; align-items: center; gap: 2px; min-width: 0; cursor: grab; user-select: none; touch-action: none; }
 /* 見出しのドラッグ: 動かしている列は薄く、入る位置（離した見出しの左か右）を線で示す */
 .tt-table thead th.tt-dragging { opacity: 0.5; }
@@ -119,6 +235,6 @@ input[type=text], input[type=search], input[type=date], select { background: var
 .tt-overlay { position: fixed; inset: 0; z-index: 19; }
 .tt-menu { position: fixed; z-index: 20; display: flex; flex-direction: column; padding: 4px; background: var(--tt-card); border: 1px solid var(--tt-line); border-radius: 8px; box-shadow: 0 8px 16px rgba(0,0,0,.14); }
 .tt-menu button { border: 0; text-align: left; }
-.tt-detail { margin-top: 12px; padding: 12px; background: var(--tt-card); border: 1px solid var(--tt-line); border-radius: 6px; }
+.tt-detail { margin-top: 12px; padding: 14px 16px; background: var(--tt-card); border: 1px solid var(--tt-line); border-radius: var(--tt-radius); box-shadow: var(--tt-shadow); }
 .tt-detail h2 { font-size: 16px; margin: 0 0 8px; }
 .tt-detail-result { white-space: pre-wrap; overflow-wrap: anywhere; }

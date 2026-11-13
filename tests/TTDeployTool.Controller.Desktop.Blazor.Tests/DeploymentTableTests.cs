@@ -233,7 +233,7 @@ public sealed class DeploymentTableTests : IAsyncLifetime
         IElement Cell(int row, string key) => Rows[row].QuerySelector($"td[data-key='{key}']")!;
 
         Cell(0, "AppName").ContextMenu(new MouseEventArgs { ClientX = 120, ClientY = 80 });
-        _page.Find(".tt-menu").GetAttribute("style").Should().Be("left: 120px; top: 80px");
+        _page.Find(".tt-menu").GetAttribute("style").Should().Be("left: min(120px, calc(100vw - 300px)); top: min(80px, calc(100vh - 130px))", "画面の右・下の端では内側に寄せる");
         _page.FindAll(".tt-menu button")[0].Click();
         _app.Clipboard.Texts.Should().Equal(List.Rows[0].AppName);
         _page.FindAll(".tt-menu").Should().BeEmpty();

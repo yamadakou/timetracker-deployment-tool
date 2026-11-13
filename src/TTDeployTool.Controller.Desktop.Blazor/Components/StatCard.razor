@@ -1,0 +1,37 @@
+@* 件数のカード（推奨のデザインの、案 B の件数のカード。押すとその条件で絞り込む・画面を開く。もう一度押すと絞り込みを外す） *@
+<button type="button" class="tt-stat tt-tone-@Tone" data-id="@Id" aria-pressed="@(Pressed ? "true" : "false")" @onclick="OnClick">
+    <span class="tt-stat-icon"><Icon Name="@IconName" Size="20" /></span>
+    <span><span class="tt-stat-value" data-id="@($"{Id}.Value")">@Value</span><br /><span class="tt-stat-label">@Label</span></span>
+    @if (Action != null)
+    {
+        <span class="tt-stat-go">@Action ›</span>
+    }
+</button>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Id { get; set; } = "";
+
+    [Parameter, EditorRequired]
+    public string IconName { get; set; } = "";
+
+    /// <summary>色（info・critical・caution・ok）。</summary>
+    [Parameter]
+    public string Tone { get; set; } = "info";
+
+    [Parameter]
+    public int Value { get; set; }
+
+    [Parameter]
+    public string Label { get; set; } = "";
+
+    /// <summary>押したときの動き（「絞り込む」など。無ければ出さない）。</summary>
+    [Parameter]
+    public string? Action { get; set; }
+
+    [Parameter]
+    public bool Pressed { get; set; }
+
+    [Parameter]
+    public EventCallback OnClick { get; set; }
+}

@@ -2,14 +2,23 @@
 
 @* Azure から削除（計画 → アプリ名の入力 → 実行。WinUI の画面の DeletePanel） *@
 <section class="tt-page tt-narrow" data-id="Panel.Delete">
-    <h1>Azure から削除</h1>
-    <button type="button" data-id="Delete.BackToList" @onclick="() => Back.InvokeAsync(Pages.Deployments)">デプロイの一覧に戻る</button>
-    <p>対象: <span data-id="Delete.Target">@Model.Target.SubscriptionDisplay</span> / @Model.Target.ResourceGroup / @Model.Target.AppName</p>
-    <p>本ツールで作ったリソースだけを削除します。リソースグループは、「リソースグループも削除する」を選んだ場合だけ、中が空になれば削除します。</p>
-    <CheckField Id="Delete.IncludeUntagged" Label="管理タグの無いものも対象にする" Value="Deletion.IncludeUntagged" ValueChanged="v => Deletion.IncludeUntagged = v" />
-    <CheckField Id="Delete.KeepDbData" Label="DB のデータを残す（ストレージアカウントを削除しない。料金がかかり続けます）" Value="Deletion.KeepDbData" ValueChanged="v => Deletion.KeepDbData = v" />
-    <CheckField Id="Delete.DeleteResourceGroup" Label="リソースグループも削除する（本ツールのリソースを削除した後に、中が空になる場合だけ。元に戻せません）"
-                Value="Deletion.DeleteResourceGroup" ValueChanged="v => Deletion.DeleteResourceGroup = v" />
+    <div class="tt-page-head"><h1>Azure から削除</h1>
+        <button type="button" data-id="Delete.BackToList" @onclick="() => Back.InvokeAsync(Pages.Deployments)">デプロイの一覧に戻る</button></div>
+    <div class="tt-surface tt-section">
+    <p>対象: <span data-id="Delete.Target">@Model.Target.SubscriptionDisplay</span> / @Model.Target.ResourceGroup@(Deletion.IsResourceGroupOnly ? "（リソースグループだけ）" : $" / {Model.Target.AppName}")</p>
+    @if (Deletion.IsResourceGroupOnly)
+    {
+        @* リソースグループだけの削除（管理タグの残った、本ツールのアプリのリソースが無いリソースグループ。オーナーの依頼、2026-11-13） *@
+        <p data-id="Delete.ResourceGroupOnly">本ツールで作ったリソースグループを削除します。中にほかのリソースがあれば削除しません。</p>
+    }
+    else
+    {
+        <p>本ツールで作ったリソースだけを削除します。リソースグループは、「リソースグループも削除する」を選んだ場合だけ、中が空になれば削除します。</p>
+        <CheckField Id="Delete.IncludeUntagged" Label="管理タグの無いものも対象にする" Value="Deletion.IncludeUntagged" ValueChanged="v => Deletion.IncludeUntagged = v" />
+        <CheckField Id="Delete.KeepDbData" Label="DB のデータを残す（ストレージアカウントを削除しない。料金がかかり続けます）" Value="Deletion.KeepDbData" ValueChanged="v => Deletion.KeepDbData = v" />
+        <CheckField Id="Delete.DeleteResourceGroup" Label="リソースグループも削除する（本ツールのリソースを削除した後に、中が空になる場合だけ。元に戻せません）"
+                    Value="Deletion.DeleteResourceGroup" ValueChanged="v => Deletion.DeleteResourceGroup = v" />
+    }
     <div class="tt-bar">
         <CommandButton Id="Delete.Plan" Command="Deletion.PlanCommand" Text="計画し直す" />
         <CommandButton Id="Delete.CopyPlan" Command="Deletion.CopyPlanCommand" Text="計画を Markdown でコピー" />
@@ -31,10 +40,10 @@
         <Lines Id="Delete.Warnings" Items="Deletion.Warnings" Css="tt-caution" />
         @if (Deletion.NeedsAppNameConfirmation)
         {
-            <p>確認のため、アプリ名「@Deletion.AppNameToConfirm」を入力してください。</p>
+            <p>確認のため、@(Deletion.ConfirmLabel)「@Deletion.AppNameToConfirm」を入力してください。</p>
             <div class="tt-bar">
-                <TextInput Id="Delete.ConfirmAppName" Label="アプリ名" Value="@Deletion.ConfirmAppName" ValueChanged="v => Deletion.ConfirmAppName = v" />
-                <CommandButton Id="Delete.CopyAppName" Command="Deletion.CopyAppNameCommand" Text="アプリ名をコピー" />
+                <TextInput Id="Delete.ConfirmAppName" Label="@Deletion.ConfirmLabel" Value="@Deletion.ConfirmAppName" ValueChanged="v => Deletion.ConfirmAppName = v" />
+                <CommandButton Id="Delete.CopyAppName" Command="Deletion.CopyAppNameCommand" Text="@($"{Deletion.ConfirmLabel}をコピー")" />
             </div>
             <CommandButton Id="Delete.Start" Command="Deletion.StartCommand" Text="今すぐ削除" Css="tt-primary" />
             <div class="tt-bar">
@@ -46,6 +55,7 @@
             <p class="tt-subtle" data-id="Delete.ScheduleNote">@SystemStatusViewModel.DeletionScheduleNote</p>
         }
     }
+    </div>
 </section>
 
 @code {
