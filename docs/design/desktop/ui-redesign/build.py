@@ -140,7 +140,7 @@ def a_list():
 <div class="info-bar">{ic("bell",18)}<div>利用可能期限は <b>11/16（あと 3 日）</b>です。期限を過ぎると自動で削除します。</div></div>
 <dl class="kv"><dt>URL</dt><dd style="color:var(--accent)">sales-tt.japaneast.…</dd><dt>状態</dt><dd><span class="badge ok"><span class="dot"></span>稼働中（3/3）</span></dd>
 <dt>DB</dt><dd>PostgreSQL・Azure Files に永続化</dd><dt>スペック</dt><dd>TT 1.5 CPU / 3 GiB</dd><dt>グループ</dt><dd><span class="chip">営業</span></dd><dt>デプロイ日</dt><dd>2026/10/15</dd></dl>
-<div style="display:flex;flex-wrap:wrap;gap:8px"><span class="btn primary">{ic("link",16)}Timetracker を開く</span><span class="btn">{ic("key",16)}パスワード</span><span class="btn">{ic("cloud",16)}状態を確認</span><span class="btn">{ic("refresh",16)}この設定で新しくデプロイ</span></div></aside></div>'''
+<div style="display:flex;flex-wrap:wrap;gap:8px"><span class="btn primary">{ic("link",16)}TimeTracker を開く</span><span class="btn">{ic("key",16)}パスワード</span><span class="btn">{ic("cloud",16)}状態を確認</span><span class="btn">{ic("refresh",16)}この設定で新しくデプロイ</span></div></aside></div>'''
     return page("案 A デプロイの一覧", A_CSS, a_shell(1, main))
 def a_wizard():
     steps = [("対象", "done"), ("DB", "done"), ("パスワード", "done"), ("スペックと期限", "cur"), ("確認と実行", "")]
@@ -149,11 +149,11 @@ def a_wizard():
         st += f'<div class="step {c}"><span class="n">{ic("check",14) if c == "done" else i + 1}</span>{E(t)}</div>'
         if i < len(steps) - 1:
             st += f'<div class="bar {"done" if c == "done" else ""}"></div>'
-    main = f'''<div class="head"><div><h1>新しくデプロイ</h1><div class="sub">Timetracker の環境を Azure に作ります。入力は次へ進むたびに確かめます。</div></div><span class="btn">テンプレートから入力 ▾</span></div>
+    main = f'''<div class="head"><div><h1>新しくデプロイ</h1><div class="sub">TimeTracker の環境を Azure に作ります。入力は次へ進むたびに確かめます。</div></div><span class="btn">テンプレートから入力 ▾</span></div>
 <div class="surface stepper">{st}</div>
 <div class="content"><div class="surface" style="flex:1;display:flex;flex-direction:column"><div class="form">
-<div class="field"><label>Timetracker の CPU</label><div class="input">1.5<span class="sub" style="margin:0">vCPU</span></div><div class="hint">0.25 刻み。既定は 1.5</div></div>
-<div class="field"><label>Timetracker のメモリ</label><div class="input">3.0<span class="sub" style="margin:0">GiB</span></div></div>
+<div class="field"><label>TimeTracker の CPU</label><div class="input">1.5<span class="sub" style="margin:0">vCPU</span></div><div class="hint">0.25 刻み。既定は 1.5</div></div>
+<div class="field"><label>TimeTracker のメモリ</label><div class="input">3.0<span class="sub" style="margin:0">GiB</span></div></div>
 <div class="field"><label>DB の CPU / メモリ</label><div class="input">0.5 vCPU / 1.0 GiB<span>▾</span></div></div>
 <div class="field"><label>Redis の CPU / メモリ</label><div class="input">0.25 vCPU / 0.5 GiB<span>▾</span></div></div>
 <div class="field" style="grid-column:1/-1"><label>利用可能期限</label><div class="seg"><span>既定（32 日後）</span><span class="on">日付を指定</span><span>期限なし</span></div>
@@ -251,7 +251,7 @@ def b_list():
 <span style="margin-left:auto"></span><span class="btn">{ic("refresh",16)}読み直す</span><span class="btn primary">{ic("plus",16)}新しくデプロイ</span></div>
 <table><thead><tr><th>アプリ</th><th>状態</th><th>利用可能期限</th><th>グループ</th><th>デプロイ日</th><th></th></tr></thead><tbody>{rows}</tbody></table></div>
 <div class="card drawer"><div class="hd"><div class="av" style="background:#6366f1;width:46px;height:46px;font-size:16px">SA</div><div><div style="font-size:17px;font-weight:700">sales</div><div style="color:var(--sub);font-size:12px">rg-sales-demo · 開発用</div></div><span class="status s-ok" style="margin-left:auto">稼働中</span></div>
-<div class="sec"><div style="display:flex;gap:8px;flex-wrap:wrap"><span class="btn primary" style="flex:1;justify-content:center">{ic("link",16)}Timetracker を開く</span><span class="btn">{ic("key",16)}</span><span class="btn">{ic("trash",16)}</span></div></div>
+<div class="sec"><div style="display:flex;gap:8px;flex-wrap:wrap"><span class="btn primary" style="flex:1;justify-content:center">{ic("link",16)}TimeTracker を開く</span><span class="btn">{ic("key",16)}</span><span class="btn">{ic("trash",16)}</span></div></div>
 <div class="sec"><h4>利用可能期限</h4><div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:20px;font-weight:700;color:#e11d48">あと 3 日</span><span style="color:var(--sub)">11/16 の終わりまで</span></div><div class="expbar"><i style="width:8%;background:#e11d48"></i></div><div style="margin-top:12px;display:flex;gap:8px"><span class="btn" style="height:30px">+7 日</span><span class="btn" style="height:30px">+30 日</span><span class="btn" style="height:30px">日付を選ぶ</span></div></div>
 <div class="sec"><h4>Container Apps</h4><div class="apps"><div class="appline"><span>sales-tt</span><span class="status s-ok">Running</span></div><div class="appline"><span>sales-db（PostgreSQL）</span><span class="status s-ok">Running</span></div><div class="appline"><span>sales-redis</span><span class="status s-ok">Running</span></div></div></div>
 <div class="sec" style="border:0"><h4>最近のジョブ</h4><div class="timeline"><div class="tl"><span class="d" style="background:#10b981"></span><div><b>デプロイ 完了</b><div style="color:var(--sub)">10/15 10:02 · 6 分 12 秒</div></div></div><div class="tl"><span class="d" style="background:#e5484d"></span><div><b>デプロイ 失敗</b><div style="color:var(--sub)">10/14 18:40 · 権限がありません</div></div><span class="btn" style="height:28px;margin-left:auto;font-size:12px">この設定で</span></div></div></div></div></div>'''
@@ -261,7 +261,7 @@ def b_wizard():
     steps = "".join(f'<div class="vs {c}"><span class="n">{"✓" if c == "done" else i + 1}</span><div><div>{E(t)}</div><div style="font-size:11.5px;font-weight:400;color:var(--sub)">{E(s)}</div></div></div>' for i, (t, s, c) in enumerate(vs))
     body = f'''<div class="wrap"><div class="card vstep"><div style="font-size:12px;color:var(--sub);margin:0 0 8px 12px">5 つの手順</div>{steps}</div>
 <div class="card" style="flex:1;display:flex;flex-direction:column"><div style="padding:22px 24px 0"><div style="font-size:20px;font-weight:700">スペックと期限</div><div style="color:var(--sub);margin-top:4px">あとから「期限を変える」で延ばせます。</div></div>
-<div class="fgrid"><div class="f" style="grid-column:1/-1"><label>Timetracker の CPU</label><div class="slider"><i></i><b></b></div><div style="display:flex;justify-content:space-between;color:var(--sub);font-size:11.5px"><span>0.25</span><span style="color:var(--accent);font-weight:700">1.5 vCPU / 3 GiB</span><span>4.0</span></div></div>
+<div class="fgrid"><div class="f" style="grid-column:1/-1"><label>TimeTracker の CPU</label><div class="slider"><i></i><b></b></div><div style="display:flex;justify-content:space-between;color:var(--sub);font-size:11.5px"><span>0.25</span><span style="color:var(--accent);font-weight:700">1.5 vCPU / 3 GiB</span><span>4.0</span></div></div>
 <div class="f"><label>DB（CPU / メモリ）</label><div class="inp">0.5 vCPU / 1 GiB<span>▾</span></div></div><div class="f"><label>Redis（CPU / メモリ）</label><div class="inp">0.25 vCPU / 0.5 GiB<span>▾</span></div></div>
 <div class="f" style="grid-column:1/-1"><label>利用可能期限</label><div class="radio"><div class="ropt"><b>既定</b>今日から 32 日後（12/15）</div><div class="ropt on"><b>日付を指定</b>2026/11/02</div><div class="ropt"><b>期限なし</b>自動で削除しない</div></div>
 <div class="inp bad" style="margin-top:12px;width:280px">2026/11/02<span>{ic("clock",16)}</span></div><div style="color:#e5484d;font-size:12px;margin-top:6px">今日以降の日付にしてください（読み込んだジョブの期限が過ぎています）</div></div></div>
@@ -338,8 +338,8 @@ def c_list():
 <aside class="side"><div class="t"><div style="color:var(--sub);font-size:11.5px">rg-sales-demo · 開発用</div><div style="font-size:16px;font-weight:700;margin-top:2px">sales <span class="st ok" style="font-size:12px;font-weight:400;margin-left:8px"><i></i>稼働中</span></div>
 <div style="display:flex;gap:6px;margin-top:10px"><span class="b pri">{ic("link",14)}開く</span><span class="b">{ic("key",14)}パスワード</span><span class="b">{ic("refresh",14)}この設定で</span><span class="b">{ic("dots",14)}</span></div></div>
 <div class="stabs"><a class="on">概要</a><a>Azure の状態</a><a>ジョブ（3）</a><a>タグ</a></div>
-<dl class="prop"><dt>URL</dt><dd style="color:var(--accent)">https://sales-tt.japaneast…</dd><dt>期限</dt><dd class="red">11/16 の終わり（あと 3 日）</dd><dt>DB</dt><dd>PostgreSQL · Azure Files</dd><dt>Timetracker</dt><dd>1.5 vCPU / 3 GiB · 2.6.1</dd><dt>DB / Redis</dt><dd>0.5 / 1 GiB · 0.25 / 0.5 GiB</dd><dt>グループ</dt><dd>営業</dd><dt>デプロイ日</dt><dd>2026-10-15 10:02</dd></dl>
-<div style="padding:0 16px 8px;color:var(--sub)">最近のログ</div><div class="log">10:02:11 デプロイが終わりました（6 分 12 秒）<br>10:01:40 Timetracker の起動を確かめています<br>09:58:02 Container App を作成: sales-tt<br>09:57:30 Container App を作成: sales-db</div></aside>'''
+<dl class="prop"><dt>URL</dt><dd style="color:var(--accent)">https://sales-tt.japaneast…</dd><dt>期限</dt><dd class="red">11/16 の終わり（あと 3 日）</dd><dt>DB</dt><dd>PostgreSQL · Azure Files</dd><dt>TimeTracker</dt><dd>1.5 vCPU / 3 GiB · 2.6.1</dd><dt>DB / Redis</dt><dd>0.5 / 1 GiB · 0.25 / 0.5 GiB</dd><dt>グループ</dt><dd>営業</dd><dt>デプロイ日</dt><dd>2026-10-15 10:02</dd></dl>
+<div style="padding:0 16px 8px;color:var(--sub)">最近のログ</div><div class="log">10:02:11 デプロイが終わりました（6 分 12 秒）<br>10:01:40 TimeTracker の起動を確かめています<br>09:58:02 Container App を作成: sales-tt<br>09:57:30 Container App を作成: sales-db</div></aside>'''
     st = '<span>● サインイン済み</span><span>ジョブ: 実行中 1 · 予定 1</span><span>次の期限の確認 16:00</span><span style="margin-left:auto">Alt+Shift+←/→ 列の移動 · Alt+←/→ 列の幅</span>'
     return page("案 C デプロイの一覧", C_CSS, c_shell(1, tb, main, st))
 def c_wizard():
@@ -410,14 +410,55 @@ def d_list():
 <div class="expbar" style="width:100%;height:6px;margin-top:8px"><i style="width:8%;background:#c42b1c"></i></div>
 <div class="quick"><span class="btn">+7 日</span><span class="btn">+30 日</span><span class="btn">{ic("clock",14)}日付を選ぶ</span></div><div class="hint">期限を過ぎると自動で削除します</div></div>
 <dl class="kv"><dt>URL</dt><dd style="color:var(--accent)">sales-tt.japaneast.…</dd><dt>DB</dt><dd>PostgreSQL・永続化</dd><dt>スペック</dt><dd>TT 1.5 CPU / 3 GiB</dd><dt>グループ</dt><dd><span class="chip">営業</span></dd><dt>デプロイ日</dt><dd>2026/10/15</dd></dl>
-<span class="btn primary" style="justify-content:center">{ic("link",16)}Timetracker を開く</span>
+<span class="btn primary" style="justify-content:center">{ic("link",16)}TimeTracker を開く</span>
 <div style="display:flex;flex-wrap:wrap;gap:8px"><span class="btn">{ic("key",16)}パスワード</span><span class="btn">{ic("cloud",16)}状態を確認</span><span class="btn">{ic("refresh",16)}この設定で新しくデプロイ</span></div></aside></div>"""
     return page("推奨 デプロイの一覧", D_CSS, a_shell(1, main))
 def d_wizard():
-    html_ = a_wizard().replace("案 A 新しくデプロイ", "推奨 新しくデプロイ")
-    # 期限の欄の下に、期限の残りのバー（入れた日付までの日数）を見せる
-    html_ = html_.replace('<div class="field"><label>グループ</label>', '<div class="field" style="grid-column:1/-1;margin-top:-6px"><div style="display:flex;align-items:center;gap:10px"><div class="expbar" style="width:220px;height:6px"><i style="width:0%"></i></div><span style="color:#c42b1c;font-size:12px">期限まで: 過ぎています（12/15 にすると あと 32 日）</span></div></div><div class="field"><label>グループ</label>', 1)
-    return html_.replace("<style>" + BASE + A_CSS, "<style>" + BASE + D_CSS)
+    # スペックは 3 つとも案 B のスライダー（CPU を選ぶとメモリは Container Apps の組み合わせ〔CPU の 2 倍〕）。右に期限までの料金の目安（単位は切り替え、既定は円）
+    def slider(name, cpu, mem, pct, day):
+        return f"""<div class="spec"><div class="spec-h"><b>{E(name)}</b><span class="spec-v">{cpu} vCPU / {mem} GiB</span></div>
+<div class="slider"><i style="width:{pct}%"></i><b style="left:{pct}%"></b></div>
+<div class="ticks"><span>0.25</span><span>0.5</span><span>1.0</span><span>1.5</span><span>2.0</span><span>4.0</span></div>
+<div class="spec-f"><span class="sub" style="margin:0">メモリは CPU の 2 倍（Container Apps の組み合わせ）</span><span>1 日 約 {day} 円</span></div></div>"""
+    steps = [("対象", "done"), ("DB", "done"), ("パスワード", "done"), ("スペックと期限", "cur"), ("確認と実行", "")]
+    st = ""
+    for i, (t, c) in enumerate(steps):
+        st += f'<div class="step {c}"><span class="n">{ic("check",14) if c == "done" else i + 1}</span>{E(t)}</div>'
+        if i < len(steps) - 1:
+            st += f'<div class="bar {"done" if c == "done" else ""}"></div>'
+    css = D_CSS + """
+.spec { border:1px solid var(--line); border-radius:8px; padding:12px 14px 10px; background:#fcfcfc; }
+.spec-h { display:flex; justify-content:space-between; align-items:baseline; } .spec-v { color:var(--accent); font-weight:600; }
+.slider { height:4px; border-radius:2px; background:#d9d9d9; position:relative; margin:16px 6px 6px; } .slider i { position:absolute; left:0; top:0; bottom:0; background:var(--accent); border-radius:2px; }
+.slider b { position:absolute; top:-8px; width:20px; height:20px; border-radius:50%; background:#fff; border:5px solid var(--accent); transform:translateX(-50%); box-shadow:0 1px 3px rgba(0,0,0,.25); }
+.ticks { display:flex; justify-content:space-between; color:#8a8a8a; font-size:11px; margin:0 0 6px; }
+.spec-f { display:flex; justify-content:space-between; font-size:12px; }
+.specs { display:flex; flex-direction:column; gap:12px; padding:18px 24px 6px; }
+.row2 { display:grid; grid-template-columns: 1fr 1fr; gap:18px 22px; padding:12px 24px 18px; }
+.cost h3 { display:flex; justify-content:space-between; align-items:center; }
+.unit { display:inline-flex; border:1px solid #d1d1d1; border-radius:6px; overflow:hidden; font-size:12px; font-weight:400; } .unit span { padding:3px 10px; } .unit span.on { background:var(--accent); color:#fff; }
+.total { font-size:26px; font-weight:600; } .total small { font-size:13px; font-weight:400; color:var(--sub); margin-left:6px; }
+.crow { display:flex; justify-content:space-between; font-size:12.5px; padding:6px 0; border-bottom:1px dashed #eee; } .crow span:first-child { color:var(--sub); }
+.stack { display:flex; height:8px; border-radius:4px; overflow:hidden; margin:6px 0 2px; } .stack i { display:block; height:100%; }
+.legend { display:flex; gap:12px; font-size:11px; color:var(--sub); } .legend i { display:inline-block; width:8px; height:8px; border-radius:2px; margin-right:4px; }
+"""
+    main = f"""<div class="head"><div><h1>新しくデプロイ</h1><div class="sub">TimeTracker の環境を Azure に作ります。入力は次へ進むたびに確かめます。</div></div><span class="btn">テンプレートから入力 ▾</span></div>
+<div class="surface stepper">{st}</div>
+<div class="content"><div class="surface" style="flex:1;display:flex;flex-direction:column;min-width:0">
+<div class="specs">{slider("TimeTracker", "1.5", "3.0", 60, "622")}{slider("DB（PostgreSQL）", "0.5", "1.0", 20, "207")}{slider("Redis", "0.25", "0.5", 0, "104")}</div>
+<div class="row2"><div class="field"><label>利用可能期限</label><div class="seg"><span>既定（32 日後）</span><span class="on">日付を指定</span><span>期限なし</span></div>
+<div style="display:flex;gap:10px;align-items:center;margin-top:10px"><div class="input focus" style="width:170px">2026/12/15<span>{ic("clock",16)}</span></div><div style="flex:1"><div class="expbar" style="width:100%;height:6px"><i style="width:36%;background:#c27c00"></i></div><div class="sub" style="margin:4px 0 0">あと 32 日</div></div></div></div>
+<div class="field"><label>グループ / DB のデータ</label><div class="input">営業<span>▾</span></div><div style="display:flex;align-items:center;gap:10px;margin-top:10px"><span class="toggle"></span>Azure Files に永続化する<span class="sub" style="margin:0">（1 日 約 1 円）</span></div></div></div>
+<div class="footer" style="margin-top:auto"><span class="btn">戻る</span><span class="btn primary">次へ（確認と実行）</span></div></div>
+<aside class="surface summary cost"><h3>料金の目安<span class="unit"><span class="on">円</span><span>USD</span></span></h3>
+<div><div class="sub" style="margin:0">期限（12/15 の終わり）までの 32 日</div><div class="total">約 29,000 円<small>1 日 約 934 円</small></div></div>
+<div class="stack"><i style="width:66%;background:#005fb8"></i><i style="width:22%;background:#4cc2ff"></i><i style="width:11%;background:#8764b8"></i><i style="width:1%;background:#c27c00"></i></div>
+<div class="legend"><span><i style="background:#005fb8"></i>TimeTracker</span><span><i style="background:#4cc2ff"></i>DB</span><span><i style="background:#8764b8"></i>Redis</span><span><i style="background:#c27c00"></i>永続化</span></div>
+<div class="crow"><span>TimeTracker（1.5 vCPU / 3 GiB）</span><span>19,900 円</span></div><div class="crow"><span>DB（0.5 vCPU / 1 GiB）</span><span>6,630 円</span></div>
+<div class="crow"><span>Redis（0.25 vCPU / 0.5 GiB）</span><span>3,320 円</span></div><div class="crow"><span>永続化（Azure Files）</span><span>約 30 円</span></div><div class="crow"><span>無料枠（月ごと）</span><span>−860 円</span></div>
+<div class="hint">東日本リージョンの従量課金（Azure の公開の価格表、11/13 時点）で、3 つとも 24 時間動き続けた場合。実際の請求は使い方・割引・為替で変わります。</div>
+<div class="info-bar" style="margin-top:4px">{ic("refresh",18)}<div>失敗したジョブ（11/02 10:50）の設定を読み込み、期限を直しました。</div></div></aside></div>"""
+    return page("推奨 新しくデプロイ", css, a_shell(2, main))
 def d_jobs():
     kpis = d_kpis([("jobs", "#e6f0fa", "#005fb8", "1", "実行中", "", False), ("clock", "#f3eefb", "#5c2e91", "1", "予定", "", False),
                    ("bell", "#fde7e9", "#c42b1c", "1", "失敗（7 日以内）", "絞り込む ›", True), ("check", "#dff6dd", "#0f7b0f", "12", "完了（7 日以内）", "", False)])
