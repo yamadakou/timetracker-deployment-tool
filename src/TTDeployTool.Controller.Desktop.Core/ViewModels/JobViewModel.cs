@@ -265,7 +265,7 @@ public sealed class JobViewModel : ObservableObject
         && State is DesktopJobState.Scheduled or DesktopJobState.Waiting or DesktopJobState.Paused;
 
     /// <summary>削除の設定の今の値（リソースグループも削除するか。削除の設定を変えられないときは null）。</summary>
-    public string? DeletionSettingsText => Saved is { } saved && !IsDeployment
+    public string? DeletionSettingsText => Saved is { } saved
         ? saved.DeleteResourceGroup
             ? saved.DeletesResourceGroup ? "リソースグループも削除する" : "リソースグループも削除する（空にならなければ削除しない）"
             : "リソースグループは残す"

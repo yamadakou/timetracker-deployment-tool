@@ -35,6 +35,16 @@ public enum JobSortKey
     Duration,
 }
 
+/// <summary>ジョブの一覧の件数のカードでの絞り込み。</summary>
+public enum JobQuickFilter
+{
+    All,
+    Running,
+    Pending,
+    RecentFailed,
+    RecentSucceeded,
+}
+
 /// <summary>
 /// ジョブの一覧（docs/design/desktop/desktop-wizard.md の 7、No.63）。このアプリのすべてのジョブ（まだ Azure に無い新しいデプロイの予定を含む）を
 /// 表に 1 行ずつ出し、見出しで並べ替え・絞り込み、選んだ行に取り消し・一時停止・再開・予定の変更・記録から削除をまとめて行う。詳細は実行状況の画面で見る。
@@ -42,6 +52,8 @@ public enum JobSortKey
 /// </summary>
 public sealed class JobListViewModel : ObservableObject
 {
+    private readonly TimeProvider _time;
+    private JobQuickFilter _quickFilter;
     public static readonly IReadOnlyList<int> PageSizes = DeploymentListViewModel.PageSizes;
 
     private readonly JobQueue _queue;
@@ -60,6 +72,7 @@ public sealed class JobListViewModel : ObservableObject
     {
         _queue = queue;
         _dialogs = dialogs;
+        _time = time;
         Schedule = new ScheduleInput(time);
         CancelSelectedCommand = new AsyncCommand(() => Apply("取り消し", j => j.CancelCommand), () => _selected.Count > 0);
         PauseSelectedCommand = new AsyncCommand(() => Apply("一時停止", j => j.PauseCommand), () => _selected.Count > 0);
@@ -103,6 +116,43 @@ public sealed class JobListViewModel : ObservableObject
                 Refresh(resetPage: false);
         };
     }
+
+    // ---- 件数のカード（推奨のデザイン、オーナーの判断 2026-11-13）
+
+    /// <summary>実行中（実行の準備中を含む）のジョブの数。</summary>
+    public int RunningCount => _queue.Jobs.Count(j => j.IsRunning || j.State == DesktopJobState.Starting);
+
+    /// <summary>予定・待機中・一時停止のジョブの数。</summary>
+    public int PendingCount => _queue.Jobs.Count(j => j.State is DesktopJobState.Scheduled or DesktopJobState.Waiting or DesktopJobState.Paused);
+
+    /// <summary>この 7 日に終わって失敗したジョブの数。</summary>
+    public int RecentFailedCount => _queue.Jobs.Count(j => j.State == DesktopJobState.Failed && IsRecent(j));
+
+    /// <summary>この 7 日に終わって完了したジョブの数。</summary>
+    public int RecentSucceededCount => _queue.Jobs.Count(j => j.State == DesktopJobState.Succeeded && IsRecent(j));
+
+    /// <summary>件数のカードでの絞り込み（表の上のフィルタと合わせて効く）。</summary>
+    public JobQuickFilter QuickFilter
+    {
+        get => _quickFilter;
+        set
+        {
+            if (SetProperty(ref _quickFilter, value))
+                Refresh(resetPage: true);
+        }
+    }
+
+    // 終わった日時の無いジョブ（まだ終わっていない）は、どの終わった状態でもないため、比べる前に除かれる
+    private bool IsRecent(JobViewModel job) => job.FinishedAt.GetValueOrDefault() >= _time.GetUtcNow().AddDays(-7);
+
+    private bool MatchesQuick(JobViewModel job) => _quickFilter switch
+    {
+        JobQuickFilter.Running => job.IsRunning || job.State == DesktopJobState.Starting,
+        JobQuickFilter.Pending => job.State is DesktopJobState.Scheduled or DesktopJobState.Waiting or DesktopJobState.Paused,
+        JobQuickFilter.RecentFailed => job.State == DesktopJobState.Failed && IsRecent(job),
+        JobQuickFilter.RecentSucceeded => job.State == DesktopJobState.Succeeded && IsRecent(job),
+        _ => true,
+    };
 
     /// <summary>絞り込んで並べたジョブのうち、今のページの行。</summary>
     public ObservableCollection<JobViewModel> Items { get; } = [];
@@ -310,7 +360,7 @@ public sealed class JobListViewModel : ObservableObject
     // 絞り込んで並べ、今のページの行を出す（並べ替え・絞り込み・ページの大きさを変えたら 1 ページ目に戻る）
     private void Refresh(bool resetPage)
     {
-        var matched = Sorted(_queue.Jobs.Where(Filters.Matches)).ToList();
+        var matched = Sorted(_queue.Jobs.Where(Filters.Matches).Where(MatchesQuick)).ToList();
         _matchedCount = matched.Count;
         if (resetPage || _pageIndex >= PageCount)
             _pageIndex = 0;
@@ -327,6 +377,10 @@ public sealed class JobListViewModel : ObservableObject
             SetSelection(selected.Where(page.Contains));
         }
         OnPropertyChanged(nameof(CountText));
+        OnPropertyChanged(nameof(RunningCount));
+        OnPropertyChanged(nameof(PendingCount));
+        OnPropertyChanged(nameof(RecentFailedCount));
+        OnPropertyChanged(nameof(RecentSucceededCount));
         OnPropertyChanged(nameof(PageCount));
         OnPropertyChanged(nameof(PageIndex));
         PreviousPageCommand.RaiseCanExecuteChanged();

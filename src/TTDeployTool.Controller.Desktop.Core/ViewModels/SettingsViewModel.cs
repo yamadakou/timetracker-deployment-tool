@@ -92,6 +92,9 @@ public sealed class SettingsViewModel : ObservableObject
         _dialogs = dialogs;
         _clipboard = clipboard;
         _expiryDate = DefaultExpiryDate();
+        TtSpec = new SpecSlider("TimeTracker", () => TtCpu, v => TtCpu = v, () => TtMemoryGi, v => TtMemoryGi = v, Defaults.TimetrackerCpu, Defaults.TimetrackerMemoryGi);
+        DbSpec = new SpecSlider("DB", () => DbCpu, v => DbCpu = v, () => DbMemoryGi, v => DbMemoryGi = v, Defaults.DbCpu, Defaults.DbMemoryGi);
+        RedisSpec = new SpecSlider("Redis", () => RedisCpu, v => RedisCpu = v, () => RedisMemoryGi, v => RedisMemoryGi = v, Defaults.RedisCpu, Defaults.RedisMemoryGi);
         foreach (var template in _preferences.Templates.OrderBy(t => t.Name, StringComparer.CurrentCulture))
             Templates.Add(template);
         CopyMarkdownCommand = new AsyncCommand(CopyMarkdownAsync, () => _clipboard != null);
@@ -171,6 +174,13 @@ public sealed class SettingsViewModel : ObservableObject
     public string DbPassword { get => _dbPassword; set => Set(ref _dbPassword, value); }
 
     public string TrackerPassword { get => _trackerPassword; set => Set(ref _trackerPassword, value); }
+
+    /// <summary>TimeTracker・DB・Redis のスペックのスライダー。</summary>
+    public SpecSlider TtSpec { get; }
+
+    public SpecSlider DbSpec { get; }
+
+    public SpecSlider RedisSpec { get; }
 
     public string TtCpu { get => _ttCpu; set => Set(ref _ttCpu, value); }
 
@@ -482,6 +492,12 @@ public sealed class SettingsViewModel : ObservableObject
             return;
         if (propertyName == nameof(DbType))
             OnPropertyChanged(nameof(DefaultTag));
+        if (propertyName is nameof(TtCpu) or nameof(TtMemoryGi))
+            TtSpec.Raise();
+        else if (propertyName is nameof(DbCpu) or nameof(DbMemoryGi))
+            DbSpec.Raise();
+        else if (propertyName is nameof(RedisCpu) or nameof(RedisMemoryGi))
+            RedisSpec.Raise();
         Validate();
     }
 }

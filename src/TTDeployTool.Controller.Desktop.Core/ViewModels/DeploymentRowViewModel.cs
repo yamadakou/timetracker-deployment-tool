@@ -69,6 +69,8 @@ public sealed class DeploymentRowViewModel : ObservableObject
             () => CopyAsync(_passwords?.TrackerPassword, "Timetracker のパスワード"), () => _owner.CanCopy && _passwords?.TrackerPassword != null);
         ChangeExpiryCommand = new AsyncCommand(() => Busy.RunAsync("利用可能期限を変えています", ChangeExpiryAsync),
             () => !HasActiveJob && (_entry.Timetracker != null || _entry.Db != null || _entry.Redis != null));
+        Extend7Command = new AsyncCommand(() => Busy.RunAsync("利用可能期限を延ばしています", () => ExtendAsync(7)), () => ChangeExpiryCommand.CanExecute(null));
+        Extend30Command = new AsyncCommand(() => Busy.RunAsync("利用可能期限を延ばしています", () => ExtendAsync(30)), () => ChangeExpiryCommand.CanExecute(null));
     }
 
     public AsyncCommand OpenCommand { get; }
@@ -100,6 +102,28 @@ public sealed class DeploymentRowViewModel : ObservableObject
     public AsyncCommand CopyTrackerPasswordCommand { get; }
 
     public AsyncCommand ChangeExpiryCommand { get; }
+
+    /// <summary>利用可能期限を今の期限日（期限なし・過ぎていれば今日）から 7 日延ばす（推奨のデザインの「+7 日」）。</summary>
+    public AsyncCommand Extend7Command { get; }
+
+    /// <summary>同じく 30 日延ばす。</summary>
+    public AsyncCommand Extend30Command { get; }
+
+    /// <summary>利用可能期限までの日数（切り上げ。過ぎていれば 0。期限が無ければ null）。</summary>
+    public int? DaysLeft => _entry is { ExpiryKind: ExpiryKind.Date, ExpiresAt: { } at }
+        ? (int)Math.Max(0, Math.Ceiling((at - _owner.Time.GetUtcNow()).TotalDays))
+        : null;
+
+    /// <summary>期限の残りの文（「あと 3 日」「期限切れ」。期限が無ければ null）。</summary>
+    public string? DaysLeftText => DaysLeft switch
+    {
+        null => null,
+        0 => "期限切れ",
+        var d => $"あと {d} 日",
+    };
+
+    /// <summary>期限の残りのバーの長さ（0〜1。90 日で 1）。</summary>
+    public double ExpiryShare => DaysLeft is { } d ? Math.Min(1, d / 90.0) : 0;
 
     /// <summary>この行の操作の処理中の表示。</summary>
     public BusyState Busy { get; } = new();
@@ -247,13 +271,20 @@ public sealed class DeploymentRowViewModel : ObservableObject
                  {
                      nameof(Entry), nameof(Url), nameof(HasUrl), nameof(DeployedText), nameof(ExpiryText), nameof(ExpiryWarning), nameof(HasExpiryWarning),
                      nameof(GroupText), nameof(GroupWarning),
-                     nameof(Level), nameof(IsExpired), nameof(IsExpirySoon),
+                     nameof(Level), nameof(IsExpired), nameof(IsExpirySoon), nameof(DaysLeft), nameof(DaysLeftText), nameof(ExpiryShare),
                      nameof(DbTypeText), nameof(PersistenceText), nameof(SpecText), nameof(StateText), nameof(State), nameof(StateDetail),
                  })
             OnPropertyChanged(name);
         OpenCommand.RaiseCanExecuteChanged();
         ShowPasswordsCommand.RaiseCanExecuteChanged();
+        RaiseExpiryCommands();
+    }
+
+    private void RaiseExpiryCommands()
+    {
         ChangeExpiryCommand.RaiseCanExecuteChanged();
+        Extend7Command.RaiseCanExecuteChanged();
+        Extend30Command.RaiseCanExecuteChanged();
     }
 
     /// <summary>同じ対象の終わっていないジョブを入れる（ジョブの状態が変わるたびに、一覧が呼ぶ）。</summary>
@@ -268,7 +299,7 @@ public sealed class DeploymentRowViewModel : ObservableObject
         OnPropertyChanged(nameof(CheckStatusText));
         UseAsTargetCommand.RaiseCanExecuteChanged();
         DeleteCommand.RaiseCanExecuteChanged();
-        ChangeExpiryCommand.RaiseCanExecuteChanged();
+        RaiseExpiryCommands();
     }
 
     private DateTimeOffset Local(DateTimeOffset value) => TimeZoneInfo.ConvertTime(value, _owner.Time.LocalTimeZone);
@@ -321,6 +352,16 @@ public sealed class DeploymentRowViewModel : ObservableObject
         _owner.Copy(value!);
         Message = $"{name}をコピーしました（クリップボードの履歴には残しません）。";
         return Task.CompletedTask;
+    }
+
+    // 今の期限日（期限なし・過ぎた・無いものは今日）から days 日延ばす
+    private Task ExtendAsync(int days)
+    {
+        var today = DeploymentExpiry.Today(_owner.Time.GetUtcNow(), _owner.Time.LocalTimeZone);
+        var from = _entry.ExpiryKind == ExpiryKind.Date ? DateOnly.FromDateTime(Local(_entry.ExpiresAt!.Value).DateTime) : today;
+        if (from < today)
+            from = today;
+        return ApplyExpiryAsync(from.AddDays(days).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
     }
 
     private Task ChangeExpiryAsync() =>

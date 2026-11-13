@@ -121,12 +121,16 @@ public sealed class DeletionSettingsTests
         var (h, _, job) = await ScheduledAsync();
         h.Main.Queue.Register(JobKind.Deploy, new JobTarget("sub", "rg2", "app2"), Start.AddDays(1), () => new TaskCompletionSource<Job>().Task)
             .CanChangeDeletion.Should().BeFalse("デプロイ");
-        h.Main.Queue.Register(JobKind.Delete, new JobTarget("sub", "rg3", "app3"), null, () => new TaskCompletionSource<Job>().Task, expiryDeletion: true)
-            .CanChangeDeletion.Should().BeFalse("期限での削除は、保存した計画が無い");
+        var expiry = h.Main.Queue.Register(JobKind.Delete, new JobTarget("sub", "rg3", "app3"), Start.AddDays(1), () => new TaskCompletionSource<Job>().Task, expiryDeletion: true);
+        (expiry.CanChangeDeletion, expiry.DeletionSettingsText).Should().Be((false, (string?)null), "期限での削除は、保存した計画が無い");
         h.Main.Queue.Register(JobKind.Delete, new JobTarget("sub", "rg4", ""), Start.AddDays(1), () => new TaskCompletionSource<Job>().Task,
             saved: job.Saved).CanChangeDeletion.Should().BeFalse("リソースグループだけの削除");
         new JobViewModel(JobKind.Delete, new JobTarget("sub", "rg5", "app5"), Start.AddDays(1), null, null) { Saved = job.Saved }.CanChangeDeletion.Should().BeFalse("JobQueue が無い");
         job.DeletionSettingsText.Should().NotBeNull();
+        // リソースグループの削除を選んだが、登録したときにリソースグループが無かった（空にならなければ削除しない）
+        h.Main.Queue.Register(JobKind.Delete, new JobTarget("sub", "rg6", "app6"), Start.AddDays(1), () => new TaskCompletionSource<Job>().Task,
+            saved: job.Saved! with { DeleteResourceGroup = true, DeletesResourceGroup = false })
+            .DeletionSettingsText.Should().Be("リソースグループも削除する（空にならなければ削除しない）");
         h.Main.Jobs.First(j => j.IsDeployment).DeletionSettingsText.Should().BeNull();
 
         // 始まったジョブは入れ替えない（計画し直している間に始まった場合）
