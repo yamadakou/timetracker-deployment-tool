@@ -71,7 +71,7 @@ public static class TableSources
     };
 
     // 状態の印の色（推奨のデザイン: 実行中は緑、処理中は青、一部だけは黄、失敗は赤、ほかは灰色）
-    internal static string StateTone(DeploymentState state) => state switch
+    public static string StateTone(DeploymentState state) => state switch
     {
         DeploymentState.Running => "tt-ok",
         DeploymentState.Processing or DeploymentState.Pending => "tt-info",
@@ -81,7 +81,7 @@ public static class TableSources
     };
 
     // ジョブの状態の印の色（完了は緑、失敗は赤、実行中・予定は青、ほかは灰色）
-    internal static string JobTone(DesktopJobState state) => state switch
+    public static string JobTone(DesktopJobState state) => state switch
     {
         DesktopJobState.Succeeded => "tt-ok",
         DesktopJobState.Failed => "tt-bad",

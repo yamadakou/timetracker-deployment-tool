@@ -352,6 +352,8 @@ jobs:
     - name: Browser tests (Playwright)
       env:
         TT_JS_COVERAGE_DIR: ${{ github.workspace }}/TestResults/js-coverage
+        # 推奨のデザインの画面（明るい画面・濃い色の画面）の画像を、成果物に残す（DesignTests。オーナーの判断、2026-11-13）
+        TT_SCREENSHOT_DIR: ${{ github.workspace }}/TestResults/screenshots
       run: >
         dotnet test --project tests/TTDeployTool.Controller.Desktop.Blazor.BrowserTests --configuration Release --no-build --
         --filter-not-class TTDeployTool.Controller.Desktop.Blazor.BrowserTests.WebView2Tests
