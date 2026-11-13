@@ -426,4 +426,5 @@ WinUI 3 版の UI テストとの対応（名前は同じ。中身の違い）:
 - テスト: Core（`ResourceGroupOnlyTests`・`DeletionSettingsTests`・`ModernDesignTests`）、Application（リソースグループだけの計画・一覧）、Infrastructure（リソースグループの問い合わせ）、bUnit（`RedesignScreenTests`）、Playwright（`DesignTests`: 明暗の画面で件数のカード・期限のバー・スライダー・料金の目安。CI では画面の画像を成果物 `blazor-prototype-results` の `screenshots` に残す）。Core 520 件・画面の部品 115 件とも行・分岐 100%、Playwright 51 件
 - Core の変更のため、WinUI 3 版のセッションに同じ仕様の反映を頼む（WinUI 3 の画面は WinUI 3 版のセッションが作る）
 - 実機の確認: 手順書の 31〜37
+- CI の結果（run 43471073694、2026-11-13）: 全ジョブ成功（1 回目は WPF のホストの build が `HttpClient` を見つけられずに失敗〔WPF の既定の using に System.Net.Http が無い〕し、名前を完全に書いて直した。2 回目の 1 回目は MCP の HTTP のテスト 1 件が SDK のプロトコルの版の食い違いで失敗し、失敗したジョブだけを流し直して成功。今回の変更とは関係ない揺れとみている）。WinUI 3 版のセッションに 1〜7 の仕様の反映を頼んだ
 
