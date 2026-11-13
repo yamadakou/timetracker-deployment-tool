@@ -1,0 +1,108 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>推奨 新しくデプロイ</title><style>
+@font-face { font-family: 'NotoJP'; src: local('Noto Sans JP'); }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Inter', 'Noto Sans JP', sans-serif; font-size: 13px; width: 1440px; height: 900px; overflow: hidden; -webkit-font-smoothing: antialiased; }
+.ic { flex: none; }
+table { border-collapse: collapse; width: 100%; }
+.mono { font-family: 'Inter', monospace; font-variant-numeric: tabular-nums; }
+
+:root { --bg:#f3f3f3; --card:#ffffff; --line:#e5e5e5; --text:#1b1b1b; --sub:#5f5f5f; --accent:#005fb8; --accent-soft:#e6f0fa; }
+body { background: linear-gradient(135deg,#eef2f7,#f6f3f1); color: var(--text); display:flex; }
+.title { position:absolute; top:0; left:0; right:0; height:40px; display:flex; align-items:center; gap:10px; padding:0 16px; font-size:12px; color:#333; }
+.logo { width:18px; height:18px; border-radius:4px; background:linear-gradient(135deg,#0078d4,#4cc2ff); }
+.nav { width:212px; flex:none; padding:52px 8px 12px; display:flex; flex-direction:column; gap:2px; height:900px; }
+.nav a { display:flex; align-items:center; gap:12px; padding:9px 12px; border-radius:6px; color:#1b1b1b; text-decoration:none; font-size:13.5px; position:relative; }
+.nav a.on { background: rgba(0,0,0,.055); font-weight:600; }
+.nav a.on::before { content:""; position:absolute; left:0; top:10px; bottom:10px; width:3px; border-radius:2px; background:var(--accent); }
+.nav .sp { flex:1; }
+.acct { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:8px; }
+.avatar { width:30px; height:30px; border-radius:50%; background:#c7dcf3; color:#004c8f; display:grid; place-items:center; font-weight:700; font-size:12px; }
+.main { flex:1; padding:52px 24px 20px 8px; height:900px; display:flex; flex-direction:column; gap:14px; }
+.surface { background:var(--card); border:1px solid var(--line); border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,.04); }
+h1 { font-size:28px; font-weight:600; letter-spacing:-.2px; }
+.head { display:flex; align-items:flex-end; justify-content:space-between; }
+.sub { color:var(--sub); font-size:12.5px; margin-top:4px; }
+.cmd { display:flex; align-items:center; gap:4px; padding:6px; }
+.btn { display:inline-flex; align-items:center; gap:8px; height:32px; padding:0 12px; border-radius:5px; border:1px solid #d1d1d1; background:#fbfbfb; color:#1b1b1b; font-size:13px; white-space:nowrap; }
+.btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+.btn.ghost { border-color:transparent; background:transparent; }
+.btn.danger { color:#c42b1c; }
+.sep { width:1px; height:20px; background:var(--line); margin:0 4px; }
+.search { margin-left:auto; display:flex; align-items:center; gap:8px; width:300px; height:32px; padding:0 10px; border:1px solid #d1d1d1; border-bottom:2px solid #8a8a8a; border-radius:5px; background:#fff; color:#777; }
+.content { flex:1; display:flex; gap:14px; min-height:0; }
+.grid { flex:1; overflow:hidden; display:flex; flex-direction:column; }
+.grid { min-width:0; } .grid table { table-layout:fixed; } .grid th, .grid td { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.acct > div:last-child { min-width:0; } .acct > div:last-child div:first-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.grid th { text-align:left; font-weight:600; font-size:12px; color:#444; padding:10px 12px; border-bottom:1px solid var(--line); background:#fafafa; }
+.grid td { padding:11px 12px; border-bottom:1px solid #f0f0f0; vertical-align:middle; }
+.grid tr.sel td { background:var(--accent-soft); }
+.grid tr.sel td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+.cb { width:16px; height:16px; border:1px solid #8a8a8a; border-radius:3px; display:inline-block; vertical-align:middle; }
+.cb.on { background:var(--accent); border-color:var(--accent); position:relative; }
+.cb.on::after { content:""; position:absolute; left:4.5px; top:1.5px; width:4px; height:8px; border:solid #fff; border-width:0 2px 2px 0; transform:rotate(45deg); }
+.badge { display:inline-flex; align-items:center; gap:6px; font-size:12px; }
+.dot { width:8px; height:8px; border-radius:50%; }
+.ok .dot { background:#0f7b0f; } .muted .dot { background:#8a8a8a; } .info .dot { background:#005fb8; } .warn .dot { background:#c27c00; }
+.exp-soon { color:#c42b1c; font-weight:600; }
+.pager { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; color:var(--sub); font-size:12px; margin-top:auto; border-top:1px solid var(--line); }
+.detail { width:316px; flex:none; padding:18px; display:flex; flex-direction:column; gap:14px; }
+.detail h2 { font-size:18px; font-weight:600; }
+.kv { display:grid; grid-template-columns: 96px 1fr; gap:8px 10px; font-size:12.5px; }
+.kv dt { color:var(--sub); }
+.info-bar { display:flex; gap:10px; align-items:flex-start; background:#fff4ce; border:1px solid #f5e1a4; padding:10px 12px; border-radius:6px; font-size:12.5px; }
+.chip { display:inline-block; padding:2px 8px; border-radius:10px; background:#eef0f3; font-size:11.5px; color:#333; }
+.jobtag { font-size:11.5px; color:#005fb8; background:#e6f0fa; padding:2px 8px; border-radius:10px; }
+.stepper { display:flex; gap:0; padding:18px 22px; align-items:center; }
+.step { display:flex; align-items:center; gap:10px; color:var(--sub); }
+.step .n { width:26px; height:26px; border-radius:50%; border:1.5px solid #c8c8c8; display:grid; place-items:center; font-weight:600; font-size:12px; background:#fff; }
+.step.done .n { background:var(--accent); border-color:var(--accent); color:#fff; }
+.step.cur { color:var(--text); font-weight:600; } .step.cur .n { border-color:var(--accent); color:var(--accent); box-shadow:0 0 0 3px #cfe3f7; }
+.bar { flex:1; height:2px; background:#ddd; margin:0 14px; } .bar.done { background:var(--accent); }
+.form { padding:22px 24px; display:grid; grid-template-columns: 1fr 1fr; gap:18px 22px; }
+.field label { display:block; font-size:12.5px; margin-bottom:6px; font-weight:500; }
+.input { height:34px; border:1px solid #d1d1d1; border-bottom:2px solid #8a8a8a; border-radius:5px; background:#fff; display:flex; align-items:center; padding:0 10px; justify-content:space-between; }
+.input.focus { border-bottom-color:var(--accent); }
+.hint { color:var(--sub); font-size:11.5px; margin-top:5px; }
+.err { color:#c42b1c; font-size:11.5px; margin-top:5px; }
+.seg { display:inline-flex; border:1px solid #d1d1d1; border-radius:6px; overflow:hidden; }
+.seg span { padding:7px 14px; font-size:12.5px; } .seg span.on { background:var(--accent); color:#fff; }
+.toggle { width:40px; height:20px; border-radius:10px; background:var(--accent); position:relative; display:inline-block; vertical-align:middle; }
+.toggle::after { content:""; position:absolute; right:3px; top:3px; width:14px; height:14px; border-radius:50%; background:#fff; }
+.footer { display:flex; justify-content:space-between; align-items:center; padding:14px 24px; border-top:1px solid var(--line); }
+.summary { width:320px; padding:18px; display:flex; flex-direction:column; gap:12px; }
+.summary h3 { font-size:14px; font-weight:600; }
+.sumrow { display:flex; justify-content:space-between; font-size:12.5px; padding:6px 0; border-bottom:1px dashed #eee; }
+.sumrow span:first-child { color:var(--sub); }
+
+.kpis { display:grid; grid-template-columns: repeat(4, 1fr); gap:12px; }
+.kpi { display:flex; gap:12px; align-items:center; padding:12px 14px; cursor:default; }
+.kpi .ico { width:36px; height:36px; border-radius:8px; display:grid; place-items:center; }
+.kpi .v { font-size:22px; font-weight:600; line-height:1.1; } .kpi .l { color:var(--sub); font-size:12px; }
+.kpi.on { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset; }
+.kpi .go { margin-left:auto; color:var(--accent); font-size:12px; }
+.expcell { display:flex; flex-direction:column; gap:5px; }
+.expbar { height:4px; border-radius:2px; background:#e6e6e6; overflow:hidden; width:110px; } .expbar i { display:block; height:100%; border-radius:2px; }
+.big { font-size:20px; font-weight:600; }
+.quick { display:flex; gap:6px; margin-top:8px; } .quick .btn { height:28px; padding:0 10px; font-size:12px; }
+.jstate { display:inline-flex; align-items:center; gap:6px; font-size:12px; padding:2px 8px; border-radius:10px; }
+.j-ok { background:#dff6dd; color:#0f5c0f; } .j-fail { background:#fde7e9; color:#a4262c; } .j-run { background:#e6f0fa; color:#004c8f; } .j-sch { background:#f3eefb; color:#5c2e91; } .j-cancel { background:#eeeeee; color:#555; }
+.progress { height:4px; background:#e6e6e6; border-radius:2px; width:120px; overflow:hidden; margin-top:5px; } .progress i { display:block; height:100%; background:var(--accent); }
+</style></head><body><div class="title"><div class="logo"></div>TTDeployTool</div>
+<nav class="nav"><a class=""><svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17l5-5-5-5M15 12H3M21 3v18"/></svg>サインイン</a><a class=""><svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>デプロイの一覧</a><a class="on"><svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>新しくデプロイ</a><a class=""><svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg>ジョブの一覧</a><a class=""><svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6M10 3v6L5 19a1 1 0 0 0 1 2h12a1 1 0 0 0 1-2l-5-10V3"/></svg>ローカル検証</a><div class="sp"></div><a><svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z"/></svg>設定</a>
+<div class="acct"><div class="avatar">KY</div><div><div style="font-weight:600">mock-user@example.com</div><div class="sub" style="margin:0">サブスクリプション 2 件</div></div></div></nav>
+<main class="main"><div class="head"><div><h1>新しくデプロイ</h1><div class="sub">Timetracker の環境を Azure に作ります。入力は次へ進むたびに確かめます。</div></div><span class="btn">テンプレートから入力 ▾</span></div>
+<div class="surface stepper"><div class="step done"><span class="n"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg></span>対象</div><div class="bar done"></div><div class="step done"><span class="n"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg></span>DB</div><div class="bar done"></div><div class="step done"><span class="n"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg></span>パスワード</div><div class="bar done"></div><div class="step cur"><span class="n">4</span>スペックと期限</div><div class="bar "></div><div class="step "><span class="n">5</span>確認と実行</div></div>
+<div class="content"><div class="surface" style="flex:1;display:flex;flex-direction:column"><div class="form">
+<div class="field"><label>Timetracker の CPU</label><div class="input">1.5<span class="sub" style="margin:0">vCPU</span></div><div class="hint">0.25 刻み。既定は 1.5</div></div>
+<div class="field"><label>Timetracker のメモリ</label><div class="input">3.0<span class="sub" style="margin:0">GiB</span></div></div>
+<div class="field"><label>DB の CPU / メモリ</label><div class="input">0.5 vCPU / 1.0 GiB<span>▾</span></div></div>
+<div class="field"><label>Redis の CPU / メモリ</label><div class="input">0.25 vCPU / 0.5 GiB<span>▾</span></div></div>
+<div class="field" style="grid-column:1/-1"><label>利用可能期限</label><div class="seg"><span>既定（32 日後）</span><span class="on">日付を指定</span><span>期限なし</span></div>
+<div style="display:flex;gap:12px;margin-top:10px;align-items:center"><div class="input focus" style="width:220px">2026/11/02<span><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span></div><div class="err">利用可能期限日（2026-11-02）は、今日以降の日付を指定してください。</div></div></div>
+<div class="field" style="grid-column:1/-1;margin-top:-6px"><div style="display:flex;align-items:center;gap:10px"><div class="expbar" style="width:220px;height:6px"><i style="width:0%"></i></div><span style="color:#c42b1c;font-size:12px">期限まで: 過ぎています（12/15 にすると あと 32 日）</span></div></div><div class="field"><label>グループ</label><div class="input">営業<span>▾</span></div><div class="hint">デプロイの一覧で、グループごとに絞り込めます</div></div>
+<div class="field"><label>DB のデータを残す</label><div style="display:flex;align-items:center;gap:10px;height:34px"><span class="toggle"></span>Azure Files に永続化する</div></div>
+</div><div class="footer" style="margin-top:auto"><span class="btn">戻る</span><span class="btn primary" style="opacity:.5">次へ（確認と実行）</span></div></div>
+<aside class="surface summary"><h3>入力のまとめ</h3>
+<div class="sumrow"><span>サブスクリプション</span><span>開発用</span></div><div class="sumrow"><span>リソースグループ</span><span>rg-sales-demo</span></div><div class="sumrow"><span>アプリ名</span><span>sales</span></div>
+<div class="sumrow"><span>リージョン</span><span>japaneast</span></div><div class="sumrow"><span>DB</span><span>PostgreSQL</span></div><div class="sumrow"><span>パスワード</span><span>入力済み（2）</span></div>
+<div class="info-bar" style="margin-top:6px"><svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg><div>失敗したジョブ（11/02 10:50）の設定を読み込みました。期限を直してください。</div></div></aside></div></main></body></html>

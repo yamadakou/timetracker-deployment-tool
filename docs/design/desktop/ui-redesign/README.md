@@ -8,5 +8,6 @@
 | A: Fluent（Windows 11 の流儀） | [A-list.png](A-list.png) | [A-wizard.png](A-wizard.png) |
 | B: ダッシュボード | [B-list.png](B-list.png) | [B-wizard.png](B-wizard.png) |
 | C: コンパクト・ダーク | [C-list.png](C-list.png) | [C-wizard.png](C-wizard.png) |
+| 推奨（A を基本に、B の件数のカードと期限の残りのバー） | [D-list.png](D-list.png)・[D-jobs.png](D-jobs.png)（ジョブの一覧） | [D-wizard.png](D-wizard.png) |
 
 作り直すとき: `python3 build.py`（HTML を作る）→ `node shot.js`（Playwright の Chromium で PNG にする）。日本語は Noto Sans JP、英数字は Inter。

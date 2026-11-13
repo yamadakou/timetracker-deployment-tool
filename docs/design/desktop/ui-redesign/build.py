@@ -361,6 +361,91 @@ def c_wizard():
     st = '<span>● サインイン済み</span><span>失敗したジョブ（11/02 10:50）の設定を読み込みました · パスワードは入力済みのものを使います</span>'
     return page("案 C 新しくデプロイ", C_CSS, c_shell(2, tb, main, st))
 
-for name, fn in [("A-list", a_list), ("A-wizard", a_wizard), ("B-list", b_list), ("B-wizard", b_wizard), ("C-list", c_list), ("C-wizard", c_wizard)]:
+
+# ---------------- 推奨: 案 A を基本に、案 B の件数のカードと期限の残りのバー ----------------
+D_CSS = A_CSS + """
+.kpis { display:grid; grid-template-columns: repeat(4, 1fr); gap:12px; }
+.kpi { display:flex; gap:12px; align-items:center; padding:12px 14px; cursor:default; }
+.kpi .ico { width:36px; height:36px; border-radius:8px; display:grid; place-items:center; }
+.kpi .v { font-size:22px; font-weight:600; line-height:1.1; } .kpi .l { color:var(--sub); font-size:12px; }
+.kpi.on { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset; }
+.kpi .go { margin-left:auto; color:var(--accent); font-size:12px; }
+.expcell { display:flex; flex-direction:column; gap:5px; }
+.expbar { height:4px; border-radius:2px; background:#e6e6e6; overflow:hidden; width:110px; } .expbar i { display:block; height:100%; border-radius:2px; }
+.big { font-size:20px; font-weight:600; }
+.quick { display:flex; gap:6px; margin-top:8px; } .quick .btn { height:28px; padding:0 10px; font-size:12px; }
+.jstate { display:inline-flex; align-items:center; gap:6px; font-size:12px; padding:2px 8px; border-radius:10px; }
+.j-ok { background:#dff6dd; color:#0f5c0f; } .j-fail { background:#fde7e9; color:#a4262c; } .j-run { background:#e6f0fa; color:#004c8f; } .j-sch { background:#f3eefb; color:#5c2e91; } .j-cancel { background:#eeeeee; color:#555; }
+.progress { height:4px; background:#e6e6e6; border-radius:2px; width:120px; overflow:hidden; margin-top:5px; } .progress i { display:block; height:100%; background:var(--accent); }
+"""
+def d_kpis(items):
+    return '<div class="kpis">' + "".join(
+        f'<div class="surface kpi {"on" if on else ""}"><div class="ico" style="background:{bg};color:{fg}">{ic(k,20)}</div><div><div class="v">{v}</div><div class="l">{E(l)}</div></div>{f"<span class=go>{E(go)}</span>" if go else ""}</div>'
+        for k, bg, fg, v, l, go, on in items) + '</div>'
+def d_list():
+    kpis = d_kpis([("cloud", "#e6f0fa", "#005fb8", "7", "デプロイ（2 サブスクリプション）", "", True), ("clock", "#fde7e9", "#c42b1c", "2", "期限が 7 日以内", "絞り込む ›", False),
+                   ("jobs", "#e6f0fa", "#005fb8", "2", "実行中・予定のジョブ", "ジョブの一覧 ›", False), ("bell", "#fff4ce", "#9d5d00", "2", "要確認（作りかけなど）", "絞り込む ›", False)])
+    rows = ""
+    for i, (sub, rg, app, grp, st, tone, exp, days, dep, job) in enumerate(ROWS):
+        sel = i == 0
+        if days is None:
+            exp_html = f'<span>{E(exp)}</span>'
+        else:
+            col = "#c42b1c" if days <= 7 else "#0f7b0f" if days > 30 else "#c27c00"
+            pct = max(4, min(100, int(days / 90 * 100)))
+            exp_html = f'<div class="expcell"><span><span style="{"color:#c42b1c;font-weight:600" if days <= 7 else ""}">{E(exp)}</span> <span class="sub" style="display:inline">あと {days} 日</span></span><div class="expbar"><i style="width:{pct}%;background:{col}"></i></div></div>'
+        rows += f"""<tr class="{"sel" if sel else ""}"><td><span class="cb {"on" if sel else ""}"></span></td>
+<td>{E(app) if app else '<span class="sub" style="display:inline">—</span>'}</td><td>{E(rg)}</td><td>{E(sub)}</td>
+<td>{f'<span class="chip">{E(grp)}</span>' if grp else ""}</td><td><span class="badge {tone}"><span class="dot"></span>{E(st)}</span></td>
+<td>{exp_html}</td><td>{f'<span class="jobtag">{E(job)}</span>' if job else ""}</td></tr>"""
+    main = f"""<div class="head"><div><h1>デプロイの一覧</h1><div class="sub">本ツールでデプロイした環境。最終更新 11/13 15:42</div></div></div>
+{kpis}
+<div class="surface cmd"><span class="btn primary">{ic("plus",16)}新しくデプロイ</span><span class="sep"></span>
+<span class="btn ghost">{ic("refresh",16)}読み直す</span><span class="btn ghost">{ic("clock",16)}期限を変える</span><span class="btn ghost danger">{ic("trash",16)}Azure から削除…</span><span class="btn ghost">{ic("filter",16)}絞り込み</span>
+<div class="search">{ic("search",16)}アプリ名・グループで探す</div></div>
+<div class="content"><div class="surface grid"><table><thead><tr><th style="width:40px"><span class="cb"></span></th><th style="width:84px">アプリ名</th><th style="width:124px">リソースグループ</th><th style="width:96px">サブスクリプション</th><th style="width:86px">グループ</th><th style="width:150px">状態</th><th style="width:150px">利用可能期限</th><th>ジョブ</th></tr></thead><tbody>{rows}</tbody></table>
+<div class="pager"><span>1〜7 件目（全 7 件）</span><span>20 件ずつ ▾</span></div></div>
+<aside class="surface detail"><div><div class="sub" style="margin:0 0 4px">rg-sales-demo · 開発用</div><h2>sales <span class="badge ok" style="font-size:12px;font-weight:400;margin-left:6px"><span class="dot"></span>稼働中（3/3）</span></h2></div>
+<div><div class="sub" style="margin:0 0 6px">利用可能期限</div><div style="display:flex;justify-content:space-between;align-items:baseline"><span class="big" style="color:#c42b1c">あと 3 日</span><span class="sub" style="margin:0">11/16 の終わりまで</span></div>
+<div class="expbar" style="width:100%;height:6px;margin-top:8px"><i style="width:8%;background:#c42b1c"></i></div>
+<div class="quick"><span class="btn">+7 日</span><span class="btn">+30 日</span><span class="btn">{ic("clock",14)}日付を選ぶ</span></div><div class="hint">期限を過ぎると自動で削除します</div></div>
+<dl class="kv"><dt>URL</dt><dd style="color:var(--accent)">sales-tt.japaneast.…</dd><dt>DB</dt><dd>PostgreSQL・永続化</dd><dt>スペック</dt><dd>TT 1.5 CPU / 3 GiB</dd><dt>グループ</dt><dd><span class="chip">営業</span></dd><dt>デプロイ日</dt><dd>2026/10/15</dd></dl>
+<span class="btn primary" style="justify-content:center">{ic("link",16)}Timetracker を開く</span>
+<div style="display:flex;flex-wrap:wrap;gap:8px"><span class="btn">{ic("key",16)}パスワード</span><span class="btn">{ic("cloud",16)}状態を確認</span><span class="btn">{ic("refresh",16)}この設定で新しくデプロイ</span></div></aside></div>"""
+    return page("推奨 デプロイの一覧", D_CSS, a_shell(1, main))
+def d_wizard():
+    html_ = a_wizard().replace("案 A 新しくデプロイ", "推奨 新しくデプロイ")
+    # 期限の欄の下に、期限の残りのバー（入れた日付までの日数）を見せる
+    html_ = html_.replace('<div class="field"><label>グループ</label>', '<div class="field" style="grid-column:1/-1;margin-top:-6px"><div style="display:flex;align-items:center;gap:10px"><div class="expbar" style="width:220px;height:6px"><i style="width:0%"></i></div><span style="color:#c42b1c;font-size:12px">期限まで: 過ぎています（12/15 にすると あと 32 日）</span></div></div><div class="field"><label>グループ</label>', 1)
+    return html_.replace("<style>" + BASE + A_CSS, "<style>" + BASE + D_CSS)
+def d_jobs():
+    kpis = d_kpis([("jobs", "#e6f0fa", "#005fb8", "1", "実行中", "", False), ("clock", "#f3eefb", "#5c2e91", "1", "予定", "", False),
+                   ("bell", "#fde7e9", "#c42b1c", "1", "失敗（7 日以内）", "絞り込む ›", True), ("check", "#dff6dd", "#0f7b0f", "12", "完了（7 日以内）", "", False)])
+    J = [("デプロイ", "rg-qa-02 / qa02", "j-run", "実行中", "62%", "11/13 15:30", "Container App を作成: qa02-tt"),
+         ("削除", "rg-poc-ai / poc", "j-sch", "予定 11/14 18:00", "", "11/13 09:12", "リソースグループも削除する"),
+         ("デプロイ", "tt-test-1 / timetracker", "j-fail", "失敗", "", "11/02 09:43", "利用可能期限日（2026-11-02）は、今日以降の日付を指定してください。"),
+         ("期限での削除", "tt-test-2 / timetracker", "j-ok", "完了", "", "11/02 00:00", "4 件を削除しました"),
+         ("デプロイ", "rg-review / review", "j-ok", "完了", "", "11/05 10:20", "https://review-tt.japaneast.…"),
+         ("削除", "tt-test-x / timetracker", "j-cancel", "取り消し", "", "11/02 09:40", "")]
+    rows = ""
+    for i, (k, t, cls, st, pr, reg, res) in enumerate(J):
+        sel = i == 2
+        rows += f"""<tr class="{"sel" if sel else ""}"><td><span class="cb {"on" if sel else ""}"></span></td><td>{E(k)}</td><td>{E(t)}</td>
+<td><span class="jstate {cls}">{E(st)}</span>{f'<div class="progress"><i style="width:{pr}"></i></div>' if pr else ""}</td><td class="mono">{E(reg)}</td><td style="color:{"#a4262c" if cls == "j-fail" else "var(--sub)"}">{E(res)}</td></tr>"""
+    main = f"""<div class="head"><div><h1>ジョブの一覧</h1><div class="sub">このアプリで登録したデプロイ・削除。終わったジョブは 180 日・500 件まで記録に残します</div></div></div>
+{kpis}
+<div class="surface cmd"><span class="btn">{ic("jobs",16)}詳細</span><span class="btn primary">{ic("refresh",16)}この設定で新しくデプロイ</span><span class="sep"></span><span class="btn ghost">取り消し</span><span class="btn ghost">一時停止</span><span class="btn ghost">再開</span><span class="btn ghost">{ic("clock",16)}予定を変える</span><span class="btn ghost danger">{ic("trash",16)}記録から削除</span>
+<div class="search">{ic("search",16)}対象・結果で探す</div></div>
+<div class="content"><div class="surface grid"><table><thead><tr><th style="width:40px"><span class="cb"></span></th><th style="width:110px">種類</th><th style="width:200px">対象</th><th style="width:160px">状態</th><th style="width:110px">登録日時</th><th>結果</th></tr></thead><tbody>{rows}</tbody></table>
+<div class="pager"><span>1〜6 件目（全 6 件）</span><span>20 件ずつ ▾</span></div></div>
+<aside class="surface detail"><div><div class="sub" style="margin:0 0 4px">デプロイ · 開発用</div><h2>tt-test-1 / timetracker</h2></div>
+<div class="info-bar" style="background:#fde7e9;border-color:#f4c7cb">{ic("bell",18)}<div><b>失敗</b>: 実行の直前の確認で、利用可能期限日（2026-11-02）が過ぎていました。</div></div>
+<div class="info-bar">{ic("clock",18)}<div>予定（11/02 10:50）より 2263 分遅れて実行しました（PC のスリープなど）。</div></div>
+<dl class="kv"><dt>登録</dt><dd>11/02 09:43</dd><dt>予定の変更</dt><dd>11/02 09:44</dd><dt>実行</dt><dd>11/04 00:33（3 秒）</dd></dl>
+<span class="btn primary" style="justify-content:center">{ic("refresh",16)}この設定で新しくデプロイ</span><div class="hint" style="margin-top:-6px">期限を直して出し直せます。パスワードは入れ直してください</div>
+<div style="display:flex;gap:8px"><span class="btn">Markdown でコピー</span><span class="btn">ログを見る</span></div></aside></div>"""
+    return page("推奨 ジョブの一覧", D_CSS, a_shell(3, main))
+
+for name, fn in [("A-list", a_list), ("A-wizard", a_wizard), ("B-list", b_list), ("B-wizard", b_wizard), ("C-list", c_list), ("C-wizard", c_wizard), ("D-list", d_list), ("D-wizard", d_wizard), ("D-jobs", d_jobs)]:
     open(f"{name}.html", "w", encoding="utf-8").write(fn())
 print("ok")
