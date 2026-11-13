@@ -14,7 +14,7 @@
     </div>
     <div class="tt-spec-foot">
         <span>メモリは CPU の 2 倍（Container Apps の組み合わせ）</span>
-        <span data-id="@($"Spec.{Spec.Name}.Cost")">@(Cost.Lines.FirstOrDefault(l => l.Name == Spec.Name)?.Amount is { } amount ? $"期限まで 約 {amount}" : null)</span>
+        <span data-id="@($"Spec.{Spec.Name}.Cost")">@(Cost.Lines.FirstOrDefault(l => l.Name == Spec.Name)?.Amount is { } amount ? $"{Cost.AmountLabel} 約 {amount}" : null)</span>
     </div>
     <Message Id="@($"Spec.{Spec.Name}.Note")" Text="@Spec.Note" Kind="MessageKind.Caution" />
 </div>

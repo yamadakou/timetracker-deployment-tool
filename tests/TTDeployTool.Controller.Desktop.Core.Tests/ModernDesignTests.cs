@@ -181,9 +181,12 @@ public sealed class ModernDesignTests
         // 期限を日付で指定する・期限なしは 30 日あたり・過ぎた日付は見積もらない
         settings.Expiry = SettingsViewModel.ExpiryOptions[1];
         settings.ExpiryDate = new DateTimeOffset(2026, 11, 20, 0, 0, 0, TimeSpan.FromHours(9));
-        cost.PeriodText.Should().Be("期限（11/20 の終わり）までの 8 日");
+        (cost.PeriodText, cost.AmountLabel).Should().Be(("期限（11/20 の終わり）までの 8 日", "期限まで"));
+        cost.TotalText.Should().StartWith("約 ");
         settings.Expiry = SettingsViewModel.ExpiryOptions[2];
-        cost.PeriodText.Should().Be("期限なしのため、30 日あたり");
+        cost.PeriodText.Should().Be("期限なしのため、目安として 1 か月（30 日）分と 1 日分");
+        (cost.AmountLabel, cost.TotalText, cost.PerDayText).Should().Match<(string, string?, string?)>(x =>
+            x.Item1 == "1 か月" && x.Item2!.StartsWith("1 か月 約 ") && x.Item3!.StartsWith("1 日 約 "));
         settings.Expiry = SettingsViewModel.ExpiryOptions[1];
         settings.ExpiryDate = new DateTimeOffset(2026, 11, 2, 0, 0, 0, TimeSpan.FromHours(9));
         (cost.PeriodText, cost.TotalText, cost.Lines.Count).Should().Be(("利用可能期限が過ぎているため、見積もれません（期限を直してください）。", (string?)null, 0));

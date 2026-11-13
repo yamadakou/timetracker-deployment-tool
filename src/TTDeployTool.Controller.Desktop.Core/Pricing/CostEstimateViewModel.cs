@@ -40,6 +40,7 @@ public sealed class CostEstimateViewModel : ObservableObject
     private string? _perDayText;
     private string? _periodText;
     private string? _savingText;
+    private string _amountLabel = "期限まで";
 
     public CostEstimateViewModel(SettingsViewModel settings, TargetViewModel target, IPriceCatalog catalog, TimeProvider time)
     {
@@ -81,6 +82,13 @@ public sealed class CostEstimateViewModel : ObservableObject
     {
         get => _totalText;
         private set => SetProperty(ref _totalText, value);
+    }
+
+    /// <summary>内訳の金額の期間（「期限まで」。期限なしは「1 か月」）。</summary>
+    public string AmountLabel
+    {
+        get => _amountLabel;
+        private set => SetProperty(ref _amountLabel, value);
     }
 
     /// <summary>1 日あたり。</summary>
@@ -155,8 +163,9 @@ public sealed class CostEstimateViewModel : ObservableObject
         }
         else
         {
+            // 期限なしは、目安として 1 か月（30 日）分と 1 日分を出す（オーナーの依頼、2026-11-13）
             seconds = 30m * 86400m;
-            PeriodText = "期限なしのため、30 日あたり";
+            PeriodText = "期限なしのため、目安として 1 か月（30 日）分と 1 日分";
         }
         // 空の欄は既定値（デプロイと同じく DeployOptionsResolver が補う値）
         var apps = new[]
@@ -183,7 +192,8 @@ public sealed class CostEstimateViewModel : ObservableObject
         var total = parts.Sum(x => x.Amount);
         foreach (var (name, spec, amount) in parts)
             Lines.Add(new CostLine(name, spec, amount < 10 ? Money.Small(amount, p.Currency) : Money.Text(amount, p.Currency), (double)(amount / total)));
-        TotalText = $"約 {Money.Text(total, p.Currency)}";
+        AmountLabel = end == null ? "1 か月" : "期限まで";
+        TotalText = end == null ? $"1 か月 約 {Money.Text(total, p.Currency)}" : $"約 {Money.Text(total, p.Currency)}";
         PerDayText = $"1 日 約 {Money.Text(total / (seconds / 86400m), p.Currency)}";
         var months = Math.Max(1m, Math.Ceiling(seconds / (30m * 86400m)));
         var saving = Math.Min(vcpuSeconds, FreeVcpuSeconds * months) * p.VcpuPerSecond + Math.Min(gibSeconds, FreeGibSeconds * months) * p.GibPerSecond;

@@ -192,5 +192,12 @@ public sealed class RedesignScreenTests : IDisposable
         Id(view, "Spec.Redis.Cost").TextContent.Should().BeEmpty("単価を読むまでは出さない");
         await _app.ViewModel.Cost.RefreshAsync();
         view.WaitForAssertion(() => Id(view, "Spec.Redis.Cost").TextContent.Should().StartWith("期限まで 約 "));
+
+        // 期限なしは、1 か月分（内訳とスライダー）と 1 日分
+        _app.ViewModel.Settings.Expiry = SettingsViewModel.ExpiryOptions[2];
+        view.WaitForAssertion(() => Id(view, "Spec.Redis.Cost").TextContent.Should().StartWith("1 か月 約 "));
+        var panel = _app.Context.Render<CostPanel>(p => p.Add(x => x.Cost, _app.ViewModel.Cost));
+        (Id(panel, "Cost.Total").TextContent, Id(panel, "Cost.PerDay").TextContent).Should().Match<(string, string)>(x => x.Item1.StartsWith("1 か月 約 ") && x.Item2.StartsWith("1 日 約 "));
+        Id(panel, "Cost.Period").TextContent.Should().Be("期限なしのため、目安として 1 か月（30 日）分と 1 日分");
     }
 }
