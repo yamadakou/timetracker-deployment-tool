@@ -216,8 +216,8 @@ public sealed class JobViewModel : ObservableObject
     public AsyncCommand StopCommand { get; }
 
     public string Title => _kind == JobKind.Deploy
-        ? $"デプロイ（{_target.ResourceGroup} / {_target.AppName}）"
-        : $"{(IsExpiryDeletion ? "期限での削除" : "削除")}（{_target.ResourceGroup} / {_target.AppName}）";
+        ? $"デプロイ（{TargetText}）"
+        : $"{(IsExpiryDeletion ? "期限での削除" : "削除")}（{TargetText}）";
 
     /// <summary>利用可能期限を過ぎたための、確認なしの削除か（docs/design/desktop/desktop-jobs.md の 6.5）。</summary>
     public bool IsExpiryDeletion { get; init; }
@@ -324,7 +324,7 @@ public sealed class JobViewModel : ObservableObject
     public string KindText => _kind == JobKind.Deploy ? "デプロイ" : IsExpiryDeletion ? "期限での削除" : "削除";
 
     /// <summary>ジョブの一覧の対象。</summary>
-    public string TargetText => $"{_target.ResourceGroup} / {_target.AppName}";
+    public string TargetText => _target.AppName.Length == 0 ? $"{_target.ResourceGroup}（リソースグループだけ）" : $"{_target.ResourceGroup} / {_target.AppName}";
 
     /// <summary>サブスクリプションの表示（名前と ID。ジョブの一覧が入れる。入れる前は ID。No.78）。</summary>
     public string SubscriptionText

@@ -2,6 +2,7 @@ using Azure.Core;
 using TTDeployTool.Common;
 using TTDeployTool.Controller.Desktop.Core.Services;
 using TTDeployTool.Infrastructure.Azure;
+using TTDeployTool.Domain.Deployment;
 
 namespace TTDeployTool.Controller.Desktop.Fixtures;
 
@@ -50,7 +51,7 @@ public sealed class FixtureAzureClients(FixtureData data) : IAzureClients
 
     public IAzureDeploymentGateway Gateway(IDeploymentLogger logger, TokenCredential credential) => new FixtureGateway(data);
 
-    public IDeploymentDirectory Deployments(TokenCredential credential) => new DeploymentDirectory(data.Resources);
+    public IDeploymentDirectory Deployments(TokenCredential credential) => new DeploymentDirectory(data);
 
     private sealed class Directory<T>(IReadOnlyList<T> items) : ITenantDirectory, ISubscriptionDirectory
     {
@@ -59,9 +60,18 @@ public sealed class FixtureAzureClients(FixtureData data) : IAzureClients
         Task<IReadOnlyList<SubscriptionInfo>> ISubscriptionDirectory.ListAsync(CancellationToken cancellationToken) => Task.FromResult((IReadOnlyList<SubscriptionInfo>)items);
     }
 
-    private sealed class DeploymentDirectory(IReadOnlyList<ManagedResourceRecord> resources) : IDeploymentDirectory
+    // Resource Graph と同じく、管理タグの付いたリソースと、管理タグの付いたリソースグループを返す
+    private sealed class DeploymentDirectory(FixtureData data) : IDeploymentDirectory
     {
-        public Task<IReadOnlyList<ManagedResourceRecord>> ListAsync(IReadOnlyList<string> subscriptionIds, CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<ManagedResourceRecord>>([.. resources.Where(r => subscriptionIds.Contains(r.SubscriptionId, StringComparer.OrdinalIgnoreCase))]);
+        public Task<IReadOnlyList<ManagedResourceRecord>> ListAsync(IReadOnlyList<string> subscriptionIds, CancellationToken cancellationToken = default)
+        {
+            var groups = (data.ResourceGroups ?? [])
+                .Where(g => ManagedTags.IsCreatedByTool(g.Tags))
+                .Select(g => new ManagedResourceRecord(
+                    $"/subscriptions/{g.SubscriptionId}/resourceGroups/{g.Name}", g.Name, ManagedResourceRecord.ResourceGroupType, g.SubscriptionId, g.Name, g.Location,
+                    g.Tags!));
+            return Task.FromResult<IReadOnlyList<ManagedResourceRecord>>(
+                [.. data.Resources.Concat(groups).Where(r => subscriptionIds.Contains(r.SubscriptionId, StringComparer.OrdinalIgnoreCase))]);
+        }
     }
 }

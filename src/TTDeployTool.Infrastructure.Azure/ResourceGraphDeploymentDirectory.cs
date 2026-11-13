@@ -18,6 +18,7 @@ public sealed record ManagedResourceRecord(
     public const string ContainerAppType = "microsoft.app/containerapps";
     public const string EnvironmentType = "microsoft.app/managedenvironments";
     public const string StorageAccountType = "microsoft.storage/storageaccounts";
+    public const string ResourceGroupType = "microsoft.resources/subscriptions/resourcegroups";
 }
 
 /// <summary>
@@ -34,7 +35,10 @@ public sealed record ContainerAppSnapshot(
 /// <summary>本ツールで作ったリソースを、複数のサブスクリプションからまとめて読む（デプロイの一覧。docs/design/desktop/desktop-jobs.md の 6.3・6.4）。</summary>
 public interface IDeploymentDirectory
 {
-    /// <summary>指定したサブスクリプション（同じテナントのもの）の、管理タグの付いた Container App・Environment・ストレージアカウント。</summary>
+    /// <summary>
+    /// 指定したサブスクリプション（同じテナントのもの）の、管理タグの付いた Container App・Environment・ストレージアカウントと、リソースグループ
+    /// （本ツールで作ったもの。中のリソースを消してリソースグループだけが残ったものを一覧に出すため）。
+    /// </summary>
     Task<IReadOnlyList<ManagedResourceRecord>> ListAsync(IReadOnlyList<string> subscriptionIds, CancellationToken cancellationToken = default);
 }
 
@@ -56,6 +60,14 @@ public sealed class ResourceGraphDeploymentDirectory : IDeploymentDirectory
         " volumes = properties.template.volumes" +
         " | order by id asc";
 
+    // 管理タグの付いたリソースグループ（resourceGroup の列は、リソースグループの名前）
+    internal static readonly string ResourceGroupQuery =
+        "resourcecontainers" +
+        $" | where type =~ '{ManagedResourceRecord.ResourceGroupType}'" +
+        $" | where tostring(tags['{ManagedTags.ManagedByKey}']) in~ ('{ManagedTags.ManagedByValue}', '{ManagedTags.LegacyManagedByValue}')" +
+        " | project id, name, type = tolower(type), subscriptionId, resourceGroup = name, location, tags" +
+        " | order by id asc";
+
     private readonly ArmClient _arm;
 
     public ResourceGraphDeploymentDirectory(ArmClient arm)
@@ -70,10 +82,19 @@ public sealed class ResourceGraphDeploymentDirectory : IDeploymentDirectory
             return result;
         // 問い合わせはテナントの範囲の API（パスにテナントを含まない）。資格情報のテナントの最初の TenantResource を使う
         var tenant = await _arm.GetTenants().GetAllAsync(cancellationToken).FirstAsync(cancellationToken);
+        foreach (var query in new[] { Query, ResourceGroupQuery })
+            await ReadAllAsync(tenant, query, subscriptionIds, result, cancellationToken);
+        return result;
+    }
+
+    private static async Task ReadAllAsync(
+        global::Azure.ResourceManager.Resources.TenantResource tenant, string query, IReadOnlyList<string> subscriptionIds, List<ManagedResourceRecord> result,
+        CancellationToken cancellationToken)
+    {
         string? skipToken = null;
         do
         {
-            var content = new ResourceQueryContent(Query)
+            var content = new ResourceQueryContent(query)
             {
                 Options = new ResourceQueryRequestOptions { ResultFormat = ResultFormat.ObjectArray, Top = PageSize, SkipToken = skipToken },
             };
@@ -84,7 +105,6 @@ public sealed class ResourceGraphDeploymentDirectory : IDeploymentDirectory
             skipToken = response.Value.SkipToken;
         }
         while (skipToken != null);
-        return result;
     }
 
     internal static IEnumerable<ManagedResourceRecord> Parse(BinaryData data)

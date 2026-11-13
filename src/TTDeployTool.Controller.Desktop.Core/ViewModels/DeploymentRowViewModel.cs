@@ -56,7 +56,7 @@ public sealed class DeploymentRowViewModel : ObservableObject
         RedeployCommand = new AsyncCommand(() => _owner.LastDeploymentWithSettings(_entry)!.RedeployCommand.ExecuteAsync(),
             () => !HasActiveJob && _owner.LastDeploymentWithSettings(_entry) != null);
         // 実行状況の画面は、その対象のジョブがあればジョブも出す（「戻る」はデプロイの一覧。No.63・No.69）
-        CheckStatusCommand = new AsyncCommand(() => _owner.UseAsTargetAsync(_entry, Pages.Status));
+        CheckStatusCommand = new AsyncCommand(() => _owner.UseAsTargetAsync(_entry, Pages.Status), () => !_entry.IsResourceGroupOnly);
         DeleteCommand = new AsyncCommand(() => _owner.UseAsTargetAsync(_entry, Pages.Delete), () => !HasActiveJob);
         ShowPasswordsCommand = new AsyncCommand(() => Busy.RunAsync("パスワードを読んでいます", ReadPasswordsAsync), () => _entry.Timetracker != null);
         TogglePasswordsCommand = new AsyncCommand(() =>
@@ -185,6 +185,7 @@ public sealed class DeploymentRowViewModel : ObservableObject
     {
         DeploymentState.Partial => $"一部だけ（{string.Join("・", _entry.Missing)} がありません）",
         DeploymentState.Pending => "デプロイ済み（Azure の一覧に反映待ち。「読み込む」で読み直せます）",
+        DeploymentState.ResourceGroupOnly => "リソースグループだけ（本ツールのリソースはありません。不要なら「Azure から削除…」でリソースグループを削除できます）",
         var state => DeploymentStates.Label(state),
     };
 

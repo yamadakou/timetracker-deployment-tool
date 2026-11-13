@@ -17,6 +17,7 @@ public sealed class DeletionPlanner
     public const string UnmanagedReason = "管理タグがありません";
     public const string OtherOwnerReason = "別のアプリまたは別のツールの管理タグがあります（--include-untagged でも対象にしません）";
     public const string KeptReason = "--keep-db-data の指定により残します（DB のデータ）";
+    public const string NotCreatedByToolReason = "本ツールで作ったリソースグループではありません（管理タグがありません）";
 
     /// <summary>リソースグループの削除の判定で、残るリソースとして名前を示す数の上限。</summary>
     public const int RemainingShown = 10;
@@ -40,8 +41,13 @@ public sealed class DeletionPlanner
         string subscriptionId, string rgName, string appName, bool includeUntagged, bool keepDbData = false, bool deleteResourceGroup = false,
         CancellationToken cancellationToken = default)
     {
-        var targets = await PlanTargetsAsync(subscriptionId, rgName, appName, includeUntagged, keepDbData, cancellationToken);
-        var resourceGroup = deleteResourceGroup ? await PlanResourceGroupAsync(subscriptionId, rgName, targets, cancellationToken) : null;
+        // アプリ名が空なら、リソースグループだけの削除（本ツールのアプリのリソースが無い、管理タグの残ったリソースグループ。デスクトップアプリの一覧から）。
+        // 本ツールで作ったリソースグループ（管理タグ）で、空の場合だけ削除する
+        var resourceGroupOnly = appName.Length == 0;
+        IReadOnlyList<DeletionTarget> targets = resourceGroupOnly ? [] : await PlanTargetsAsync(subscriptionId, rgName, appName, includeUntagged, keepDbData, cancellationToken);
+        var resourceGroup = deleteResourceGroup || resourceGroupOnly
+            ? await PlanResourceGroupAsync(subscriptionId, rgName, targets, cancellationToken, requireCreatedByTool: resourceGroupOnly)
+            : null;
 
         var requirements = targets.Where(t => t.WillDelete)
             .Select(t => t.Kind switch
@@ -64,11 +70,15 @@ public sealed class DeletionPlanner
     /// 削除の対象（<paramref name="targets"/> の <see cref="DeletionTarget.WillDelete"/> のもの）を消した後に、リソースグループが空になるかを確かめる
     /// （ほかのアプリ名の環境や、本ツール以外のリソースが 1 つでも残れば削除しない）。
     /// </summary>
+    /// <param name="requireCreatedByTool">本ツールで作ったリソースグループ（管理タグ）だけを削除するか（リソースグループだけの削除）</param>
     public async Task<ResourceGroupDeletion> PlanResourceGroupAsync(
-        string subscriptionId, string rgName, IReadOnlyList<DeletionTarget> targets, CancellationToken cancellationToken = default)
+        string subscriptionId, string rgName, IReadOnlyList<DeletionTarget> targets, CancellationToken cancellationToken = default, bool requireCreatedByTool = false)
     {
-        if (await _gateway.GetResourceGroupAsync(subscriptionId, rgName, cancellationToken) == null)
+        var group = await _gateway.GetResourceGroupAsync(subscriptionId, rgName, cancellationToken);
+        if (group == null)
             return new ResourceGroupDeletion(false, false, NotFoundReason, []);
+        if (requireCreatedByTool && !group.CreatedByTool)
+            return new ResourceGroupDeletion(true, false, NotCreatedByToolReason, []);
 
         var deleting = targets.Where(t => t.WillDelete).Select(t => (t.Name, Type: ResourceTypes[t.Kind])).ToList();
         var remaining = (await _gateway.ListResourcesAsync(subscriptionId, rgName, cancellationToken))

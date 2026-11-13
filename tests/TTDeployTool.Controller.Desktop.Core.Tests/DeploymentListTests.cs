@@ -774,7 +774,7 @@ public class DeploymentStateTests
     public void A_Partial_Deployment_Should_Be_Partial_And_Every_State_Should_Have_A_Label()
     {
         DeploymentStates.Of(Entry(("Succeeded", "Running"))).Should().Be(DeploymentState.Partial);
-        Enum.GetValues<DeploymentState>().Select(DeploymentStates.Label).Should().Equal("実行中", "停止中", "処理中（作成・更新・削除）", "失敗", "一部だけ", "デプロイ済み（反映待ち）", "不明");
+        Enum.GetValues<DeploymentState>().Select(DeploymentStates.Label).Should().Equal("実行中", "停止中", "処理中（作成・更新・削除）", "失敗", "一部だけ", "デプロイ済み（反映待ち）", "不明", "リソースグループだけ");
     }
 
     [Fact]

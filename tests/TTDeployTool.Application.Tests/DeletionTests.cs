@@ -318,6 +318,45 @@ public class DeletionPlannerTests
         _resources.Add(new AzureResourceInfo("DEMO-ENV", "microsoft.app/managedEnvironments"));
     }
 
+    // リソースグループだけの削除（アプリ名が空。デスクトップアプリの一覧の「リソースグループだけ」の行。2026-11-13）
+    private Task<DeletionPlan> PlanResourceGroupOnly(bool createdByTool = true)
+    {
+        _gateway.Setup(g => g.GetResourceGroupAsync("sub", "rg", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ResourceGroupInfo("rg", "japaneast", createdByTool ? ManagedTags.ForResourceGroup() : null));
+        _gateway.Setup(g => g.ListResourcesAsync("sub", "rg", It.IsAny<CancellationToken>())).ReturnsAsync(() => _resources.ToList());
+        return new DeletionPlanner(_gateway.Object).PlanAsync("sub", "rg", "", false, deleteResourceGroup: false, cancellationToken: Ct);
+    }
+
+    [Fact]
+    public async Task An_Empty_Resource_Group_Made_By_The_Tool_Should_Be_Deleted_Alone()
+    {
+        var plan = await PlanResourceGroupOnly();
+
+        (plan.IsResourceGroupOnly, plan.Targets.Count, plan.DeleteResourceGroupRequested, plan.DeletesResourceGroup, plan.HasDeletions).Should().Be((true, 0, true, true, true));
+        plan.ResourceGroupBlocker.Should().BeNull();
+        _gateway.Verify(g => g.ListContainerAppsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never, "アプリのリソースは探さない");
+    }
+
+    [Fact]
+    public async Task A_Resource_Group_Not_Made_By_The_Tool_Should_Not_Be_Deleted_Alone()
+    {
+        var plan = await PlanResourceGroupOnly(createdByTool: false);
+
+        (plan.DeletesResourceGroup, plan.HasDeletions, plan.ResourceGroupTarget!.Reason).Should().Be((false, false, DeletionPlanner.NotCreatedByToolReason));
+        plan.ResourceGroupBlocker.Should().Be($"リソースグループ rg は削除できません（{DeletionPlanner.NotCreatedByToolReason}）。", "チェックを外す案内は出さない");
+    }
+
+    [Fact]
+    public async Task A_Resource_Group_With_Other_Resources_Should_Not_Be_Deleted_Alone()
+    {
+        _resources.Add(new AzureResourceInfo("vm1", "Microsoft.Compute/virtualMachines"));
+
+        var plan = await PlanResourceGroupOnly();
+
+        (plan.DeletesResourceGroup, plan.ResourceGroupTarget!.Remaining).Should().BeEquivalentTo((false, new[] { "vm1（Microsoft.Compute/virtualMachines）" }));
+        plan.ResourceGroupBlocker.Should().StartWith("リソースグループ rg は削除できません（ほかのリソースが残ります: vm1").And.EndWith("）。");
+    }
+
     [Fact]
     public async Task Should_Not_Plan_The_Resource_Group_Unless_Requested()
     {

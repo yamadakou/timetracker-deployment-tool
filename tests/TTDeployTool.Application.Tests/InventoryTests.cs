@@ -32,6 +32,25 @@ public class DeploymentCatalogTests
         new($"/subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.Storage/storageAccounts/{name}", name, ManagedResourceRecord.StorageAccountType,
             sub, rg, "", tags);
 
+    private static ManagedResourceRecord Group(string rg, string sub = "s1", string location = "japaneast") =>
+        new($"/subscriptions/{sub}/resourceGroups/{rg}", rg, ManagedResourceRecord.ResourceGroupType, sub, rg, location, ManagedTags.ForResourceGroup());
+
+    [Fact]
+    public void A_Resource_Group_Without_Deployments_Should_Be_A_Resource_Group_Only_Entry()
+    {
+        // 管理タグのあるリソースグループのうち、本ツールのアプリのリソースが無いものだけを、リソースグループだけの行にする（2026-11-13）
+        var entries = DeploymentCatalog.Build(
+        [
+            Group("rg"), App("demo-tt", Tags("demo")), Group("RG-OLD", location: ""), Group("rg-z", sub: "s0"),
+        ]);
+
+        entries.Select(e => (e.SubscriptionId, e.ResourceGroup, e.AppName, e.IsResourceGroupOnly)).Should().Equal(
+            ("s0", "rg-z", "", true), ("s1", "rg", "demo", false), ("s1", "RG-OLD", "", true));
+        var old = entries[2];
+        (old.Location, old.ExpiryKind, old.Url, old.IsComplete, old.Missing.Count).Should().Be(((string?)null, ExpiryKind.Missing, (string?)null, false, 4));
+        entries[0].Location.Should().Be("japaneast");
+    }
+
     [Fact]
     public void A_Complete_Deployment_Should_Be_One_Entry()
     {

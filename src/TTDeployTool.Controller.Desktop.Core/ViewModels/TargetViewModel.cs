@@ -90,10 +90,13 @@ public sealed class TargetViewModel : ObservableObject
     public string SubscriptionDisplay => SelectedSubscription?.Display ?? "サブスクリプション: 「サインインと対象」で選んでください。";
 
     /// <summary>アプリ名の誤り（削除と状態の確認で、Azure を読む前に確かめる）。</summary>
-    public string? TargetError =>
+    public string? TargetError => ResourceGroupError ?? AppNameValidator.GetError(AppName.ToLowerInvariant());
+
+    /// <summary>サブスクリプションとリソースグループの誤り（リソースグループだけの削除は、アプリ名を確かめない）。</summary>
+    public string? ResourceGroupError =>
         SelectedSubscription == null ? "サブスクリプションを選んでください。"
         : ResourceGroup.Length == 0 ? "リソースグループ名を入力してください。"
-        : AppNameValidator.GetError(AppName.ToLowerInvariant());
+        : null;
 
     /// <summary>テナントごとにサブスクリプションを読む。読めないテナントがあっても、ほかのテナントの一覧は続ける。</summary>
     public Task LoadAsync() => Busy.RunAsync("テナントの一覧を読んでいます", LoadCoreAsync);

@@ -59,8 +59,22 @@ public sealed class DeletionViewModel : ObservableObject
         PlanCommand = new AsyncCommand(() => Busy.RunAsync("計画を作っています", PlanAsync));
         StartCommand = new AsyncCommand(() => RegisterAsync(null), () => CanStart);
         ScheduleCommand = new AsyncCommand(() => RegisterAsync(Schedule), () => CanStart);
-        _target.Changed += (_, _) => Ticket = null;
+        _target.Changed += (_, _) =>
+        {
+            Ticket = null;
+            OnPropertyChanged(nameof(IsResourceGroupOnly));
+            OnPropertyChanged(nameof(ConfirmLabel));
+        };
     }
+
+    /// <summary>
+    /// リソースグループだけの削除か（デプロイの一覧の「リソースグループだけ」の行から開いた。対象のアプリ名が空）。リソースグループは必ず削除の対象にし、
+    /// 確かめにはリソースグループ名を入れてもらう（オーナーの依頼、2026-11-13）。
+    /// </summary>
+    public bool IsResourceGroupOnly => _target.AppName.Length == 0;
+
+    /// <summary>確かめに入れてもらう名前の種類（アプリ名・リソースグループ名）。</summary>
+    public string ConfirmLabel => IsResourceGroupOnly ? "リソースグループ名" : "アプリ名";
 
     public AsyncCommand PlanCommand { get; }
 
@@ -156,8 +170,8 @@ public sealed class DeletionViewModel : ObservableObject
 
     public bool HasPlan => _ticket != null;
 
-    /// <summary>入力してもらうアプリ名（計画のアプリ名）。</summary>
-    public string? AppNameToConfirm => _ticket?.CanRun == true ? _ticket.Plan.AppName : null;
+    /// <summary>入力してもらうアプリ名（計画のアプリ名。リソースグループだけの削除はリソースグループ名）。</summary>
+    public string? AppNameToConfirm => _ticket?.CanRun == true ? _ticket.Plan.IsResourceGroupOnly ? _ticket.Plan.ResourceGroup : _ticket.Plan.AppName : null;
 
     /// <summary>アプリ名の入力欄を表示するか。</summary>
     public bool NeedsAppNameConfirmation => AppNameToConfirm != null;
@@ -166,7 +180,7 @@ public sealed class DeletionViewModel : ObservableObject
     {
         null => null,
         { Plan.KeepsDbData: true } t => $"{KeptResourceGroup(t.Plan)}\n{KeptDbDataNotice(t.Plan)}",
-        { Plan.DeletesResourceGroup: true } => null,
+        { Plan.DeletesResourceGroup: true } or { Plan.IsResourceGroupOnly: true } => null,
         { } t => KeptResourceGroup(t.Plan),
     };
 
@@ -176,7 +190,7 @@ public sealed class DeletionViewModel : ObservableObject
     public string? BlockedText => AppNameToConfirm == null
         ? null
         : !CanStart
-            ? $"アプリ名「{AppNameToConfirm}」を入力すると、「今すぐ削除」と「予定に追加」が押せます。"
+            ? $"{ConfirmLabel}「{AppNameToConfirm}」を入力すると、「今すぐ削除」と「予定に追加」が押せます。"
             : Schedule.Error is { } error ? $"「予定に追加」: {error}" : null;
 
     /// <summary>押せない理由を出すか。</summary>
@@ -273,7 +287,7 @@ public sealed class DeletionViewModel : ObservableObject
     {
         Error = null;
         Ticket = null;
-        if (_target.TargetError is { } targetError)
+        if ((IsResourceGroupOnly ? _target.ResourceGroupError : _target.TargetError) is { } targetError)
         {
             Error = targetError;
             return;
@@ -305,9 +319,10 @@ public sealed class DeletionViewModel : ObservableObject
             return Task.CompletedTask;
         }
         var ticket = _ticket!;
-        var confirmed = ConfirmAppName;
-        var session = _target.CreateJobSession();
         var plan = ticket.Plan;
+        // リソースグループだけの削除は、確かめた名前（リソースグループ名）ではなく、計画のアプリ名（空）で始める
+        var confirmed = plan.IsResourceGroupOnly ? plan.AppName : ConfirmAppName;
+        var session = _target.CreateJobSession();
         try
         {
             _registered(_queue.Register(JobKind.Delete, new JobTarget(plan.Subscription, plan.ResourceGroup, plan.AppName), schedule?.At,

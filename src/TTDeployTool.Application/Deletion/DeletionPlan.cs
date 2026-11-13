@@ -31,6 +31,9 @@ public sealed record DeletionPlan(
 {
     public bool HasDeletions => Targets.Any(t => t.WillDelete) || DeletesResourceGroup;
 
+    /// <summary>リソースグループだけの削除か（アプリ名が空。本ツールのアプリのリソースが無い、管理タグの残ったリソースグループ）。</summary>
+    public bool IsResourceGroupOnly => AppName.Length == 0;
+
     /// <summary>利用者がリソースグループの削除を選んだか。</summary>
     public bool DeleteResourceGroupRequested => ResourceGroupTarget != null;
 
@@ -42,7 +45,9 @@ public sealed record DeletionPlan(
     /// 選んだ利用者が、リソースグループが残ることに気付かないまま本ツールのリソースだけを消さないよう、実行させない。
     /// </summary>
     public string? ResourceGroupBlocker => ResourceGroupTarget is { Exists: true, WillDelete: false, Reason: var reason }
-        ? $"リソースグループ {ResourceGroup} は削除できません（{reason}）。リソースグループを残して削除する場合は、リソースグループの削除の指定を外してください。"
+        ? IsResourceGroupOnly
+            ? $"リソースグループ {ResourceGroup} は削除できません（{reason}）。"
+            : $"リソースグループ {ResourceGroup} は削除できません（{reason}）。リソースグループを残して削除する場合は、リソースグループの削除の指定を外してください。"
         : null;
 
     /// <summary>対象ごとの「削除するか」がほかの計画と同じか（削除しない理由の文言の違いは問わない。実行の直前の確認に使う）。</summary>

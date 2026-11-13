@@ -63,6 +63,12 @@ public sealed record DeploymentEntry(
         .. Redis == null ? ["Redis"] : Array.Empty<string>(),
     ];
 
+    /// <summary>
+    /// リソースグループだけの行か（アプリ名が空。本ツールのアプリのリソースが無い、管理タグの残ったリソースグループ。オーナーの依頼、2026-11-13）。
+    /// 削除の画面でリソースグループだけを削除する。期限での自動の削除の対象にはしない。
+    /// </summary>
+    public bool IsResourceGroupOnly => AppName.Length == 0;
+
     /// <summary>同じ対象か（大文字・小文字を区別しない）。</summary>
     public bool IsFor(string subscriptionId, string resourceGroup, string appName) =>
         string.Equals(SubscriptionId, subscriptionId, StringComparison.OrdinalIgnoreCase)
@@ -75,18 +81,31 @@ public static class DeploymentCatalog
 {
     /// <summary>
     /// サブスクリプション・リソースグループ・アプリ名（タグ <see cref="ManagedTags.AppNameKey"/>）の組ごとにまとめる。アプリ名のタグが無いものは出さない。
+    /// リソースグループ（<see cref="ManagedResourceRecord.ResourceGroupType"/>）は、その中に本ツールのアプリのリソースが無ければ、リソースグループだけの行にする。
     /// 並びはサブスクリプション・リソースグループ・アプリ名の順。
     /// </summary>
-    public static IReadOnlyList<DeploymentEntry> Build(IEnumerable<ManagedResourceRecord> records) =>
-        records
+    public static IReadOnlyList<DeploymentEntry> Build(IEnumerable<ManagedResourceRecord> records)
+    {
+        var all = records.ToList();
+        var deployments = all
+            .Where(r => r.Type != ManagedResourceRecord.ResourceGroupType)
             .Select(r => (Record: r, AppName: r.Tags.TryGetValue(ManagedTags.AppNameKey, out var name) ? name.ToLowerInvariant() : null))
             .Where(x => x.AppName != null)
             .GroupBy(x => (Sub: x.Record.SubscriptionId.ToLowerInvariant(), Rg: x.Record.ResourceGroup.ToLowerInvariant(), App: x.AppName!))
             .Select(g => ToEntry(g.Key.App, g.Select(x => x.Record).ToList()))
+            .ToList();
+        var groupsOnly = all
+            .Where(r => r.Type == ManagedResourceRecord.ResourceGroupType
+                        && !deployments.Any(d => string.Equals(d.SubscriptionId, r.SubscriptionId, StringComparison.OrdinalIgnoreCase)
+                                                 && string.Equals(d.ResourceGroup, r.ResourceGroup, StringComparison.OrdinalIgnoreCase)))
+            .Select(r => new DeploymentEntry(r.SubscriptionId, r.ResourceGroup, "", r.Location is { Length: > 0 } location ? location : null, null, null,
+                ExpiryKind.Missing, null, null, null, null, null, null, false));
+        return deployments.Concat(groupsOnly)
             .OrderBy(e => e.SubscriptionId, StringComparer.OrdinalIgnoreCase)
             .ThenBy(e => e.ResourceGroup, StringComparer.OrdinalIgnoreCase)
             .ThenBy(e => e.AppName, StringComparer.Ordinal)
             .ToList();
+    }
 
     private static DeploymentEntry ToEntry(string appName, IReadOnlyList<ManagedResourceRecord> records)
     {
