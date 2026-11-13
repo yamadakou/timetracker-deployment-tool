@@ -1,0 +1,110 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>案 A デプロイの一覧</title><style>
+@font-face { font-family: 'NotoJP'; src: local('Noto Sans JP'); }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Inter', 'Noto Sans JP', sans-serif; font-size: 13px; width: 1440px; height: 900px; overflow: hidden; -webkit-font-smoothing: antialiased; }
+.ic { flex: none; }
+table { border-collapse: collapse; width: 100%; }
+.mono { font-family: 'Inter', monospace; font-variant-numeric: tabular-nums; }
+
+:root { --bg:#f3f3f3; --card:#ffffff; --line:#e5e5e5; --text:#1b1b1b; --sub:#5f5f5f; --accent:#005fb8; --accent-soft:#e6f0fa; }
+body { background: linear-gradient(135deg,#eef2f7,#f6f3f1); color: var(--text); display:flex; }
+.title { position:absolute; top:0; left:0; right:0; height:40px; display:flex; align-items:center; gap:10px; padding:0 16px; font-size:12px; color:#333; }
+.logo { width:18px; height:18px; border-radius:4px; background:linear-gradient(135deg,#0078d4,#4cc2ff); }
+.nav { width:212px; flex:none; padding:52px 8px 12px; display:flex; flex-direction:column; gap:2px; height:900px; }
+.nav a { display:flex; align-items:center; gap:12px; padding:9px 12px; border-radius:6px; color:#1b1b1b; text-decoration:none; font-size:13.5px; position:relative; }
+.nav a.on { background: rgba(0,0,0,.055); font-weight:600; }
+.nav a.on::before { content:""; position:absolute; left:0; top:10px; bottom:10px; width:3px; border-radius:2px; background:var(--accent); }
+.nav .sp { flex:1; }
+.acct { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:8px; }
+.avatar { width:30px; height:30px; border-radius:50%; background:#c7dcf3; color:#004c8f; display:grid; place-items:center; font-weight:700; font-size:12px; }
+.main { flex:1; padding:52px 24px 20px 8px; height:900px; display:flex; flex-direction:column; gap:14px; }
+.surface { background:var(--card); border:1px solid var(--line); border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,.04); }
+h1 { font-size:28px; font-weight:600; letter-spacing:-.2px; }
+.head { display:flex; align-items:flex-end; justify-content:space-between; }
+.sub { color:var(--sub); font-size:12.5px; margin-top:4px; }
+.cmd { display:flex; align-items:center; gap:4px; padding:6px; }
+.btn { display:inline-flex; align-items:center; gap:8px; height:32px; padding:0 12px; border-radius:5px; border:1px solid #d1d1d1; background:#fbfbfb; color:#1b1b1b; font-size:13px; white-space:nowrap; }
+.btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+.btn.ghost { border-color:transparent; background:transparent; }
+.btn.danger { color:#c42b1c; }
+.sep { width:1px; height:20px; background:var(--line); margin:0 4px; }
+.search { margin-left:auto; display:flex; align-items:center; gap:8px; width:300px; height:32px; padding:0 10px; border:1px solid #d1d1d1; border-bottom:2px solid #8a8a8a; border-radius:5px; background:#fff; color:#777; }
+.content { flex:1; display:flex; gap:14px; min-height:0; }
+.grid { flex:1; overflow:hidden; display:flex; flex-direction:column; }
+.grid { min-width:0; } .grid table { table-layout:fixed; } .grid th, .grid td { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.acct > div:last-child { min-width:0; } .acct > div:last-child div:first-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.grid th { text-align:left; font-weight:600; font-size:12px; color:#444; padding:10px 12px; border-bottom:1px solid var(--line); background:#fafafa; }
+.grid td { padding:11px 12px; border-bottom:1px solid #f0f0f0; vertical-align:middle; }
+.grid tr.sel td { background:var(--accent-soft); }
+.grid tr.sel td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+.cb { width:16px; height:16px; border:1px solid #8a8a8a; border-radius:3px; display:inline-block; vertical-align:middle; }
+.cb.on { background:var(--accent); border-color:var(--accent); position:relative; }
+.cb.on::after { content:""; position:absolute; left:4.5px; top:1.5px; width:4px; height:8px; border:solid #fff; border-width:0 2px 2px 0; transform:rotate(45deg); }
+.badge { display:inline-flex; align-items:center; gap:6px; font-size:12px; }
+.dot { width:8px; height:8px; border-radius:50%; }
+.ok .dot { background:#0f7b0f; } .muted .dot { background:#8a8a8a; } .info .dot { background:#005fb8; } .warn .dot { background:#c27c00; }
+.exp-soon { color:#c42b1c; font-weight:600; }
+.pager { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; color:var(--sub); font-size:12px; margin-top:auto; border-top:1px solid var(--line); }
+.detail { width:316px; flex:none; padding:18px; display:flex; flex-direction:column; gap:14px; }
+.detail h2 { font-size:18px; font-weight:600; }
+.kv { display:grid; grid-template-columns: 96px 1fr; gap:8px 10px; font-size:12.5px; }
+.kv dt { color:var(--sub); }
+.info-bar { display:flex; gap:10px; align-items:flex-start; background:#fff4ce; border:1px solid #f5e1a4; padding:10px 12px; border-radius:6px; font-size:12.5px; }
+.chip { display:inline-block; padding:2px 8px; border-radius:10px; background:#eef0f3; font-size:11.5px; color:#333; }
+.jobtag { font-size:11.5px; color:#005fb8; background:#e6f0fa; padding:2px 8px; border-radius:10px; }
+.stepper { display:flex; gap:0; padding:18px 22px; align-items:center; }
+.step { display:flex; align-items:center; gap:10px; color:var(--sub); }
+.step .n { width:26px; height:26px; border-radius:50%; border:1.5px solid #c8c8c8; display:grid; place-items:center; font-weight:600; font-size:12px; background:#fff; }
+.step.done .n { background:var(--accent); border-color:var(--accent); color:#fff; }
+.step.cur { color:var(--text); font-weight:600; } .step.cur .n { border-color:var(--accent); color:var(--accent); box-shadow:0 0 0 3px #cfe3f7; }
+.bar { flex:1; height:2px; background:#ddd; margin:0 14px; } .bar.done { background:var(--accent); }
+.form { padding:22px 24px; display:grid; grid-template-columns: 1fr 1fr; gap:18px 22px; }
+.field label { display:block; font-size:12.5px; margin-bottom:6px; font-weight:500; }
+.input { height:34px; border:1px solid #d1d1d1; border-bottom:2px solid #8a8a8a; border-radius:5px; background:#fff; display:flex; align-items:center; padding:0 10px; justify-content:space-between; }
+.input.focus { border-bottom-color:var(--accent); }
+.hint { color:var(--sub); font-size:11.5px; margin-top:5px; }
+.err { color:#c42b1c; font-size:11.5px; margin-top:5px; }
+.seg { display:inline-flex; border:1px solid #d1d1d1; border-radius:6px; overflow:hidden; }
+.seg span { padding:7px 14px; font-size:12.5px; } .seg span.on { background:var(--accent); color:#fff; }
+.toggle { width:40px; height:20px; border-radius:10px; background:var(--accent); position:relative; display:inline-block; vertical-align:middle; }
+.toggle::after { content:""; position:absolute; right:3px; top:3px; width:14px; height:14px; border-radius:50%; background:#fff; }
+.footer { display:flex; justify-content:space-between; align-items:center; padding:14px 24px; border-top:1px solid var(--line); }
+.summary { width:320px; padding:18px; display:flex; flex-direction:column; gap:12px; }
+.summary h3 { font-size:14px; font-weight:600; }
+.sumrow { display:flex; justify-content:space-between; font-size:12.5px; padding:6px 0; border-bottom:1px dashed #eee; }
+.sumrow span:first-child { color:var(--sub); }
+</style></head><body><div class="title"><div class="logo"></div>TTDeployTool</div>
+<nav class="nav"><a class=""><svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17l5-5-5-5M15 12H3M21 3v18"/></svg>サインイン</a><a class="on"><svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>デプロイの一覧</a><a class=""><svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>新しくデプロイ</a><a class=""><svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg>ジョブの一覧</a><a class=""><svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6M10 3v6L5 19a1 1 0 0 0 1 2h12a1 1 0 0 0 1-2l-5-10V3"/></svg>ローカル検証</a><div class="sp"></div><a><svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z"/></svg>設定</a>
+<div class="acct"><div class="avatar">KY</div><div><div style="font-weight:600">mock-user@example.com</div><div class="sub" style="margin:0">サブスクリプション 2 件</div></div></div></nav>
+<main class="main"><div class="head"><div><h1>デプロイの一覧</h1><div class="sub">本ツールでデプロイした環境（2 サブスクリプション・7 件）。最終更新 11/13 15:42</div></div></div>
+<div class="surface cmd"><span class="btn primary"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>新しくデプロイ</span><span class="sep"></span>
+<span class="btn ghost"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg>読み直す</span><span class="btn ghost"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>期限を変える</span><span class="btn ghost danger"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>Azure から削除…</span><span class="btn ghost"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16l-6 8v6l-4-2v-4z"/></svg>絞り込み</span>
+<div class="search"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>アプリ名・グループで探す</div></div>
+<div class="content"><div class="surface grid"><table><thead><tr><th style="width:40px"><span class="cb"></span></th><th style="width:84px">アプリ名</th><th style="width:124px">リソースグループ</th><th style="width:96px">サブスクリプション</th><th style="width:86px">グループ</th><th style="width:150px">状態</th><th style="width:140px">利用可能期限</th><th>ジョブ</th></tr></thead><tbody><tr class="sel"><td><span class="cb on"></span></td>
+<td>sales</td><td>rg-sales-demo</td><td>開発用</td>
+<td><span class="chip">営業</span></td><td><span class="badge ok"><span class="dot"></span>稼働中</span></td>
+<td><span class="exp-soon">11/16</span> <span class="sub" style="display:inline">（あと 3 日）</span></td><td></td></tr><tr class=""><td><span class="cb "></span></td>
+<td>training</td><td>rg-training</td><td>開発用</td>
+<td><span class="chip">教育</span></td><td><span class="badge ok"><span class="dot"></span>稼働中</span></td>
+<td><span class="">12/20</span></td><td></td></tr><tr class=""><td><span class="cb "></span></td>
+<td>qa01</td><td>rg-qa-01</td><td>検証用</td>
+<td><span class="chip">品質保証</span></td><td><span class="badge muted"><span class="dot"></span>停止</span></td>
+<td><span class="">期限なし</span></td><td></td></tr><tr class=""><td><span class="cb "></span></td>
+<td>qa02</td><td>rg-qa-02</td><td>検証用</td>
+<td><span class="chip">品質保証</span></td><td><span class="badge info"><span class="dot"></span>デプロイ中</span></td>
+<td><span class="">12/31</span></td><td><span class="jobtag">デプロイ 実行中 62%</span></td></tr><tr class=""><td><span class="cb "></span></td>
+<td>poc</td><td>rg-poc-ai</td><td>開発用</td>
+<td></td><td><span class="badge warn"><span class="dot"></span>作りかけ</span></td>
+<td><span class="exp-soon">11/14</span> <span class="sub" style="display:inline">（あと 1 日）</span></td><td><span class="jobtag">削除 予定 11/14 18:00</span></td></tr><tr class=""><td><span class="cb "></span></td>
+<td><span class="sub" style="display:inline">—</span></td><td>rg-old-team</td><td>開発用</td>
+<td></td><td><span class="badge muted"><span class="dot"></span>リソースグループだけ</span></td>
+<td><span class="">—</span></td><td></td></tr><tr class=""><td><span class="cb "></span></td>
+<td>review</td><td>rg-review</td><td>検証用</td>
+<td><span class="chip">レビュー</span></td><td><span class="badge ok"><span class="dot"></span>稼働中</span></td>
+<td><span class="">01/31</span></td><td></td></tr></tbody></table>
+<div class="pager"><span>1〜7 件目（全 7 件）</span><span>20 件ずつ ▾</span></div></div>
+<aside class="surface detail"><div><div class="sub" style="margin:0 0 4px">rg-sales-demo</div><h2>sales</h2></div>
+<div class="info-bar"><svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 20h4"/></svg><div>利用可能期限は <b>11/16（あと 3 日）</b>です。期限を過ぎると自動で削除します。</div></div>
+<dl class="kv"><dt>URL</dt><dd style="color:var(--accent)">sales-tt.japaneast.…</dd><dt>状態</dt><dd><span class="badge ok"><span class="dot"></span>稼働中（3/3）</span></dd>
+<dt>DB</dt><dd>PostgreSQL・Azure Files に永続化</dd><dt>スペック</dt><dd>TT 1.5 CPU / 3 GiB</dd><dt>グループ</dt><dd><span class="chip">営業</span></dd><dt>デプロイ日</dt><dd>2026/10/15</dd></dl>
+<div style="display:flex;flex-wrap:wrap;gap:8px"><span class="btn primary"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>Timetracker を開く</span><span class="btn"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3"/></svg>パスワード</span><span class="btn"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a5 5 0 1 1 1-9.9A6 6 0 0 1 19 10a4 4 0 0 1-1 8z"/></svg>状態を確認</span><span class="btn"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg>この設定で新しくデプロイ</span></div></aside></div></main></body></html>

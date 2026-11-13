@@ -407,3 +407,6 @@ WinUI 3 版の UI テストとの対応（名前は同じ。中身の違い）:
 - 変えたもの: `TTDeployTool.Controller.Desktop.Blazor.BrowserTests` と `TTDeployTool.SystemTests` の `Microsoft.Playwright` を 1.56.0 から 1.64.1 に。手元（Linux の Chromium）で Playwright の 49 件が成功。`TTDeployTool.SystemTests` は `e2e-local`（CI）と Desktop System Test・`system-test.yml` が使う。main・`feature/desktop-app` の CI の `e2e-local` も同じ理由で失敗するはずのため、WinUI 3 版のセッションに伝えた
 - CI の結果（run 43453244760、2026-11-13）: 全ジョブ成功（Ubuntu 26.04 の `blazor-prototype`〔Playwright・`table.js` の網羅率〕と `e2e-local`、Windows の WebView2 のテストを含む）
 
+### 16.11 画面のデザイン案（オーナーの依頼、2026-11-13）
+オーナーの依頼「全体的に UX を考慮したモダンなデザインにして欲しい。デザイン案として画面イメージの画像を複数案」で、3 案の画面イメージ（デプロイの一覧・新しくデプロイ）を作った（`ui-redesign/`。HTML から Playwright の Chromium で PNG にした。データはモック）。案 A は Fluent（Windows 11 の流儀）、案 B はダッシュボード、案 C はコンパクト・ダーク。オーナーの判断待ち
+

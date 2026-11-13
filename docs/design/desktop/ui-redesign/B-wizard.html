@@ -1,0 +1,79 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>案 B 新しくデプロイ</title><style>
+@font-face { font-family: 'NotoJP'; src: local('Noto Sans JP'); }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Inter', 'Noto Sans JP', sans-serif; font-size: 13px; width: 1440px; height: 900px; overflow: hidden; -webkit-font-smoothing: antialiased; }
+.ic { flex: none; }
+table { border-collapse: collapse; width: 100%; }
+.mono { font-family: 'Inter', monospace; font-variant-numeric: tabular-nums; }
+
+:root { --bg:#f6f7fb; --card:#fff; --line:#e7e9f0; --text:#172033; --sub:#66708a; --accent:#4f46e5; --accent-soft:#eef0ff; }
+body { background:var(--bg); color:var(--text); display:flex; }
+.rail { width:76px; background:#141a2e; height:900px; display:flex; flex-direction:column; align-items:center; padding:18px 0; gap:8px; }
+.rail .logo { width:38px; height:38px; border-radius:11px; background:linear-gradient(135deg,#6366f1,#22d3ee); margin-bottom:14px; display:grid; place-items:center; color:#fff; font-weight:800; font-size:14px; }
+.rail a { width:52px; padding:8px 0 6px; border-radius:12px; color:#9aa4c2; display:flex; flex-direction:column; align-items:center; gap:4px; font-size:9.5px; }
+.rail a.on { background:#2a3352; color:#fff; }
+.rail .sp { flex:1; }
+.main { flex:1; display:flex; flex-direction:column; height:900px; }
+.top { height:64px; background:#fff; border-bottom:1px solid var(--line); display:flex; align-items:center; padding:0 28px; gap:16px; }
+.top h1 { font-size:18px; font-weight:700; }
+.crumb { color:var(--sub); font-size:12.5px; }
+.search { margin-left:auto; width:360px; height:38px; border-radius:10px; background:#f1f3f8; display:flex; align-items:center; gap:10px; padding:0 14px; color:#8a93ab; }
+.kbd { margin-left:auto; font-size:11px; border:1px solid #d7dbe6; border-radius:5px; padding:1px 6px; color:#7a839b; background:#fff; }
+.avatar { width:36px; height:36px; border-radius:50%; background:#e0e7ff; color:#4338ca; display:grid; place-items:center; font-weight:700; }
+.body { padding:22px 28px; display:flex; flex-direction:column; gap:18px; flex:1; min-height:0; }
+.kpis { display:grid; grid-template-columns: repeat(4, 1fr); gap:16px; }
+.kpi { background:#fff; border:1px solid var(--line); border-radius:14px; padding:16px 18px; display:flex; gap:14px; align-items:center; }
+.kpi .ico { width:42px; height:42px; border-radius:12px; display:grid; place-items:center; }
+.kpi .v { font-size:24px; font-weight:700; } .kpi .l { color:var(--sub); font-size:12px; }
+.card { background:#fff; border:1px solid var(--line); border-radius:14px; }
+.tools { display:flex; align-items:center; gap:10px; padding:14px 16px; border-bottom:1px solid var(--line); }
+.pill { padding:6px 12px; border-radius:20px; background:#f1f3f8; color:#3b4560; font-size:12.5px; display:inline-flex; gap:6px; align-items:center; }
+.pill.on { background:var(--accent); color:#fff; }
+.pill .n { font-size:11px; opacity:.8; }
+.btn { display:inline-flex; align-items:center; gap:8px; height:36px; padding:0 14px; border-radius:10px; border:1px solid var(--line); background:#fff; font-size:13px; font-weight:500; white-space:nowrap; }
+.btn.primary { background:var(--accent); color:#fff; border-color:var(--accent); box-shadow:0 4px 12px rgba(79,70,229,.25); }
+.wrap { display:flex; gap:18px; flex:1; min-height:0; }
+.list { flex:1; overflow:hidden; display:flex; flex-direction:column; }
+.list th { text-align:left; font-size:11.5px; color:var(--sub); font-weight:600; padding:10px 16px; text-transform:none; background:#fafbfe; border-bottom:1px solid var(--line); }
+.list td { padding:12px 16px; border-bottom:1px solid #f1f2f6; }
+.list tr.sel td { background:var(--accent-soft); }
+.appcell { display:flex; gap:12px; align-items:center; }
+.av { width:34px; height:34px; border-radius:10px; display:grid; place-items:center; font-weight:700; color:#fff; font-size:13px; }
+.status { display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:20px; font-size:12px; font-weight:500; }
+.s-ok { background:#e7f8ef; color:#137a45; } .s-muted { background:#eef0f4; color:#59627a; } .s-info { background:#e8efff; color:#3150c9; } .s-warn { background:#fff3e0; color:#b45f06; }
+.exp { width:150px; } .expbar { height:6px; border-radius:3px; background:#eef0f4; margin-top:6px; overflow:hidden; } .expbar i { display:block; height:100%; border-radius:3px; }
+.drawer { width:380px; display:flex; flex-direction:column; }
+.drawer .hd { padding:20px; border-bottom:1px solid var(--line); display:flex; gap:14px; align-items:center; }
+.drawer .sec { padding:16px 20px; border-bottom:1px solid var(--line); }
+.drawer h4 { font-size:12px; color:var(--sub); font-weight:600; margin-bottom:10px; }
+.apps { display:flex; flex-direction:column; gap:8px; }
+.appline { display:flex; justify-content:space-between; align-items:center; padding:8px 10px; background:#fafbfe; border-radius:8px; font-size:12.5px; }
+.timeline { display:flex; flex-direction:column; gap:12px; }
+.tl { display:flex; gap:10px; font-size:12.5px; } .tl .d { width:10px; height:10px; border-radius:50%; margin-top:4px; }
+.vstep { display:flex; flex-direction:column; gap:4px; padding:22px 18px; width:260px; }
+.vs { display:flex; gap:12px; align-items:center; padding:12px; border-radius:12px; color:var(--sub); }
+.vs .n { width:30px; height:30px; border-radius:10px; display:grid; place-items:center; background:#f1f3f8; font-weight:700; }
+.vs.done .n { background:#e7f8ef; color:#137a45; } .vs.cur { background:var(--accent-soft); color:var(--text); font-weight:600; } .vs.cur .n { background:var(--accent); color:#fff; }
+.fgrid { display:grid; grid-template-columns: 1fr 1fr; gap:18px; padding:24px; }
+.f label { display:block; font-size:12.5px; font-weight:600; margin-bottom:8px; }
+.inp { height:40px; border-radius:10px; border:1px solid #dfe3ec; display:flex; align-items:center; justify-content:space-between; padding:0 12px; background:#fff; }
+.inp.bad { border-color:#e5484d; box-shadow:0 0 0 3px #fde4e4; }
+.radio { display:flex; gap:10px; }
+.ropt { flex:1; border:1px solid #dfe3ec; border-radius:12px; padding:12px; font-size:12.5px; } .ropt.on { border-color:var(--accent); background:var(--accent-soft); box-shadow:0 0 0 2px #c7c9ff inset; }
+.ropt b { display:block; margin-bottom:4px; }
+.slider { height:6px; border-radius:3px; background:#e4e7ef; position:relative; margin:16px 4px 6px; } .slider i { position:absolute; left:0; top:0; bottom:0; width:45%; background:var(--accent); border-radius:3px; } .slider b { position:absolute; left:45%; top:-6px; width:18px; height:18px; border-radius:50%; background:#fff; border:3px solid var(--accent); transform:translateX(-50%); }
+.preview { width:330px; display:flex; flex-direction:column; }
+.cost { font-size:26px; font-weight:700; }
+</style></head><body><nav class="rail"><div class="logo">TT</div><a class=""><svg class="ic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17l5-5-5-5M15 12H3M21 3v18"/></svg><span>サインイン</span></a><a class=""><svg class="ic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span>一覧</span></a><a class="on"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg><span>新規デプロイ</span></a><a class=""><svg class="ic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg><span>ジョブ一覧</span></a><a class=""><svg class="ic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6M10 3v6L5 19a1 1 0 0 0 1 2h12a1 1 0 0 0 1-2l-5-10V3"/></svg><span>ローカル検証</span></a><div class="sp"></div><a><svg class="ic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 20h4"/></svg><span>通知</span></a><a><svg class="ic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z"/></svg><span>設定</span></a></nav>
+<div class="main"><div class="top"><div><div class="crumb">ホーム / デプロイ / 新規</div><h1>新しくデプロイ</h1></div><div class="search"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>デプロイ・ジョブ・操作を探す<span class="kbd">Ctrl K</span></div><div class="avatar">KY</div></div>
+<div class="body"><div class="wrap"><div class="card vstep"><div style="font-size:12px;color:var(--sub);margin:0 0 8px 12px">5 つの手順</div><div class="vs done"><span class="n">✓</span><div><div>対象</div><div style="font-size:11.5px;font-weight:400;color:var(--sub)">rg-sales-demo / sales</div></div></div><div class="vs done"><span class="n">✓</span><div><div>DB</div><div style="font-size:11.5px;font-weight:400;color:var(--sub)">PostgreSQL</div></div></div><div class="vs done"><span class="n">✓</span><div><div>パスワード</div><div style="font-size:11.5px;font-weight:400;color:var(--sub)">入力済み</div></div></div><div class="vs cur"><span class="n">4</span><div><div>スペックと期限</div><div style="font-size:11.5px;font-weight:400;color:var(--sub)">入力中</div></div></div><div class="vs "><span class="n">5</span><div><div>確認と実行</div><div style="font-size:11.5px;font-weight:400;color:var(--sub)"></div></div></div></div>
+<div class="card" style="flex:1;display:flex;flex-direction:column"><div style="padding:22px 24px 0"><div style="font-size:20px;font-weight:700">スペックと期限</div><div style="color:var(--sub);margin-top:4px">あとから「期限を変える」で延ばせます。</div></div>
+<div class="fgrid"><div class="f" style="grid-column:1/-1"><label>Timetracker の CPU</label><div class="slider"><i></i><b></b></div><div style="display:flex;justify-content:space-between;color:var(--sub);font-size:11.5px"><span>0.25</span><span style="color:var(--accent);font-weight:700">1.5 vCPU / 3 GiB</span><span>4.0</span></div></div>
+<div class="f"><label>DB（CPU / メモリ）</label><div class="inp">0.5 vCPU / 1 GiB<span>▾</span></div></div><div class="f"><label>Redis（CPU / メモリ）</label><div class="inp">0.25 vCPU / 0.5 GiB<span>▾</span></div></div>
+<div class="f" style="grid-column:1/-1"><label>利用可能期限</label><div class="radio"><div class="ropt"><b>既定</b>今日から 32 日後（12/15）</div><div class="ropt on"><b>日付を指定</b>2026/11/02</div><div class="ropt"><b>期限なし</b>自動で削除しない</div></div>
+<div class="inp bad" style="margin-top:12px;width:280px">2026/11/02<span><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span></div><div style="color:#e5484d;font-size:12px;margin-top:6px">今日以降の日付にしてください（読み込んだジョブの期限が過ぎています）</div></div></div>
+<div style="margin-top:auto;padding:16px 24px;border-top:1px solid var(--line);display:flex;justify-content:space-between"><span class="btn">戻る</span><span class="btn primary">確認と実行へ</span></div></div>
+<div class="card preview"><div style="padding:20px;border-bottom:1px solid var(--line)"><div style="color:var(--sub);font-size:12px">作るもの</div><div style="font-weight:700;font-size:16px;margin-top:4px">sales（rg-sales-demo）</div></div>
+<div style="padding:16px 20px;display:flex;flex-direction:column;gap:10px"><div class="appline"><span>Container Apps Environment</span><span class="status s-info">新規</span></div><div class="appline"><span>sales-tt / -db / -redis</span><span class="status s-info">新規 3</span></div><div class="appline"><span>ストレージアカウント</span><span class="status s-info">新規</span></div></div>
+<div style="padding:16px 20px;border-top:1px solid var(--line)"><div style="color:var(--sub);font-size:12px">目安の時間</div><div class="cost">約 8 分</div></div>
+<div style="padding:16px 20px;border-top:1px solid var(--line);font-size:12.5px;color:#b45f06;background:#fff8ec;margin:0 16px;border-radius:10px">失敗したジョブ（11/02）の設定を読み込みました。パスワードは入力済みのものを使います。</div></div></div></div></div></body></html>
