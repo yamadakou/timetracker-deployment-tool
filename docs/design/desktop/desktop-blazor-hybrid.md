@@ -396,3 +396,13 @@ WinUI 3 版の UI テストとの対応（名前は同じ。中身の違い）:
 - CI の結果（run 41669248222、2026-11-03）: 全ジョブ成功。オーナーの依頼で、WinUI 3 版のセッションに同じ仕様の反映（Core の取り込みと、WinUI 3 の画面の 3 つのボタンと理由の表示）を頼んだ
 - WinUI 3 版のセッションが取り込んだ（`feature/desktop-app` の cce8b19・16a9cb8。Core と Core.Tests は同じ。CI run 41675892333 は全ジョブ成功）。WinUI 3 の画面では、2 行を選んで `JobList.Current` が null になったとき、x:Bind が前の行の理由の文を残していた（FallbackValue で直した）と知らせを受けた。Blazor 版は描き直しで消えることを bUnit（`RedeployScreenTests`）で確かめた
 
+### 16.10 Playwright の版を上げる（オーナーの依頼、2026-11-13）
+- 起きたこと: CI（run 43226998343、2026-11-12）で、Linux の `blazor-prototype`・`e2e-local (sqlserver / postgresql)` が、Playwright のブラウザーを入れる手順で「Playwright does not support chromium on ubuntu26.04-x64」で失敗した。`runs-on: ubuntu-latest` が Ubuntu 26.04 になり、使っていた Playwright 1.56 が 26.04 に対応していなかった（コードの変更とは関係ない）
+- オーナーの判断: 古い版を使い続けるのはデメリットがあるため、リリースノート（https://playwright.dev/docs/release-notes ）を確かめて最新にする（`runs-on` を 24.04 に固定する案は採らない）
+- リリースノートの確認: Ubuntu 26.04 には 1.61 から対応。最新は 1.65 だが、.NET の `Microsoft.Playwright` の最新は 1.64.1（NuGet）のため、1.64.1 にした。1.57〜1.64 の破壊的変更のうち、使っている API に当たるものは無かった
+  - 1.57: Chromium は Chrome for Testing のビルドになり、ヘッドレスは `chrome-headless-shell`（CI は `playwright.ps1 install --with-deps chromium` で入れるため、そのまま）
+  - 1.60: 長く非推奨だった API の削除（`videosPath`・`videoSize`・`connectOverCDP` の `logger` など。使っていない。WebView2 のテストの `ConnectOverCDPAsync` は URL だけ渡す）
+  - 1.62: ヘッドレスではクリップボードが OS から切り離される（テストのクリップボードは、テスト用のホストの記録〔`/test/clipboard`〕で見るため、影響なし）
+  - 1.64: 見えない iframe の中の要素は見えないものとして扱う（iframe は使っていない）
+- 変えたもの: `TTDeployTool.Controller.Desktop.Blazor.BrowserTests` と `TTDeployTool.SystemTests` の `Microsoft.Playwright` を 1.56.0 から 1.64.1 に。手元（Linux の Chromium）で Playwright の 49 件が成功。`TTDeployTool.SystemTests` は `e2e-local`（CI）と Desktop System Test・`system-test.yml` が使う。main・`feature/desktop-app` の CI の `e2e-local` も同じ理由で失敗するはずのため、WinUI 3 版のセッションに伝えた
+
