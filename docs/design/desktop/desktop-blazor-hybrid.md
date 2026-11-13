@@ -405,4 +405,5 @@ WinUI 3 版の UI テストとの対応（名前は同じ。中身の違い）:
   - 1.62: ヘッドレスではクリップボードが OS から切り離される（テストのクリップボードは、テスト用のホストの記録〔`/test/clipboard`〕で見るため、影響なし）
   - 1.64: 見えない iframe の中の要素は見えないものとして扱う（iframe は使っていない）
 - 変えたもの: `TTDeployTool.Controller.Desktop.Blazor.BrowserTests` と `TTDeployTool.SystemTests` の `Microsoft.Playwright` を 1.56.0 から 1.64.1 に。手元（Linux の Chromium）で Playwright の 49 件が成功。`TTDeployTool.SystemTests` は `e2e-local`（CI）と Desktop System Test・`system-test.yml` が使う。main・`feature/desktop-app` の CI の `e2e-local` も同じ理由で失敗するはずのため、WinUI 3 版のセッションに伝えた
+- CI の結果（run 43453244760、2026-11-13）: 全ジョブ成功（Ubuntu 26.04 の `blazor-prototype`〔Playwright・`table.js` の網羅率〕と `e2e-local`、Windows の WebView2 のテストを含む）
 
