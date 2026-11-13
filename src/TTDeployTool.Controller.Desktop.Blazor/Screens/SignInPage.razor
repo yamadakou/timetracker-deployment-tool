@@ -3,6 +3,7 @@
 @* サインイン（WinUI の画面の TargetPanel。サブスクリプションは「新しくデプロイ」の ① で選ぶ。docs/design/desktop/desktop-wizard.md の 2） *@
 <section class="tt-page tt-narrow" data-id="Panel.Target">
     <h1>Azure へのサインイン</h1>
+    <div class="tt-surface tt-section">
     <p data-id="SignIn.Account">@Model.SignIn.AccountDisplay</p>
     <div class="tt-bar">
         <CommandButton Id="SignIn.SignIn" Command="Model.SignIn.SignInCommand" Text="サインイン" Css="tt-primary" />
@@ -14,6 +15,7 @@
     <BusyView Id="Target.Busy" State="Model.Target.Busy" />
     <Lines Id="Target.Notices" Items="Model.Target.Notices" />
     <Message Id="Target.Error" Text="@Model.Target.Error" />
+    </div>
 </section>
 
 @code {

@@ -410,3 +410,20 @@ WinUI 3 版の UI テストとの対応（名前は同じ。中身の違い）:
 ### 16.11 画面のデザイン案（オーナーの依頼、2026-11-13）
 オーナーの依頼「全体的に UX を考慮したモダンなデザインにして欲しい。デザイン案として画面イメージの画像を複数案」で、3 案の画面イメージ（デプロイの一覧・新しくデプロイ）を作った（`ui-redesign/`。HTML から Playwright の Chromium で PNG にした。データはモック）。案 A は Fluent（Windows 11 の流儀）、案 B はダッシュボード、案 C はコンパクト・ダーク。推奨（案 A を基本に、案 B の件数のカードと期限の残りのバーを取り入れる）の画面イメージも、オーナーの依頼で作った（デプロイの一覧・ジョブの一覧・新しくデプロイ。`D-*.png`）。オーナーの依頼で、新しくデプロイのスペックは 3 つ（TimeTracker・DB・Redis）ともスライダーにし、期限までの料金の目安（単位は切り替え、既定は円）を右に出す形に直した。料金は Azure の公開の価格表（Retail Prices API。東日本・従量課金。円の価格もある）の値で描いた（2026-11-13 の値: vCPU 0.0038 円/秒、メモリ 0.0005 円/GiB 秒）。表記は「TimeTracker」（2 つ目の T も大文字）が正しい（オーナーの指摘）。オーナーの判断待ち
 
+### 16.12 推奨のデザインで作り直す（オーナーの判断、2026-11-13）
+オーナーの判断: デザインは推奨（案 A〔Windows 11 の Fluent〕を基本に、案 B の件数のカードと期限の残りのバー）、スペックは 3 つともスライダー、料金の目安を出す（単価は案 1: Azure の公開の価格表をその場で読み、読めなければアプリに入れた価格。単位は切り替え、既定は円）、表記は「TimeTracker」に（すべて）、ダークモードも用意する、リソースグループの件（1・2）は案 A で、新しいデザインと一緒に作る。
+
+| 項目 | 内容 | 主な場所 |
+|---|---|---|
+| リソースグループだけの行（1） | Resource Graph で管理タグの付いたリソースグループも読み（`resourcecontainers`）、本ツールのアプリのリソースが無いものを「リソースグループだけ」の行にする（アプリ名は空）。削除の画面は、アプリ名が空ならリソースグループだけを計画する（本ツールで作った〔管理タグの〕空のリソースグループだけを削除。確かめはリソースグループ名）。今すぐ・予定・まとめての削除で使える。期限での自動の削除の対象にはしない | `ResourceGraphDeploymentDirectory.ResourceGroupQuery`・`DeploymentCatalog.Build`・`DeletionPlanner`（アプリ名が空）・`DeletionViewModel.IsResourceGroupOnly` |
+| 削除の設定の変更（2） | 予定・待機中・一時停止の削除のジョブ（このアプリで登録したもの）で、「リソースグループも削除する」を切り替えて「削除の設定を変える」。登録したときと同じ選択とアプリ名で計画し直し、実行できなければ理由を出す。広げるときは確かめる。ジョブの始め方と、アプリを終了しても残す予定を入れ替える | `JobViewModel.ChangeDeletionCommand`・`DeletionViewModel.ChangeResourceGroupAsync`・`JobQueue.ReplaceDeletion` |
+| 料金の目安 | 期限まで（既定の期限・指定の日付。期限なしは 30 日あたり）の、TimeTracker・DB・Redis（3 つとも 24 時間動き続けた場合の上限）と永続化（Azure Files、DB のデータ 1 GB の想定）。無料枠で安くなる額の上限も出す。円の価格は 4 桁目で丸められているため、USD の価格を読み、同じ価格表の最も高い項目の比で換算する | `Pricing/PriceCatalog.cs`（`AzureRetailPriceCatalog`・`BuiltInPriceCatalog`）・`Pricing/CostEstimateViewModel.cs` |
+| スペックのスライダー | CPU 0.25〜2.0（0.25 刻み。ワークロード プロファイルを使わない Container Apps の環境で選べる値）、メモリは CPU の 2 倍。数値で入れる欄も「数値で入れる」の中に残す | `SpecSlider`・`SpecSliderView.razor` |
+| 件数のカード・期限の残り | デプロイの一覧（すべて・期限が 7 日以内・実行中・予定のジョブ・要確認）、ジョブの一覧（実行中・予定・失敗と完了〔7 日以内〕）。押すと絞り込み、もう一度押すと外す。期限の列に残りのバーと「あと n 日」（CSS で描き、セルの文字〔コピー・テスト〕には入れない）。右の詳細に「+7 日」「+30 日」 | `DeploymentListViewModel.QuickFilter`・`JobListViewModel.QuickFilter`・`DeploymentRowViewModel.DaysLeft`・`StatCard.razor` |
+| 画面 | 左のメニューにアイコンとアカウント、ページの見出し、面（カード）、操作の帯、1 行を選んだときの右の詳細、新しくデプロイの手順の帯と料金の目安。明るい画面と濃い色の画面は、Windows の設定に合わせて切り替える（`prefers-color-scheme`。WebView2 は Windows のアプリのモードに従う）。右クリックのメニューは画面の端で内側に寄せる（行が高くなり、下の端で外にはみ出していた） | `wwwroot/app.css`・`Shell/DesktopShell.razor`・各画面 |
+| 表記 | 画面・メッセージ・ログ・MCP のツールの説明・CLI のヘルプ・文書の「Timetracker」を「TimeTracker」に。C# の名前・Azure のリソース名・タグの値・以前の名前（`Timetracker MCP …` のアプリ登録を探すスクリプトなど）は変えない。このブランチの WinUI 3 のアプリの画面（XAML）も変えない | 全体 |
+
+- テスト: Core（`ResourceGroupOnlyTests`・`DeletionSettingsTests`・`ModernDesignTests`）、Application（リソースグループだけの計画・一覧）、Infrastructure（リソースグループの問い合わせ）、bUnit（`RedesignScreenTests`）、Playwright（`DesignTests`: 明暗の画面で件数のカード・期限のバー・スライダー・料金の目安。CI では画面の画像を成果物 `blazor-prototype-results` の `screenshots` に残す）。Core 520 件・画面の部品 115 件とも行・分岐 100%、Playwright 51 件
+- Core の変更のため、WinUI 3 版のセッションに同じ仕様の反映を頼む（WinUI 3 の画面は WinUI 3 版のセッションが作る）
+- 実機の確認: 手順書の 31〜37
+

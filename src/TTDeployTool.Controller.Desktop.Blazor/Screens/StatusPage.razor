@@ -3,6 +3,7 @@
 @* 実行状況（今すぐ実行・今すぐ削除の後と、一覧の「状態を確認」・ジョブの「詳細」から開く。WinUI の画面の StatusPanel） *@
 <section class="tt-page tt-narrow" data-id="Panel.Status">
     <h1>実行状況</h1>
+    <div class="tt-surface tt-section">
     <button type="button" data-id="Status.BackToList" @onclick="() => Back.InvokeAsync(Model.ReturnPage)">@Model.ReturnText</button>
     @if (Model.StatusJob is { } job)
     {
@@ -36,6 +37,7 @@
             <li><span class="tt-strong">@app.Role: @app.Name</span><br />@app.State、@app.Resources、@app.Image</li>
         }
     </ul>
+    </div>
 </section>
 
 @code {
