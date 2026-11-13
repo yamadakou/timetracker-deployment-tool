@@ -674,7 +674,7 @@ public class DeletionRunnerTests
     [Fact]
     public async Task Should_Stop_When_Replaced_By_An_Untagged_Resource_With_The_Same_Name()
     {
-        // 計画の作成後に、Timetracker アプリが管理タグの無い同じ名前のアプリに置き換えられた
+        // 計画の作成後に、TimeTracker アプリが管理タグの無い同じ名前のアプリに置き換えられた
         App("demo-tt", NoTags);
 
         var act = () => new DeletionRunner(_gateway.Object).RunAsync(

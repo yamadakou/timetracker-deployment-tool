@@ -30,7 +30,7 @@ public interface IAzureDeploymentGateway
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// DB / Redis / Timetracker の各 Container App を作成または更新する。
+    /// DB / Redis / TimeTracker の各 Container App を作成または更新する。
     /// <see cref="DeployOptions.PersistDb"/> が true なら DB アプリに Azure Files をマウントし、
     /// 既に Azure Files を使っている DB アプリは、停止してから更新し、開始する。
     /// </summary>
@@ -126,7 +126,7 @@ public interface IAzureDeploymentGateway
         CancellationToken cancellationToken = default);
 }
 
-/// <summary>作成・更新した Container App の名前と、Timetracker のエンドポイント URL（取得できなければ null）。</summary>
+/// <summary>作成・更新した Container App の名前と、TimeTracker のエンドポイント URL（取得できなければ null）。</summary>
 public sealed record ContainerAppsDeployment(string TimetrackerAppName, string DbAppName, string RedisAppName, string? TimetrackerUrl);
 
 /// <summary>リソースグループの情報。<see cref="Tags"/> は取得しなければ null。</summary>

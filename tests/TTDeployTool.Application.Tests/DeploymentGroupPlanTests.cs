@@ -76,7 +76,7 @@ public class DeploymentGroupPlanTests
         Deployed(null, "営業");
 
         var plan = await new DeploymentPlanner(_gateway.Object).PlanAsync(Opts(), Ct);
-        plan.Group.Should().Be(new GroupDecision("営業", "営業"), "Timetracker に無ければ DB のものを読む");
+        plan.Group.Should().Be(new GroupDecision("営業", "営業"), "TimeTracker に無ければ DB のものを読む");
         var result = await new DeploymentRunner(_gateway.Object).RunAsync(Opts(), cancellationToken: Ct);
         result.Group!.Inherited.Should().BeTrue();
         _sent!.LifecycleTags!.Should().NotContainKey(DeploymentGroup.Key, "今のタグは、アプリの更新でそのまま残る");

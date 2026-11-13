@@ -237,7 +237,7 @@ public class StatusViewModelTests
         vm.Summary.Should().Be("Container Apps Environment demo-env（japaneast、Succeeded）");
         vm.Endpoint.Should().Be(new Uri("https://demo-tt.example.io"));
         vm.Apps.Should().Equal(
-            new AppStateRow("Timetracker", "demo-tt", "Succeeded / Running", "img:1", "1.5 vCPU / 3Gi", "demo-tt--r1", true),
+            new AppStateRow("TimeTracker", "demo-tt", "Succeeded / Running", "img:1", "1.5 vCPU / 3Gi", "demo-tt--r1", true),
             new AppStateRow("DB", "demo-db", "Succeeded / Running", "img:1", "1.5 vCPU / 3Gi", "demo-db--r1", false));
 
         h.Main.Target.AppName = "other";

@@ -141,7 +141,7 @@ public class DeploymentCatalogTests
         e.DbType.Should().Be("postgresql");
         e.DbPersisted.Should().BeFalse();
         e.IsComplete.Should().BeFalse();
-        e.Missing.Should().Equal("Timetracker", "Redis");
+        e.Missing.Should().Equal("TimeTracker", "Redis");
     }
 
     [Fact]
@@ -152,7 +152,7 @@ public class DeploymentCatalogTests
         var e = entries.Single();
         e.Location.Should().BeNull();
         e.DbType.Should().BeNull();
-        e.Missing.Should().Equal("Container Apps Environment", "Timetracker", "DB", "Redis");
+        e.Missing.Should().Equal("Container Apps Environment", "TimeTracker", "DB", "Redis");
     }
 
     [Fact]

@@ -104,7 +104,7 @@ flowchart LR
 | 3 | `GET /.well-known/oauth-protected-resource` | `resource` が `https://<FQDN>/mcp`、`authorization_servers` がテナントの v2 の発行者、`scopes_supported` が `https://<FQDN>/mcp/Mcp.Access` |
 | 4 | Claude Code で `/mcp` からサインイン | ブラウザーでサインインでき、`timetracker` が接続済みになる。サーバーのログ（`az containerapp logs show`）に利用者名と `{tid}/{oid}` が出る |
 | 5 | ロールなしで `get_deployment_options` と `list_subscriptions` | 前者は使え、後者はアプリロールが必要というエラー |
-| 6 | `TTDeployTool.Deploy.Server` で、許可したリソースグループに計画 → デプロイ → 状態の確認 → 削除 | `identity` が「MCP サーバーのマネージド ID（server 方式）」で、Timetracker の URL が返り、削除できる。アクティビティログの操作者がマネージド ID |
+| 6 | `TTDeployTool.Deploy.Server` で、許可したリソースグループに計画 → デプロイ → 状態の確認 → 削除 | `identity` が「MCP サーバーのマネージド ID（server 方式）」で、TimeTracker の URL が返り、削除できる。アクティビティログの操作者がマネージド ID |
 | 7 | `server` 方式で許可していないリソースグループに計画 | Azure を読まずにブロッカー |
 | 8 | （`user` 方式）`TTDeployTool.Deploy.User` で、自分に Contributor があるリソースグループに計画 → デプロイ → 削除 | `identity` が「サインインした利用者本人の権限（user 方式）」。アクティビティログの操作者が本人 |
 | 9 | （`user` 方式）自分に権限の無いリソースグループに計画 | 権限の事前確認で不足が示され、`plan_id` が null |
@@ -150,7 +150,7 @@ flowchart LR
 | 3 | 期待どおり（`scopes_supported` は下の 1 の修正の後のもの） |
 | 4 | 成功（2026-10-19、イメージ 0.9.0、Claude Code 2.1.303）。`claude mcp add --transport http --client-id … --callback-port 8765` で登録し、`/mcp` からブラウザーでサインインして接続済みになった（MFA あり）。`get_deployment_options` と `list_subscriptions` を呼べた。サーバーのログに、要求ごとの利用者名と `{tid}/{oid}`、`Server (ttdeploytool 0.9.0), Client (claude-code 2.1.303)` が出た。それまでは、検証用のスクリプトで `resource` 付きのサインインとトークンの取得を確認していた（下の 1 の修正の後） |
 | 5 | ロールなしでは確認していない（利用者が 1 人のため）。ロールありで `get_deployment_options` と `list_subscriptions`（server 方式）が使えた |
-| 6 | 計画（権限の事前確認は不足なし）→ デプロイ（約 2 分。Timetracker の URL が `/setup` に転送）→ `get_deployment_info` → 削除（アプリ名の不一致は拒否。約 13 分。リソースグループは残る）。アクティビティログの操作者はマネージド ID |
+| 6 | 計画（権限の事前確認は不足なし）→ デプロイ（約 2 分。TimeTracker の URL が `/setup` に転送）→ `get_deployment_info` → 削除（アプリ名の不一致は拒否。約 13 分。リソースグループは残る）。アクティビティログの操作者はマネージド ID |
 | 7 | Azure を読まずにブロッカー。`azure_identity` を省略して範囲外の削除を計画した場合は、`user` 方式を案内するエラー |
 | 8 | 下の 3・4 の対応の後に成功。`user` 方式で、許可したリソースグループの外に、リソースグループの作成から計画 → デプロイ（約 2 分）→ 削除。`identity` は「サインインした利用者本人の権限（user 方式）」、アクティビティログの操作者は本人 |
 | 9・10 | 未確認（利用者がすべてのリソースグループの所有者で、ほかの利用者がいないため） |

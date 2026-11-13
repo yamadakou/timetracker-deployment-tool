@@ -19,7 +19,7 @@ Azure にも Entra ID にも何もない状態から、次の順に進めます�
 | 言葉 | 意味 |
 |---|---|
 | MCP サーバー（HTTP 版） | AI アシスタントから URL で接続して使う、本ツールのサーバー（[MCP_SERVER.md の HTTP 版](../../MCP_SERVER.md#http-版開発中)）。Azure Container Apps の [Container App](https://learn.microsoft.com/ja-jp/azure/container-apps/overview) として動かす |
-| [Environment](https://learn.microsoft.com/ja-jp/azure/container-apps/environment) | Container App を入れる箱（Container Apps 環境）。MCP サーバー用と、確認で作る Timetracker 用の 2 つが出てくる |
+| [Environment](https://learn.microsoft.com/ja-jp/azure/container-apps/environment) | Container App を入れる箱（Container Apps 環境）。MCP サーバー用と、確認で作る TimeTracker 用の 2 つが出てくる |
 | [マネージド ID](https://learn.microsoft.com/ja-jp/entra/identity/managed-identities-azure-resources/overview) | MCP サーバーが Azure を操作するときに使う ID。パスワードを持たない |
 | [アプリ登録](https://learn.microsoft.com/ja-jp/entra/identity-platform/quickstart-register-app) | Entra ID に登録するアプリの情報。MCP サーバー用（サインインした人を確かめる）と、クライアント用（Claude Code がサインインに使う）の 2 つを作る |
 | [アプリロール](https://learn.microsoft.com/ja-jp/entra/identity-platform/howto-add-app-roles-in-apps) | MCP サーバーで Azure を操作してよい人に割り当てる役割。`TTDeployTool.Deploy.Server`（`server` 方式と `user` 方式）と `TTDeployTool.Deploy.User`（`user` 方式だけ）がある |
@@ -71,7 +71,7 @@ $Me = az ad signed-in-user show --query userPrincipalName -o tsv       # 自分�
 ```powershell
 $McpRg      = "rg-tt-mcp"        # MCP サーバーを置くリソースグループ（スクリプトが作る）
 $McpName    = "tt-mcp"           # MCP サーバーの Container App の名前（Environment・マネージド ID・アプリ登録の名前の元にもなる）
-$AllowedRg  = "rg-tt-mcp-demo"   # server 方式で操作を許すリソースグループ（スクリプトが作る）。4 章の確認で Timetracker を作る場所
+$AllowedRg  = "rg-tt-mcp-demo"   # server 方式で操作を許すリソースグループ（スクリプトが作る）。4 章の確認で TimeTracker を作る場所
 $ImageTag   = "<版>"             # MCP サーバーのイメージの版（2.3 で確かめた版。例: 0.9.0）
 ```
 
@@ -130,12 +130,12 @@ pwsh scripts/assign-mcp-role.ps1 -Name $McpName -Role Server -UserPrincipalName 
 | # | 依頼・操作 | 期待する結果 |
 |---|---|---|
 | S1 | 「サブスクリプション <2.2 の ID> のリソースグループ rg-tt-mcp-demo に、アプリ名 `ttmcp` で、DB のデータを永続化してデプロイする計画を作って」（`plan_deployment` に `persist_db=true`。パスワードを聞かれたら、確認用の値を答える） | `persist_db` が true、`storage_account` にストレージアカウント名がある。`actions` に `storage_account` / `file_share` / `environment_storage` の作成が並ぶ。`warnings` に料金と削除での扱いの案内がある。`permission_check` が `ok`、`requires_data_loss_ack` が false、`identity` が server 方式 |
-| S2 | 計画の内容を確かめて「実行して」と頼む（`start_deployment`）。終わるまで待つ（アシスタントが `get_job_status` で進み具合を確かめる。10 分ほど） | `succeeded`。手順は 4 つ（`current_step` が 4/4）。`result` に Timetracker の URL と `storage_account` がある |
+| S2 | 計画の内容を確かめて「実行して」と頼む（`start_deployment`）。終わるまで待つ（アシスタントが `get_job_status` で進み具合を確かめる。10 分ほど） | `succeeded`。手順は 4 つ（`current_step` が 4/4）。`result` に TimeTracker の URL と `storage_account` がある |
 | S3 | 「`ttmcp` の状態を教えて」（`get_deployment_info`） | `persistence` が `db_persisted: true`、`storage_account` が S1 の名前、`storage_account_managed: true` |
 | S4 | DB のデータが Azure Files に置かれていることを確かめ、テスト用の行を入れる（下の「データの確認」） | ファイル共有に `pgdata/PG_VERSION` がある |
 | S5 | 「`ttmcp` の DB の CPU を 1.25 にして再デプロイする計画を作って」（`persist_db` は指定しない） | `persist_db` が true（今の状態を引き継ぐ）、`requires_data_loss_ack` が false。`warnings` に「データを守るために一度停止してから更新し、開始します」がある |
 | S6 | S5 の計画を実行する（データが消えることへの同意 `acknowledge_data_loss` は付けない）。終わったら、S4 で入れた行を確かめる（下の「データの確認」） | 同意を求められずに実行できる。ジョブのログに DB アプリの開始が出る。S4 で入れた行が残っている |
-| S7 | 「`ttmcp` の永続化をやめて再デプロイする計画を作って」（`persist_db=false`） | `requires_data_loss_ack` が true。`warnings` に「Timetracker からは空の DB に見えます。これまでのデータは消えずにストレージアカウントに残り…」がある。**実行はしない**（同意なしで実行を頼むと、実行されずにエラーになることだけ確かめる） |
+| S7 | 「`ttmcp` の永続化をやめて再デプロイする計画を作って」（`persist_db=false`） | `requires_data_loss_ack` が true。`warnings` に「TimeTracker からは空の DB に見えます。これまでのデータは消えずにストレージアカウントに残り…」がある。**実行はしない**（同意なしで実行を頼むと、実行されずにエラーになることだけ確かめる） |
 | S8 | 「`ttmcp` を、DB のデータを残して削除する計画を作って」（`plan_deletion` に `keep_db_data=true`） | ストレージアカウントの対象が `will_delete: false`（理由: `--keep-db-data の指定により残します`）。`keeps_db_data` が true、`kept` にストレージアカウントの案内がある。「DB のデータはすべて失われます」の警告は出ない |
 | S9 | S8 を実行する（確認のためアプリ名 `ttmcp` の入力を求められる）。終わるまで待つ（15 分ほど） | `succeeded`。Container App と Environment は削除され、ストレージアカウントは残る（`get_deployment_info` の `persistence.storage_account` が残っている） |
 | S10 | 「`ttmcp` を削除する計画を作って」（既定。`keep_db_data` なし） | ストレージアカウントの対象が `will_delete: true`、`deletes_db_data` が true。「ストレージアカウント…も削除します。元に戻せません（残すには keep_db_data=true）」の警告がある |
@@ -197,7 +197,7 @@ $UserRg = "rg-tt-mcp-user"   # user 方式の確認に使うリソースグル�
 `user` 方式では、MCP サーバーへのサインインで MFA を行っている必要があります。「多要素認証（MFA）が必要です」というエラーになった場合は、`/mcp` から `timetracker` にサインインし直し、MFA を行ってください（詳細は [`docs/design/mcp/mcp-phase4c.md`](mcp-phase4c.md) の「10. 確認結果」の 3）。
 
 ## 6. 後片付けと記録
-### 6.1 確認で作った Timetracker の環境
+### 6.1 確認で作った TimeTracker の環境
 - [ ] Claude Code に「`ttmcp` の状態を教えて」と頼み、`exists` が false になっている（残っていれば、削除の計画 → 実行を頼む）。5 章で `user` 方式も確かめた場合は、そちらのアプリ名も同じように確かめる
 
 ### 6.2 MCP サーバーと、配置のスクリプトが作ったもの

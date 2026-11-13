@@ -16,7 +16,7 @@ public class GroupTests
 {
     private readonly MovableTime _time = new();
 
-    // グループのタグを Timetracker と DB の Container App に付けたデプロイ（db を別の値にすると食い違い）
+    // グループのタグを TimeTracker と DB の Container App に付けたデプロイ（db を別の値にすると食い違い）
     private static IEnumerable<ManagedResourceRecord> Grouped(string app, string? group, string? dbGroup = null, string rg = "rg") =>
         Deployment("sub", rg, app).Select(r =>
             (r.Type, r.Name.EndsWith("-db", StringComparison.Ordinal) ? dbGroup ?? group : group) is (ManagedResourceRecord.ContainerAppType, { } value)

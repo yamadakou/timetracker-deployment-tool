@@ -4,7 +4,7 @@ using TTDeployTool.Infrastructure.Azure;
 namespace TTDeployTool.Application.Deployment;
 
 /// <summary>
-/// Azure Container Apps へのデプロイ手順（リソースグループ → Environment →（永続化する場合）DB のストレージ → DB / Redis / Timetracker）を実行する。
+/// Azure Container Apps へのデプロイ手順（リソースグループ → Environment →（永続化する場合）DB のストレージ → DB / Redis / TimeTracker）を実行する。
 /// CLI など各フロントエンドから共通で使う。
 /// </summary>
 public sealed class DeploymentRunner
@@ -68,7 +68,7 @@ public sealed class DeploymentRunner
                 await _gateway.UpdateStorageAccountTagsAsync(opts.Subscription, opts.ResourceGroup, storageAccount, lifecycleTags, cancellationToken);
         }
 
-        progress?.Report(new DeploymentProgress(DeploymentStep.ContainerApps, ++index, total, "Container Apps（DB / Redis / Timetracker）"));
+        progress?.Report(new DeploymentProgress(DeploymentStep.ContainerApps, ++index, total, "Container Apps（DB / Redis / TimeTracker）"));
         var apps = await _gateway.CreateOrUpdateContainerAppAsync(
             opts.Subscription, opts.ResourceGroup, opts.AppName, opts.Location, opts, env, cancellationToken);
 

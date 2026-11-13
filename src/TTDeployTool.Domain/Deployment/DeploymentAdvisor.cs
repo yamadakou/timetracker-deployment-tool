@@ -14,7 +14,7 @@ public static class DeploymentAdvisor
     {
         var warnings = new List<string>();
         if (o.DbType == "sqlserver" && target == ValidationTarget.Azure)
-            warnings.Add("Azure 上の SQL Server 構成ではサンプル DB を作成できません（Timetracker のセットアップで空の DB を選択してください）。");
+            warnings.Add("Azure 上の SQL Server 構成ではサンプル DB を作成できません（TimeTracker のセットアップで空の DB を選択してください）。");
         if (o.TimetrackerMemoryGi <= LowTimetrackerMemoryGi)
             warnings.Add(
                 $"tt-memory が {o.TimetrackerMemoryGi.ToString(CultureInfo.InvariantCulture)}Gi です。" +

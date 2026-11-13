@@ -340,7 +340,7 @@ public sealed class DeletionJobToolsTests
     public async Task StartDeletion_Should_Stop_When_The_State_Changed_After_The_Plan()
     {
         var plan = await Plan();
-        // 計画の後に Timetracker のアプリの管理タグが外された
+        // 計画の後に TimeTracker のアプリの管理タグが外された
         _apps[0] = _apps[0] with { Tags = new Dictionary<string, string>() };
 
         var act = () => Tools().StartDeletion(plan.PlanId!, "demo", Ct);

@@ -3,7 +3,7 @@ using Xunit;
 namespace TTDeployTool.SystemTests.E2E;
 
 /// <summary>
-/// ブラウザーでのセットアップ・ログインのテスト（E2E）の設定。TT_E2E_LICENSE_KEY（Timetracker のライセンスキー）と、
+/// ブラウザーでのセットアップ・ログインのテスト（E2E）の設定。TT_E2E_LICENSE_KEY（TimeTracker のライセンスキー）と、
 /// サンプルデータベースに入っているユーザー（TT_E2E_SAMPLE_LOGIN / TT_E2E_SAMPLE_PASSWORD）が無ければスキップする。
 /// これらの値はテストの出力に出さない。手順は docs/SYSTEM_TESTS.md を参照。
 /// </summary>

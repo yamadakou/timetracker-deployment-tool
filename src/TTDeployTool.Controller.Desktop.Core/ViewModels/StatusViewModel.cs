@@ -112,7 +112,7 @@ public sealed class StatusViewModel : ObservableObject
             Apps.Clear();
             if (value != null)
             {
-                Add("Timetracker", value.Timetracker, value.AppName);
+                Add("TimeTracker", value.Timetracker, value.AppName);
                 Add("DB", value.Db, value.AppName);
                 Add("Redis", value.Redis, value.AppName);
             }

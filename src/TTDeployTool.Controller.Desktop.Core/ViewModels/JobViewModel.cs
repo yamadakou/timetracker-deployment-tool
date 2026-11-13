@@ -372,7 +372,7 @@ public sealed class JobViewModel : ObservableObject
         internal set => SetProperty(ref _note, value);
     }
 
-    /// <summary>デプロイが成功した場合の Timetracker の URL。</summary>
+    /// <summary>デプロイが成功した場合の TimeTracker の URL。</summary>
     public Uri? Endpoint => (_record != null ? _record.Endpoint : (_snapshot?.Result as DeploymentResult)?.TimetrackerUrl) is { } url ? new Uri(url) : null;
 
     public bool HasEndpoint => Endpoint != null;

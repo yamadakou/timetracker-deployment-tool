@@ -260,7 +260,7 @@ flowchart TB
       "検証環境向け。Azure 上の DB データは永続化されない（DB コンテナ再起動で消える）",
       "SQL Server は Developer エディション（本番利用不可）",
       "Azure 上の SQL Server 構成ではサンプル DB を作成できない（空の DB を選択）",
-      "Timetracker のメモリが 2Gi 以下だとサンプル DB 作成が OutOfMemory で失敗する"
+      "TimeTracker のメモリが 2Gi 以下だとサンプル DB 作成が OutOfMemory で失敗する"
     ],
     "tag_list_url": "https://hub.docker.com/r/densocreate/timetracker/tags"
   }
@@ -377,14 +377,14 @@ DB を再デプロイするとデータが消えるため、**計画（読み取
     "device_code_message": null     // device-code 認証時、ユーザーに表示すべきメッセージ
   }
   ```
-- デプロイのステップ: ① 検証 ② リソースグループ ③ Environment ④ DB ⑤ Redis ⑥ Timetracker
+- デプロイのステップ: ① 検証 ② リソースグループ ③ Environment ④ DB ⑤ Redis ⑥ TimeTracker
 - `list_jobs` の入力は `status`（任意）。呼び出し元が作ったジョブだけを返す
 - ジョブは `IJobStore` に保存する（初期実装はメモリ内）。stdio ではプロセスが終了すると失われるが、Azure 側の状態は `get_deployment_info` で確認できる
 - 実行中のジョブはキャンセルできない仕様にする。Azure の操作を途中で止めると中途半端な状態が残るため。必要になったら、ステップの区切りで止める方式を検討する
 
 ### 4.9 `get_deployment_info`
 - 入力: `subscription`、`resource_group`、`app_name`
-- 出力: 各リソースの有無、`provisioningState`、稼働状態、イメージ（タグ）、CPU/メモリ、最新リビジョン、管理タグ（4.12）、Timetracker の FQDN（`https://...`）
+- 出力: 各リソースの有無、`provisioningState`、稼働状態、イメージ（タグ）、CPU/メモリ、最新リビジョン、管理タグ（4.12）、TimeTracker の FQDN（`https://...`）
 - 用途: 「さっきデプロイした環境の URL は？」「今のタグは？」への回答、ジョブが失われた後の状態確認、削除前の確認
 
 ### 4.10 秘密情報（パスワード）の扱い【決定: 引数と環境変数の両方を受け付け、環境変数を推奨】
@@ -661,7 +661,7 @@ README の「必要な RBAC ロールと権限」（`docs/fix-rbac-requirements`
 - デプロイ・削除は必ず「`plan_*` → 結果をユーザーに示して確認 → `start_*`」の順に行うこと。`acknowledge_data_loss` と `confirm_app_name` は、ユーザーの明示的な同意を得てから指定すること
 - `start_*` の後は `get_job_status` を間隔をあけて呼ぶこと
 - パスワードは環境変数での設定を推奨すること。`get_deployment_options` の `password_env` が true ならパスワードを尋ねないこと
-- SQL Server + Azure ではサンプル DB を作れないこと、Timetracker のメモリは 3Gi 以上を推奨すること
+- SQL Server + Azure ではサンプル DB を作れないこと、TimeTracker のメモリは 3Gi 以上を推奨すること
 
 ### 5.2 Resources（任意・Phase 3 の後半）
 - `ttdeploytool://docs/constraints`: 「本ツールの目的と注意事項」
@@ -789,7 +789,7 @@ README の「必要な RBAC ロールと権限」（`docs/fix-rbac-requirements`
 - Domain に `DeploymentValidator`（全エラーの列挙）と `DeploymentAdvisor`（警告）を追加した。`ComposeGenerator.Validate` は `DeploymentValidator` の最初のエラーを投げるようにし、CLI の挙動とメッセージは変えていない
 - サブスクリプションの一覧は Infrastructure の `AzureSubscriptionDirectory` で読む。資格情報は使うときに作る（`sp-env` の環境変数が足りない場合なども、ツールの結果として返すため）
 - MCP は Application をまだ参照しない（Phase 3a のツールでは使わないため。Phase 3b で参照する）
-- 確認: 単体テストとプロトコル結合テスト（ビルドした `ttdeploytool-mcp` を SDK のクライアントで stdio 接続）、MCP Inspector（CLI モード）での `tools/list` と `tools/call`、Claude Code（`claude mcp list` で接続を確認）。`generate_compose` で生成したファイルで `docker compose up` し、Timetracker のセットアップ画面が表示されることを確認した
+- 確認: 単体テストとプロトコル結合テスト（ビルドした `ttdeploytool-mcp` を SDK のクライアントで stdio 接続）、MCP Inspector（CLI モード）での `tools/list` と `tools/call`、Claude Code（`claude mcp list` で接続を確認）。`generate_compose` で生成したファイルで `docker compose up` し、TimeTracker のセットアップ画面が表示されることを確認した
 
 **実施結果（Phase 3b）**: 詳細設計は `docs/design/mcp/mcp-phase3b.md`。
 - `plan_deployment` / `start_deployment` / `get_job_status` / `list_jobs` / `get_deployment_info` を追加した（ツールは 9 つ）。MCP は Application を参照するようにした
@@ -824,7 +824,7 @@ README の「必要な RBAC ロールと権限」（`docs/fix-rbac-requirements`
 **実施結果（`refactor/shared-layer`）**: R1〜R4・R6・R7 を実施した。
 - R5（`DeploymentPlanner`）は、使う側（CLI の `delete --dry-run` と権限の事前確認）がそろう `feature/cli-delete` に移した。Phase 0 では使われない処理を追加しないため
 - `IAzureDeploymentGateway` は Infrastructure.Azure に置き、`AzureSdkExecutor` が実装する。Application はこのインターフェースに依存する
-- `DeploymentProgress` の手順は「リソースグループ」「Environment」「Container Apps」の 3 段階にした。DB / Redis / Timetracker の個別の進捗は、MCP の `get_job_status` を実装するときに必要に応じて細かくする
+- `DeploymentProgress` の手順は「リソースグループ」「Environment」「Container Apps」の 3 段階にした。DB / Redis / TimeTracker の個別の進捗は、MCP の `get_job_status` を実装するときに必要に応じて細かくする
 - CLI の挙動が変わらないことは、代表的な 10 通りの引数で、出力・終了コード・生成ファイル（compose / .env）が変更前と一致することで確認した
 
 ---
@@ -851,7 +851,7 @@ claude mcp add ttdeploytool `
   --env TT_MCP_AUTH_MODE=azure-cli `
   --env TT_MCP_DEFAULT_SUBSCRIPTION=<サブスクリプションID> `
   --env TT_MCP_DB_PASSWORD=<DB パスワード> `
-  --env TT_MCP_TRACKER_PASSWORD=<Timetracker パスワード> `
+  --env TT_MCP_TRACKER_PASSWORD=<TimeTracker パスワード> `
   -- C:\tools\ttdeploytool-mcp.exe
 ```
 ※ 設定ファイルにパスワードが平文で残るため、共有するプロジェクト単位の設定（`.mcp.json`）ではなく、ユーザー単位の設定に追加する。
@@ -872,7 +872,7 @@ VS Code（`.vscode/mcp.json`、stdio。パスワードは起動時に入力さ�
   },
   "inputs": [
     { "id": "dbPassword", "type": "promptString", "description": "DB パスワード", "password": true },
-    { "id": "trackerPassword", "type": "promptString", "description": "Timetracker パスワード", "password": true }
+    { "id": "trackerPassword", "type": "promptString", "description": "TimeTracker パスワード", "password": true }
   ]
 }
 ```
@@ -887,7 +887,7 @@ HTTP（Phase 4。クライアントが OAuth でサインインする）:
 ```
 
 想定する対話の例:
-1. ユーザー「検証用に Timetracker を Azure に立てたい。SQL Server で」
+1. ユーザー「検証用に TimeTracker を Azure に立てたい。SQL Server で」
 2. LLM → `get_deployment_options` → `list_subscriptions` → サブスクリプションを確認する
 3. LLM → `validate_deployment` → 「SQL Server では Azure 上でサンプル DB を作れません」と警告を伝える
 4. LLM → `plan_deployment` → 作るリソースと所要時間を示し、ユーザーの承認を得る

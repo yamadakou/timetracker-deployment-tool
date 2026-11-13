@@ -38,7 +38,7 @@ public class DeploymentGroupTests
     [Fact]
     public void Values_Of_Several_Resources_Should_Be_Combined_In_Order()
     {
-        DeploymentGroup.Combine([null, "営業", "研修"]).Should().Be("営業", "先に渡したもの（Timetracker）を優先する");
+        DeploymentGroup.Combine([null, "営業", "研修"]).Should().Be("営業", "先に渡したもの（TimeTracker）を優先する");
         DeploymentGroup.Combine([null, " "]).Should().BeNull();
         DeploymentGroup.Differ(["営業", " 営業 "]).Should().BeFalse();
         DeploymentGroup.Differ(["営業", null]).Should().BeTrue("付いていないリソースがある");

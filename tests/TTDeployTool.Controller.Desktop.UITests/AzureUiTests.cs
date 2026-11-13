@@ -114,7 +114,7 @@ public class AzureUiTests
                 app.TextOf("Status.Persistence").Should().NotContain("永続化していません", "環境が無いときは永続化の行を出さない");
             var deployed = app.WaitForText("Job.Status", t => t.Contains("完了") || t.Contains("失敗"), "デプロイが終わる", JobTimeout);
             deployed.Should().Contain("完了", app.Exists("Job.Error") ? app.TextOf("Job.Error") : "");
-            app.IsEnabled("Deploy.OpenEndpoint").Should().BeTrue("デプロイした Timetracker の URL がある");
+            app.IsEnabled("Deploy.OpenEndpoint").Should().BeTrue("デプロイした TimeTracker の URL がある");
             // ジョブが終わると、Azure の状態を読み直す
             app.WaitForText("Status.Summary", t => t.Contains("Container Apps Environment"), "デプロイした環境が表示される", LoadTimeout);
 

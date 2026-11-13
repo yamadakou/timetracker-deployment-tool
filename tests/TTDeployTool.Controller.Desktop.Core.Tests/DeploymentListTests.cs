@@ -35,7 +35,7 @@ public class DeploymentListViewModelTests
         return tags;
     }
 
-    /// <summary>3 つの Container App と Environment（期限とデプロイ日は Timetracker のタグ）。</summary>
+    /// <summary>3 つの Container App と Environment（期限とデプロイ日は TimeTracker のタグ）。</summary>
     internal static IEnumerable<ManagedResourceRecord> Deployment(
         string sub, string rg, string app, string? expires = null, string? deployed = null, string? runningStatus = "Running", string? provisioning = "Succeeded")
     {
@@ -133,7 +133,7 @@ public class DeploymentListViewModelTests
         (row.IsExpired, row.IsExpirySoon).Should().Be((false, false));
         row.DbTypeText.Should().Be("PostgreSQL");
         row.PersistenceText.Should().Be("永続化していない");
-        row.SpecText.Should().Be("Timetracker 1.5 vCPU / 3Gi、DB 1 vCPU / 2Gi、Redis ? vCPU / ?");
+        row.SpecText.Should().Be("TimeTracker 1.5 vCPU / 3Gi、DB 1 vCPU / 2Gi、Redis ? vCPU / ?");
         row.StateText.Should().Be("実行中");
         row.Entry.Location.Should().Be("japaneast");
 
@@ -171,13 +171,13 @@ public class DeploymentListViewModelTests
         var rows = h.Main.Deployments.Rows.ToDictionary(r => r.AppName);
 
         (rows["p"].DbTypeText, rows["p"].PersistenceText, rows["p"].StateText).Should().Be(("SQL Server", "Azure Files に永続化", "不明"));
-        rows["p"].StateDetail.Should().Be("Timetracker: ? / ?\nDB: Succeeded / Running\nRedis: Succeeded / Running");
+        rows["p"].StateDetail.Should().Be("TimeTracker: ? / ?\nDB: Succeeded / Running\nRedis: Succeeded / Running");
         (rows["q"].DbTypeText, rows["q"].StateText, rows["q"].State).Should().Be(("不明", "処理中（作成・更新・削除）", DeploymentState.Processing));
         var old = rows["old"];
         old.Subscription.Should().Be("unknown-sub");
         old.PersistenceText.Should().Be("永続化していない（以前の DB のデータが残っています）");
-        old.StateText.Should().Be("一部だけ（Container Apps Environment・Timetracker・DB・Redis がありません）");
-        old.StateDetail.Should().Be("Timetracker: ありません\nDB: ありません\nRedis: ありません");
+        old.StateText.Should().Be("一部だけ（Container Apps Environment・TimeTracker・DB・Redis がありません）");
+        old.StateDetail.Should().Be("TimeTracker: ありません\nDB: ありません\nRedis: ありません");
         old.SpecText.Should().BeEmpty();
         old.HasUrl.Should().BeFalse();
         old.OpenCommand.CanExecute(null).Should().BeFalse();
@@ -407,9 +407,9 @@ public class DeploymentListViewModelTests
         var h = await LoadedAsync(Deployment("sub", "rg", "demo"));
         var row = h.Main.Deployments.Rows.Single();
 
-        // 本ツールで作った Timetracker アプリが（もう）無い
+        // 本ツールで作った TimeTracker アプリが（もう）無い
         await row.ShowPasswordsCommand.ExecuteAsync();
-        row.Error.Should().Contain("本ツールで作った Timetracker の Container App（demo-tt）がありません");
+        row.Error.Should().Contain("本ツールで作った TimeTracker の Container App（demo-tt）がありません");
         row.HasError.Should().BeTrue();
 
         h.Azure.Deployed();
@@ -614,11 +614,11 @@ public class DeploymentListViewModelTests
     [Fact]
     public async Task A_Partly_Reflected_Deployment_Should_Be_Completed_By_The_Job_Result()
     {
-        // デプロイの直後は、Resource Graph に Timetracker のアプリがまだ無いことがある（Desktop System Test、2026-10-23）
+        // デプロイの直後は、Resource Graph に TimeTracker のアプリがまだ無いことがある（Desktop System Test、2026-10-23）
         var h = await LoadedAsync(Deployment("sub", "rg", "demo").Where(r => r.Name != "demo-tt").Select(r => r.Name == "demo-db"
             ? r with { App = new ContainerAppSnapshot("Succeeded", "Running", "postgres:16", 1, "2Gi", null, ["dbdata"]) }
             : r));
-        h.Main.Deployments.Rows.Single().StateText.Should().Be("一部だけ（Timetracker がありません）");
+        h.Main.Deployments.Rows.Single().StateText.Should().Be("一部だけ（TimeTracker がありません）");
         h.Azure.ResourceGroup = null;
         h.Main.Settings.PersistDb = SettingsViewModel.PersistDbOptions[1];
 
@@ -686,7 +686,7 @@ public class DeploymentListViewModelTests
         await h.Main.Queue.WhenIdleAsync();
 
         var row = h.Main.Deployments.Rows.Single();
-        row.StateText.Should().Be("一部だけ（Container Apps Environment・Timetracker・DB・Redis がありません）");
+        row.StateText.Should().Be("一部だけ（Container Apps Environment・TimeTracker・DB・Redis がありません）");
         row.Entry.StorageAccountName.Should().Be(FakeAzure.StorageAccountName);
 
         // DB のデータも消すと、一覧から消える
@@ -790,7 +790,7 @@ public class DeploymentStateTests
 
         var row = h.Main.Deployments.Rows.Single();
         (row.State, row.StateText).Should().Be((DeploymentState.Pending, "デプロイ済み（Azure の一覧に反映待ち。「読み込む」で読み直せます）"));
-        row.StateDetail.Should().Be("Timetracker: ? / ?\nDB: ? / ?\nRedis: ? / ?");
+        row.StateDetail.Should().Be("TimeTracker: ? / ?\nDB: ? / ?\nRedis: ? / ?");
     }
 
     [Fact]

@@ -517,7 +517,7 @@ public sealed class DeploymentListViewModel : ObservableObject
         new AppEntry(r.TimetrackerAppName, null, null, null, null, null), new AppEntry(r.DbAppName, null, null, null, null, null),
         new AppEntry(r.RedisAppName, null, null, null, null, null), r.EnvironmentName, r.StorageAccountName, r.StorageAccountName != null);
 
-    // デプロイしたものを重ねる。Resource Graph に一部だけ反映されている場合（デプロイの直後に Timetracker のアプリが無い、など）は、無いものを
+    // デプロイしたものを重ねる。Resource Graph に一部だけ反映されている場合（デプロイの直後に TimeTracker のアプリが無い、など）は、無いものを
     // デプロイの結果で補う（「パスワードを表示」が押せなかった。Desktop System Test、2026-10-23）
     private static DeploymentEntry Deployed(DeploymentEntry? e, DeploymentEntry placeholder) => e == null
         ? placeholder

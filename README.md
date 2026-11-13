@@ -3,15 +3,15 @@
 # TTDeployTool
 
 ## ツールの概要
-[TimeTracker](https://www.timetracker.jp/)（Docker Hub の [`densocreate/timetracker`](https://hub.docker.com/r/densocreate/timetracker) イメージ）を、[Azure Container Apps](https://learn.microsoft.com/ja-jp/azure/container-apps/overview) の上に、DB（PostgreSQL または SQL Server）と Redis と一緒に、コマンド 1 つで用意するツールです。Timetracker の検証環境（評価・動作確認・デモ）を手早く作ることを目的としています。
+[TimeTracker](https://www.timetracker.jp/)（Docker Hub の [`densocreate/timetracker`](https://hub.docker.com/r/densocreate/timetracker) イメージ）を、[Azure Container Apps](https://learn.microsoft.com/ja-jp/azure/container-apps/overview) の上に、DB（PostgreSQL または SQL Server）と Redis と一緒に、コマンド 1 つで用意するツールです。TimeTracker の検証環境（評価・動作確認・デモ）を手早く作ることを目的としています。
 
 TimeTracker のコンテナイメージの詳細（クイックスタート、タグの一覧など）は、[Docker Hub の TimeTracker のページ](https://hub.docker.com/r/densocreate/timetracker)を参照してください。
 
 できること:
-- Azure へのデプロイ（`deploy`）: Timetracker・DB・Redis の 3 つのコンテナを、Azure Container Apps のアプリとして作成・更新します。リソースグループが無ければ作成します
+- Azure へのデプロイ（`deploy`）: TimeTracker・DB・Redis の 3 つのコンテナを、Azure Container Apps のアプリとして作成・更新します。リソースグループが無ければ作成します
 - 作ったリソースの削除（`delete`）: 本ツールで作ったものだけを削除します（リソースグループは、`--delete-resource-group` を付けた場合だけ、中が空になれば削除します）
 - ローカルでの検証（Dry-run）: Azure を使わずに、Docker Compose で起動するための `docker-compose.yml` と `.env` を作ります（[Docker Hub の TimeTracker のページ](https://hub.docker.com/r/densocreate/timetracker)の「クイックスタート」に沿った構成）
-- 設定の指定: Timetracker のイメージのバージョン（タグ）と、コンテナごとの CPU・メモリを指定できます。台数は 1 台に固定です
+- 設定の指定: TimeTracker のイメージのバージョン（タグ）と、コンテナごとの CPU・メモリを指定できます。台数は 1 台に固定です
 - DB のデータの永続化（`--persist-db`）: 既定では、DB のデータは DB コンテナの再起動で消えます。指定すると、Azure Files に置いて残します（[DB のデータの扱い](#db-のデータの扱いと永続化--persist-db)）
 - 利用可能期限（`--expires-on`）: デプロイに期限日を記録します（省略すると今日から 32 日後。再デプロイは今の期限を引き継ぎます）。期限を過ぎると、デスクトップアプリが自動で削除します（CLI と MCP サーバーは削除しません）
 - グループ（`--group`）: 用途・利用者ごとにデプロイを分ける名前を、Azure のタグ（`tt-group`）に記録します（任意。再デプロイで省略すると今のグループを引き継ぎます）。デスクトップアプリのデプロイの一覧で、グループで絞り込み・並べ替えし、まとめて変えられます
@@ -26,7 +26,7 @@ TimeTracker のコンテナイメージの詳細（クイックスタート、�
 ## 本ツールの目的と注意事項
 
 > [!IMPORTANT]
-> 本ツールは、Timetracker の **検証環境（評価・動作確認・デモ）を手早く作るための支援ツール** です。本番環境の構築は対象外です。本番の運用に必要な構成（バックアップ、冗長化、ネットワークの設計、ライセンスに合った DB のエディションの選択など）は行いません。
+> 本ツールは、TimeTracker の **検証環境（評価・動作確認・デモ）を手早く作るための支援ツール** です。本番環境の構築は対象外です。本番の運用に必要な構成（バックアップ、冗長化、ネットワークの設計、ライセンスに合った DB のエディションの選択など）は行いません。
 
 検証用に割り切った作りのため、次の点にご注意ください。
 
@@ -34,7 +34,7 @@ TimeTracker のコンテナイメージの詳細（クイックスタート、�
 |---|---|
 | DB のデータは、既定では DB コンテナの再起動で消える | 既定では、Azure 上の DB はデータの保存先（ボリューム）を持たずに動きます。設定を変えた再デプロイ、Azure 基盤のメンテナンスなどで DB コンテナが再起動すると、**DB のデータは失われます**。データを残したい場合は、`--persist-db` を付けてデプロイすると、データを Azure Files に置いて再起動の後も残せます（ストレージの料金がかかります）。違いと注意点は [DB のデータの扱いと永続化](#db-のデータの扱いと永続化--persist-db) を参照してください。なお、ローカルの検証（Dry-run の docker-compose）では、データは Docker のボリュームに残ります |
 | SQL Server は Developer エディション | `--db-type sqlserver` では、SQL Server を `MSSQL_PID=Developer` で起動します。[Developer エディション](https://learn.microsoft.com/ja-jp/sql/sql-server/editions-and-components-of-sql-server-2022)は開発・テスト用で、本番環境では使えません |
-| Azure 上の SQL Server ではサンプル DB を作れない | サンプル DB を使う場合は、PostgreSQL（`--db-type` の既定値）を使ってください。SQL Server では、セットアップウィザードで「空のデータベースを作成する」を選んで評価してください（SQL Server の復元は DB コンテナの中のファイルを読みますが、Azure では Timetracker のコンテナの中にあるサンプル DB のファイルを DB コンテナから読めないため）。ローカルの検証（Dry-run の docker-compose）では、SQL Server でもサンプル DB を作れます |
+| Azure 上の SQL Server ではサンプル DB を作れない | サンプル DB を使う場合は、PostgreSQL（`--db-type` の既定値）を使ってください。SQL Server では、セットアップウィザードで「空のデータベースを作成する」を選んで評価してください（SQL Server の復元は DB コンテナの中のファイルを読みますが、Azure では TimeTracker のコンテナの中にあるサンプル DB のファイルを DB コンテナから読めないため）。ローカルの検証（Dry-run の docker-compose）では、SQL Server でもサンプル DB を作れます |
 | 台数は 1 台に固定 | どのコンテナも 1 台で動きます。冗長化や台数の増減（スケールアウト）は行いません |
 | パスワードの扱い | Azure 上では、パスワードを Container Apps の[シークレット](https://learn.microsoft.com/ja-jp/azure/container-apps/manage-secrets)として登録します。Dry-run で作る `.env` には、DB のパスワードなどが平文で書かれます。共有したり、リポジトリにコミットしたりしないでください |
 | 使い終わったら削除する | Azure のリソースは、置いてある間は料金がかかります（[Container Apps の料金](https://azure.microsoft.com/ja-jp/pricing/details/container-apps/)）。検証が終わったら [`delete`](#リソースの削除delete) で削除してください（`--delete-resource-group` で、空になったリソースグループも削除できます）。リソースグループごと削除することもできます（例: [`az group delete --name <リソースグループ名>`](https://learn.microsoft.com/ja-jp/cli/azure/group#az-group-delete)）。既存のリソースグループを使った場合は、他のリソースを巻き込まないようご注意ください |
@@ -61,8 +61,8 @@ TimeTracker のコンテナイメージの詳細（クイックスタート、�
      --tracker-password "AppLoginP@ss!" `
      --auth-mode "azure-cli"
    ```
-   完了すると、最後に Timetracker の URL が表示されます（`[SUCCESS] Timetracker endpoint: https://...`）
-5. **Timetracker の初期設定**: 表示された URL をブラウザーで開き、セットアップウィザードでライセンスキーを入力して DB を作ります（「空のデータベース」または「サンプルデータベース」）
+   完了すると、最後に TimeTracker の URL が表示されます（`[SUCCESS] TimeTracker endpoint: https://...`）
+5. **TimeTracker の初期設定**: 表示された URL をブラウザーで開き、セットアップウィザードでライセンスキーを入力して DB を作ります（「空のデータベース」または「サンプルデータベース」）
 6. **使い終わったら削除**: [`delete`](#リソースの削除delete) で、作ったリソースを削除します
 
 サブスクリプション ID は、`az account show` の `id`、または [Azure ポータル](https://learn.microsoft.com/ja-jp/azure/azure-portal/get-subscription-tenant-id)で確認できます。
@@ -75,7 +75,7 @@ TimeTracker のコンテナイメージの詳細（クイックスタート、�
 |---|---|---|
 | [リソースグループ](https://learn.microsoft.com/ja-jp/azure/azure-resource-manager/management/manage-resource-groups-cli) | `--resource-group` の値 | 無ければ作成します。既にある場合は、変更せずにそのまま使います（タグなどは残ります） |
 | [Container Apps 環境](https://learn.microsoft.com/ja-jp/azure/container-apps/environment)（Environment） | `{アプリ名}-env`（例: `timetracker-env`） | 3 つのアプリが動く環境です。既にある場合は、設定を変えずにそのまま使います |
-| Container App（Timetracker） | `{アプリ名}-tt` | Timetracker 本体。インターネットに公開します（HTTPS、[イングレス](https://learn.microsoft.com/ja-jp/azure/container-apps/ingress-overview)のポート 8080） |
+| Container App（TimeTracker） | `{アプリ名}-tt` | TimeTracker 本体。インターネットに公開します（HTTPS、[イングレス](https://learn.microsoft.com/ja-jp/azure/container-apps/ingress-overview)のポート 8080） |
 | Container App（DB） | `{アプリ名}-db` | PostgreSQL または SQL Server。環境の中からだけ接続できます（TCP） |
 | Container App（Redis） | `{アプリ名}-redis` | Redis。環境の中からだけ接続できます（TCP） |
 | [ストレージアカウント](https://learn.microsoft.com/ja-jp/azure/storage/common/storage-account-overview)（`--persist-db` を指定した場合だけ） | `tt` ＋ アプリ名の英数字（先頭 14 文字まで）＋ 8 文字（例: `tttimetracker1a2b3c4d`） | DB のデータを置くファイル共有 `{アプリ名}-db`（[Azure Files](https://learn.microsoft.com/ja-jp/azure/storage/files/storage-files-introduction)。SMB）を持ちます（StorageV2 / Standard_LRS）。名前の最後の 8 文字は、サブスクリプション・リソースグループ・アプリ名から作ります（ストレージアカウントの名前は Azure 全体で重複できないため）。あわせて、Container Apps 環境にストレージ `dbdata` を登録します（既存の環境にも登録します。環境のほかの設定は変えません） |
@@ -110,7 +110,7 @@ TimeTracker のコンテナイメージの詳細（クイックスタート、�
 
 ### 名前の変更（v0.9.0 から）
 
-本ツールの名前を、Timetracker（デプロイする製品の名前）と区別するため、TTDeployTool に改めました（v0.9.0 から。v0.9.0 は、名前を改めて作り直しました）。v0.8.1 までの版から移る場合は、次の点に注意してください。
+本ツールの名前を、TimeTracker（デプロイする製品の名前）と区別するため、TTDeployTool に改めました（v0.9.0 から。v0.9.0 は、名前を改めて作り直しました）。v0.8.1 までの版から移る場合は、次の点に注意してください。
 
 | 変わったもの | v0.8.1 まで | v0.9.0 から | 必要な作業 |
 |---|---|---|---|
@@ -143,7 +143,7 @@ TimeTracker のコンテナイメージの詳細（クイックスタート、�
 | リソースグループの確認 | `Microsoft.Resources/subscriptions/resourceGroups/read` | リソースグループ |
 | リソースグループの作成（無い場合） | `Microsoft.Resources/subscriptions/resourceGroups/write` | サブスクリプション |
 | Container Apps 環境の確認・作成 | `Microsoft.App/managedEnvironments/read` / `write` | リソースグループ |
-| Container App（DB / Redis / Timetracker）の確認・作成・更新 | `Microsoft.App/containerApps/read` / `write`、`Microsoft.App/managedEnvironments/join/action` | リソースグループ |
+| Container App（DB / Redis / TimeTracker）の確認・作成・更新 | `Microsoft.App/containerApps/read` / `write`、`Microsoft.App/managedEnvironments/join/action` | リソースグループ |
 | Container App の削除（`delete`） | `Microsoft.App/containerApps/delete` | リソースグループ |
 | Container Apps 環境の削除（`delete`） | `Microsoft.App/managedEnvironments/delete` | リソースグループ |
 | DB のデータの永続化（`--persist-db`）: ストレージアカウントの確認・作成・キーの取得 | `Microsoft.Storage/storageAccounts/read` / `write`（作成する場合）/ `listkeys/action` | リソースグループ |
@@ -255,7 +255,7 @@ az provider show --namespace Microsoft.OperationalInsights --query "registration
    - サブスクリプション ID（`az account show` で確認できます）
    - リソースグループ名（まだ無くても構いません）
    - DB のパスワード
-   - Timetracker のパスワード
+   - TimeTracker のパスワード
 
 3. **デプロイの実行**
    ```powershell
@@ -443,12 +443,12 @@ Azure 上の DB のデータを、DB コンテナの再起動の後も残すか�
 | DB コンテナが再起動したとき（設定を変えた再デプロイ、Azure 基盤のメンテナンスなど） | **データは失われます**。既存の DB アプリがある状態で再デプロイすると、警告を表示します | データは残ります |
 | 追加で作るリソース | なし | ストレージアカウント・ファイル共有・Container Apps 環境のストレージ（[作成される Azure リソース](#作成される-azure-リソース)） |
 | 追加の料金 | なし | Azure Files の料金（下記） |
-| 再デプロイの動き | DB アプリをそのまま更新します | DB アプリを**停止してから更新し、開始します**（その間は Timetracker を使えません） |
+| 再デプロイの動き | DB アプリをそのまま更新します | DB アプリを**停止してから更新し、開始します**（その間は TimeTracker を使えません） |
 | `delete` での扱い | DB アプリと一緒にデータも消えます | 既定でストレージアカウントもデータごと削除します。`--keep-db-data` で残せます |
 
 ```powershell
 ttdeploytool-cli.exe deploy --subscription "<サブスクリプション ID>" --resource-group "rg-tt-demo" `
-  --db-password "<DB のパスワード>" --tracker-password "<Timetracker のパスワード>" --persist-db
+  --db-password "<DB のパスワード>" --tracker-password "<TimeTracker のパスワード>" --persist-db
 ```
 
 **`--persist-db` の詳しい動き**:
@@ -456,18 +456,18 @@ ttdeploytool-cli.exe deploy --subscription "<サブスクリプション ID>" --
 - **再デプロイで `--persist-db` を省略した場合**: 既存の DB アプリの今の状態を引き継ぎます（永続化していれば、永続化を続けます）。新しく作る場合は永続化しません
 - **停止 → 更新 → 開始の理由**: Container Apps は、新しい[リビジョン](https://learn.microsoft.com/ja-jp/azure/container-apps/revisions)が準備できるまで古いものを止めません。そのまま更新すると、新旧の DB コンテナが同じデータを同時に開いてしまうため、先に停止します。データは失われないので、データが消える警告は出ません（MCP の `acknowledge_data_loss` も不要です）
 - **途中で切り替える場合**（どちらも警告を表示します）:
-  - 永続化していない環境に `--persist-db` を付けると、**今の DB のデータは消えます**。切り替えた後の DB は、以前に永続化していたときのデータ（初めての場合は空の DB）になります。今のデータを残したい場合は、事前に Timetracker でエクスポートしてください
-  - 永続化をやめる（`--persist-db false`）と、Timetracker からは空の DB に見えます。これまでのデータは消えずにストレージアカウントに残り、もう一度 `--persist-db` を付けてデプロイすると元に戻ります
+  - 永続化していない環境に `--persist-db` を付けると、**今の DB のデータは消えます**。切り替えた後の DB は、以前に永続化していたときのデータ（初めての場合は空の DB）になります。今のデータを残したい場合は、事前に TimeTracker でエクスポートしてください
+  - 永続化をやめる（`--persist-db false`）と、TimeTracker からは空の DB に見えます。これまでのデータは消えずにストレージアカウントに残り、もう一度 `--persist-db` を付けてデプロイすると元に戻ります
 - **DB アプリの再起動は、本ツールの再デプロイで行ってください**: 同じ設定で `deploy` を実行すると、停止 → 更新 → 開始で再起動します。Azure ポータルの「再起動」や [`az containerapp revision restart`](https://learn.microsoft.com/ja-jp/cli/azure/containerapp/revision#az-containerapp-revision-restart) は使わないでください。新旧の DB コンテナが同じデータを同時に開こうとします。Azure での確認では、SQL Server は新しいコンテナが起動に失敗し続けて再起動が終わらなくなりました（データは無事で、本ツールの再デプロイで回復しました）。PostgreSQL は、新旧が一時的に同時に動いた後、自動の復旧で起動しました（データは無事でした）
 - **削除**: `delete` は、既定でストレージアカウントも DB のデータごと削除します。`--keep-db-data` を付けると残せます（料金はかかり続けます。同じアプリ名で `--persist-db` を付けてデプロイすると、データを引き継げます）
 - **料金**: Azure Files（Standard、LRS）の保存容量とトランザクションの料金がかかります。DB は読み書きが多いため、主にトランザクションの料金になります。金額は [Azure Files の料金](https://azure.microsoft.com/ja-jp/pricing/details/storage/files/) を確認してください
 - **前提**: リソースプロバイダー `Microsoft.Storage` の登録（[Azure リソースプロバイダーの登録](#azure-リソースプロバイダーの登録)）と、ストレージの権限（[必要な RBAC ロールと権限](#必要な-rbac-ロールと権限)。Contributor には含まれます）が必要です。ファイル共有のマウントにはストレージアカウントのアカウントキーを使い、Container Apps 環境は仮想ネットワーク（VNet）を使いません。そのため、Azure Policy で[アカウントキーによるアクセス（共有キー）](https://learn.microsoft.com/ja-jp/azure/storage/common/shared-key-authorization-prevent)やパブリック ネットワーク アクセスを禁止している環境では、DB コンテナへのマウントが失敗します
-- **制約**: 検証環境のための補助です。バックアップはなく、冗長化は [LRS](https://learn.microsoft.com/ja-jp/azure/storage/common/storage-redundancy)（1 つのデータセンターの中の 3 つのコピー）だけです。Azure 基盤のメンテナンスによる再起動は本ツールでは制御できず、まれにデータが壊れるおそれがあります。重要なデータは、Timetracker の機能でエクスポートしておいてください。Azure 上の SQL Server でサンプル DB を作れない制約は、`--persist-db` を付けても変わりません
+- **制約**: 検証環境のための補助です。バックアップはなく、冗長化は [LRS](https://learn.microsoft.com/ja-jp/azure/storage/common/storage-redundancy)（1 つのデータセンターの中の 3 つのコピー）だけです。Azure 基盤のメンテナンスによる再起動は本ツールでは制御できず、まれにデータが壊れるおそれがあります。重要なデータは、TimeTracker の機能でエクスポートしておいてください。Azure 上の SQL Server でサンプル DB を作れない制約は、`--persist-db` を付けても変わりません
 - **設計の詳細**: [docs/design/common/db-persistence.md](docs/design/common/db-persistence.md)
 
 ### ローカル検証（Dry-run）
 
-Azure を使わずに、自分の PC の Docker で Timetracker・DB・Redis を起動して確かめられます。
+Azure を使わずに、自分の PC の Docker で TimeTracker・DB・Redis を起動して確かめられます。
 
 #### 前提環境
 - Windows 10 / 11 では [Docker Desktop](https://docs.docker.com/desktop/setup/install/windows-install/)（Linux コンテナのモード。WSL 2 のバックエンドを推奨）、macOS / Linux では [Docker Engine](https://docs.docker.com/engine/install/)
@@ -495,7 +495,7 @@ Azure を使わずに、自分の PC の Docker で Timetracker・DB・Redis を
 3. **動作を確認する**
    - ブラウザーで `http://localhost:8080` を開き、セットアップウィザードでライセンスキーを入力して DB を作ります（「空のデータベース」または「サンプルデータベース」）
    - DB（PostgreSQL のデータベース）はセットアップウィザードが作ります。本ツールは事前に作りません
-   - SQL Server でサンプルデータベースを作れるよう、作られる compose では、共有のボリューム `ttsample` を両方のコンテナにマウントしています（SQL Server が Timetracker のコンテナの中にあるバックアップのファイルを読めるようにするため）
+   - SQL Server でサンプルデータベースを作れるよう、作られる compose では、共有のボリューム `ttsample` を両方のコンテナにマウントしています（SQL Server が TimeTracker のコンテナの中にあるバックアップのファイルを読めるようにするため）
 
 4. **データと後片付け**
    - DB のデータは Docker の[名前付きボリューム](https://docs.docker.com/engine/storage/volumes/)に置くため、コンテナを再起動しても残ります
@@ -575,7 +575,7 @@ CLI や AI アシスタントを使わずに、Windows の画面の操作で同�
 - できること: Azure へのサインイン（Windows のアカウント。`az login` は不要）、サブスクリプションの選択、デプロイ（計画 → 確認 → 実行）、状態の確認、削除（アプリ名の入力で確認）、ローカル検証（Dry-run）の docker-compose.yml と .env の保存
 - 安全策は CLI・MCP サーバーと同じです（実行の前に計画を示す、DB のデータが失われる更新は同意のチェックが必要、実行の直前に計画を作り直して状態が変わっていれば実行しない）
 - デプロイの一覧: サインインしたアカウントで読めるサブスクリプションから、本ツールでデプロイした環境（別の PC・CLI・MCP サーバーでデプロイしたものを含む）を読み、サブスクリプション・リソースグループ・デプロイ日・利用可能期限日・状態で絞り込み・並べ替えできます。「状態」は 3 つのアプリの Azure 上の状態をまとめて「実行中」「停止中」「処理中」「失敗」「一部だけ」で出し（マウスを置くとアプリごとの値）、このアプリでデプロイした直後で Azure の一覧に反映される前は「デプロイ済み（反映待ち）」と出します。行から、状態の確認・削除・「対象に入れる」（ウィザードに入れる。再デプロイのため）・期限の変更・パスワードの表示ができます。パスワードは押したときだけ Azure から読み、コピーしてもクリップボードの履歴には残しません。Azure に反映されるまで数分かかることがあり、このアプリで直前に行った操作は反映済みとして表示します
-- 画面の流れ: 「新しくデプロイ」は 5 画面のウィザードです（① 対象（テンプレート・サブスクリプション・リソースグループ・アプリ名・リージョン）→ ② DB → ③ パスワード → ④ スペックと利用可能期限 → ⑤ 確認と実行）。入力に誤りがあれば次へ進めません。⑤ で計画を確かめて「今すぐ実行」か「予定に追加」を押すと、ウィザードが「完了」の表示になり、進み具合と結果（Timetracker の URL など）が出ます。そこから「実行状況（ログ）を見る」（予定はジョブの一覧）、「続けてデプロイ」（今の設定のまま ① から）、「新規デプロイ」（初期値から）を選べます。削除と状態の確認は「デプロイの一覧」の行から行います（一覧はサインインすると使えます）
+- 画面の流れ: 「新しくデプロイ」は 5 画面のウィザードです（① 対象（テンプレート・サブスクリプション・リソースグループ・アプリ名・リージョン）→ ② DB → ③ パスワード → ④ スペックと利用可能期限 → ⑤ 確認と実行）。入力に誤りがあれば次へ進めません。⑤ で計画を確かめて「今すぐ実行」か「予定に追加」を押すと、ウィザードが「完了」の表示になり、進み具合と結果（TimeTracker の URL など）が出ます。そこから「実行状況（ログ）を見る」（予定はジョブの一覧）、「続けてデプロイ」（今の設定のまま ① から）、「新規デプロイ」（初期値から）を選べます。削除と状態の確認は「デプロイの一覧」の行から行います（一覧はサインインすると使えます）
 - 一覧の操作（No.63）: 「デプロイの一覧」と「ジョブの一覧」は表で、見出しを押すと並べ替え、見出しの右の「…」で値を選んで絞り込めます（No.78。値の一覧から複数を選ぶ・検索。文字の一部と日付の範囲での絞り込みは、表の上の「対象の列＋条件」のフィルタ）。列の幅（見出しの境目のドラッグ）と順序（見出しのドラッグ）を変えられ、次の起動でも同じになります（「列の幅と順序を初期値に戻す」で戻せます）。表の左上のチェックボックスで、今のページの行をすべて選べます。セルを右クリックすると、セルの文字・選んだ行（タブ区切り）・選んだ行の Markdown の表をコピーでき、Ctrl+C でも選んだ行をコピーできます。ジョブの一覧は、サインインしていなくても開けます（ジョブの操作はサインインしてから）。複数の行を選んで、期限の変更・削除（デプロイの一覧。2 件以上の削除は、計画を並べて件数を入力して確認します）、取り消し・一時停止・再開・予定の変更（ジョブの一覧）をまとめて行えます。「新しくデプロイ」「デプロイの一覧」「ジョブの一覧」はサインインするまで押せません。同時に実行する数・サインイン時の起動・診断用のログは、メニューの下の「設定」にあります
 - 設定の便利な機能: 名前を付けてテンプレートとして保存し、選んで入力できます（パスワードは保存しません）。どの画面でも「初期値に戻す」と Markdown でのコピー（パスワードは既定で伏せ字。「パスワードも含める」で値を出す）ができます。実行状況・削除の計画・ジョブの内容も Markdown でコピーでき、削除のアプリ名の入力欄の横には「アプリ名をコピー」があります
 - 利用可能期限: サインインしたときに一覧を読み、その後は最も近い期限（3 日前・前日を含む）の時刻と 6 時間ごとに読み直して、期限の 3 日前と前日に通知します（通知を押すと一覧が開きます）。期限を過ぎたデプロイは、確認なしで削除のジョブを登録して、本ツールで作ったリソース（DB のデータを含む。リソースグループは本ツールが作ったもので、空になる場合だけ）を削除します。削除の直前に Azure のタグを読み直し、別の PC や一覧で期限が延ばされていれば削除しません
@@ -604,8 +604,8 @@ CLI や AI アシスタントを使わずに、Windows の画面の操作で同�
   - サンプル DB を使う場合は `postgresql` を使ってください。`sqlserver` は Developer エディションで起動し、Azure 上では空のデータベースで評価します（[本ツールの目的と注意事項](#本ツールの目的と注意事項)）
 - `--db-password`（必須）: DB のパスワード（DB の種類に関係なく共通。8 文字以上。`sqlserver` の場合は、英大文字・英小文字・数字・記号のうち 3 種類以上を含める必要があります）
 - `--db-name`（任意）: DB 名（省略時は `timetracker`）
-- `--tracker-password`（必須）: Timetracker のパスワード（[Docker Hub の TimeTracker のページ](https://hub.docker.com/r/densocreate/timetracker)の説明にある `<your password>` に当たるもの）
-- `--tt-tag`（任意）: Timetracker のイメージのタグ（版）。省略時は、DB の種類に合わせて `11.0.1-linux-postgres`（postgresql）または `11.0.1-linux-mssql`（sqlserver）。使えるタグは [Docker Hub](https://hub.docker.com/r/densocreate/timetracker/tags) を参照してください。**DB の種類に合ったタグ**（PostgreSQL 用は `-linux-postgres`、SQL Server 用は `-linux-mssql`）を指定してください
+- `--tracker-password`（必須）: TimeTracker のパスワード（[Docker Hub の TimeTracker のページ](https://hub.docker.com/r/densocreate/timetracker)の説明にある `<your password>` に当たるもの）
+- `--tt-tag`（任意）: TimeTracker のイメージのタグ（版）。省略時は、DB の種類に合わせて `11.0.1-linux-postgres`（postgresql）または `11.0.1-linux-mssql`（sqlserver）。使えるタグは [Docker Hub](https://hub.docker.com/r/densocreate/timetracker/tags) を参照してください。**DB の種類に合ったタグ**（PostgreSQL 用は `-linux-postgres`、SQL Server 用は `-linux-mssql`）を指定してください
 - `--persist-db`（任意）: DB のデータを Azure Files に置き、DB コンテナの再起動の後も残す（[DB のデータの扱いと永続化](#db-のデータの扱いと永続化--persist-db)）。省略時は、既存の DB アプリの今の状態を引き継ぎます（新しく作る場合は永続化しない）。永続化をやめるには `--persist-db false`。Dry-run では使いません（警告を表示します）
 - `--expires-on`（任意）: 利用可能期限日（`yyyy-MM-dd`）。期限は期限日の終わり（実行する PC の時刻帯の 23:59:59）です。`none` で期限なし。今日より前の日付は誤りになります。省略時は、既存のデプロイの今の期限を引き継ぎ、無ければ（新しくデプロイする場合、この機能より前にデプロイした環境の場合）**今日から 32 日後**にします。期限は Container App のタグ（`tt-expires-at`）に記録します。**期限を過ぎると、TTDeployTool のデスクトップアプリが自動で削除します**（DB のデータも消えます。CLI と MCP サーバーは期限での削除をしません）。残したい環境は、期限日を指定し直すか `none` を指定して再デプロイしてください。Dry-run では使いません
 - `--group`（任意）: グループ名（用途・利用者ごとにデプロイを分ける名前。1〜64 文字、改行などの制御文字は使えません。前後の空白は除きます）。Container App などのタグ（`tt-group`）に記録します。省略すると、既存のデプロイは今のグループを引き継ぎ、新しいデプロイはグループなしです。外す・まとめて変えるのは、デスクトップアプリのデプロイの一覧で行います。タグは平文で見えるため、秘密の情報は入れないでください。Dry-run では使いません
@@ -614,11 +614,11 @@ CLI や AI アシスタントを使わずに、Windows の画面の操作で同�
 
 | コンテナ | CPU（vCPU。小数可） | メモリ（Gi） | 省略時 |
 |---|---|---|---|
-| Timetracker | `--tt-cpu` | `--tt-memory` | 1.5 / 3.0Gi |
+| TimeTracker | `--tt-cpu` | `--tt-memory` | 1.5 / 3.0Gi |
 | DB | `--db-cpu` | `--db-memory` | 1.0 / 2.0Gi |
 | Redis | `--redis-cpu` | `--redis-memory` | 0.5 / 1.0Gi |
 
-- Timetracker のメモリを 2Gi 以下にすると、Azure 上でセットアップウィザードの「サンプルデータベースを作成する」がメモリ不足（`OutOfMemoryException`）で失敗します。サンプル DB を使う場合は、既定値（1.5 / 3.0Gi）以上を指定してください
+- TimeTracker のメモリを 2Gi 以下にすると、Azure 上でセットアップウィザードの「サンプルデータベースを作成する」がメモリ不足（`OutOfMemoryException`）で失敗します。サンプル DB を使う場合は、既定値（1.5 / 3.0Gi）以上を指定してください
 
 **動作**:
 - `--dry-run`（任意）: 指定すると（または `--dry-run true`）、Azure には反映せず、`docker-compose.yml` と `.env` を作るだけにします（[ローカル検証](#ローカル検証dry-run)）。`--subscription` と `--resource-group` は不要です。`--dry-run false` で無効
@@ -734,7 +734,7 @@ dotnet publish .\src\TTDeployTool.Controller.Cli\TTDeployTool.Controller.Cli.csp
 ### テスト
 - 単体テスト: `dotnet test TTDeployTool.sln`（Azure には接続しません）
 - システムテスト（本物の Azure に対するテスト。料金がかかります）: 準備と実行の方法は [docs/SYSTEM_TESTS.md](docs/SYSTEM_TESTS.md) を参照してください。ローカルでは `scripts/run-system-tests.ps1`（または `.sh`）、CI では GitHub Actions の **System Test** ワークフローを手動で実行します
-- セットアップウィザードとログインの確認（ブラウザーを使う E2E テスト。Playwright）: Timetracker のライセンスキーとサンプルデータベースのユーザー（`TT_E2E_LICENSE_KEY` / `TT_E2E_SAMPLE_LOGIN` / `TT_E2E_SAMPLE_PASSWORD`）がある場合に、サンプルデータベースの作成と、そのユーザーでのログインまでを確かめます。ローカルの docker compose（PostgreSQL / SQL Server）では PR の CI（ubuntu）で毎回、Azure ではシステムテストの中で実行します（[docs/SYSTEM_TESTS.md](docs/SYSTEM_TESTS.md)）
+- セットアップウィザードとログインの確認（ブラウザーを使う E2E テスト。Playwright）: TimeTracker のライセンスキーとサンプルデータベースのユーザー（`TT_E2E_LICENSE_KEY` / `TT_E2E_SAMPLE_LOGIN` / `TT_E2E_SAMPLE_PASSWORD`）がある場合に、サンプルデータベースの作成と、そのユーザーでのログインまでを確かめます。ローカルの docker compose（PostgreSQL / SQL Server）では PR の CI（ubuntu）で毎回、Azure ではシステムテストの中で実行します（[docs/SYSTEM_TESTS.md](docs/SYSTEM_TESTS.md)）
 - CI（`.github/workflows/ci.yml`）: PR と `main` への push のたびに、ビルドと単体テスト・スクリプトのテスト・上の E2E テスト・MCP サーバーのイメージの確認・デスクトップアプリの Store 用のパッケージの作成と確認・デスクトップアプリの UI テスト（署名した MSIX を導入して画面を操作する）を実行します。変更がドキュメント（`docs/` の下と `*.md`）だけのときは省きます（Actions の **CI** → Run workflow で手動実行すると、変更にかかわらずすべて実行します）
 - リンク切れのチェック（[lychee](https://github.com/lycheeverse/lychee)。設定は `lychee.toml`）: Markdown の中のファイルと見出し（`#...`）へのリンクは、CI の `links` ジョブで PR と `main` への push のたびに確かめます（ドキュメントだけの変更でも省きません）。外部のサイトへのリンクは、相手の都合で一時的に失敗することがあるため、**Links** ワークフロー（`.github/workflows/links.yml`）で月 1 回確かめ、切れていればラベル `link-check` の Issue で知らせます（Actions の **Links** → Run workflow で手動でも実行できます）
 
@@ -744,7 +744,7 @@ dotnet publish .\src\TTDeployTool.Controller.Cli\TTDeployTool.Controller.Cli.csp
 - ドメイン層（TTDeployTool.Domain）
   - パラメーターのモデル（DeployOptions）、既定値（Defaults）と既定値の適用（DeployOptionsResolver）、検証（DeploymentValidator。すべてのエラーを列挙する）と警告（DeploymentAdvisor）、リソース名の規則（ResourceNaming）、管理タグ（ManagedTags）、権限の判定（PermissionEvaluator）、Compose と .env の生成（Dry-run 用）
 - アプリケーション層（TTDeployTool.Application）
-  - デプロイの手順の実行（DeploymentRunner: リソースグループ → 環境 →（--persist-db の場合）DB のストレージ → DB / Redis / Timetracker）と結果（DeploymentResult）
+  - デプロイの手順の実行（DeploymentRunner: リソースグループ → 環境 →（--persist-db の場合）DB のストレージ → DB / Redis / TimeTracker）と結果（DeploymentResult）
   - 削除の計画の作成と削除の実行（DeletionPlanner / DeletionRunner）、権限の事前確認（PermissionChecker / DeploymentPlanner）
   - 計画 → 確認 → 実行の安全策（DeploymentWorkflow / DeletionWorkflow: 計画の保存、実行の直前の再確認、データ消失への同意、アプリ名の確認、同じ対象の二重実行の拒否）。MCP サーバーとデスクトップアプリで共有する
   - Dry-run のファイルの保存（ComposeExporter）
@@ -775,7 +775,7 @@ dotnet publish .\src\TTDeployTool.Controller.Cli\TTDeployTool.Controller.Cli.csp
 
 ### 注意点
 - 検証環境の構築が目的のため、Azure Container Apps の DB と Redis には、既定では永続ボリュームを付けていません（Dry-run の docker-compose は名前付きボリュームを使います）。DB だけは、`--persist-db` で Azure Files をマウントできます（設計は [docs/design/common/db-persistence.md](docs/design/common/db-persistence.md)）
-- DB のパスワードと Timetracker のパスワードは、Container Apps のシークレット（`db-password` / `app-password`）として登録し、環境変数からは `secretRef` で参照します（ポータルの環境変数の一覧に平文で表示されません）
+- DB のパスワードと TimeTracker のパスワードは、Container Apps のシークレット（`db-password` / `app-password`）として登録し、環境変数からは `secretRef` で参照します（ポータルの環境変数の一覧に平文で表示されません）
 - 認証には、マネージド ID かサービスプリンシパルをおすすめします（DefaultAzureCredential で使えます）
 - [Docker Hub の TimeTracker のページ](https://hub.docker.com/r/densocreate/timetracker)の「クイックスタート」に書かれた固定の DB ユーザー名は、ドメイン層の Defaults にまとめています
 

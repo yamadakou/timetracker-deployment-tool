@@ -66,7 +66,7 @@ public sealed class DeploymentRowViewModel : ObservableObject
         }, () => HasPasswords);
         CopyDbPasswordCommand = new AsyncCommand(() => CopyAsync(_passwords?.DbPassword, "DB のパスワード"), () => _owner.CanCopy && _passwords?.DbPassword != null);
         CopyTrackerPasswordCommand = new AsyncCommand(
-            () => CopyAsync(_passwords?.TrackerPassword, "Timetracker のパスワード"), () => _owner.CanCopy && _passwords?.TrackerPassword != null);
+            () => CopyAsync(_passwords?.TrackerPassword, "TimeTracker のパスワード"), () => _owner.CanCopy && _passwords?.TrackerPassword != null);
         ChangeExpiryCommand = new AsyncCommand(() => Busy.RunAsync("利用可能期限を変えています", ChangeExpiryAsync),
             () => !HasActiveJob && (_entry.Timetracker != null || _entry.Db != null || _entry.Redis != null));
         Extend7Command = new AsyncCommand(() => Busy.RunAsync("利用可能期限を延ばしています", () => ExtendAsync(7)), () => ChangeExpiryCommand.CanExecute(null));
@@ -159,7 +159,7 @@ public sealed class DeploymentRowViewModel : ObservableObject
 
     /// <summary>リソースごとのグループのタグが食い違っている場合の注意（揃っていれば null）。</summary>
     public string? GroupWarning => _entry.GroupDiffers
-        ? "リソースごとにグループのタグ（tt-group）が違うか、付いていないリソースがあります（Timetracker の Container App の値を出しています）。「グループを変える」で揃えてください。"
+        ? "リソースごとにグループのタグ（tt-group）が違うか、付いていないリソースがあります（TimeTracker の Container App の値を出しています）。「グループを変える」で揃えてください。"
         : null;
 
     /// <summary>リソースごとの期限のタグが食い違っている場合の注意（揃っていれば null）。</summary>
@@ -198,7 +198,7 @@ public sealed class DeploymentRowViewModel : ObservableObject
         ? "Azure Files に永続化"
         : _entry.StorageAccountName != null ? "永続化していない（以前の DB のデータが残っています）" : "永続化していない";
 
-    public string SpecText => string.Join("、", new[] { ("Timetracker", _entry.Timetracker), ("DB", _entry.Db), ("Redis", _entry.Redis) }
+    public string SpecText => string.Join("、", new[] { ("TimeTracker", _entry.Timetracker), ("DB", _entry.Db), ("Redis", _entry.Redis) }
         .Where(x => x.Item2 != null)
         .Select(x => string.Create(CultureInfo.InvariantCulture, $"{x.Item1} {x.Item2!.Cpu?.ToString() ?? "?"} vCPU / {x.Item2.Memory ?? "?"}")));
 
@@ -214,7 +214,7 @@ public sealed class DeploymentRowViewModel : ObservableObject
     };
 
     /// <summary>「状態」にマウスを置いたときの、アプリごとの Azure の値。</summary>
-    public string StateDetail => string.Join("\n", new[] { ("Timetracker", _entry.Timetracker), ("DB", _entry.Db), ("Redis", _entry.Redis) }
+    public string StateDetail => string.Join("\n", new[] { ("TimeTracker", _entry.Timetracker), ("DB", _entry.Db), ("Redis", _entry.Redis) }
         .Select(x => $"{x.Item1}: " + (x.Item2 == null ? "ありません" : $"{x.Item2.ProvisioningState ?? "?"} / {x.Item2.RunningStatus ?? "?"}")));
 
     public bool HasPasswords => _passwords != null;

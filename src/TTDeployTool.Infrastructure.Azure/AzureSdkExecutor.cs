@@ -235,7 +235,7 @@ public class AzureSdkExecutor : IAzureDeploymentGateway
         var redisEndpointHost = redisAppName;
         _logger.Info($"Redis app ready: {redisApp.Data.Name} (endpoint: {redisEndpointHost}:{ContainerAppSpecBuilder.RedisPort})");
 
-        // 3) Timetracker
+        // 3) TimeTracker
         var ttAppName = ResourceNaming.TimetrackerApp(appName);
         var ttTags = await GetExistingTagsAsync(apps, ttAppName, cancellationToken);
         var ttAppOp = await apps.CreateOrUpdateAsync(WaitUntil.Completed, ttAppName,
@@ -250,11 +250,11 @@ public class AzureSdkExecutor : IAzureDeploymentGateway
         _logger.Success($"Container Apps ready: {ttApp.Data.Name}, {dbApp.Data.Name}, {redisApp.Data.Name}");
         if (!string.IsNullOrEmpty(ttUrl))
         {
-            _logger.Success($"Timetracker endpoint: {ttUrl}");
+            _logger.Success($"TimeTracker endpoint: {ttUrl}");
         }
         else
         {
-            _logger.Warn("Timetracker endpoint FQDN not available yet. Check Container App ingress settings.");
+            _logger.Warn("TimeTracker endpoint FQDN not available yet. Check Container App ingress settings.");
         }
 
         return new ContainerAppsDeployment(ttApp.Data.Name, dbApp.Data.Name, redisApp.Data.Name,

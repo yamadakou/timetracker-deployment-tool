@@ -172,7 +172,7 @@ public class DeploymentWorkflowTests
         job.Target.Should().Be(new JobTarget("sub", "rg", "demo"));
         var s = job.Snapshot();
         s.Status.Should().Be(JobStatus.Succeeded);
-        s.CurrentStep.Should().Be(new JobStep(3, 3, "Container Apps（DB / Redis / Timetracker）"));
+        s.CurrentStep.Should().Be(new JobStep(3, 3, "Container Apps（DB / Redis / TimeTracker）"));
         (s.Result.Should().BeOfType<DeploymentResult>().Which with { Expiry = null, Group = null })
             .Should().Be(new DeploymentResult("rg", "demo-env", "demo-tt", "demo-db", "demo-redis", "https://demo-tt.example.io"));
         // 計画は一度だけ使える
@@ -323,7 +323,7 @@ public class DeletionWorkflowTests
             .ReturnsAsync([]);
     }
 
-    // Timetracker と Redis だけがある（DB と Environment は無い）
+    // TimeTracker と Redis だけがある（DB と Environment は無い）
     private void TwoApps()
     {
         _apps.Add(new ContainerAppInfo("demo-tt", EnvId, Managed));

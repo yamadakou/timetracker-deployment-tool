@@ -58,7 +58,7 @@ public sealed record DeploymentEntry(
     public IReadOnlyList<string> Missing =>
     [
         .. EnvironmentName == null ? ["Container Apps Environment"] : Array.Empty<string>(),
-        .. Timetracker == null ? ["Timetracker"] : Array.Empty<string>(),
+        .. Timetracker == null ? ["TimeTracker"] : Array.Empty<string>(),
         .. Db == null ? ["DB"] : Array.Empty<string>(),
         .. Redis == null ? ["Redis"] : Array.Empty<string>(),
     ];
@@ -124,7 +124,7 @@ public static class DeploymentCatalog
             resources.Add(env);
         var expiresTags = resources.Select(r => r.Tags.GetValueOrDefault(DeploymentExpiry.ExpiresAtKey)).ToList();
         var expiresTag = DeploymentExpiry.Combine(expiresTags);
-        // グループも同じリソースのタグから読む（Timetracker の Container App を優先。docs/design/common/deployment-groups.md の 3）
+        // グループも同じリソースのタグから読む（TimeTracker の Container App を優先。docs/design/common/deployment-groups.md の 3）
         var groupTags = resources.Select(r => DeploymentGroup.Read(r.Tags)).ToList();
         var deployedTag = resources.Select(r => DeploymentExpiry.TryParseTag(r.Tags.GetValueOrDefault(DeploymentExpiry.DeployedAtKey), out var at) ? at : (DateTimeOffset?)null)
             .Max();

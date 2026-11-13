@@ -443,7 +443,7 @@ public sealed class DeploymentToolsTests : IDisposable
         result.EnvFileName.Should().Be(".env");
         result.ComposeContent.Should().Be(ComposeGenerator.GenerateCompose(expected));
         result.EnvContent.Should().Be(ComposeGenerator.GenerateEnv(expected))
-            .And.Contain("DB_PASSWORD=\"<DB パスワードを設定>\"").And.Contain("TIMETRACKER_PASSWORD=\"<Timetracker のパスワードを設定>\"");
+            .And.Contain("DB_PASSWORD=\"<DB パスワードを設定>\"").And.Contain("TIMETRACKER_PASSWORD=\"<TimeTracker のパスワードを設定>\"");
         result.Warnings.Should().BeEmpty();
         result.NextSteps.Should().Contain(s => s.Contains(passwordRule));
         Json(result).Should().NotContain("Placeholder-Passw0rd");

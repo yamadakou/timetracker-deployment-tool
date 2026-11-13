@@ -39,7 +39,7 @@
 
 ## 3. 開発者アカウントを作り、アプリ名を予約する（Partner Center）
 1. [開発者アカウントを作る](https://learn.microsoft.com/ja-jp/windows/apps/publish/partner-center/open-a-developer-account)。新しい登録の手順（`storedeveloper.microsoft.com` から始める）では、個人・会社とも登録料が無料。会社のアカウントは、D-U-N-S 番号などの確認に数日かかる
-2. Partner Center の「アプリとゲーム」で「新しい製品」→「MSIX または PWA アプリ」を選び、アプリ名を予約する（[アプリ名の予約](https://learn.microsoft.com/ja-jp/windows/apps/publish/publish-your-app/msix/reserve-your-apps-name)）。Timetracker は株式会社デンソークリエイトの製品のため、製品名を含めてよいかは事前に確かめる
+2. Partner Center の「アプリとゲーム」で「新しい製品」→「MSIX または PWA アプリ」を選び、アプリ名を予約する（[アプリ名の予約](https://learn.microsoft.com/ja-jp/windows/apps/publish/publish-your-app/msix/reserve-your-apps-name)）。TimeTracker は株式会社デンソークリエイトの製品のため、製品名を含めてよいかは事前に確かめる
 3. 予約したアプリの「製品管理」→「製品 ID」で、次の 3 つを控える（4 章で使う）
    - パッケージ/ID/名前（`Package/Identity/Name`）
    - パッケージ/ID/発行元（`Package/Identity/Publisher`。`CN=` で始まる）
@@ -70,14 +70,14 @@
 | プロパティ | カテゴリ: 開発者ツール。プライバシー ポリシーの URL: `docs/PRIVACY.md` を公開した URL（例: `https://github.com/yamadakou/timetracker-deployment-tool/blob/main/docs/PRIVACY.md`。デスクトップのアプリでは必須。[ポリシー 10.5.1](https://learn.microsoft.com/ja-jp/windows/apps/publish/store-policies)）。サポートの連絡先: GitHub の Issues の URL |
 | 年齢区分 | IARC のアンケートに答える（[ポリシー 11.11](https://learn.microsoft.com/ja-jp/windows/apps/publish/store-policies)。暴力・課金・ユーザー間のやり取りなどは無い） |
 | パッケージ | 4 章で取得した `.msixupload` をアップロードする。対象のデバイスは「デスクトップ」 |
-| ストア登録情報（日本語） | 説明（例: 「Timetracker の検証環境を Azure Container Apps にデプロイ・確認・削除し、ローカル検証用の docker-compose を作ります。」）、スクリーンショット（1 枚以上）、検索用のキーワード |
+| ストア登録情報（日本語） | 説明（例: 「TimeTracker の検証環境を Azure Container Apps にデプロイ・確認・削除し、ローカル検証用の docker-compose を作ります。」）、スクリーンショット（1 枚以上）、検索用のキーワード |
 | 申請オプション | 制限付き機能 `runFullTrust` の用途: 「WinUI 3 のデスクトップアプリ（Windows App SDK）として動作するために必要です。Azure Resource Manager への接続と、利用者が選んだフォルダーへのファイルの保存を行います。」。認定の担当者への注記: 下記 |
 
 認定の担当者への注記（例）:
 ```
-このアプリは、利用者自身の Azure サブスクリプションに検証用の Timetracker 環境をデプロイするツールです。
+このアプリは、利用者自身の Azure サブスクリプションに検証用の TimeTracker 環境をデプロイするツールです。
 Azure の機能（サインイン、デプロイ、削除）には Azure のサブスクリプションと Entra ID のアカウントが必要なため、テスト用のアカウントは提供していません。
-サインインせずに確かめられる機能: 左のメニューの「設定」で DB のパスワードと Timetracker のパスワード（それぞれ 8 文字以上）を入力し、
+サインインせずに確かめられる機能: 左のメニューの「設定」で DB のパスワードと TimeTracker のパスワード（それぞれ 8 文字以上）を入力し、
 「ローカル検証（Dry-run）」の「保存先を選んで保存」で docker-compose.yml と .env を保存できます。
 ```
 

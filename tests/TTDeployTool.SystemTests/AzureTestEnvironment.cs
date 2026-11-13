@@ -241,7 +241,7 @@ public sealed class AzureTestEnvironment
         }
     }
 
-    /// <summary>Timetracker が HTTP で応答するまで待つ（初回起動は時間がかかる）。応答した状態コードを返す。</summary>
+    /// <summary>TimeTracker が HTTP で応答するまで待つ（初回起動は時間がかかる）。応答した状態コードを返す。</summary>
     public static async Task<int> WaitForHttpResponseAsync(string url, TimeSpan timeout, CancellationToken cancellationToken)
     {
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
@@ -251,7 +251,7 @@ public sealed class AzureTestEnvironment
             try
             {
                 var response = await http.GetAsync(url, cancellationToken);
-                // 502/503 などは起動中。それ以外が返れば Timetracker が応答している
+                // 502/503 などは起動中。それ以外が返れば TimeTracker が応答している
                 if ((int)response.StatusCode < 500)
                     return (int)response.StatusCode;
             }

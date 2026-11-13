@@ -262,7 +262,7 @@ public class AzureSdkExecutorStorageTests
         account.Verify(a => a.DeleteAsync(WaitUntil.Completed, It.IsAny<CancellationToken>()), Times.Once);
     }
 
-    // DB アプリ（既存なら Azure Files を使っているかを指定）。Redis・Timetracker は新規
+    // DB アプリ（既存なら Azure Files を使っているかを指定）。Redis・TimeTracker は新規
     private (Mock<ContainerAppResource>? existingDb, Mock<ContainerAppResource> updatedDb, List<string> calls) SetupDbApp(bool? existingPersisted)
     {
         var calls = new List<string>();

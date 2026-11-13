@@ -83,7 +83,7 @@ public class DeploymentExpiryPlanTests
     [Fact]
     public async Task A_Redeployment_Should_Inherit_The_Expiry_From_The_Apps()
     {
-        // Timetracker に無ければ、DB アプリの期限を使う
+        // TimeTracker に無ければ、DB アプリの期限を使う
         Deployed(ttExpiry: null, dbExpiry: "none");
 
         var plan = await Plan();

@@ -230,7 +230,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     /// <summary>診断用のログのフォルダーを開く（問い合わせのときに、ファイルを添付してもらう）。</summary>
     public AsyncCommand OpenLogFolderCommand { get; }
 
-    /// <summary>デプロイが成功した後に、Timetracker を既定のブラウザーで開く。</summary>
+    /// <summary>デプロイが成功した後に、TimeTracker を既定のブラウザーで開く。</summary>
     public AsyncCommand OpenEndpointCommand { get; }
 
     /// <summary>終わったジョブの記録（アプリを終了しても残す）。</summary>
@@ -509,7 +509,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             if (CurrentDeployment?.IsSameTarget(job) == true)
                 CurrentDeployment = null;
         }
-        // デプロイが終わって URL が分かったら、「Timetracker を開く」を押せるようにする
+        // デプロイが終わって URL が分かったら、「TimeTracker を開く」を押せるようにする
         job.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(JobViewModel.Endpoint))

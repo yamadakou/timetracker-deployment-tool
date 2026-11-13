@@ -183,7 +183,7 @@ namespace TTDeployTool.Domain.Tests
         [Fact]
         public void GenerateCompose_Postgres_Should_Not_PreCreate_Database()
         {
-            // POSTGRES_DB で DB を事前作成すると、Timetracker のサンプルDB作成時にアプリが対象DBへの接続を保持したまま
+            // POSTGRES_DB で DB を事前作成すると、TimeTracker のサンプルDB作成時にアプリが対象DBへの接続を保持したまま
             // DB を削除・復元しようとして失敗する（Exception while writing to stream）。DB はアプリのセットアップで作成させる。
             var composeYml = ComposeGenerator.GenerateCompose(CreateOptions("postgresql"));
             EnvironmentOf(composeYml, "db").Should().NotContainKey("POSTGRES_DB");

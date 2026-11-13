@@ -51,7 +51,7 @@ public static class DeploymentGroup
     public static string? Read(IReadOnlyDictionary<string, string>? tags) =>
         Normalize(tags?.FirstOrDefault(t => string.Equals(t.Key, Key, StringComparison.OrdinalIgnoreCase)).Value);
 
-    /// <summary>複数のリソースのグループ名をまとめる（先に渡したものを優先する。Timetracker の Container App を先に渡す）。どれにも無ければ null。</summary>
+    /// <summary>複数のリソースのグループ名をまとめる（先に渡したものを優先する。TimeTracker の Container App を先に渡す）。どれにも無ければ null。</summary>
     public static string? Combine(IEnumerable<string?> values) => values.Select(Normalize).FirstOrDefault(v => v != null);
 
     /// <summary>リソースごとのグループ名が食い違っているか（付いていないリソースがあるものを含む。変更の途中の失敗、ポータルでの書き換えなど）。</summary>

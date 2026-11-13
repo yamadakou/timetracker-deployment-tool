@@ -4,13 +4,13 @@
 
 - 環境変数 `TT_SYSTEMTEST_SUBSCRIPTION_ID` が無い場合はスキップされます。通常の `dotnet test TTDeployTool.sln` や PR の CI では実行されません
 - **料金が発生します**（Azure Container Apps。1 回 20〜40 分。`DbPersistenceLifecycleTests` はストレージアカウントも作る）。リリース前などに実行してください
-- Timetracker のライセンスキーとサンプルデータベースのユーザー（環境変数 `TT_E2E_LICENSE_KEY` / `TT_E2E_SAMPLE_LOGIN` / `TT_E2E_SAMPLE_PASSWORD`）がある場合は、ブラウザー（Playwright）でセットアップウィザードを操作し、サンプルデータベースの作成と、そのユーザーでのログイン（管理画面のユーザー一覧にサンプルのユーザーが表示されること）まで確認します（Azure 上と、ローカルの docker compose 上）。無い場合はその確認だけを省略します
+- TimeTracker のライセンスキーとサンプルデータベースのユーザー（環境変数 `TT_E2E_LICENSE_KEY` / `TT_E2E_SAMPLE_LOGIN` / `TT_E2E_SAMPLE_PASSWORD`）がある場合は、ブラウザー（Playwright）でセットアップウィザードを操作し、サンプルデータベースの作成と、そのユーザーでのログイン（管理画面のユーザー一覧にサンプルのユーザーが表示されること）まで確認します（Azure 上と、ローカルの docker compose 上）。無い場合はその確認だけを省略します
 - テスト用のリソースは、テストの最後に削除します（下記「後片付け」）
 
 ## シナリオ
 | テスト | 内容 |
 |---|---|
-| `DeploymentLifecycleTests` | 実行ごとに専用のリソースグループを作り、次を順に確認する。① デプロイすると 4 つのリソースに管理タグが付き、Timetracker が HTTP で応答する（E2E の設定があれば、続けてセットアップウィザードでサンプルデータベースを作り、ログインできる） ② 手で付けたタグが再デプロイ後も残る ③ DB アプリの管理タグを外すと、DB アプリと Environment が削除の対象外になる（`--include-untagged` で対象になる） ④ 確認の入力が一致しなければ中止する ⑤ 管理タグがあるものだけ削除される ⑥ 残りを削除してもリソースグループは残る ⑦ 再実行しても失敗しない |
+| `DeploymentLifecycleTests` | 実行ごとに専用のリソースグループを作り、次を順に確認する。① デプロイすると 4 つのリソースに管理タグが付き、TimeTracker が HTTP で応答する（E2E の設定があれば、続けてセットアップウィザードでサンプルデータベースを作り、ログインできる） ② 手で付けたタグが再デプロイ後も残る ③ DB アプリの管理タグを外すと、DB アプリと Environment が削除の対象外になる（`--include-untagged` で対象になる） ④ 確認の入力が一致しなければ中止する ⑤ 管理タグがあるものだけ削除される ⑥ 残りを削除してもリソースグループは残る ⑦ 再実行しても失敗しない |
 | `DbPersistenceLifecycleTests` | DB データの永続化（`--persist-db`。PostgreSQL）を、専用のリソースグループで確認する。① `--persist-db` でデプロイすると、管理タグ付きのストレージアカウントができ、DB アプリが Azure Files をマウントし、DB のデータのディレクトリが共有の上に作られる ② `--persist-db` を省略して設定を変えた再デプロイで、永続化を引き継いで停止 → 更新 → 開始し（データ消失の警告は出ない）、新しい DB コンテナが共有の上のデータを初期化せずに使う（`PG_VERSION` が変わらず、再デプロイの後に `postmaster.pid` が作られる）③ `--keep-db-data` の削除ではストレージアカウントとデータが残る ④ 既定の削除でストレージアカウントも消える。サブスクリプションにリソースプロバイダー `Microsoft.Storage` の登録が必要 |
 | `LocalComposeSetupTests` | CLI の Dry-run で作った docker-compose.yml でローカルに起動し、セットアップウィザードでサンプルデータベースを作って、サンプルデータベースのユーザーでログインできることを確かめる（PostgreSQL と SQL Server）。Azure は使わない。E2E の設定が無い場合と、Docker が使えない場合はスキップする。ポート 8080 を使う |
 | `LimitedPermissionTests` | 権限の少ないサービスプリンシパルで、権限の事前確認が Azure の実際の挙動と合っていることを確認する。① Environment の新規作成が必要なデプロイは止まり、何も作成しない ② 既存の Environment への Container App の更新は成功する（`containerApps/*/write` で `containerApps/write` が許可される） ③ Environment の削除権限が無いため、削除は止まり何も削除しない |
@@ -62,7 +62,7 @@ GitHub のリポジトリの Settings → Secrets and variables → Actions → 
 
 | 名前 | 値 |
 |---|---|
-| `TT_E2E_LICENSE_KEY` | Timetracker のライセンスキー（評価用など） |
+| `TT_E2E_LICENSE_KEY` | TimeTracker のライセンスキー（評価用など） |
 | `TT_E2E_SAMPLE_LOGIN` | サンプルデータベースに入っているユーザーのログイン名（サンプルデータベースを作る場合、ウィザードで管理ユーザーは登録しないため） |
 | `TT_E2E_SAMPLE_PASSWORD` | そのユーザーのパスワード。パスワードが空の場合は `""`（引用符 2 文字）を登録する（GitHub のシークレットは空にできないため） |
 

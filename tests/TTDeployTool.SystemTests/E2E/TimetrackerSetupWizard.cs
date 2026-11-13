@@ -8,7 +8,7 @@ namespace TTDeployTool.SystemTests.E2E;
 public sealed record LoginUser(string LoginName, string Password);
 
 /// <summary>
-/// Timetracker のセットアップウィザード（/setup）とログインを、ブラウザー（Playwright）で操作する。
+/// TimeTracker のセットアップウィザード（/setup）とログインを、ブラウザー（Playwright）で操作する。
 /// 画面は ExtJS で作られていて要素の ID が自動生成されるため、表示されている文言とラベルで要素を探す。
 /// サンプルデータベースを作る場合のウィザードの流れ: セットアップの開始 → ライセンスキーの入力 → ライセンス情報の確認
 /// → データベースの作成方法 → 実行の確認 → 実行中 → セットアップの完了（または セットアップエラー）。

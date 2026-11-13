@@ -127,4 +127,4 @@ tests/TTDeployTool.Controller.Mcp.Tests/  (新規) ツールの単体テスト�
 - Infrastructure: `AzureSubscriptionDirectory`（`ArmClient` のモック）
 - MCP（単体）: 設定の読み取り、引数の変換とパスワードの取得元、各ツールの正常・エラーの分岐、出力先の制限、上書きの禁止、パスワードが結果に含まれないこと
 - MCP（プロトコル結合）: ビルドした `ttdeploytool-mcp` を SDK の `StdioClientTransport` で起動し、`initialize`（instructions）・`tools/list`（スキーマ・annotations）・`tools/call` を確かめる。stdout に JSON-RPC 以外が出ないことは、プロトコルが成立することで確かめる
-- 手動: MCP Inspector（CLI モード）で `tools/list` と `tools/call`。`generate_compose` で生成したファイルで `docker compose up` が成功し、Timetracker が応答すること
+- 手動: MCP Inspector（CLI モード）で `tools/list` と `tools/call`。`generate_compose` で生成したファイルで `docker compose up` が成功し、TimeTracker が応答すること

@@ -3,7 +3,7 @@ using TTDeployTool.Infrastructure.Azure;
 
 namespace TTDeployTool.Application.Inventory;
 
-/// <summary>Timetracker アプリのシークレットに入っているパスワード（無ければ null）。</summary>
+/// <summary>TimeTracker アプリのシークレットに入っているパスワード（無ければ null）。</summary>
 public sealed record DeploymentPasswords(string? DbPassword, string? TrackerPassword);
 
 /// <summary>
@@ -100,8 +100,8 @@ public sealed class DeploymentMaintenance
     private static IReadOnlyDictionary<string, string>? CurrentTag(IReadOnlyDictionary<string, string> tags) =>
         tags.Where(t => string.Equals(t.Key, DeploymentGroup.Key, StringComparison.OrdinalIgnoreCase)).ToDictionary() is { Count: > 0 } found ? found : null;
 
-    /// <summary>Timetracker アプリのシークレットから、DB と Timetracker のパスワードを読む（値はログに書かない）。</summary>
-    /// <exception cref="InvalidOperationException">本ツールで作った Timetracker アプリが無い</exception>
+    /// <summary>TimeTracker アプリのシークレットから、DB と TimeTracker のパスワードを読む（値はログに書かない）。</summary>
+    /// <exception cref="InvalidOperationException">本ツールで作った TimeTracker アプリが無い</exception>
     public async Task<DeploymentPasswords> ReadPasswordsAsync(
         string subscriptionId, string resourceGroup, string appName, CancellationToken cancellationToken = default)
     {
@@ -111,7 +111,7 @@ public sealed class DeploymentMaintenance
             : null;
         if (secrets == null)
             throw new InvalidOperationException(
-                $"リソースグループ {resourceGroup} に、本ツールで作った Timetracker の Container App（{tt}）がありません。一覧を読み直してください。");
+                $"リソースグループ {resourceGroup} に、本ツールで作った TimeTracker の Container App（{tt}）がありません。一覧を読み直してください。");
         return new DeploymentPasswords(
             secrets.GetValueOrDefault(ContainerAppSpecBuilder.DbPasswordSecretName),
             secrets.GetValueOrDefault(ContainerAppSpecBuilder.AppPasswordSecretName));
@@ -145,7 +145,7 @@ public sealed class DeploymentMaintenance
     private async Task<IReadOnlyList<string>> ManagedAppsAsync(string subscriptionId, string resourceGroup, string appName, CancellationToken cancellationToken) =>
         [.. (await ManagedAppInfosAsync(subscriptionId, resourceGroup, appName, cancellationToken)).Select(a => a.Name)];
 
-    // 3 つの Container App のうち、あって管理タグが一致するもの（Timetracker・DB・Redis の順。名前は本ツールの付け方のまま）
+    // 3 つの Container App のうち、あって管理タグが一致するもの（TimeTracker・DB・Redis の順。名前は本ツールの付け方のまま）
     private async Task<IReadOnlyList<ContainerAppInfo>> ManagedAppInfosAsync(
         string subscriptionId, string resourceGroup, string appName, CancellationToken cancellationToken)
     {

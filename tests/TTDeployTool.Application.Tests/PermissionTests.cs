@@ -218,7 +218,7 @@ public class DeploymentPlannerTests
     [Fact]
     public async Task Should_Require_Resource_Group_Permissions_For_Apps_To_Be_Created()
     {
-        // DB アプリだけが既存。作成する Redis / Timetracker は、リソースでの権限では判定しない
+        // DB アプリだけが既存。作成する Redis / TimeTracker は、リソースでの権限では判定しない
         ResourceGroupExists();
         _gateway.Setup(g => g.GetEnvironmentAsync("sub", "rg", "demo-env", It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ManagedEnvironmentInfo("id", "demo-env", "japaneast", new Dictionary<string, string>()));

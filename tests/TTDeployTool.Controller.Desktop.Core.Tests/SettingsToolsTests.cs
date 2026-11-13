@@ -41,15 +41,15 @@ public sealed class SettingsToolsTests : IDisposable
         masked.Should().StartWith("# TTDeployTool のデプロイの設定\n\n| 項目 | 値 |\n|---|---|\n")
             .And.Contain("| サブスクリプション | 検証（sub、開発） |")
             .And.Contain("| リソースグループ | rg |")
-            .And.Contain("| Timetracker のイメージのタグ | custom\\|tag |")
+            .And.Contain("| TimeTracker のイメージのタグ | custom\\|tag |")
             .And.Contain("| DB のパスワード | ********（入力済み） |")
-            .And.Contain("| Timetracker の CPU / メモリ | 1.5 vCPU / 3.0 Gi |")
+            .And.Contain("| TimeTracker の CPU / メモリ | 1.5 vCPU / 3.0 Gi |")
             .And.Contain("| 利用可能期限日 | 2026-12-01（期限日の終わり） |")
             .And.Contain("| 作るリソース | demo-env、demo-tt、demo-db、demo-redis |")
             .And.NotContain("DbPassw0rd!")
             // タグが DB 種別に合わないため、誤りの節も出る（「|」は置き換える）
             .And.Contain("## 誤り\n\n- 不適切な組み合わせ: db-type='postgresql' と tt-tag='custom\\|tag'");
-        vm.ToMarkdown(includePasswords: true).Should().Contain("| DB のパスワード | DbPassw0rd! |").And.Contain("| Timetracker のパスワード | TrackerPass! |");
+        vm.ToMarkdown(includePasswords: true).Should().Contain("| DB のパスワード | DbPassw0rd! |").And.Contain("| TimeTracker のパスワード | TrackerPass! |");
     }
 
     [Fact]
@@ -65,7 +65,7 @@ public sealed class SettingsToolsTests : IDisposable
         markdown.Should().Contain("| サブスクリプション | （未選択） |")
             .And.Contain("| リソースグループ | （未入力） |")
             .And.Contain("| DB のパスワード | （未入力） |")
-            .And.Contain($"| Timetracker のイメージのタグ | {Defaults.TimetrackerTagSqlServer}（既定） |")
+            .And.Contain($"| TimeTracker のイメージのタグ | {Defaults.TimetrackerTagSqlServer}（既定） |")
             .And.Contain($"| 利用可能期限日 | {SettingsViewModel.ExpiryOptions[0].Label} |")
             .And.Contain("## 誤り\n\n- subscription は必須です。")
             .And.Contain("## 警告\n\n- ");
@@ -306,7 +306,7 @@ public class CopyTests
         var markdown = h.Clipboard.Copied.Single();
         markdown.Should().StartWith("# TTDeployTool の状態の確認（rg / demo）\n\n- サブスクリプション: sub\n- Container Apps Environment demo-env（japaneast、Succeeded）\n- https://demo-tt.example.io/")
             .And.Contain("## Container Apps\n\n| 役割 | 名前 | 状態 | イメージ | CPU / メモリ | リビジョン | 管理タグ |")
-            .And.Contain("| Timetracker | demo-tt | Succeeded / Running | img:1 | 1.5 vCPU / 3Gi | demo-tt--r1 | あり |")
+            .And.Contain("| TimeTracker | demo-tt | Succeeded / Running | img:1 | 1.5 vCPU / 3Gi | demo-tt--r1 | あり |")
             .And.Contain("| DB | demo-db | Succeeded / Running | img\\|2 | 1 vCPU / 2Gi |  | なし |");
         vm.Message.Should().Be("状態を Markdown でコピーしました。");
 

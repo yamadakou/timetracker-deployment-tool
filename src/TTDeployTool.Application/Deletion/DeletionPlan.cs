@@ -20,7 +20,7 @@ public sealed record DeletionTarget(string Name, DeletionResourceKind Kind, bool
 public sealed record ResourceGroupDeletion(bool Exists, bool WillDelete, string? Reason, IReadOnlyList<string> Remaining);
 
 /// <summary>
-/// 削除計画。対象は削除する順（Timetracker → Redis → DB → Environment → ストレージアカウント）に並ぶ。
+/// 削除計画。対象は削除する順（TimeTracker → Redis → DB → Environment → ストレージアカウント）に並ぶ。
 /// <see cref="IncludeUntagged"/> は管理タグの無いリソースも対象にするか、<see cref="KeepDbData"/> は DB のデータを置いた
 /// ストレージアカウントを残すか、<see cref="ResourceGroupTarget"/> はリソースグループも削除するか（null なら削除しない。
 /// 削除の直前の確認でも同じ規則を使う）。リソースグループは、本ツールのリソースを削除した後に空になる場合だけ、最後に削除する。

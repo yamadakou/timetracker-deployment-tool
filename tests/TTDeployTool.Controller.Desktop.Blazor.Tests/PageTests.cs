@@ -12,7 +12,7 @@ namespace TTDeployTool.Controller.Desktop.Blazor.Tests;
 /// <summary>メニューに無い画面（削除・まとめての削除・実行状況）と、Dry-run・設定・一覧の 1 行の詳細（WinUI の画面と同じ操作が Core に届くこと）。</summary>
 public sealed class PageTests : IDisposable
 {
-    // app01 は Timetracker の URL が無い（止めた・作りかけのデプロイ）
+    // app01 は TimeTracker の URL が無い（止めた・作りかけのデプロイ）
     private readonly TestApp _app = new(secrets: true, data: d => d with
     {
         Resources = [.. d.Resources.Select(r => r.Name == ResourceNaming.TimetrackerApp(FixtureSamples.AppName(1)) ? r with { App = r.App! with { Fqdn = null } } : r)],

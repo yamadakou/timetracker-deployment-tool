@@ -63,15 +63,15 @@
         @* ③ パスワード *@
         <p>パスワードは保存しません（アプリを終了すると消えます。テンプレートにも保存しません）。</p>
         <TextInput Id="Settings.DbPassword" Type="password" Label="DB のパスワード（8 文字以上）" Value="@Settings.DbPassword" ValueChanged="v => Settings.DbPassword = v" Css="tt-wide" />
-        <TextInput Id="Settings.TrackerPassword" Type="password" Label="Timetracker のパスワード（8 文字以上）" Value="@Settings.TrackerPassword" ValueChanged="v => Settings.TrackerPassword = v" Css="tt-wide" />
+        <TextInput Id="Settings.TrackerPassword" Type="password" Label="TimeTracker のパスワード（8 文字以上）" Value="@Settings.TrackerPassword" ValueChanged="v => Settings.TrackerPassword = v" Css="tt-wide" />
     }
     else if (Wizard.IsSpec)
     {
         @* ④ スペックと利用可能期限 *@
         <p class="tt-strong">CPU（vCPU）とメモリ（Gi）</p>
         <div class="tt-bar">
-            <TextInput Id="Settings.TtCpu" Label="Timetracker の CPU" Value="@Settings.TtCpu" ValueChanged="v => Settings.TtCpu = v" Css="tt-short" />
-            <TextInput Id="Settings.TtMemory" Label="Timetracker のメモリ" Value="@Settings.TtMemoryGi" ValueChanged="v => Settings.TtMemoryGi = v" Css="tt-short" />
+            <TextInput Id="Settings.TtCpu" Label="TimeTracker の CPU" Value="@Settings.TtCpu" ValueChanged="v => Settings.TtCpu = v" Css="tt-short" />
+            <TextInput Id="Settings.TtMemory" Label="TimeTracker のメモリ" Value="@Settings.TtMemoryGi" ValueChanged="v => Settings.TtMemoryGi = v" Css="tt-short" />
             <TextInput Id="Settings.DbCpu" Label="DB の CPU" Value="@Settings.DbCpu" ValueChanged="v => Settings.DbCpu = v" Css="tt-short" />
             <TextInput Id="Settings.DbMemory" Label="DB のメモリ" Value="@Settings.DbMemoryGi" ValueChanged="v => Settings.DbMemoryGi = v" Css="tt-short" />
             <TextInput Id="Settings.RedisCpu" Label="Redis の CPU" Value="@Settings.RedisCpu" ValueChanged="v => Settings.RedisCpu = v" Css="tt-short" />

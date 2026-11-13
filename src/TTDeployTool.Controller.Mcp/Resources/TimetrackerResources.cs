@@ -20,14 +20,14 @@ public sealed class TimetrackerResources
     public const string Constraints = """
         # 本ツールの目的と注意事項
 
-        本ツールは、Timetracker の **検証環境（評価・動作確認・デモ用途）を手早く構築するための支援ツール** です。本番環境の構築は対象外です。
+        本ツールは、TimeTracker の **検証環境（評価・動作確認・デモ用途）を手早く構築するための支援ツール** です。本番環境の構築は対象外です。
 
         | 項目 | 内容 |
         |---|---|
         | Azure 上の DB データは既定では永続化されない | 既定では、DB はボリュームを持たないコンテナとして動作します。DB コンテナが再起動すると（設定を変えた再デプロイ、リビジョンの更新、Azure 基盤のメンテナンスなど）、DB のデータは失われます。残したいデータは事前にエクスポートしてください。persist_db=true を指定すると、DB のデータを Azure Files（ストレージアカウント）に置き、再起動の後も残します（ストレージの容量とトランザクションの料金がかかります。plan_deletion では keep_db_data=true を指定しない限り、ストレージアカウントも削除します。まれにデータが壊れるおそれがあるため、重要なデータはエクスポートしておいてください。永続化した DB アプリを再起動するときは、Azure ポータルの「再起動」や az containerapp revision restart ではなく、同じ設定で plan_deployment → start_deployment を実行してください（新旧の DB が同じデータを同時に開かないよう、停止 → 更新 → 開始で再起動します））。ローカルの docker-compose（generate_compose）は名前付きボリュームを使うため、再起動してもデータは残ります（docker compose down -v で消えます） |
         | SQL Server は Developer エディション | db_type=sqlserver では MSSQL_PID=Developer で起動します。開発・テスト用途に限られ、本番環境では使えません |
         | SQL Server ＋ Azure ではサンプル DB を作成できない | サンプル DB を使う場合は PostgreSQL（既定）を使ってください。SQL Server では、セットアップウィザードで「空のデータベースを作成する」を選んでください（ローカルの docker-compose では SQL Server でもサンプル DB を作成できます） |
-        | Timetracker のメモリ | 3Gi 以上を推奨します |
+        | TimeTracker のメモリ | 3Gi 以上を推奨します |
         | スケールは 1 台固定 | 各コンテナとも 1 台で動作し、冗長化・スケールアウトは行いません |
         | 機密情報の取り扱い | generate_compose で生成する .env には DB パスワードなどが平文で書かれます。共有やリポジトリへのコミットは避けてください。Azure 上ではパスワードを Container Apps の secret として登録します |
         | 利用可能期限 | デプロイには利用可能期限があり、本ツールで作るリソース（3 つの Container App・ストレージアカウント。Container Apps Environment は作成するときだけ）のタグ（tt-expires-at。UTC）に記録します。plan_deployment の expires_on で、期限日（yyyy-MM-dd。期限日の終わり＝サーバーの時刻帯の 23:59:59）か none（期限なし）を指定できます。省略すると、新しいデプロイは今日から 32 日後、再デプロイは今の期限を引き継ぎます（期限のタグが無い環境は 32 日後）。期限を過ぎると、TTDeployTool のデスクトップアプリが自動で削除します（DB のデータも消えます）。CLI・MCP サーバーは期限での削除をしません |
@@ -95,7 +95,7 @@ public sealed class TimetrackerResources
     public static string GetRbac() => Rbac;
 
     [McpServerResource(UriTemplate = DeploymentUriTemplate, Name = "deployment", Title = "デプロイ済みの環境の状態", MimeType = "application/json")]
-    [Description("get_deployment_info と同じ内容（Environment と各 Container App の状態、管理タグの有無、Timetracker の URL）。")]
+    [Description("get_deployment_info と同じ内容（Environment と各 Container App の状態、管理タグの有無、TimeTracker の URL）。")]
     public async Task<string> GetDeployment(string subscription, string resource_group, string app_name, CancellationToken cancellationToken)
     {
         var tools = ActivatorUtilities.CreateInstance<DeploymentJobTools>(_services);
