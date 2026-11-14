@@ -66,8 +66,11 @@ public class MockRowMenuTests
         AppSession.Clipboard().Should().Contain("リソースグループ: rg-mock-01").And.NotContain("パスワード");
 
         // 詳細の文字をダブルクリックで選び（範囲選択できる）、「選んだ文字をコピー」
-        AppSession.Click(Middle(app.Find("Row.DaysLeft").BoundingRectangle), twice: true);
-        AppSession.Click(Middle(app.Find("Row.DaysLeft").BoundingRectangle), right: true);
+        // 文字の欄は横いっぱいに伸びるが、文字は左にしか無いため、左の端の「あと」を押す（真ん中は文字の無い所で、何も選べない）
+        var days = app.Find("Row.DaysLeft").BoundingRectangle;
+        var word = new Point(days.X + 12, days.Y + days.Height / 2);
+        AppSession.Click(word, twice: true);
+        AppSession.Click(word, right: true);
         var selected = app.FindAnywhere("Detail.CopySelection");
         AppSession.WaitUntil(() => selected.IsEnabled, "選んだ文字があれば押せる");
         selected.Patterns.Invoke.Pattern.Invoke();
