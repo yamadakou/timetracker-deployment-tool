@@ -54,8 +54,8 @@ internal static class Ui
     /// <summary>割合の幅（Grid の列の *）。</summary>
     public static GridLength Star(double share) => new(share, GridUnitType.Star);
 
-    /// <summary>残りの割合。</summary>
-    public static double Rest(double share) => 1 - share;
+    /// <summary>残りの割合の幅（x:Bind の関数の入れ子はコード生成が誤るため〔CS0103〕、1 つの関数にする）。</summary>
+    public static GridLength RestStar(double share) => new(1 - share, GridUnitType.Star);
 
     /// <summary>割合が 0 より大きいときだけ出す（Redis は最低がいちばん左のため、赤の帯を出さない）。</summary>
     public static Visibility IfPositive(double share) => share > 0 ? Visibility.Visible : Visibility.Collapsed;
