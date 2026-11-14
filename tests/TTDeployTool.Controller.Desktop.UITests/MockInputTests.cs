@@ -65,7 +65,10 @@ public class MockInputTests
         Maximize(again);
         OpenJobs(again);
         AppSession.WaitUntil(() => KindAfterSubscription(again), "順序は起動し直しても同じ");
-        KindCellWidth(again).Should().BeCloseTo(widened, 4, "幅は起動し直しても同じ");
+        // 幅は、見出しの幅が決まった後の配置でセルに移るため、待つ（起動の直後に読むと、まだ初期値の幅のことがあった。CI run 43606009045）
+        var restored = 0;
+        AppSession.TryWait(() => Math.Abs((restored = KindCellWidth(again)) - widened) <= 4, null);
+        restored.Should().BeCloseTo(widened, 4, "幅は起動し直しても同じ");
         again.Invoke("Jobs.ResetLayout");
         AppSession.WaitUntil(() => !KindAfterSubscription(again), "初期値に戻すと元の順序");
         // 幅は、見出しの幅が決まった後の配置でセルに移るため、待つ
