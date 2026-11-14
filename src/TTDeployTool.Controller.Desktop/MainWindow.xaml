@@ -78,6 +78,15 @@
                         <TextBlock AutomationProperties.AutomationId="Job.RescheduleMessage" VerticalAlignment="Bottom" TextWrapping="Wrap"
                                    Foreground="{ThemeResource SystemFillColorCriticalBrush}" Text="{x:Bind RescheduleMessage, Mode=OneWay}" />
                     </StackPanel>
+                    <!-- まだ始めていない削除のジョブの「リソースグループも削除する」を変える（No.86。広げるときは確認のダイアログ） -->
+                    <StackPanel Spacing="4" Visibility="{x:Bind CanChangeDeletion, Mode=OneWay}">
+                        <StackPanel Orientation="Horizontal" Spacing="4"><TextBlock Text="削除の設定:" /><TextBlock AutomationProperties.AutomationId="Job.DeletionSettings" Text="{x:Bind DeletionSettingsText, Mode=OneWay}" /></StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <CheckBox AutomationProperties.AutomationId="Job.EditDeleteResourceGroup" Content="リソースグループも削除する（中が空になる場合だけ）" IsChecked="{x:Bind EditDeleteResourceGroup, Mode=TwoWay}" />
+                            <Button AutomationProperties.AutomationId="Job.ChangeDeletion" Content="削除の設定を変える" Command="{x:Bind ChangeDeletionCommand}" />
+                        </StackPanel>
+                        <TextBlock AutomationProperties.AutomationId="Job.DeletionMessage" TextWrapping="Wrap" Text="{x:Bind DeletionMessage, Mode=OneWay}" />
+                    </StackPanel>
                 </StackPanel>
             </DataTemplate>
         </Grid.Resources>
@@ -367,7 +376,7 @@
                                 </tv:TableViewTemplateColumn>
                                 <tv:TableViewTemplateColumn Header="リソースグループ" Tag="ResourceGroup">
                                     <tv:TableViewTemplateColumn.CellTemplate><DataTemplate x:DataType="vm:DeploymentRowViewModel">
-                                        <TextBlock Style="{StaticResource CellTextStyle}" Text="{x:Bind ResourceGroup}" local:CellText.ShowFullText="True" />
+                                        <TextBlock AutomationProperties.AutomationId="Row.ResourceGroup" Style="{StaticResource CellTextStyle}" Text="{x:Bind ResourceGroup}" local:CellText.ShowFullText="True" />
                                     </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
                                 </tv:TableViewTemplateColumn>
                                 <tv:TableViewTemplateColumn Header="アプリ名" Tag="AppName">
@@ -463,7 +472,7 @@
                         <TextBlock TextWrapping="Wrap" Text="本ツールで作ったリソースだけを削除します。リソースグループは、「リソースグループも削除する」を選んだ場合だけ、中が空になれば削除します。" />
                         <CheckBox AutomationProperties.AutomationId="Delete.IncludeUntagged" Content="管理タグの無いものも対象にする" IsChecked="{x:Bind ViewModel.Deletion.IncludeUntagged, Mode=TwoWay}" />
                         <CheckBox AutomationProperties.AutomationId="Delete.KeepDbData" Content="DB のデータを残す（ストレージアカウントを削除しない。料金がかかり続けます）" IsChecked="{x:Bind ViewModel.Deletion.KeepDbData, Mode=TwoWay}" />
-                        <CheckBox AutomationProperties.AutomationId="Delete.DeleteResourceGroup" Content="リソースグループも削除する（本ツールのリソースを削除した後に、中が空になる場合だけ。元に戻せません）" IsChecked="{x:Bind ViewModel.Deletion.DeleteResourceGroup, Mode=TwoWay}" />
+                        <CheckBox AutomationProperties.AutomationId="Delete.DeleteResourceGroup" Content="リソースグループも削除する（本ツールのリソースを削除した後に、中が空になる場合だけ。元に戻せません）" IsChecked="{x:Bind ViewModel.Deletion.DeleteResourceGroup, Mode=TwoWay}" Visibility="{x:Bind local:Ui.IfFalse(ViewModel.Deletion.IsResourceGroupOnly), Mode=OneWay}" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <Button AutomationProperties.AutomationId="Delete.Plan" Content="計画し直す" Command="{x:Bind ViewModel.Deletion.PlanCommand}" />
                             <Button AutomationProperties.AutomationId="Delete.CopyPlan" Content="計画を Markdown でコピー" Command="{x:Bind ViewModel.Deletion.CopyPlanCommand}" />
@@ -485,10 +494,12 @@
                             <ItemsControl AutomationProperties.AutomationId="Delete.Blockers" ItemsSource="{x:Bind ViewModel.Deletion.Blockers}" Foreground="{ThemeResource SystemFillColorCriticalBrush}" ItemTemplate="{StaticResource LineTemplate}" />
                             <ItemsControl ItemsSource="{x:Bind ViewModel.Deletion.Warnings}" Foreground="{ThemeResource SystemFillColorCautionBrush}" ItemTemplate="{StaticResource LineTemplate}" />
                             <StackPanel Spacing="8" Visibility="{x:Bind ViewModel.Deletion.NeedsAppNameConfirmation, Mode=OneWay}">
-                                <StackPanel Orientation="Horizontal"><TextBlock Text="確認のため、アプリ名「" /><TextBlock Text="{x:Bind ViewModel.Deletion.AppNameToConfirm, Mode=OneWay}" /><TextBlock Text="」を入力してください。" /></StackPanel>
+                                <StackPanel Orientation="Horizontal"><TextBlock Text="確認のため、" /><TextBlock AutomationProperties.AutomationId="Delete.ConfirmLabel" Text="{x:Bind ViewModel.Deletion.ConfirmLabel, Mode=OneWay}" /><TextBlock Text="「" /><TextBlock Text="{x:Bind ViewModel.Deletion.AppNameToConfirm, Mode=OneWay}" /><TextBlock Text="」を入力してください。" /></StackPanel>
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <TextBox AutomationProperties.AutomationId="Delete.ConfirmAppName" Text="{x:Bind ViewModel.Deletion.ConfirmAppName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="320" HorizontalAlignment="Left" />
-                                    <Button AutomationProperties.AutomationId="Delete.CopyAppName" Content="アプリ名をコピー" Command="{x:Bind ViewModel.Deletion.CopyAppNameCommand}" />
+                                    <Button AutomationProperties.AutomationId="Delete.CopyAppName" Command="{x:Bind ViewModel.Deletion.CopyAppNameCommand}">
+                                        <StackPanel Orientation="Horizontal"><TextBlock Text="{x:Bind ViewModel.Deletion.ConfirmLabel, Mode=OneWay}" /><TextBlock Text="をコピー" /></StackPanel>
+                                    </Button>
                                 </StackPanel>
                                 <Button AutomationProperties.AutomationId="Delete.Start" Content="今すぐ削除" Command="{x:Bind ViewModel.Deletion.StartCommand}" Style="{StaticResource AccentButtonStyle}" />
                                 <StackPanel Orientation="Horizontal" Spacing="8">
