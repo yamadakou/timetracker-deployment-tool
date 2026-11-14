@@ -401,46 +401,50 @@
                         <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                             <Border Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8" Padding="12"
                                     BorderBrush="{x:Bind local:Ui.CardBorder(ViewModel.Deployments.QuickFilter, 'All'), Mode=OneWay}" BorderThickness="{x:Bind local:Ui.CardThickness(ViewModel.Deployments.QuickFilter, 'All'), Mode=OneWay}">
-                                <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <!-- 狭い幅でも数と説明が折り返しすぎないよう、「絞り込む」は説明の下に置く -->
+                                <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                                     <FontIcon Glyph="&#xE753;" FontSize="20" VerticalAlignment="Center" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
                                     <StackPanel Grid.Column="1">
                                         <TextBlock AutomationProperties.AutomationId="Deployments.TotalCount" Style="{StaticResource SubtitleTextBlockStyle}" Text="{x:Bind ViewModel.Deployments.TotalCount, Mode=OneWay}" />
                                         <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Text="デプロイ（すべて）" TextWrapping="Wrap" />
+                                        <HyperlinkButton AutomationProperties.AutomationId="Deployments.Filter.All" Content="すべて" Padding="0,4,0,0" Tag="All" Click="OnDeploymentsQuickFilter" />
                                     </StackPanel>
-                                    <HyperlinkButton Grid.Column="2" AutomationProperties.AutomationId="Deployments.Filter.All" Content="すべて" VerticalAlignment="Center" Tag="All" Click="OnDeploymentsQuickFilter" />
                                 </Grid>
                             </Border>
                             <Border Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8" Padding="12"
                                     BorderBrush="{x:Bind local:Ui.CardBorder(ViewModel.Deployments.QuickFilter, 'ExpiringSoon'), Mode=OneWay}" BorderThickness="{x:Bind local:Ui.CardThickness(ViewModel.Deployments.QuickFilter, 'ExpiringSoon'), Mode=OneWay}">
-                                <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <!-- 狭い幅でも数と説明が折り返しすぎないよう、「絞り込む」は説明の下に置く -->
+                                <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                                     <FontIcon Glyph="&#xE823;" FontSize="20" VerticalAlignment="Center" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
                                     <StackPanel Grid.Column="1">
                                         <TextBlock AutomationProperties.AutomationId="Deployments.ExpiringSoonCount" Style="{StaticResource SubtitleTextBlockStyle}" Text="{x:Bind ViewModel.Deployments.ExpiringSoonCount, Mode=OneWay}" />
                                         <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Text="期限が 7 日以内" TextWrapping="Wrap" />
+                                        <HyperlinkButton AutomationProperties.AutomationId="Deployments.Filter.ExpiringSoon" Content="絞り込む" Padding="0,4,0,0" Tag="ExpiringSoon" Click="OnDeploymentsQuickFilter" />
                                     </StackPanel>
-                                    <HyperlinkButton Grid.Column="2" AutomationProperties.AutomationId="Deployments.Filter.ExpiringSoon" Content="絞り込む" VerticalAlignment="Center" Tag="ExpiringSoon" Click="OnDeploymentsQuickFilter" />
                                 </Grid>
                             </Border>
                             <Border Grid.Column="2" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8" Padding="12"
                                     BorderBrush="{x:Bind local:Ui.CardBorder(ViewModel.Deployments.QuickFilter, 'Jobs'), Mode=OneWay}" BorderThickness="{x:Bind local:Ui.CardThickness(ViewModel.Deployments.QuickFilter, 'Jobs'), Mode=OneWay}">
-                                <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <!-- 狭い幅でも数と説明が折り返しすぎないよう、「絞り込む」は説明の下に置く -->
+                                <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                                     <FontIcon Glyph="&#xE916;" FontSize="20" VerticalAlignment="Center" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
                                     <StackPanel Grid.Column="1">
                                         <TextBlock AutomationProperties.AutomationId="Deployments.ActiveJobCount" Style="{StaticResource SubtitleTextBlockStyle}" Text="{x:Bind ViewModel.Deployments.ActiveJobCount, Mode=OneWay}" />
                                         <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Text="実行中・予定のジョブ" TextWrapping="Wrap" />
+                                        <HyperlinkButton AutomationProperties.AutomationId="Deployments.ShowJobs" Content="ジョブの一覧" Padding="0,4,0,0" Tag="Jobs" Click="OnShowJobs" />
                                     </StackPanel>
-                                    <HyperlinkButton Grid.Column="2" AutomationProperties.AutomationId="Deployments.ShowJobs" Content="ジョブの一覧" VerticalAlignment="Center" Tag="Jobs" Click="OnShowJobs" />
                                 </Grid>
                             </Border>
                             <Border Grid.Column="3" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8" Padding="12"
                                     BorderBrush="{x:Bind local:Ui.CardBorder(ViewModel.Deployments.QuickFilter, 'Attention'), Mode=OneWay}" BorderThickness="{x:Bind local:Ui.CardThickness(ViewModel.Deployments.QuickFilter, 'Attention'), Mode=OneWay}">
-                                <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <!-- 狭い幅でも数と説明が折り返しすぎないよう、「絞り込む」は説明の下に置く -->
+                                <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                                     <FontIcon Glyph="&#xEA8F;" FontSize="20" VerticalAlignment="Center" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
                                     <StackPanel Grid.Column="1">
                                         <TextBlock AutomationProperties.AutomationId="Deployments.AttentionCount" Style="{StaticResource SubtitleTextBlockStyle}" Text="{x:Bind ViewModel.Deployments.AttentionCount, Mode=OneWay}" />
                                         <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Text="要確認（作りかけ・失敗・リソースグループだけ）" TextWrapping="Wrap" />
+                                        <HyperlinkButton AutomationProperties.AutomationId="Deployments.Filter.Attention" Content="絞り込む" Padding="0,4,0,0" Tag="Attention" Click="OnDeploymentsQuickFilter" />
                                     </StackPanel>
-                                    <HyperlinkButton Grid.Column="2" AutomationProperties.AutomationId="Deployments.Filter.Attention" Content="絞り込む" VerticalAlignment="Center" Tag="Attention" Click="OnDeploymentsQuickFilter" />
                                 </Grid>
                             </Border>
                         </Grid>
@@ -676,46 +680,50 @@
                         <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                             <Border Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8" Padding="12"
                                     BorderBrush="{x:Bind local:Ui.CardBorder(ViewModel.JobList.QuickFilter, 'Running'), Mode=OneWay}" BorderThickness="{x:Bind local:Ui.CardThickness(ViewModel.JobList.QuickFilter, 'Running'), Mode=OneWay}">
-                                <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <!-- 狭い幅でも数と説明が折り返しすぎないよう、「絞り込む」は説明の下に置く -->
+                                <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                                     <FontIcon Glyph="&#xE768;" FontSize="20" VerticalAlignment="Center" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
                                     <StackPanel Grid.Column="1">
                                         <TextBlock AutomationProperties.AutomationId="Jobs.RunningCount" Style="{StaticResource SubtitleTextBlockStyle}" Text="{x:Bind ViewModel.JobList.RunningCount, Mode=OneWay}" />
                                         <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Text="実行中" TextWrapping="Wrap" />
+                                        <HyperlinkButton AutomationProperties.AutomationId="Jobs.Filter.Running" Content="絞り込む" Padding="0,4,0,0" Tag="Running" Click="OnJobsQuickFilter" />
                                     </StackPanel>
-                                    <HyperlinkButton Grid.Column="2" AutomationProperties.AutomationId="Jobs.Filter.Running" Content="絞り込む" VerticalAlignment="Center" Tag="Running" Click="OnJobsQuickFilter" />
                                 </Grid>
                             </Border>
                             <Border Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8" Padding="12"
                                     BorderBrush="{x:Bind local:Ui.CardBorder(ViewModel.JobList.QuickFilter, 'Pending'), Mode=OneWay}" BorderThickness="{x:Bind local:Ui.CardThickness(ViewModel.JobList.QuickFilter, 'Pending'), Mode=OneWay}">
-                                <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <!-- 狭い幅でも数と説明が折り返しすぎないよう、「絞り込む」は説明の下に置く -->
+                                <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                                     <FontIcon Glyph="&#xE823;" FontSize="20" VerticalAlignment="Center" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
                                     <StackPanel Grid.Column="1">
                                         <TextBlock AutomationProperties.AutomationId="Jobs.PendingCount" Style="{StaticResource SubtitleTextBlockStyle}" Text="{x:Bind ViewModel.JobList.PendingCount, Mode=OneWay}" />
                                         <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Text="予定・待機中・一時停止" TextWrapping="Wrap" />
+                                        <HyperlinkButton AutomationProperties.AutomationId="Jobs.Filter.Pending" Content="絞り込む" Padding="0,4,0,0" Tag="Pending" Click="OnJobsQuickFilter" />
                                     </StackPanel>
-                                    <HyperlinkButton Grid.Column="2" AutomationProperties.AutomationId="Jobs.Filter.Pending" Content="絞り込む" VerticalAlignment="Center" Tag="Pending" Click="OnJobsQuickFilter" />
                                 </Grid>
                             </Border>
                             <Border Grid.Column="2" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8" Padding="12"
                                     BorderBrush="{x:Bind local:Ui.CardBorder(ViewModel.JobList.QuickFilter, 'RecentFailed'), Mode=OneWay}" BorderThickness="{x:Bind local:Ui.CardThickness(ViewModel.JobList.QuickFilter, 'RecentFailed'), Mode=OneWay}">
-                                <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <!-- 狭い幅でも数と説明が折り返しすぎないよう、「絞り込む」は説明の下に置く -->
+                                <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                                     <FontIcon Glyph="&#xEA39;" FontSize="20" VerticalAlignment="Center" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
                                     <StackPanel Grid.Column="1">
                                         <TextBlock AutomationProperties.AutomationId="Jobs.RecentFailedCount" Style="{StaticResource SubtitleTextBlockStyle}" Text="{x:Bind ViewModel.JobList.RecentFailedCount, Mode=OneWay}" />
                                         <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Text="最近の失敗" TextWrapping="Wrap" />
+                                        <HyperlinkButton AutomationProperties.AutomationId="Jobs.Filter.RecentFailed" Content="絞り込む" Padding="0,4,0,0" Tag="RecentFailed" Click="OnJobsQuickFilter" />
                                     </StackPanel>
-                                    <HyperlinkButton Grid.Column="2" AutomationProperties.AutomationId="Jobs.Filter.RecentFailed" Content="絞り込む" VerticalAlignment="Center" Tag="RecentFailed" Click="OnJobsQuickFilter" />
                                 </Grid>
                             </Border>
                             <Border Grid.Column="3" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8" Padding="12"
                                     BorderBrush="{x:Bind local:Ui.CardBorder(ViewModel.JobList.QuickFilter, 'RecentSucceeded'), Mode=OneWay}" BorderThickness="{x:Bind local:Ui.CardThickness(ViewModel.JobList.QuickFilter, 'RecentSucceeded'), Mode=OneWay}">
-                                <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <!-- 狭い幅でも数と説明が折り返しすぎないよう、「絞り込む」は説明の下に置く -->
+                                <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                                     <FontIcon Glyph="&#xE73E;" FontSize="20" VerticalAlignment="Center" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
                                     <StackPanel Grid.Column="1">
                                         <TextBlock AutomationProperties.AutomationId="Jobs.RecentSucceededCount" Style="{StaticResource SubtitleTextBlockStyle}" Text="{x:Bind ViewModel.JobList.RecentSucceededCount, Mode=OneWay}" />
                                         <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Text="最近の完了" TextWrapping="Wrap" />
+                                        <HyperlinkButton AutomationProperties.AutomationId="Jobs.Filter.RecentSucceeded" Content="絞り込む" Padding="0,4,0,0" Tag="RecentSucceeded" Click="OnJobsQuickFilter" />
                                     </StackPanel>
-                                    <HyperlinkButton Grid.Column="2" AutomationProperties.AutomationId="Jobs.Filter.RecentSucceeded" Content="絞り込む" VerticalAlignment="Center" Tag="RecentSucceeded" Click="OnJobsQuickFilter" />
                                 </Grid>
                             </Border>
                         </Grid>

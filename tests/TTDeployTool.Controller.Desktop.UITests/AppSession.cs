@@ -446,7 +446,9 @@ public sealed class AppSession : IDisposable
         if (page == null)
             return;
         var scroll = page.Patterns.Scroll.Pattern;
-        for (var i = 0; i < 100 && target.BoundingRectangle.Top > page.BoundingRectangle.Top + 40; i++)
+        // 画面の外の要素は、位置が 0（空）で返ることがあるため、位置が取れない間もスクロールを続ける
+        bool Below() => target.IsOffscreen || target.BoundingRectangle.IsEmpty || target.BoundingRectangle.Top > page.BoundingRectangle.Top + 40;
+        for (var i = 0; i < 100 && Below(); i++)
         {
             var before = scroll.VerticalScrollPercent.Value;
             scroll.Scroll(ScrollAmount.NoAmount, ScrollAmount.SmallIncrement);
