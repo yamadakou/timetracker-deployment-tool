@@ -160,6 +160,19 @@ public sealed partial class MainWindow : Window
     // 上部の帯の「ジョブを見る」
     private void OnShowJobs(object sender, RoutedEventArgs e) => Navigate(Pages.Jobs);
 
+    // 件数のカードの「絞り込む」（No.86）: 押したカードの条件で絞り込む。同じカードをもう一度押すと外す（ジョブの一覧と同じ）
+    private void OnDeploymentsQuickFilter(object sender, RoutedEventArgs e)
+    {
+        var filter = Enum.Parse<DeploymentQuickFilter>((string)((FrameworkElement)sender).Tag);
+        ViewModel.Deployments.QuickFilter = ViewModel.Deployments.QuickFilter == filter ? DeploymentQuickFilter.All : filter;
+    }
+
+    private void OnJobsQuickFilter(object sender, RoutedEventArgs e)
+    {
+        var filter = Enum.Parse<JobQuickFilter>((string)((FrameworkElement)sender).Tag);
+        ViewModel.JobList.QuickFilter = ViewModel.JobList.QuickFilter == filter ? JobQuickFilter.All : filter;
+    }
+
     private void OnNavigationChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
     {
         // メニューに無い画面（削除・実行状況）を開いたときは、メニューの選択を外すだけ

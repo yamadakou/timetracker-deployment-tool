@@ -327,6 +327,53 @@
                     <StackPanel x:Name="DeploymentsPanel" Tag="deployments" Spacing="12" Visibility="Collapsed">
                         <TextBlock AutomationProperties.AutomationId="Panel.Deployments" Style="{StaticResource SubtitleTextBlockStyle}" Text="デプロイの一覧" />
                         <TextBlock TextWrapping="Wrap" Text="サインインしたアカウントで読めるサブスクリプションから、本ツールでデプロイした環境（別の PC・CLI・MCP サーバーでデプロイしたものを含む）を読みます。パスワードは「パスワードを表示」を押したときだけ Azure から読み、PC には保存しません。" />
+                        <!-- 件数のカード（No.86。Blazor 版のデザイン。押すとその条件で絞り込む。今の絞り込みのカードは枠を強調する） -->
+                        <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <Border Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8" Padding="12"
+                                    BorderBrush="{x:Bind local:Ui.CardBorder(ViewModel.Deployments.QuickFilter, 'All'), Mode=OneWay}" BorderThickness="{x:Bind local:Ui.CardThickness(ViewModel.Deployments.QuickFilter, 'All'), Mode=OneWay}">
+                                <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="&#xE753;" FontSize="20" VerticalAlignment="Center" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock AutomationProperties.AutomationId="Deployments.TotalCount" Style="{StaticResource SubtitleTextBlockStyle}" Text="{x:Bind ViewModel.Deployments.TotalCount, Mode=OneWay}" />
+                                        <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Text="デプロイ（すべて）" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <HyperlinkButton Grid.Column="2" AutomationProperties.AutomationId="Deployments.Filter.All" Content="すべて" VerticalAlignment="Center" Tag="All" Click="OnDeploymentsQuickFilter" />
+                                </Grid>
+                            </Border>
+                            <Border Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8" Padding="12"
+                                    BorderBrush="{x:Bind local:Ui.CardBorder(ViewModel.Deployments.QuickFilter, 'ExpiringSoon'), Mode=OneWay}" BorderThickness="{x:Bind local:Ui.CardThickness(ViewModel.Deployments.QuickFilter, 'ExpiringSoon'), Mode=OneWay}">
+                                <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="&#xE823;" FontSize="20" VerticalAlignment="Center" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock AutomationProperties.AutomationId="Deployments.ExpiringSoonCount" Style="{StaticResource SubtitleTextBlockStyle}" Text="{x:Bind ViewModel.Deployments.ExpiringSoonCount, Mode=OneWay}" />
+                                        <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Text="期限が 7 日以内" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <HyperlinkButton Grid.Column="2" AutomationProperties.AutomationId="Deployments.Filter.ExpiringSoon" Content="絞り込む" VerticalAlignment="Center" Tag="ExpiringSoon" Click="OnDeploymentsQuickFilter" />
+                                </Grid>
+                            </Border>
+                            <Border Grid.Column="2" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8" Padding="12"
+                                    BorderBrush="{x:Bind local:Ui.CardBorder(ViewModel.Deployments.QuickFilter, 'Jobs'), Mode=OneWay}" BorderThickness="{x:Bind local:Ui.CardThickness(ViewModel.Deployments.QuickFilter, 'Jobs'), Mode=OneWay}">
+                                <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="&#xE916;" FontSize="20" VerticalAlignment="Center" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock AutomationProperties.AutomationId="Deployments.ActiveJobCount" Style="{StaticResource SubtitleTextBlockStyle}" Text="{x:Bind ViewModel.Deployments.ActiveJobCount, Mode=OneWay}" />
+                                        <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Text="実行中・予定のジョブ" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <HyperlinkButton Grid.Column="2" AutomationProperties.AutomationId="Deployments.ShowJobs" Content="ジョブの一覧" VerticalAlignment="Center" Tag="Jobs" Click="OnShowJobs" />
+                                </Grid>
+                            </Border>
+                            <Border Grid.Column="3" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8" Padding="12"
+                                    BorderBrush="{x:Bind local:Ui.CardBorder(ViewModel.Deployments.QuickFilter, 'Attention'), Mode=OneWay}" BorderThickness="{x:Bind local:Ui.CardThickness(ViewModel.Deployments.QuickFilter, 'Attention'), Mode=OneWay}">
+                                <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="&#xEA8F;" FontSize="20" VerticalAlignment="Center" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock AutomationProperties.AutomationId="Deployments.AttentionCount" Style="{StaticResource SubtitleTextBlockStyle}" Text="{x:Bind ViewModel.Deployments.AttentionCount, Mode=OneWay}" />
+                                        <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Text="要確認（作りかけ・失敗・リソースグループだけ）" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <HyperlinkButton Grid.Column="2" AutomationProperties.AutomationId="Deployments.Filter.Attention" Content="絞り込む" VerticalAlignment="Center" Tag="Attention" Click="OnDeploymentsQuickFilter" />
+                                </Grid>
+                            </Border>
+                        </Grid>
                         <Button AutomationProperties.AutomationId="Deployments.Load" Content="読み込む" Command="{x:Bind ViewModel.Deployments.LoadCommand}" />
                         <StackPanel Orientation="Horizontal" Spacing="8" Visibility="{x:Bind ViewModel.Deployments.Busy.IsBusy, Mode=OneWay}"><ProgressRing IsActive="{x:Bind ViewModel.Deployments.Busy.IsBusy, Mode=OneWay}" Width="20" Height="20" /><TextBlock AutomationProperties.AutomationId="Deployments.Busy" VerticalAlignment="Center" Text="{x:Bind ViewModel.Deployments.Busy.Text, Mode=OneWay}" /></StackPanel>
                         <InfoBar AutomationProperties.AutomationId="Deployments.Error" AutomationProperties.Name="{x:Bind ViewModel.Deployments.Error, Mode=OneWay}" Severity="Error" IsOpen="True" IsClosable="False" Message="{x:Bind ViewModel.Deployments.Error, Mode=OneWay}"
@@ -396,7 +443,12 @@
                                 </tv:TableViewTemplateColumn>
                                 <tv:TableViewTemplateColumn Header="利用可能期限日" Tag="ExpiresAt">
                                     <tv:TableViewTemplateColumn.CellTemplate><DataTemplate x:DataType="vm:DeploymentRowViewModel">
-                                        <TextBlock Style="{StaticResource CellTextStyle}" AutomationProperties.AutomationId="Row.Expiry" Text="{x:Bind ExpiryText, Mode=OneWay}" Foreground="{x:Bind local:Ui.ExpiryBrush(Level), Mode=OneWay}" local:CellText.ShowFullText="True" />
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Style="{StaticResource CellTextStyle}" AutomationProperties.AutomationId="Row.Expiry" Text="{x:Bind ExpiryText, Mode=OneWay}" Foreground="{x:Bind local:Ui.ExpiryBrush(Level), Mode=OneWay}" local:CellText.ShowFullText="True" />
+                                            <!-- 期限の残り（No.86。90 日で端まで） -->
+                                            <ProgressBar AutomationProperties.AutomationId="Row.ExpiryBar" Maximum="1" Value="{x:Bind ExpiryShare, Mode=OneWay}" Width="100" HorizontalAlignment="Left"
+                                                         Foreground="{x:Bind local:Ui.ExpiryBarBrush(Level), Mode=OneWay}" Visibility="{x:Bind local:Ui.IfValue(DaysLeft), Mode=OneWay}" />
+                                        </StackPanel>
                                     </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
                                 </tv:TableViewTemplateColumn>
                                 <tv:TableViewTemplateColumn Header="デプロイ日" Tag="DeployedAt">
@@ -435,6 +487,17 @@
                                 <TextBlock AutomationProperties.AutomationId="Row.GroupWarning" Text="{x:Bind ViewModel.Deployments.Current.GroupWarning, Mode=OneWay}" TextWrapping="Wrap" Foreground="{ThemeResource SystemFillColorCautionBrush}" />
                                 <TextBlock AutomationProperties.AutomationId="Row.ExpiryWarning" Text="{x:Bind ViewModel.Deployments.Current.ExpiryWarning, Mode=OneWay}" TextWrapping="Wrap" Foreground="{ThemeResource SystemFillColorCautionBrush}"
                                            Visibility="{x:Bind ViewModel.Deployments.Current.HasExpiryWarning, Mode=OneWay}" />
+                                <!-- 期限の残りと延長（No.86。今の期限日〔無い・過ぎていれば今日〕から 7 日・30 日延ばす） -->
+                                <StackPanel Spacing="4">
+                                    <TextBlock AutomationProperties.AutomationId="Row.DaysLeft" Style="{StaticResource SubtitleTextBlockStyle}" Text="{x:Bind ViewModel.Deployments.Current.DaysLeftText, Mode=OneWay, FallbackValue=''}"
+                                               Foreground="{x:Bind local:Ui.ExpiryBrush(ViewModel.Deployments.Current.Level), Mode=OneWay}" />
+                                    <ProgressBar Maximum="1" Value="{x:Bind ViewModel.Deployments.Current.ExpiryShare, Mode=OneWay, FallbackValue=0}" Width="240" HorizontalAlignment="Left"
+                                                 Foreground="{x:Bind local:Ui.ExpiryBarBrush(ViewModel.Deployments.Current.Level), Mode=OneWay}" />
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <Button AutomationProperties.AutomationId="Row.Extend7" Content="+7 日" Command="{x:Bind ViewModel.Deployments.Current.Extend7Command, Mode=OneWay}" />
+                                        <Button AutomationProperties.AutomationId="Row.Extend30" Content="+30 日" Command="{x:Bind ViewModel.Deployments.Current.Extend30Command, Mode=OneWay}" />
+                                    </StackPanel>
+                                </StackPanel>
                                 <StackPanel Orientation="Horizontal" Spacing="4">
                                     <TextBlock Text="{x:Bind ViewModel.Deployments.Current.DbTypeText, Mode=OneWay}" /><TextBlock Text="、" /><TextBlock Text="{x:Bind ViewModel.Deployments.Current.PersistenceText, Mode=OneWay}" /><TextBlock Text="、" />
                                     <TextBlock Text="{x:Bind ViewModel.Deployments.Current.SpecText, Mode=OneWay}" TextWrapping="Wrap" />
@@ -539,6 +602,53 @@
                     <!-- ジョブの一覧（表。docs/design/desktop/desktop-wizard.md の 7） -->
                     <StackPanel x:Name="JobsPanel" Tag="jobs" Spacing="12" Visibility="Collapsed">
                         <TextBlock AutomationProperties.AutomationId="Panel.Jobs" Style="{StaticResource SubtitleTextBlockStyle}" Text="ジョブの一覧" />
+                        <!-- 件数のカード（No.86。押すとその条件で絞り込み、もう一度押すと外す） -->
+                        <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <Border Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8" Padding="12"
+                                    BorderBrush="{x:Bind local:Ui.CardBorder(ViewModel.JobList.QuickFilter, 'Running'), Mode=OneWay}" BorderThickness="{x:Bind local:Ui.CardThickness(ViewModel.JobList.QuickFilter, 'Running'), Mode=OneWay}">
+                                <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="&#xE768;" FontSize="20" VerticalAlignment="Center" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock AutomationProperties.AutomationId="Jobs.RunningCount" Style="{StaticResource SubtitleTextBlockStyle}" Text="{x:Bind ViewModel.JobList.RunningCount, Mode=OneWay}" />
+                                        <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Text="実行中" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <HyperlinkButton Grid.Column="2" AutomationProperties.AutomationId="Jobs.Filter.Running" Content="絞り込む" VerticalAlignment="Center" Tag="Running" Click="OnJobsQuickFilter" />
+                                </Grid>
+                            </Border>
+                            <Border Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8" Padding="12"
+                                    BorderBrush="{x:Bind local:Ui.CardBorder(ViewModel.JobList.QuickFilter, 'Pending'), Mode=OneWay}" BorderThickness="{x:Bind local:Ui.CardThickness(ViewModel.JobList.QuickFilter, 'Pending'), Mode=OneWay}">
+                                <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="&#xE823;" FontSize="20" VerticalAlignment="Center" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock AutomationProperties.AutomationId="Jobs.PendingCount" Style="{StaticResource SubtitleTextBlockStyle}" Text="{x:Bind ViewModel.JobList.PendingCount, Mode=OneWay}" />
+                                        <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Text="予定・待機中・一時停止" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <HyperlinkButton Grid.Column="2" AutomationProperties.AutomationId="Jobs.Filter.Pending" Content="絞り込む" VerticalAlignment="Center" Tag="Pending" Click="OnJobsQuickFilter" />
+                                </Grid>
+                            </Border>
+                            <Border Grid.Column="2" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8" Padding="12"
+                                    BorderBrush="{x:Bind local:Ui.CardBorder(ViewModel.JobList.QuickFilter, 'RecentFailed'), Mode=OneWay}" BorderThickness="{x:Bind local:Ui.CardThickness(ViewModel.JobList.QuickFilter, 'RecentFailed'), Mode=OneWay}">
+                                <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="&#xEA39;" FontSize="20" VerticalAlignment="Center" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock AutomationProperties.AutomationId="Jobs.RecentFailedCount" Style="{StaticResource SubtitleTextBlockStyle}" Text="{x:Bind ViewModel.JobList.RecentFailedCount, Mode=OneWay}" />
+                                        <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Text="最近の失敗" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <HyperlinkButton Grid.Column="2" AutomationProperties.AutomationId="Jobs.Filter.RecentFailed" Content="絞り込む" VerticalAlignment="Center" Tag="RecentFailed" Click="OnJobsQuickFilter" />
+                                </Grid>
+                            </Border>
+                            <Border Grid.Column="3" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8" Padding="12"
+                                    BorderBrush="{x:Bind local:Ui.CardBorder(ViewModel.JobList.QuickFilter, 'RecentSucceeded'), Mode=OneWay}" BorderThickness="{x:Bind local:Ui.CardThickness(ViewModel.JobList.QuickFilter, 'RecentSucceeded'), Mode=OneWay}">
+                                <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="&#xE73E;" FontSize="20" VerticalAlignment="Center" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock AutomationProperties.AutomationId="Jobs.RecentSucceededCount" Style="{StaticResource SubtitleTextBlockStyle}" Text="{x:Bind ViewModel.JobList.RecentSucceededCount, Mode=OneWay}" />
+                                        <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Text="最近の完了" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <HyperlinkButton Grid.Column="2" AutomationProperties.AutomationId="Jobs.Filter.RecentSucceeded" Content="絞り込む" VerticalAlignment="Center" Tag="RecentSucceeded" Click="OnJobsQuickFilter" />
+                                </Grid>
+                            </Border>
+                        </Grid>
                         <TextBlock TextWrapping="Wrap" Text="このアプリで登録したデプロイ・削除です（予定・実行中・終わったもの）。終わったジョブは、アプリを終了しても記録として残します（180 日・500 件まで）。行を選ぶと、まとめて取り消し・一時停止・再開・予定の変更・記録から削除ができます。1 行だけ選んで「詳細」（または行をダブルクリック）で、進み具合・結果・ログを見られます。「記録から削除」は、この一覧と PC の記録を消すだけで、Azure のリソースは消しません（Azure から消すときは、デプロイの一覧の「Azure から削除…」）。" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <TextBlock AutomationProperties.AutomationId="Jobs.Count" VerticalAlignment="Center" Text="{x:Bind ViewModel.JobList.CountText, Mode=OneWay}" />

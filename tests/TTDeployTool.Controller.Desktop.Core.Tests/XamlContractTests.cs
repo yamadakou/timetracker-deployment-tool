@@ -157,7 +157,8 @@ public partial class XamlContractTests
         if (open < 0)
             return [path];
         var inner = path[(open + 1)..path.LastIndexOf(')')];
-        return SplitTopLevel(inner).Select(a => a.Trim()).Where(a => a.Length > 0).SelectMany(PathsIn);
+        // 引数の文字の値（'All' など。x:Bind の関数の引数に書ける）は名前ではない
+        return SplitTopLevel(inner).Select(a => a.Trim()).Where(a => a.Length > 0 && !a.StartsWith('\'')).SelectMany(PathsIn);
     }
 
     private static IEnumerable<string> SplitTopLevel(string text)
