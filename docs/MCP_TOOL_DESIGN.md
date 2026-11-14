@@ -260,7 +260,7 @@ flowchart TB
       "検証環境向け。Azure 上の DB データは永続化されない（DB コンテナ再起動で消える）",
       "SQL Server は Developer エディション（本番利用不可）",
       "Azure 上の SQL Server 構成ではサンプル DB を作成できない（空の DB を選択）",
-      "TimeTracker のメモリが 2Gi 以下だとサンプル DB 作成が OutOfMemory で失敗する"
+      "サンプル DB を作れる実用上の最低スペックは TimeTracker 1.25 vCPU / 2.5Gi、DB 0.5 vCPU / 1Gi、Redis 0.25 vCPU / 0.5Gi。下回るとサンプル DB の作成ができない場合がある（TimeTracker は 2Gi 以下で OutOfMemory）"
     ],
     "tag_list_url": "https://hub.docker.com/r/densocreate/timetracker/tags"
   }

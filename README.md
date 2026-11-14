@@ -618,7 +618,7 @@ CLI や AI アシスタントを使わずに、Windows の画面の操作で同�
 | DB | `--db-cpu` | `--db-memory` | 1.0 / 2.0Gi |
 | Redis | `--redis-cpu` | `--redis-memory` | 0.5 / 1.0Gi |
 
-- TimeTracker のメモリを 2Gi 以下にすると、Azure 上でセットアップウィザードの「サンプルデータベースを作成する」がメモリ不足（`OutOfMemoryException`）で失敗します。サンプル DB を使う場合は、既定値（1.5 / 3.0Gi）以上を指定してください
+- サンプル DB を作れる実用上の最低スペックは、TimeTracker 1.25 vCPU / 2.5Gi、DB 0.5 vCPU / 1Gi、Redis 0.25 vCPU / 0.5Gi です（Azure で確認）。これを下回ると、セットアップウィザードの「サンプルデータベースを作成する」ができない場合があります（警告を出します）。特に TimeTracker のメモリが 2Gi 以下だと、メモリ不足（`OutOfMemoryException`）で失敗します。DB は 0.25 vCPU でも作れますが、作成に時間がかかります。既定値（TimeTracker 1.5 / 3.0Gi、DB 1.0 / 2.0Gi、Redis 0.5 / 1.0Gi）は、余裕を持たせた値です
 
 **動作**:
 - `--dry-run`（任意）: 指定すると（または `--dry-run true`）、Azure には反映せず、`docker-compose.yml` と `.env` を作るだけにします（[ローカル検証](#ローカル検証dry-run)）。`--subscription` と `--resource-group` は不要です。`--dry-run false` で無効

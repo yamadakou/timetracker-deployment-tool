@@ -48,7 +48,7 @@ public sealed class DeploymentTools
         DeploymentTools.ExpiryNote,
         "SQL Server は Developer エディションです（本番環境では使えません）。",
         "Azure 上の SQL Server 構成ではサンプル DB を作成できません（TimeTracker のセットアップで空の DB を選択してください）。",
-        "TimeTracker のメモリが 2Gi 以下だと、サンプル DB の作成が OutOfMemory で失敗することがあります。",
+        $"サンプル DB を作れる実用上の最低スペックは {DeploymentAdvisor.SampleDbMinimumText} です。これを下回ると、サンプル DB の作成ができない場合があります（TimeTracker は 2Gi 以下だと OutOfMemory で失敗します）。",
     ];
 
     private readonly McpServerSettings _settings;

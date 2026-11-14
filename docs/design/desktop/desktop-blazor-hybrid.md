@@ -449,5 +449,11 @@ WinUI 3 版の UI テストとの対応（名前は同じ。中身の違い）:
 - 2 回目（run 43587522355。結果・時間・メモリの最大の使用量をファイルに残すようにした）: TimeTracker 1.25 / 2.5Gi・DB 0.5 / 1Gi・Redis 0.25 / 0.5Gi は 2 回とも成功（1 分 47 秒・2 分 00 秒。TimeTracker の最大 1.87 GiB）。DB 0.25 / 0.5Gi は成功（3 分 14 秒）。今の既定（1.5 / 3.0Gi・1.0 / 2Gi・0.5 / 1Gi）は成功（1 分 35 秒。TimeTracker の最大 1.79 GiB）。TimeTracker 1.0 / 2Gi は、DB 0.5 / 1Gi でも OutOfMemory で失敗（TimeTracker の最大 1.55 GiB）。DB の最大の使用量は上限いっぱいになるが、読んだファイルのキャッシュを含む値
 - Azure（オーナーの依頼・承認。`system-test.yml` の `spec_probe`、`SpecProbeTests`。run 43587918814、japaneast）: 構成ごとに専用のリソースグループにデプロイし、サンプル DB の作成とログインを確かめ、リソースグループを削除した。TimeTracker 1.25 / 2.5Gi・DB 0.5 / 1Gi・Redis 0.25 / 0.5Gi は成功（デプロイ 3 分 36 秒、サンプル DB 1 分 57 秒）。DB 0.25 / 0.5Gi も成功（サンプル DB 3 分 06 秒）
 - 結論: サンプル DB を作れる最低構成は TimeTracker 1.25 vCPU / 2.5Gi・DB 0.25 / 0.5Gi・Redis 0.25 / 0.5Gi。DB は 0.5 / 1Gi にすると作成の時間が約 6 割になるため、実用の最低は TimeTracker 1.25 / 2.5Gi・DB 0.5 / 1Gi・Redis 0.25 / 0.5Gi。既定のスペックと警告（2Gi 以下）を変えるかは、オーナーの判断待ち
+- オーナーの判断（2026-11-14）: 案 1（既定のスペックは変えない）。警告は、実用上の最低スペック（TimeTracker 1.25 / 2.5Gi、DB 0.5 / 1Gi、Redis 0.25 / 0.5Gi）を下回るとサンプル DB の作成ができない場合があることを伝える。スライダーで、最低スペックを下回る範囲を赤にする
+- 対応:
+  - 警告（Domain の `DeploymentAdvisor`。CLI・MCP・デスクトップアプリで共通）: アプリごとに、CPU かメモリが最低を下回れば「tt-cpu / tt-memory（TimeTracker）が 1 vCPU / 2Gi です。サンプル DB を作れる実用上の最低スペック（…）を下回るため、サンプル DB の作成ができない場合があります。」と出す（頭のオプション名で、ウィザードは「スペックと利用可能期限」の手順に出す）。最低ちょうどは警告しない。スペックは Azure でだけ使う（docker-compose には上限を書かない）ため、ローカル（Dry-run）では出さない（前は TimeTracker のメモリ 2Gi 以下を、ローカルでも警告していた）。最低スペックは `DeploymentAdvisor.SampleDbMinimums`。MCP の制約の説明と README も直した
+  - スライダー（`SpecSlider`・`SpecSliderView.razor`）: 最低スペックを下回る範囲に赤の帯を引き、その目盛りの文字を赤にする（TimeTracker は 0.25〜1.0、DB は 0.25。Redis は最低がいちばん左のため帯なし）。下に「サンプル DB を作れる実用上の最低スペック: 1.25 vCPU / 2.5Gi」と出し、下回ったら、つまみと値を赤にして、この文を注意に変える。最低ちょうどは赤にしない
+  - テスト: Domain（`DeploymentAdvisorTests`）、Core（`ModernDesignTests`）、bUnit（`RedesignScreenTests`）。網羅率は Domain・Core・Blazor とも 100%
+  - Core と Domain の変更のため、WinUI 3 版のセッションに同じ仕様の反映を頼む
 - 分かったこと: 失敗の原因は TimeTracker のメモリで、DB・Redis のスペックではない（オーナーの報告の失敗も TimeTracker 1 / 2Gi）。.NET は既定でコンテナのメモリの 75% を上限に使うため、2Gi では 1.5 GiB の中で大きな文字列を確保できずに失敗する
 

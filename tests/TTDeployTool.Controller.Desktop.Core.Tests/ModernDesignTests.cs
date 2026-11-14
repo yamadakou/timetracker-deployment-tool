@@ -275,6 +275,36 @@ public sealed class ModernDesignTests
         (s.DbCpu, s.DbMemoryGi, s.DbSpec.Note).Should().Be(("1.0", "2.0", (string?)null));
     }
 
+    [Fact]
+    public async Task Spec_Sliders_Should_Mark_The_Range_Below_The_Sample_Db_Minimum()
+    {
+        var h = await new Harness().ReadyAsync();
+        var s = h.Main.Settings;
+        var (tt, db, redis) = (s.TtSpec, s.DbSpec, s.RedisSpec);
+
+        // 赤の帯: 最低スペックの段階まで（TimeTracker 1.25 は 4 / 7、DB 0.5 は 1 / 7、Redis 0.25 は帯なし）
+        (tt.BelowMinimumShare, db.BelowMinimumShare, redis.BelowMinimumShare).Should().Be((4 / 7.0, 1 / 7.0, 0));
+        Enumerable.Range(0, 8).Select(tt.IsBelowMinimumStep).Should().Equal(true, true, true, true, false, false, false, false);
+        (tt.IsBelowMinimum, tt.MinimumText).Should().Be((false, "サンプル DB を作れる実用上の最低スペック: 1.25 vCPU / 2.5Gi"));
+
+        var changes = new List<string?>();
+        tt.PropertyChanged += (_, e) => changes.Add(e.PropertyName);
+        tt.Step = 3;
+        (tt.IsBelowMinimum, tt.MinimumText).Should().Be((true,
+            "サンプル DB を作れる実用上の最低スペック（1.25 vCPU / 2.5Gi）を下回っています。サンプル DB の作成ができない場合があります。"));
+        changes.Should().Contain([nameof(SpecSlider.IsBelowMinimum), nameof(SpecSlider.MinimumText)]);
+        tt.Step = 4;
+        tt.IsBelowMinimum.Should().BeFalse("最低スペックちょうどは赤にしない");
+        s.TtMemoryGi = "2";
+        tt.IsBelowMinimum.Should().BeTrue("CPU が足りていても、メモリが足りなければ下回る");
+        db.Step = 0;
+        db.IsBelowMinimum.Should().BeTrue();
+        redis.Step = 0;
+        redis.IsBelowMinimum.Should().BeFalse();
+        (s.TtCpu, s.TtMemoryGi) = ("", "");
+        tt.IsBelowMinimum.Should().BeFalse("空の欄は既定値（1.5 vCPU / 3Gi）");
+    }
+
     // ---------------- 件数のカード・期限の残り・延長
 
     private static async Task<(Harness H, FakeTimeProvider Time)> ListedAsync()

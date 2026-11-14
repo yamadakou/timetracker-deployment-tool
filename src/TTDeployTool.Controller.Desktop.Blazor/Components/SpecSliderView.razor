@@ -2,16 +2,25 @@
 @inherits ViewModelComponent
 
 @* スペックのスライダー（オーナーの依頼、2026-11-13: TimeTracker・DB・Redis の 3 つとも案 B のスライダー）。CPU を選ぶと、メモリは CPU の 2 倍 *@
-<div class="tt-spec" data-id="@($"Spec.{Spec.Name}")">
+<div class="tt-spec @(Spec.IsBelowMinimum ? "tt-spec-low" : null)" data-id="@($"Spec.{Spec.Name}")">
     <div class="tt-spec-head"><span class="tt-strong">@Spec.Name</span><span class="tt-spec-value" data-id="@($"Spec.{Spec.Name}.Value")">@Spec.Text</span></div>
+    @* サンプル DB を作れる実用上の最低スペックを下回る範囲を赤にする（オーナーの依頼、2026-11-14） *@
+    <div class="tt-spec-track">
+    @if (Spec.BelowMinimumShare > 0)
+    {
+        <span class="tt-spec-below" data-id="@($"Spec.{Spec.Name}.Below")" aria-hidden="true"
+              style="width: @((Spec.BelowMinimumShare * 100).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture))%"></span>
+    }
     <input type="range" min="0" max="@Spec.MaxStep" step="1" value="@Spec.Step" aria-label="@($"{Spec.Name} の CPU")" data-id="@($"Spec.{Spec.Name}.Slider")"
            @oninput="e => Spec.Step = int.Parse((string)e.Value!, System.Globalization.CultureInfo.InvariantCulture)" />
+    </div>
     <div class="tt-ticks">
-        @foreach (var label in Spec.Labels)
+        @for (var i = 0; i < Spec.Labels.Count; i++)
         {
-            <span>@label</span>
+            <span class="@(Spec.IsBelowMinimumStep(i) ? "tt-tick-low" : null)">@Spec.Labels[i]</span>
         }
     </div>
+    <p class="tt-spec-min @(Spec.IsBelowMinimum ? "tt-critical" : "tt-subtle")" data-id="@($"Spec.{Spec.Name}.Minimum")">@Spec.MinimumText</p>
     <div class="tt-spec-foot">
         <span>メモリは CPU の 2 倍（Container Apps の組み合わせ）</span>
         <span data-id="@($"Spec.{Spec.Name}.Cost")">@(Cost.Lines.FirstOrDefault(l => l.Name == Spec.Name)?.Amount is { } amount ? $"{Cost.AmountLabel} 約 {amount}" : null)</span>

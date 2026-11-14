@@ -127,18 +127,35 @@ public class DeploymentAdvisorTests
     }
 
     [Theory]
-    [InlineData(2.0, true)]
-    [InlineData(2.5, false)]
-    public void Should_Warn_About_Low_Timetracker_Memory(double memory, bool expected)
+    [InlineData(1.0, 2.0, 1.0, 2.0, 0.5, 1.0, "tt")]
+    [InlineData(1.25, 2.0, 1.0, 2.0, 0.5, 1.0, "tt")]
+    [InlineData(1.25, 2.5, 0.25, 0.5, 0.5, 1.0, "db")]
+    [InlineData(1.25, 2.5, 0.5, 0.75, 0.5, 1.0, "db")]
+    [InlineData(1.25, 2.5, 0.5, 1.0, 0.25, 0.25, "redis")]
+    [InlineData(1.25, 2.5, 0.5, 1.0, 0.1, 0.5, "redis")]
+    [InlineData(1.25, 2.5, 0.5, 1.0, 0.25, 0.5, null)]
+    public void Should_Warn_When_A_Spec_Is_Below_The_Sample_Db_Minimum(double ttCpu, double ttMemory, double dbCpu, double dbMemory, double redisCpu, double redisMemory, string? warned)
     {
         var o = Options();
-        o.TimetrackerMemoryGi = memory;
+        (o.TimetrackerCpu, o.TimetrackerMemoryGi, o.DbCpu, o.DbMemoryGi, o.RedisCpu, o.RedisMemoryGi) = (ttCpu, ttMemory, dbCpu, dbMemory, redisCpu, redisMemory);
 
-        var warnings = DeploymentAdvisor.GetWarnings(o, ValidationTarget.Compose);
+        var warnings = DeploymentAdvisor.GetWarnings(o, ValidationTarget.Azure);
 
-        warnings.Any(w => w.Contains("OutOfMemory")).Should().Be(expected);
-        if (expected)
-            warnings.Single().Should().StartWith("tt-memory が 2Gi です。");
+        if (warned == null)
+            warnings.Should().BeEmpty("実用上の最低スペックちょうどは警告しない");
+        else
+            warnings.Should().ContainSingle().Which.Should().StartWith($"{warned}-cpu / {warned}-memory（")
+                .And.EndWith("サンプル DB を作れる実用上の最低スペック（TimeTracker 1.25 vCPU / 2.5Gi、DB 0.5 vCPU / 1Gi、Redis 0.25 vCPU / 0.5Gi）を下回るため、サンプル DB の作成ができない場合があります。");
+        DeploymentAdvisor.GetWarnings(o, ValidationTarget.Compose).Should().BeEmpty("docker-compose にはスペックの上限を書かない");
+    }
+
+    [Fact]
+    public void The_Warning_Should_Name_The_App_And_Its_Spec()
+    {
+        var o = Options();
+        (o.TimetrackerCpu, o.TimetrackerMemoryGi) = (1.0, 2.0);
+        DeploymentAdvisor.GetWarnings(o, ValidationTarget.Azure).Single().Should().StartWith("tt-cpu / tt-memory（TimeTracker）が 1 vCPU / 2Gi です。");
+        DeploymentAdvisor.SampleDbMinimumOf("DB").Should().Be(new SampleDbMinimum("DB", "db", 0.5, 1.0));
     }
 
     [Fact]

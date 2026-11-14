@@ -235,4 +235,25 @@ public sealed class RedesignScreenTests : IDisposable
         (Id(panel, "Cost.Total").TextContent, Id(panel, "Cost.PerDay").TextContent).Should().Match<(string, string)>(x => x.Item1.StartsWith("1 か月 約 ") && x.Item2.StartsWith("1 日 約 "));
         Id(panel, "Cost.Period").TextContent.Should().Be("期限なしのため、目安として 1 か月（30 日）分と 1 日分");
     }
+
+    [Fact]
+    public async Task The_Spec_Sliders_Should_Show_The_Range_Below_The_Sample_Db_Minimum_In_Red()
+    {
+        await _app.SignInAsync();
+        var spec = _app.ViewModel.Settings.TtSpec;
+        var view = _app.Context.Render<SpecSliderView>(p => p.Add(x => x.Spec, spec).Add(x => x.Cost, _app.ViewModel.Cost));
+        Id(view, "Spec.TimeTracker.Below").GetAttribute("style").Should().Be("width: 57.143%");
+        view.FindAll(".tt-ticks .tt-tick-low").Select(t => t.TextContent).Should().Equal("0.25", "0.5", "0.75", "1.0");
+        Id(view, "Spec.TimeTracker.Minimum").ClassList.Should().Contain("tt-subtle");
+        Id(view, "Spec.TimeTracker").ClassList.Should().NotContain("tt-spec-low");
+
+        Id(view, "Spec.TimeTracker.Slider").Input("3");
+        view.WaitForAssertion(() => Id(view, "Spec.TimeTracker").ClassList.Should().Contain("tt-spec-low"));
+        Id(view, "Spec.TimeTracker.Minimum").ClassList.Should().Contain("tt-critical");
+        Id(view, "Spec.TimeTracker.Minimum").TextContent.Should().StartWith("サンプル DB を作れる実用上の最低スペック（1.25 vCPU / 2.5Gi）を下回っています");
+
+        // Redis は最低が 0.25 vCPU（いちばん左）のため、赤の帯は無い
+        var redis = _app.Context.Render<SpecSliderView>(p => p.Add(x => x.Spec, _app.ViewModel.Settings.RedisSpec).Add(x => x.Cost, _app.ViewModel.Cost));
+        redis.FindAll("[data-id='Spec.Redis.Below']").Should().BeEmpty();
+    }
 }

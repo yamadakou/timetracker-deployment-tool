@@ -174,7 +174,14 @@ input[type=range] { accent-color: var(--tt-accent); }
 .tt-spec { border: 1px solid var(--tt-line); border-radius: var(--tt-radius); padding: 12px 14px 10px; background: var(--tt-card-2); margin-bottom: 12px; }
 .tt-spec-head { display: flex; justify-content: space-between; align-items: baseline; }
 .tt-spec-value { color: var(--tt-accent); font-weight: 600; }
-.tt-spec input[type=range] { width: 100%; margin: 12px 0 2px; }
+.tt-spec input[type=range] { width: 100%; margin: 12px 0 2px; position: relative; }
+/* サンプル DB を作れる実用上の最低スペックを下回る範囲（赤の帯）と、下回ったときのスライダー・値 */
+.tt-spec-track { position: relative; }
+.tt-spec-below { position: absolute; left: 0; bottom: 4px; height: 4px; border-radius: 2px; background: var(--tt-critical); opacity: .55; pointer-events: none; }
+.tt-tick-low { color: var(--tt-critical); }
+.tt-spec-low input[type=range] { accent-color: var(--tt-critical); }
+.tt-spec-low .tt-spec-value { color: var(--tt-critical); }
+.tt-spec-min { margin: 4px 0 0; font-size: 12px; }
 .tt-ticks { display: flex; justify-content: space-between; color: var(--tt-muted); font-size: 11px; }
 .tt-spec-foot { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--tt-subtle); margin-top: 4px; }
 .tt-cost h2 { display: flex; justify-content: space-between; align-items: center; font-size: 15px; }
