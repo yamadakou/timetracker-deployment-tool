@@ -39,7 +39,8 @@ public class MockRowMenuTests
         app.FindAnywhere("Menu.Row.EditBatch");
         app.FindAnywhere("Menu.Row.Detail").Patterns.Invoke.Pattern.Invoke();
         app.WaitForText("Deployments.Selection", t => t == "1 件を選んでいます。", "右クリックした行を選ぶ");
-        app.Find("Deployments.Detail");
+        // 詳細の枠（Border）は UI Automation に出ないため、詳細の中の操作で見る
+        app.Find("Row.Extend7");
 
         // 2 行を選んで右クリック: まとめての項目になる
         app.SelectRowWith(Rows, "Row.AppName", "app06");
@@ -78,8 +79,9 @@ public class MockRowMenuTests
         app.Show("Jobs");
         app.WaitForText("Jobs.Count", t => t.Contains($"全 {Records} 件"), "記録の 45 件");
         app.ScrollToTop("Jobs.Text");
-        var row = app.RowWhere("Jobs.List", _ => true, "先頭の行");
-        AppSession.Click(Middle(Cell(row, "Job.Target").BoundingRectangle), right: true);
+        // 画面に出ている、いちばん新しい記録の行を右クリックする
+        var newest = $"rg-mock-{100 + Records - 1} / app{100 + Records - 1}";
+        AppSession.Click(Middle(Cell(app.RowWith("Jobs.List", "Job.Target", newest), "Job.Target").BoundingRectangle), right: true);
         app.FindAnywhere("Menu.Job.Detail").IsEnabled.Should().BeTrue("詳細はサインインの前も押せる");
         app.FindAnywhere("Menu.Jobs.DeleteRecords").IsEnabled.Should().BeFalse("サインインするまで押せない");
         app.FindAnywhere("Menu.Job.Detail").Patterns.Invoke.Pattern.Invoke();
@@ -90,10 +92,7 @@ public class MockRowMenuTests
     public void The_Spec_Slider_Should_Mark_Specs_Below_The_Sample_Db_Minimum() => WithFixture(app =>
     {
         MockCostTests.OpenSpec(app);
-        // TimeTracker と DB は最低を下回る範囲に赤の帯を出す。Redis は最低がいちばん左のため出さない
-        app.Find("Settings.TtSpecBelowMinimum");
-        app.Find("Settings.DbSpecBelowMinimum");
-        app.Exists("Settings.RedisSpecBelowMinimum").Should().BeFalse();
+        // 赤の帯（Rectangle）は UI Automation に出ないため、帯の幅は Core の ModernDesignTests（BelowMinimumShare）で確かめ、見た目は実機で見る（desktop-app-check.md の 4.4 の 10）
         app.TextOf("Settings.TtSpecMinimum").Should().Be("サンプル DB を作れる実用上の最低スペック: 1.25 vCPU / 2.5Gi", "既定の 1.5 vCPU は下回らない");
 
         // 1.0 vCPU（段階 3）は下回る。1.25 vCPU（段階 4。最低ちょうど）は下回らない

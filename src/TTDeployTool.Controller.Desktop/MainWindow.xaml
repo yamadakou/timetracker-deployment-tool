@@ -247,7 +247,7 @@
                                                 Foreground="{x:Bind local:Ui.SpecBrush(ViewModel.Settings.TtSpec.IsBelowMinimum, 'AccentFillColorDefaultBrush'), Mode=OneWay}" />
                                         <!-- サンプル DB を作れる実用上の最低スペックを下回る範囲の赤の帯（No.89） -->
                                         <Grid Height="4" Margin="10,0" Visibility="{x:Bind local:Ui.IfPositive(ViewModel.Settings.TtSpec.BelowMinimumShare)}"><Grid.ColumnDefinitions><ColumnDefinition Width="{x:Bind local:Ui.Star(ViewModel.Settings.TtSpec.BelowMinimumShare)}" /><ColumnDefinition Width="{x:Bind local:Ui.RestStar(ViewModel.Settings.TtSpec.BelowMinimumShare)}" /></Grid.ColumnDefinitions>
-                                            <Rectangle AutomationProperties.AutomationId="Settings.TtSpecBelowMinimum" Fill="{ThemeResource SystemFillColorCriticalBrush}" RadiusX="2" RadiusY="2" /></Grid>
+                                            <Rectangle Fill="{ThemeResource SystemFillColorCriticalBrush}" RadiusX="2" RadiusY="2" /></Grid>
                                         <ItemsControl ItemsSource="{x:Bind local:Ui.SpecLabels(ViewModel.Settings.TtSpec)}">
                                             <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="0" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
                                             <ItemsControl.ItemTemplate><DataTemplate x:DataType="local:SpecLabel"><TextBlock Style="{StaticResource CaptionTextBlockStyle}" Width="60" Text="{x:Bind Text}" Foreground="{x:Bind Brush}" /></DataTemplate></ItemsControl.ItemTemplate>
@@ -266,7 +266,7 @@
                                                 Foreground="{x:Bind local:Ui.SpecBrush(ViewModel.Settings.DbSpec.IsBelowMinimum, 'AccentFillColorDefaultBrush'), Mode=OneWay}" />
                                         <!-- サンプル DB を作れる実用上の最低スペックを下回る範囲の赤の帯（No.89） -->
                                         <Grid Height="4" Margin="10,0" Visibility="{x:Bind local:Ui.IfPositive(ViewModel.Settings.DbSpec.BelowMinimumShare)}"><Grid.ColumnDefinitions><ColumnDefinition Width="{x:Bind local:Ui.Star(ViewModel.Settings.DbSpec.BelowMinimumShare)}" /><ColumnDefinition Width="{x:Bind local:Ui.RestStar(ViewModel.Settings.DbSpec.BelowMinimumShare)}" /></Grid.ColumnDefinitions>
-                                            <Rectangle AutomationProperties.AutomationId="Settings.DbSpecBelowMinimum" Fill="{ThemeResource SystemFillColorCriticalBrush}" RadiusX="2" RadiusY="2" /></Grid>
+                                            <Rectangle Fill="{ThemeResource SystemFillColorCriticalBrush}" RadiusX="2" RadiusY="2" /></Grid>
                                         <ItemsControl ItemsSource="{x:Bind local:Ui.SpecLabels(ViewModel.Settings.DbSpec)}">
                                             <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="0" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
                                             <ItemsControl.ItemTemplate><DataTemplate x:DataType="local:SpecLabel"><TextBlock Style="{StaticResource CaptionTextBlockStyle}" Width="60" Text="{x:Bind Text}" Foreground="{x:Bind Brush}" /></DataTemplate></ItemsControl.ItemTemplate>
@@ -285,7 +285,7 @@
                                                 Foreground="{x:Bind local:Ui.SpecBrush(ViewModel.Settings.RedisSpec.IsBelowMinimum, 'AccentFillColorDefaultBrush'), Mode=OneWay}" />
                                         <!-- サンプル DB を作れる実用上の最低スペックを下回る範囲の赤の帯（No.89） -->
                                         <Grid Height="4" Margin="10,0" Visibility="{x:Bind local:Ui.IfPositive(ViewModel.Settings.RedisSpec.BelowMinimumShare)}"><Grid.ColumnDefinitions><ColumnDefinition Width="{x:Bind local:Ui.Star(ViewModel.Settings.RedisSpec.BelowMinimumShare)}" /><ColumnDefinition Width="{x:Bind local:Ui.RestStar(ViewModel.Settings.RedisSpec.BelowMinimumShare)}" /></Grid.ColumnDefinitions>
-                                            <Rectangle AutomationProperties.AutomationId="Settings.RedisSpecBelowMinimum" Fill="{ThemeResource SystemFillColorCriticalBrush}" RadiusX="2" RadiusY="2" /></Grid>
+                                            <Rectangle Fill="{ThemeResource SystemFillColorCriticalBrush}" RadiusX="2" RadiusY="2" /></Grid>
                                         <ItemsControl ItemsSource="{x:Bind local:Ui.SpecLabels(ViewModel.Settings.RedisSpec)}">
                                             <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="0" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
                                             <ItemsControl.ItemTemplate><DataTemplate x:DataType="local:SpecLabel"><TextBlock Style="{StaticResource CaptionTextBlockStyle}" Width="60" Text="{x:Bind Text}" Foreground="{x:Bind Brush}" /></DataTemplate></ItemsControl.ItemTemplate>
