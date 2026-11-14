@@ -7,6 +7,11 @@ on:
     branches: [ main ]
   # 手動で実行したときは、変更したファイルにかかわらず、すべて実行する
   workflow_dispatch:
+    inputs:
+      spec_probe:
+        description: 'サンプル DB の作成に要るスペックの調査（JSON の配列。例: ["tt=1.25:2.5,db=0.5:1,redis=0.25:0.5"]。vCPU:GiB）。空なら調べない'
+        required: false
+        default: ''
 
 jobs:
   # 変更したファイルがドキュメント（docs/ の下と *.md）だけかを判定する（.github/scripts/detect-code-changes.ps1）。
@@ -148,6 +153,52 @@ jobs:
       uses: actions/upload-artifact@v7
       with:
         name: e2e-local-results-${{ matrix.db-type }}
+        path: TestResults
+
+  # サンプル DB の作成に要るスペックの調査（オーナーの依頼、2026-11-14）。手動で実行したときに spec_probe を渡した場合だけ動く。
+  # 上限の組ごとに、ローカルの docker compose（PostgreSQL）で CPU とメモリの上限を付けてセットアップウィザードを動かし、成否とメモリの最大の使用量を残す。
+  # Azure は使わない（料金はかからない）
+  spec-probe:
+    if: github.event_name == 'workflow_dispatch' && inputs.spec_probe != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 80
+    strategy:
+      fail-fast: false
+      matrix:
+        limits: ${{ fromJSON(inputs.spec_probe || '[]') }}
+    permissions:
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: 10.0.x
+
+    - name: Install Playwright browser
+      run: |
+        dotnet build tests/TTDeployTool.SystemTests
+        pwsh tests/TTDeployTool.SystemTests/bin/Debug/net10.0/playwright.ps1 install --with-deps chromium
+
+    - name: Setup wizard with limits (docker compose)
+      env:
+        TT_E2E_DB_TYPE: postgresql
+        TT_E2E_LIMITS: ${{ matrix.limits }}
+        TT_E2E_LICENSE_KEY: ${{ secrets.TT_E2E_LICENSE_KEY }}
+        TT_E2E_SAMPLE_LOGIN: ${{ secrets.TT_E2E_SAMPLE_LOGIN }}
+        TT_E2E_SAMPLE_PASSWORD: ${{ secrets.TT_E2E_SAMPLE_PASSWORD }}
+      run: >
+        dotnet test --project tests/TTDeployTool.SystemTests --no-build --
+        --filter-class TTDeployTool.SystemTests.E2E.LocalComposeSetupTests
+        --output detailed --report-xunit-trx --results-directory=TestResults
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: spec-probe-${{ strategy.job-index }}
         path: TestResults
 
   # MCP サーバー（HTTP）のコンテナイメージがビルドでき、起動して /healthz に応答し、トークンなしの /mcp を 401 にすることを確かめる（push はしない）

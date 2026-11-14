@@ -14,6 +14,12 @@ public static class E2ESettings
     /// <summary>ローカルの docker compose のテストで確かめる DB 種別（省略時はすべて）。</summary>
     public static string? DbType => Get("TT_E2E_DB_TYPE");
 
+    /// <summary>
+    /// サンプル DB の作成に要るスペックの調査で、コンテナに付ける上限（「tt=1.25:2.5,db=0.5:1,redis=0.25:0.5」。vCPU:GiB。省略時は上限なし）。
+    /// ci.yml を手動で実行するときの spec_probe で渡す。
+    /// </summary>
+    public static string? Limits => Get("TT_E2E_LIMITS");
+
     /// <summary>使う Chromium の実行ファイル（省略時は playwright install で入れたもの）。</summary>
     public static string? ChromiumPath => Get("TT_E2E_CHROMIUM_PATH");
 

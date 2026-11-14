@@ -35,6 +35,12 @@ public sealed class LocalComposeSetupTests
         var code = await CliApplication.RunAsync(
             ["deploy", "--db-type", dbType, "--db-password", password, "--tracker-password", password, "--dry-run", "true"], output, error, dir);
         code.Should().Be(0, $"{output}\n{error}");
+        // スペックの調査（TT_E2E_LIMITS）: Azure の Container Apps と同じく、コンテナごとに CPU とメモリの上限を付ける（docker compose が自動で読む上書きのファイル）
+        if (E2ESettings.Limits is { } limits)
+        {
+            await File.WriteAllTextAsync(Path.Combine(dir, "docker-compose.override.yml"), ComposeLimits.Override(limits), ct);
+            TestContext.Current.TestOutputHelper?.WriteLine($"上限: {limits}");
+        }
 
         try
         {
@@ -55,6 +61,13 @@ public sealed class LocalComposeSetupTests
         }
         finally
         {
+            // 調べたときは、成否にかかわらず、コンテナごとのメモリの最大の使用量（cgroup v2 の memory.peak）を出す
+            if (E2ESettings.Limits != null)
+            {
+                foreach (var container in new[] { "timetracker-app", dbType == "postgresql" ? "timetracker-postgres" : "timetracker-sqlserver", "timetracker-redis" })
+                    await RunAsync("docker", ["exec", container, "cat", "/sys/fs/cgroup/memory.peak"], dir);
+                await RunAsync("docker", ["compose", "-p", project, "logs", "--tail", "80", "timetracker"], dir);
+            }
             await RunAsync("docker", ["compose", "-p", project, "down", "-v"], dir);
             Directory.Delete(dir, recursive: true);
         }
