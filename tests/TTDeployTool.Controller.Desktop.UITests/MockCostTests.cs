@@ -44,10 +44,11 @@ public class MockCostTests
         app.TextOf("Cost.Source").Should().Contain("アプリに入れた", "UI テストのビルドは Azure の価格表を読まない");
         var total = app.TextOf("Cost.Total");
 
-        // TimeTracker のスライダーを 1.5 vCPU（7 段のうち 6 番目）にすると、CPU とメモリ（CPU の 2 倍）の欄と、料金が変わる
-        app.Find("Settings.TtSpec").Patterns.RangeValue.Pattern.SetValue(5);
-        app.WaitForText("Settings.TtSpecText", t => t == "1.5 vCPU / 3 GiB", "スライダーの値を出す");
-        app.ValueOf("Settings.TtCpu").Should().Be("1.5");
+        // TimeTracker のスライダーを 2.0 vCPU（いちばん右。初期値は 1.5）にすると、CPU とメモリ（CPU の 2 倍）の欄と、料金が変わる
+        app.TextOf("Settings.TtSpecText").Should().Be("1.5 vCPU / 3 GiB", "初期値");
+        app.Find("Settings.TtSpec").Patterns.RangeValue.Pattern.SetValue(7);
+        app.WaitForText("Settings.TtSpecText", t => t == "2 vCPU / 4 GiB", "スライダーの値を出す");
+        app.ValueOf("Settings.TtCpu").Should().Be("2.0");
         AppSession.WaitUntil(() => app.TextOf("Cost.Total") != total, "スペックを変えると料金の目安が変わる");
 
         // 単位を USD にする
