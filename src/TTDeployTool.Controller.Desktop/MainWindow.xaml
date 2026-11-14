@@ -156,7 +156,7 @@
                             <ContentControl AutomationProperties.AutomationId="Wizard.Job" Content="{x:Bind ViewModel.Wizard.RegisteredJob, Mode=OneWay}" ContentTemplate="{StaticResource JobSummaryTemplate}" HorizontalContentAlignment="Stretch" />
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <Button AutomationProperties.AutomationId="Wizard.ShowJob" Content="{x:Bind ViewModel.Wizard.ShowJobText, Mode=OneWay}" Command="{x:Bind ViewModel.Wizard.ShowJobCommand}" Style="{StaticResource AccentButtonStyle}" />
-                                <Button AutomationProperties.AutomationId="Wizard.Continue" Content="続けてデプロイ（今の設定で ① から）" Command="{x:Bind ViewModel.Wizard.ContinueCommand}" />
+                                <Button AutomationProperties.AutomationId="Wizard.Continue" Content="続けてデプロイ（今の設定で、手順「対象」から）" Command="{x:Bind ViewModel.Wizard.ContinueCommand}" />
                                 <Button AutomationProperties.AutomationId="Wizard.NewDeployment" Content="新規デプロイ（初期値から）" Command="{x:Bind ViewModel.Wizard.NewDeploymentCommand}" />
                             </StackPanel>
                         </StackPanel>
@@ -448,6 +448,23 @@
                                 </Grid>
                             </Border>
                         </Grid>
+                        <!-- 料金の目安（No.87。読んだすべてのデプロイの期限までの合計と、今月の見込み。円・USD を切り替える） -->
+                        <Border AutomationProperties.AutomationId="Deployments.Cost" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="12">
+                            <Grid ColumnSpacing="24"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Text="料金の目安（全体）" />
+                                    <TextBlock AutomationProperties.AutomationId="Deployments.CostTotal" Style="{StaticResource SubtitleTextBlockStyle}" Text="{x:Bind ViewModel.Deployments.CostTotalText, Mode=OneWay, TargetNullValue='—'}" />
+                                    <TextBlock Style="{StaticResource CaptionTextBlockStyle}" TextWrapping="Wrap" Text="{x:Bind ViewModel.Deployments.CostTotalNote, Mode=OneWay, TargetNullValue=''}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Text="{x:Bind ViewModel.Deployments.CostThisMonthLabel, Mode=OneWay}" />
+                                    <TextBlock AutomationProperties.AutomationId="Deployments.CostThisMonth" Style="{StaticResource SubtitleTextBlockStyle}" Text="{x:Bind ViewModel.Deployments.CostThisMonthText, Mode=OneWay, TargetNullValue='—'}" />
+                                </StackPanel>
+                                <TextBlock Grid.Column="2" Style="{StaticResource CaptionTextBlockStyle}" TextWrapping="Wrap" VerticalAlignment="Center" Text="{x:Bind vmp:DeploymentCostBook.Note}" />
+                                <ComboBox Grid.Column="3" AutomationProperties.AutomationId="Deployments.CostCurrency" VerticalAlignment="Center" ItemsSource="{x:Bind vmp:CostEstimateViewModel.CurrencyOptions}" DisplayMemberPath="Label"
+                                          SelectedItem="{x:Bind ViewModel.Deployments.Costs.Currency, Mode=OneWay}" SelectionChanged="OnDeploymentsCurrencyChanged" />
+                            </Grid>
+                        </Border>
                         <Button AutomationProperties.AutomationId="Deployments.Load" Content="読み込む" Command="{x:Bind ViewModel.Deployments.LoadCommand}" />
                         <StackPanel Orientation="Horizontal" Spacing="8" Visibility="{x:Bind ViewModel.Deployments.Busy.IsBusy, Mode=OneWay}"><ProgressRing IsActive="{x:Bind ViewModel.Deployments.Busy.IsBusy, Mode=OneWay}" Width="20" Height="20" /><TextBlock AutomationProperties.AutomationId="Deployments.Busy" VerticalAlignment="Center" Text="{x:Bind ViewModel.Deployments.Busy.Text, Mode=OneWay}" /></StackPanel>
                         <InfoBar AutomationProperties.AutomationId="Deployments.Error" AutomationProperties.Name="{x:Bind ViewModel.Deployments.Error, Mode=OneWay}" Severity="Error" IsOpen="True" IsClosable="False" Message="{x:Bind ViewModel.Deployments.Error, Mode=OneWay}"
@@ -522,6 +539,15 @@
                                             <!-- 期限の残り（No.86。90 日で端まで） -->
                                             <ProgressBar AutomationProperties.AutomationId="Row.ExpiryBar" Maximum="1" Value="{x:Bind ExpiryShare, Mode=OneWay}" Width="100" HorizontalAlignment="Left"
                                                          Foreground="{x:Bind local:Ui.ExpiryBarBrush(Level), Mode=OneWay}" Visibility="{x:Bind local:Ui.IfValue(DaysLeft), Mode=OneWay}" />
+                                        </StackPanel>
+                                    </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
+                                </tv:TableViewTemplateColumn>
+                                <!-- 料金の目安（No.87。スペックから。期限まで、期限なしは 1 か月分。2 行目は 1 日あたり） -->
+                                <tv:TableViewTemplateColumn Header="料金の目安" Tag="Cost">
+                                    <tv:TableViewTemplateColumn.CellTemplate><DataTemplate x:DataType="vm:DeploymentRowViewModel">
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Style="{StaticResource CellTextStyle}" AutomationProperties.AutomationId="Row.Cost" Text="{x:Bind CostText, Mode=OneWay, TargetNullValue='見積もれません'}" local:CellText.ShowFullText="True" />
+                                            <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="{x:Bind CostPerDayText, Mode=OneWay, TargetNullValue=''}" />
                                         </StackPanel>
                                     </DataTemplate></tv:TableViewTemplateColumn.CellTemplate>
                                 </tv:TableViewTemplateColumn>
@@ -857,8 +883,10 @@
                         <TextBlock AutomationProperties.AutomationId="Panel.BatchDelete" Style="{StaticResource SubtitleTextBlockStyle}" Text="まとめて Azure から削除" />
                         <Button AutomationProperties.AutomationId="BatchDelete.BackToList" Content="デプロイの一覧に戻る" Click="OnBackToList" />
                         <TextBlock TextWrapping="Wrap" Text="選んだデプロイごとに、本ツールで作ったリソースだけを削除します。下の指定は、すべてのデプロイに当てます。計画に誤りがあるもの・ジョブがあるものは外します。" />
-                        <CheckBox AutomationProperties.AutomationId="BatchDelete.KeepDbData" Content="DB のデータを残す（ストレージアカウントを削除しない。料金がかかり続けます）" IsChecked="{x:Bind ViewModel.BatchDeletion.KeepDbData, Mode=TwoWay}" />
-                        <CheckBox AutomationProperties.AutomationId="BatchDelete.DeleteResourceGroup" Content="リソースグループも削除する（本ツールのリソースを削除した後に、中が空になる場合だけ。元に戻せません）" IsChecked="{x:Bind ViewModel.BatchDeletion.DeleteResourceGroup, Mode=TwoWay}" />
+                        <!-- リソースグループだけの行の扱い（No.87。すべてリソースグループだけなら、DB のデータとリソースグループの指定は出さない） -->
+                        <TextBlock AutomationProperties.AutomationId="BatchDelete.ResourceGroupOnly" TextWrapping="Wrap" Foreground="{ThemeResource SystemFillColorCautionBrush}" Text="{x:Bind ViewModel.BatchDeletion.ResourceGroupOnlyText, Mode=OneWay, TargetNullValue=''}" />
+                        <CheckBox AutomationProperties.AutomationId="BatchDelete.KeepDbData" Content="DB のデータを残す（ストレージアカウントを削除しない。料金がかかり続けます）" IsChecked="{x:Bind ViewModel.BatchDeletion.KeepDbData, Mode=TwoWay}" Visibility="{x:Bind local:Ui.IfFalse(ViewModel.BatchDeletion.IsAllResourceGroupOnly), Mode=OneWay}" />
+                        <CheckBox AutomationProperties.AutomationId="BatchDelete.DeleteResourceGroup" Content="リソースグループも削除する（本ツールのリソースを削除した後に、中が空になる場合だけ。元に戻せません）" IsChecked="{x:Bind ViewModel.BatchDeletion.DeleteResourceGroup, Mode=TwoWay}" Visibility="{x:Bind local:Ui.IfFalse(ViewModel.BatchDeletion.IsAllResourceGroupOnly), Mode=OneWay}" />
                         <Button AutomationProperties.AutomationId="BatchDelete.Plan" Content="計画し直す" Command="{x:Bind ViewModel.BatchDeletion.PlanCommand}" />
                         <StackPanel Orientation="Horizontal" Spacing="8" Visibility="{x:Bind ViewModel.BatchDeletion.Busy.IsBusy, Mode=OneWay}"><ProgressRing IsActive="{x:Bind ViewModel.BatchDeletion.Busy.IsBusy, Mode=OneWay}" Width="20" Height="20" /><TextBlock AutomationProperties.AutomationId="BatchDelete.Busy" VerticalAlignment="Center" Text="{x:Bind ViewModel.BatchDeletion.Busy.Text, Mode=OneWay}" /></StackPanel>
                         <ItemsControl AutomationProperties.AutomationId="BatchDelete.Items" ItemsSource="{x:Bind ViewModel.BatchDeletion.Items}">

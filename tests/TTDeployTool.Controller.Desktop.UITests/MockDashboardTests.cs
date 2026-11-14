@@ -59,4 +59,21 @@ public class MockDashboardTests
         app.Invoke("Jobs.Filter.RecentFailed");
         app.WaitForText("Jobs.Count", t => t.Contains($"（全 {Records} 件）"), "もう一度押すと外す");
     });
+
+    [Fact]
+    public void The_Deployment_List_Should_Show_Cost_Estimates_In_Yen_Or_Dollars() => WithFixture(app =>
+    {
+        // 料金の目安（No.87。スペックから。UI テストのビルドはアプリに入れた価格）: 行ごとの期限まで・1 日あたり、上部の全体と今月の見込み、円・USD の切り替え
+        SignIn(app);
+        Load(app);
+        app.Select("Deployments.PageSize", "50");
+        app.WaitForText("Deployments.CostTotal", t => t.StartsWith("約 ", StringComparison.Ordinal) && t.EndsWith(" 円", StringComparison.Ordinal), "全体の料金の目安を円で出す");
+        app.TextOf("Deployments.CostThisMonth").Should().EndWith(" 円");
+        string Cost() => Cell(app.RowWith("Deployments.Rows", "Row.AppName", "app02"), "Row.Cost").Name;
+        AppSession.WaitUntil(() => Cost().Contains('円'), "行の料金の目安を出す");
+
+        app.Select("Deployments.CostCurrency", "USD");
+        app.WaitForText("Deployments.CostTotal", t => t.Contains('$'), "USD に切り替える");
+        AppSession.WaitUntil(() => Cost().Contains('$'), "行も USD になる");
+    });
 }

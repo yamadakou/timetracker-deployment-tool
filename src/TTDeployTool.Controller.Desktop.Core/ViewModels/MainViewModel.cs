@@ -72,7 +72,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             () => Queue.ActiveFor(Target.Subscription, Target.ResourceGroup, Target.AppName.ToLowerInvariant())?.IsRunning == true, clipboard);
         // サインアウトしたときに一覧を消すため、サインインより先に作る
         Deployments = new DeploymentListViewModel(Target, Queue, logger, loggers.CreateLogger("TTDeployTool.Desktop.Deployments"), time,
-            launcher, clipboard, OpenAsync, OpenBatchDeletionAsync, dialogs);
+            launcher, clipboard, OpenAsync, OpenBatchDeletionAsync, dialogs, prices);
         var deletions = new DeletionWorkflow(plans, jobs, caller, logger, time);
         Expiry = new ExpiryWatcher(Deployments, Queue, Target, deletions, logger, preferences, notifications, time,
             loggers.CreateLogger("TTDeployTool.Desktop.Expiry"), () => SignIn!.IsSignedIn);
@@ -113,7 +113,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         // 表の列の幅と順序（幅 0 は残りの幅いっぱいに伸ばす列。docs/design/desktop/desktop-tables.md の 10.1）
         DeploymentsLayout = new TableLayout("deployments",
         [
-            new("Subscription", 200), new("ResourceGroup", 150), new("AppName", 130), new("Group", 130), new("State", 140), new("ExpiresAt", 140), new("DeployedAt", 130),
+            new("Subscription", 200), new("ResourceGroup", 150), new("AppName", 130), new("Group", 130), new("State", 140), new("ExpiresAt", 140), new("Cost", 130), new("DeployedAt", 130),
             new(DeploymentListViewModel.JobColumn, 0),
         ], preferences);
         JobsLayout = new TableLayout("jobs",
@@ -445,7 +445,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     // デプロイのジョブの設定を入力に入れ、「新しくデプロイ」を ① から開く（パスワードは記録に残さないため、③ で入れ直す。入力済みならそのまま）
     private async Task RedeployAsync(DeploymentTemplate settings)
     {
-        Settings.Apply(settings, $"ジョブの設定（{settings.ResourceGroup} / {settings.AppName}）を入力しました。パスワードは記録に残していないため、③ で入れてください（入力済みなら、そのまま使います）。");
+        Settings.Apply(settings, $"ジョブの設定（{settings.ResourceGroup} / {settings.AppName}）を入力しました。パスワードは記録に残していないため、手順「パスワード」で入れてください（入力済みなら、そのまま使います）。");
         await OpenAsync(Pages.Wizard);
     }
 

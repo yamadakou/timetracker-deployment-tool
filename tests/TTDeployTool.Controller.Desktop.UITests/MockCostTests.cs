@@ -22,11 +22,11 @@ public class MockCostTests
         app.SetText("Target.ResourceGroup", "rg-mock-cost");
         app.SetText("Target.AppName", "cost");
         app.SetText("Target.Location", "japaneast");
-        Next(app, "②");
-        Next(app, "③");
+        Next(app, "DB（2");
+        Next(app, "パスワード（3");
         app.SetText("Settings.DbPassword", "UiTestDbPass1!");
         app.SetText("Settings.TrackerPassword", "UiTestTracker1!");
-        Next(app, "④");
+        Next(app, "スペックと利用可能期限（4");
     }
 
     private static void Next(AppSession app, string step)

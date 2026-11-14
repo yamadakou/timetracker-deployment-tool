@@ -86,6 +86,13 @@ public sealed partial class MainWindow : Window
         spec.Step = (int)Math.Round(e.NewValue);
     }
 
+    // デプロイの一覧の料金の目安の単位（円・USD。No.87）
+    private void OnDeploymentsCurrencyChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (((ComboBox)sender).SelectedItem is Core.Pricing.CurrencyOption option)
+            ViewModel.Deployments.Costs.Currency = option;
+    }
+
     // 料金の目安の単位（円・USD）
     private void OnCurrencyChanged(object sender, SelectionChangedEventArgs e)
     {

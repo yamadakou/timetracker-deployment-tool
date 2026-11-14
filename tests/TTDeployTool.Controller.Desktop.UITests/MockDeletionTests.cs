@@ -62,4 +62,28 @@ public class MockDeletionTests
         app.TextOf("Job.DeletionSettings").Should().StartWith("リソースグループも削除する");
         app.TextOf("Job.Status").Should().StartWith("予定", "予定のまま");
     });
+
+    [Fact]
+    public void A_Batch_Of_Resource_Group_Only_Rows_Should_Hide_The_Data_And_Group_Options() => WithFixture(app =>
+    {
+        // まとめての削除で、選んだのがすべてリソースグループだけの行なら、DB のデータとリソースグループの指定は出さず、扱いを注意として出す（No.87）
+        SignIn(app);
+        app.Show("Deployments");
+        app.Invoke("Deployments.Load");
+        app.WaitForText("Deployments.Page", t => t.Contains($"全 {Deployments + 2} 件"), "リソースグループだけの行も一覧に出る");
+        app.Select("Deployments.PageSize", "50");
+        app.SelectRowWith("Deployments.Rows", "Row.ResourceGroup", EmptyGroup);
+        app.SelectRowWith("Deployments.Rows", "Row.ResourceGroup", EmptyGroup + "-2");
+        app.Invoke("Deployments.Delete");
+        app.Find("Panel.BatchDelete");
+        app.WaitForText("BatchDelete.ResourceGroupOnly", t => t.StartsWith("選んだのは、本ツールのアプリのリソースが無い、リソースグループだけの行です。", StringComparison.Ordinal),
+            "リソースグループだけの扱いを出す");
+        app.Exists("BatchDelete.KeepDbData").Should().BeFalse("DB のデータは無い");
+        app.Exists("BatchDelete.DeleteResourceGroup").Should().BeFalse("リソースグループを削除するため、指定は要らない");
+    }, data: d => d with
+    {
+        ResourceGroups = [.. d.ResourceGroups!,
+            new FixtureResourceGroup(FixtureSamples.SubscriptionA, EmptyGroup, FixtureSamples.Location, new Dictionary<string, string> { [ManagedTags.ManagedByKey] = ManagedTags.ManagedByValue }),
+            new FixtureResourceGroup(FixtureSamples.SubscriptionA, EmptyGroup + "-2", FixtureSamples.Location, new Dictionary<string, string> { [ManagedTags.ManagedByKey] = ManagedTags.ManagedByValue })],
+    });
 }

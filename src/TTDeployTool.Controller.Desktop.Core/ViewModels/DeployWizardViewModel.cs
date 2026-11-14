@@ -32,7 +32,7 @@ public enum WizardStep
 /// </summary>
 public sealed class DeployWizardViewModel : ObservableObject
 {
-    public static readonly IReadOnlyList<string> Titles = ["① 対象", "② DB", "③ パスワード", "④ スペックと利用可能期限", "⑤ 確認と実行"];
+    public static readonly IReadOnlyList<string> Titles = ["対象", "DB", "パスワード", "スペックと利用可能期限", "確認と実行"];
 
     // メッセージの先頭の項目名（CLI のオプション名）で、誤り・警告の画面を決める（DeploymentValidator・DeploymentAdvisor・SettingsViewModel のメッセージ）
     private static readonly (string Prefix, WizardStep Step)[] Prefixes =

@@ -45,7 +45,7 @@ public class AzureUiTests
             // 7f: デプロイはウィザード（① 対象 → ② DB → ③ パスワード → ④ スペックと利用可能期限 → ⑤ 確認と実行）で行う
             app.IsEnabled("Nav.Deployments").Should().BeTrue("サインインすると、デプロイの一覧を使える");
             app.Show("Wizard");
-            WizardStep(app, "①");
+            WizardStep(app, "対象（1");
             // サブスクリプションの読み込み（読めなかったテナントの注意は、結果に書き出す）
             app.SelectWhere("Target.Subscription", name => name.Contains(subscription!), $"サブスクリプション {subscription}", LoadTimeout);
             Log($"サブスクリプションの一覧: {string.Join(" / ", app.ItemsOf("Target.Subscription"))}");
@@ -65,9 +65,9 @@ public class AzureUiTests
             app.SetText("Target.ResourceGroup", resourceGroup!);
             app.SetText("Target.AppName", appName);
             app.SetText("Target.Location", location);
-            Next(app, "②");
+            Next(app, "DB（2");
             // ② DB は既定のまま
-            Next(app, "③");
+            Next(app, "パスワード（3");
             // ③ パスワード: 入れるまで次へ進めない（誤りはこの画面に出る）
             app.IsEnabled("Wizard.Next").Should().BeFalse("パスワードが無ければ次へ進めない");
             // 誤りの一覧は、画面を切り替えた直後には UI Automation に出ていないことがあるため、出るのを待つ
@@ -75,7 +75,7 @@ public class AzureUiTests
             var dbPassword = "Ui" + Guid.NewGuid().ToString("N")[..12] + "!";
             app.SetText("Settings.DbPassword", dbPassword);
             app.SetText("Settings.TrackerPassword", "Ui" + Guid.NewGuid().ToString("N")[..12] + "!");
-            Next(app, "④");
+            Next(app, "スペックと利用可能期限（4");
             // ④ 利用可能期限日: 「日付を指定する」で日付の入力が現れ、既定に戻すと消える
             app.TextOf("Settings.ExpiryNotice").Should().Contain("今日から 32 日後");
             app.Select("Settings.Expiry", "日付を指定する");
@@ -171,22 +171,22 @@ public class AzureUiTests
             app.Show("Wizard");
             WizardStep(app, "完了");
             app.Invoke("Wizard.Continue");
-            WizardStep(app, "①");
+            WizardStep(app, "対象（1");
             app.WaitForText("Wizard.ActiveJobNotice", t => t.Contains("削除（"), "① で同じ対象のジョブを知らせる");
-            Next(app, "②");
-            Next(app, "③");
-            Next(app, "④");
-            Next(app, "⑤");
+            Next(app, "DB（2");
+            Next(app, "パスワード（3");
+            Next(app, "スペックと利用可能期限（4");
+            Next(app, "確認と実行（5");
             app.WaitForText("Deploy.Error", t => t.Contains("この対象のジョブ"), "同じ対象のジョブがあれば計画できない", LoadTimeout);
 
             // 7b: 別の対象を予定に追加し（完了の表示から、ジョブの一覧を開く）、上部の帯からジョブの一覧に移って取り消す
             var second = appName + "b";
-            BackTo(app, "①");
+            BackTo(app, "対象（1");
             app.SetText("Target.AppName", second);
             app.Exists("Wizard.ActiveJobNotice").Should().BeFalse("別の対象にはジョブが無い");
-            Next(app, "②");
-            Next(app, "③");
-            Next(app, "④");
+            Next(app, "DB（2");
+            Next(app, "パスワード（3");
+            Next(app, "スペックと利用可能期限（4");
             app.Invoke("Wizard.Next");
             AppSession.WaitUntil(() => app.Exists("Deploy.Schedule") && app.IsEnabled("Deploy.Schedule"), "2 つ目の対象の計画が表示されませんでした。", LoadTimeout);
             // 予定の時刻の初期値は今の次の分のため（No.83）、後の時刻にしてから入れる（既定のままでは 1 分後に本物のデプロイが始まる）
@@ -233,10 +233,10 @@ public class AzureUiTests
             app.Show("Wizard");
             WizardStep(app, "完了");
             app.Invoke("Wizard.Continue");
-            WizardStep(app, "①");
-            Next(app, "②");
-            Next(app, "③");
-            Next(app, "④");
+            WizardStep(app, "対象（1");
+            Next(app, "DB（2");
+            Next(app, "パスワード（3");
+            Next(app, "スペックと利用可能期限（4");
             app.Invoke("Wizard.Next");
             AppSession.WaitUntil(() => app.Exists("Deploy.Start") && app.IsEnabled("Deploy.Start"), "2 つ目の対象の計画が表示されませんでした。", LoadTimeout);
             app.Invoke("Deploy.Start");
