@@ -57,7 +57,8 @@ public class RealDeviceFixesTests
         h.Main.Deployment.HasError.Should().BeFalse();
         notified.Count(n => n == nameof(h.Main.Deployment.HasError)).Should().Be(2, "エラーが出たときと消えたときに、表示の切り替えを知らせる");
 
-        h.Main.Target.AppName = "";
+        // アプリ名の誤り（空はリソースグループだけの削除になるため、使えない文字で誤りにする）
+        h.Main.Target.AppName = "bad_app!";
         await h.Main.Deletion.PlanCommand.ExecuteAsync();
         await h.Main.Status.RefreshCommand.ExecuteAsync();
         h.Main.Deletion.HasError.Should().BeTrue();

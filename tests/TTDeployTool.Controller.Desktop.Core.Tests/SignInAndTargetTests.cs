@@ -28,12 +28,13 @@ internal sealed class Harness
     /// <param name="preferences">前回のアプリが保存した設定（無ければ空）</param>
     public Harness(
         Microsoft.Extensions.Logging.ILoggerFactory? loggers = null, TimeProvider? time = null, bool withClipboard = true, bool withNotifications = true,
-        InMemoryAppPreferences? preferences = null, bool withSecrets = true, InMemoryJobHistory? history = null)
+        InMemoryAppPreferences? preferences = null, bool withSecrets = true, InMemoryJobHistory? history = null,
+        TTDeployTool.Controller.Desktop.Core.Pricing.IPriceCatalog? prices = null)
     {
         Preferences = preferences ?? new();
         History = history ?? new();
         Main = new MainViewModel(SignIn, Azure, Dialogs, Launcher, time ?? TimeProvider.System, loggers ?? NullLoggerFactory.Instance, TimeSpan.FromMilliseconds(5),
-            Preferences, withNotifications ? Notifications : null, withClipboard ? Clipboard : null, StartupTask, withSecrets ? Secrets : null, History);
+            Preferences, withNotifications ? Notifications : null, withClipboard ? Clipboard : null, StartupTask, withSecrets ? Secrets : null, History, prices);
         Main.NavigationRequested += Navigations.Add;
     }
 

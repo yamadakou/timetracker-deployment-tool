@@ -60,7 +60,7 @@
 | 項目 | stdio | HTTP |
 |---|---|---|
 | パスワード | 引数または環境変数 `TT_MCP_DB_PASSWORD` / `TT_MCP_TRACKER_PASSWORD` | 引数だけ（環境変数は読まない。全利用者で共有になるため） |
-| `generate_compose` | `output_dir` に書き込む | 引数は `app_name` / `db_type` / `db_name` / `tt_tag` だけ（`output_dir` / `overwrite` / パスワード / リソースの引数は無い）。`docker-compose.yml` の内容と、パスワードをプレースホルダー（`<DB パスワードを設定>` / `<Timetracker のパスワードを設定>`）にした `.env` の内容を返す（Azure・ファイルとも変更しないため `readOnlyHint: true`）。検証は、要件を満たす仮のパスワードで行う（結果には出さない）。`next_steps` で、SQL Server のパスワード要件を案内する |
+| `generate_compose` | `output_dir` に書き込む | 引数は `app_name` / `db_type` / `db_name` / `tt_tag` だけ（`output_dir` / `overwrite` / パスワード / リソースの引数は無い）。`docker-compose.yml` の内容と、パスワードをプレースホルダー（`<DB パスワードを設定>` / `<TimeTracker のパスワードを設定>`）にした `.env` の内容を返す（Azure・ファイルとも変更しないため `readOnlyHint: true`）。検証は、要件を満たす仮のパスワードで行う（結果には出さない）。`next_steps` で、SQL Server のパスワード要件を案内する |
 | `get_deployment_options` の `server` | `transport: stdio`、認証モード、パスワードの環境変数の有無、出力先 | `transport: http`、`identity_modes: ["server"]`、`allowed_resource_groups`、`can_create_resource_group` |
 | instructions | 現行 | HTTP 用（パスワードは引数で渡す必要があること、`server` 方式で操作できる範囲、`generate_compose` はファイルを書かないこと） |
 | Prompts | 現行 | `deploy-timetracker` の最後の注意と、`local-dry-run` の手順（ファイルを保存してプレースホルダーを置き換える）を HTTP 用にする |

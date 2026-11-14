@@ -20,7 +20,7 @@ Azure 上の DB のデータを、DB コンテナの再起動（設定を変え�
 | `get_deployment_info` に永続化の状態を出す | ✔ |
 | README（目的と注意事項・作成されるリソース・RBAC・料金・FAQ）、MCP の Resources / instructions の更新 | ✔ |
 | Azure 上の SQL Server でのサンプル DB の作成（No.19） | ✘（【決定 Q4】別の項目にする。永続化を Azure で確かめてから、同じストレージの仕組みで行う） |
-| Redis の永続化 | ✘（キャッシュとジョブのキューで、消えても Timetracker のデータは失われないため） |
+| Redis の永続化 | ✘（キャッシュとジョブのキューで、消えても TimeTracker のデータは失われないため） |
 | バックアップ・リストア、冗長化（ZRS / GRS） | ✘（検証環境向けの方針のまま。LRS に固定） |
 | Dry-run（docker-compose） | ✘（既に名前付きボリュームで永続化している。`--persist-db` は Azure 向けの設定のため、Dry-run では警告を出して無視する） |
 
@@ -67,10 +67,10 @@ Azure 上の DB のデータを、DB コンテナの再起動（設定を変え�
 ### 4.1 リビジョンの更新で新旧のコンテナが同時に動く問題
 2 のとおり、更新の間は古いリビジョンと新しいリビジョンが短い間同時に動く。同じデータのファイルを 2 つの DB のプロセスが開くと、データが壊れるおそれがある（PostgreSQL の `postmaster.pid` による排他は、別のコンテナでは PID が同じ 1 になりうるため、確実には働かない）。
 
-- 対策: **永続化した既存の DB アプリを更新するときは、先に DB アプリを停止（`stop`）し、更新してから開始（`start`）する**。停止の間（数十秒〜数分）は Timetracker から DB に接続できない
+- 対策: **永続化した既存の DB アプリを更新するときは、先に DB アプリを停止（`stop`）し、更新してから開始（`start`）する**。停止の間（数十秒〜数分）は TimeTracker から DB に接続できない
 - 必要な権限: `Microsoft.App/containerApps/stop/action`、`Microsoft.App/containerApps/start/action`（Contributor・Container Apps Contributor に含まれる）
 - 停止した Container App の更新でリビジョンがどう扱われるか（開始で新しいリビジョンが動くか）は、Azure で確認する。うまくいかない場合は、レプリカ数を 0 にする更新 → 本来の更新、の 2 段階に変える
-- 基盤のメンテナンスでの再起動は本ツールでは制御できない。README に「まれにデータが壊れるおそれがある。検証環境向けで、重要なデータは Timetracker の機能でエクスポートしておく」と書く
+- 基盤のメンテナンスでの再起動は本ツールでは制御できない。README に「まれにデータが壊れるおそれがある。検証環境向けで、重要なデータは TimeTracker の機能でエクスポートしておく」と書く
 
 ## 5. 引数
 ### 5.1 CLI
@@ -99,7 +99,7 @@ ttdeploytool-cli delete ... [--keep-db-data [true|false]]
 | 永続化なし | 永続化する | **今のデータは失われる**（以前に永続化していたときのデータ、初めてなら空の DB になる） | **true** | 「今の DB に保存されているデータは消えます。切り替えた後の DB は、以前に永続化していたときのデータ（初めて永続化する場合は空の DB）になります」 |
 | 永続化あり | 永続化する | 残る | **false** | 「DB アプリを停止してから更新します（その間は接続できません）」 |
 | 永続化あり | 指定なし | 残る（Q3 で今の状態を引き継ぐ） | **false** | 永続化ありの行と同じ |
-| 永続化あり | 永続化なし（`--persist-db false`） | 共有には残るが、Timetracker からは空の DB に見える | **true** | 「Timetracker からは空の DB に見えます。これまでのデータは消えずにストレージアカウントに残り、もう一度 --persist-db を指定すると元に戻ります」 |
+| 永続化あり | 永続化なし（`--persist-db false`） | 共有には残るが、TimeTracker からは空の DB に見える | **true** | 「TimeTracker からは空の DB に見えます。これまでのデータは消えずにストレージアカウントに残り、もう一度 --persist-db を指定すると元に戻ります」 |
 
 - 計画の操作（`PlannedOperation`）に、ストレージアカウント・ファイル共有・Environment のストレージを加える（`PlannedResourceKind` に `StorageAccount` / `FileShare` / `EnvironmentStorage`）。`HasSameOperations` の比較の対象にも含まれる
 - `PlannedOperation.DataLoss` の判定を上の表に変える。`DeploymentRunner` は、永続化した既存の DB アプリの更新で、4.1 の停止 → 更新 → 開始を行う

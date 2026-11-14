@@ -24,7 +24,7 @@ public static class DesktopMessages
         "https://aka.ms/mysecurityinfo で登録してから、サインインし直してください。";
 
     public const string EnvFileWarning =
-        ".env には DB パスワードと Timetracker のパスワードが平文で保存されます。共有やリポジトリへのコミットは避けてください。";
+        ".env には DB パスワードと TimeTracker のパスワードが平文で保存されます。共有やリポジトリへのコミットは避けてください。";
 
     // AADSTS50076 は MFA を行っていない、AADSTS50079 は MFA の方法を登録していない
     private const string MfaRequiredError = "AADSTS50076";

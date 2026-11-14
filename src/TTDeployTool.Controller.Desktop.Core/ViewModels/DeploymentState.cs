@@ -27,6 +27,9 @@ public enum DeploymentState
 
     /// <summary>上のどれにも当たらない。</summary>
     Unknown,
+
+    /// <summary>リソースグループだけ（本ツールのアプリのリソースが無い、管理タグの残ったリソースグループ）。</summary>
+    ResourceGroupOnly,
 }
 
 /// <summary>
@@ -38,6 +41,8 @@ public static class DeploymentStates
 {
     public static DeploymentState Of(DeploymentEntry entry)
     {
+        if (entry.IsResourceGroupOnly)
+            return DeploymentState.ResourceGroupOnly;
         if (!entry.IsComplete)
             return DeploymentState.Partial;
         AppEntry[] apps = [entry.Timetracker!, entry.Db!, entry.Redis!];
@@ -62,6 +67,7 @@ public static class DeploymentStates
         DeploymentState.Failed => "失敗",
         DeploymentState.Partial => "一部だけ",
         DeploymentState.Pending => "デプロイ済み（反映待ち）",
+        DeploymentState.ResourceGroupOnly => "リソースグループだけ",
         _ => "不明",
     };
 }

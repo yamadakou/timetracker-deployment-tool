@@ -192,13 +192,13 @@ classDiagram
 
 ## 4. Azure に作るもの
 
-1 つのデプロイ（アプリ名 `{app}`）は、1 つのリソースグループの中の次のリソースです。DB と Redis は Environment の中だけで TCP で受け、Timetracker だけを外に公開します。`--persist-db`（永続化）を選ぶと、DB のデータをストレージアカウントのファイル共有に置きます（[`db-persistence.md`](db-persistence.md)）。
+1 つのデプロイ（アプリ名 `{app}`）は、1 つのリソースグループの中の次のリソースです。DB と Redis は Environment の中だけで TCP で受け、TimeTracker だけを外に公開します。`--persist-db`（永続化）を選ぶと、DB のデータをストレージアカウントのファイル共有に置きます（[`db-persistence.md`](db-persistence.md)）。
 
 ```mermaid
 flowchart LR
   subgraph RG["リソースグループ"]
     subgraph Env["Container Apps Environment<br/>{app}-env"]
-      TT["Container App {app}-tt<br/>Timetracker<br/>外部公開（HTTPS）"]
+      TT["Container App {app}-tt<br/>TimeTracker<br/>外部公開（HTTPS）"]
       DB["Container App {app}-db<br/>PostgreSQL 5432 / SQL Server 1433<br/>内部（TCP）"]
       Redis["Container App {app}-redis<br/>Redis 6379<br/>内部（TCP）"]
       EnvSt["Environment のストレージ<br/>（永続化するときだけ）"]

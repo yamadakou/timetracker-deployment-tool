@@ -66,11 +66,19 @@ public class ResourceGraphDeploymentDirectoryTests
                  "type": "microsoft.app/managedenvironments", "subscriptionId": "s1", "resourceGroup": "rg", "location": "japaneast",
                  "tags": null, "cpu": "x" }
              ]
+             """, null),
+            // 続けて、管理タグの付いたリソースグループを読む（リソースグループだけの行のため。2026-11-13）
+            ("""
+             [
+               { "id": "/subscriptions/s1/resourceGroups/rg-old", "name": "rg-old", "type": "microsoft.resources/subscriptions/resourcegroups",
+                 "subscriptionId": "s1", "resourceGroup": "rg-old", "location": "japaneast", "tags": { "managed-by": "ttdeploytool" } }
+             ]
              """, null));
 
         var result = await new ResourceGraphDeploymentDirectory(_arm.Object).ListAsync(["s1", "s2"], Ct);
 
-        result.Should().HaveCount(4);
+        result.Should().HaveCount(5);
+        (result[4].Type, result[4].ResourceGroup, result[4].App).Should().Be((ManagedResourceRecord.ResourceGroupType, "rg-old", (ContainerAppSnapshot?)null));
         var db = result[0];
         (db.Name, db.Type, db.SubscriptionId, db.ResourceGroup, db.Location).Should().Be(("demo-db", "microsoft.app/containerapps", "s1", "rg", "japaneast"));
         db.Tags.Should().Equal(new Dictionary<string, string> { ["managed-by"] = "ttdeploytool", ["tt-app-name"] = "demo", ["tt-expires-at"] = "none" });
@@ -81,7 +89,9 @@ public class ResourceGraphDeploymentDirectoryTests
         result[2].App!.Cpu.Should().BeNull();
         result[3].App.Should().BeNull();
         result[3].Tags.Should().BeEmpty();
-        _queries.Should().HaveCount(2);
+        _queries.Should().HaveCount(3);
+        _queries[2].Query.Should().Be(ResourceGraphDeploymentDirectory.ResourceGroupQuery).And.StartWith("resourcecontainers").And.Contain("resourceGroup = name");
+        (_queries[2].Options.SkipToken, _queries[2].Subscriptions.Count).Should().Be(((string?)null, 2));
         _queries[0].Subscriptions.Should().Equal("s1", "s2");
         _queries[0].Options.ResultFormat.Should().Be(ResultFormat.ObjectArray);
         _queries[0].Options.Top.Should().Be(1000);

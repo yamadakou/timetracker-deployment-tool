@@ -46,6 +46,6 @@
 
 ## 6. Azure 上の SQL Server でのサンプル DB の作成
 - **目的**: Azure 上の SQL Server 構成でも、セットアップウィザードでサンプル DB を作れるようにする（REVIEW_ISSUES No.19 の制約の解消）
-- **背景**: SQL Server の `RESTORE DATABASE` は DB サーバー側のファイルを読むが、サンプル DB のバックアップは Timetracker のイメージの中にしか無い。ローカルの docker-compose では名前付きボリュームで共有しているが、Azure では共有の手段が無かった。1 の DB データの永続化で、Azure Files を Container Apps にマウントする仕組みができた（`docs/design/common/db-persistence.md` の Q4 で、別の項目にすると決めた）
-- **案**: Timetracker アプリに初期化コンテナ（同じイメージで、サンプルのファイルを共有にコピー）を加え、DB アプリの同じパスに読み取り専用でマウントする
+- **背景**: SQL Server の `RESTORE DATABASE` は DB サーバー側のファイルを読むが、サンプル DB のバックアップは TimeTracker のイメージの中にしか無い。ローカルの docker-compose では名前付きボリュームで共有しているが、Azure では共有の手段が無かった。1 の DB データの永続化で、Azure Files を Container Apps にマウントする仕組みができた（`docs/design/common/db-persistence.md` の Q4 で、別の項目にすると決めた）
+- **案**: TimeTracker アプリに初期化コンテナ（同じイメージで、サンプルのファイルを共有にコピー）を加え、DB アプリの同じパスに読み取り専用でマウントする
 - **検討すること**: `--persist-db` が無い場合も共有を作るか（サンプル用の小さな共有）、初期化コンテナのコマンド（イメージにあるシェルとコマンド）、共有の権限（SQL Server の mssql ユーザーが読めること）、削除での扱い

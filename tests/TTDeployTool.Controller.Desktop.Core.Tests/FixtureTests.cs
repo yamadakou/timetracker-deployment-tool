@@ -209,7 +209,7 @@ public class FixtureTests
         var credential = new FixtureCredential();
         (await clients.Tenants(credential).ListAsync()).Single().TenantId.Should().Be(FixtureSamples.TenantId);
         (await clients.Subscriptions(credential).ListAsync()).Should().HaveCount(2);
-        (await clients.Deployments(credential).ListAsync([FixtureSamples.SubscriptionB])).Should().HaveCount(48).And.OnlyContain(r => r.SubscriptionId == FixtureSamples.SubscriptionB);
+        (await clients.Deployments(credential).ListAsync([FixtureSamples.SubscriptionB])).Should().HaveCount(48 + 12, "リソースと、管理タグのあるリソースグループ（12）").And.OnlyContain(r => r.SubscriptionId == FixtureSamples.SubscriptionB);
     }
 
     [Fact]

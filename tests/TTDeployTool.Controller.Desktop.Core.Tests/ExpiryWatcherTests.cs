@@ -26,7 +26,7 @@ public class ExpiryWatcherTests
         return tags;
     }
 
-    // Resource Graph の結果（Timetracker のアプリと Environment）
+    // Resource Graph の結果（TimeTracker のアプリと Environment）
     private static List<ManagedResourceRecord> Listed(string app, string? expires) =>
     [
         new($"/subscriptions/sub/resourceGroups/rg/providers/Microsoft.App/containerApps/{app}-tt", $"{app}-tt", ManagedResourceRecord.ContainerAppType,

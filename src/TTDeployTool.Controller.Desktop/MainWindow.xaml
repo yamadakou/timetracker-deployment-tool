@@ -194,15 +194,15 @@
                         <StackPanel Spacing="12" Visibility="{x:Bind ViewModel.Wizard.IsPasswords, Mode=OneWay}">
                             <TextBlock TextWrapping="Wrap" Text="パスワードは保存しません（アプリを終了すると消えます。テンプレートにも保存しません）。" />
                             <PasswordBox AutomationProperties.AutomationId="Settings.DbPassword" Header="DB のパスワード（8 文字以上）" Password="{x:Bind ViewModel.Settings.DbPassword, Mode=TwoWay}" Width="480" HorizontalAlignment="Left" />
-                            <PasswordBox AutomationProperties.AutomationId="Settings.TrackerPassword" Header="Timetracker のパスワード（8 文字以上）" Password="{x:Bind ViewModel.Settings.TrackerPassword, Mode=TwoWay}" Width="480" HorizontalAlignment="Left" />
+                            <PasswordBox AutomationProperties.AutomationId="Settings.TrackerPassword" Header="TimeTracker のパスワード（8 文字以上）" Password="{x:Bind ViewModel.Settings.TrackerPassword, Mode=TwoWay}" Width="480" HorizontalAlignment="Left" />
                         </StackPanel>
 
                         <!-- ④ スペックと利用可能期限 -->
                         <StackPanel Spacing="12" Visibility="{x:Bind ViewModel.Wizard.IsSpec, Mode=OneWay}">
                             <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="CPU（vCPU）とメモリ（Gi）" />
                             <StackPanel Orientation="Horizontal" Spacing="8">
-                                <TextBox AutomationProperties.AutomationId="Settings.TtCpu" Header="Timetracker の CPU" Text="{x:Bind ViewModel.Settings.TtCpu, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="150" />
-                                <TextBox Header="Timetracker のメモリ" Text="{x:Bind ViewModel.Settings.TtMemoryGi, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="150" />
+                                <TextBox AutomationProperties.AutomationId="Settings.TtCpu" Header="TimeTracker の CPU" Text="{x:Bind ViewModel.Settings.TtCpu, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="150" />
+                                <TextBox Header="TimeTracker のメモリ" Text="{x:Bind ViewModel.Settings.TtMemoryGi, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="150" />
                                 <TextBox Header="DB の CPU" Text="{x:Bind ViewModel.Settings.DbCpu, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="150" />
                                 <TextBox Header="DB のメモリ" Text="{x:Bind ViewModel.Settings.DbMemoryGi, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="150" />
                                 <TextBox Header="Redis の CPU" Text="{x:Bind ViewModel.Settings.RedisCpu, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="150" />
@@ -287,7 +287,7 @@
                         </ContentControl>
                         <TextBlock AutomationProperties.AutomationId="Status.RedeployNote" TextWrapping="Wrap" Foreground="{ThemeResource SystemFillColorCautionBrush}"
                                    Text="{x:Bind ViewModel.StatusJob.RedeployNote, Mode=OneWay, FallbackValue=''}" />
-                        <Button AutomationProperties.AutomationId="Deploy.OpenEndpoint" Content="Timetracker を開く" Command="{x:Bind ViewModel.OpenEndpointCommand}" />
+                        <Button AutomationProperties.AutomationId="Deploy.OpenEndpoint" Content="TimeTracker を開く" Command="{x:Bind ViewModel.OpenEndpointCommand}" />
                         <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Azure の状態" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <Button AutomationProperties.AutomationId="Status.Refresh" Content="読み直す" Command="{x:Bind ViewModel.Status.RefreshCommand}" />
@@ -442,7 +442,7 @@
                                         <Button Content="コピー" Command="{x:Bind ViewModel.Deployments.Current.CopyDbPasswordCommand, Mode=OneWay}" />
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <TextBlock VerticalAlignment="Center" Text="Timetracker のパスワード:" /><TextBlock AutomationProperties.AutomationId="Row.TrackerPassword" VerticalAlignment="Center" IsTextSelectionEnabled="False" Text="{x:Bind ViewModel.Deployments.Current.TrackerPasswordText, Mode=OneWay}" />
+                                        <TextBlock VerticalAlignment="Center" Text="TimeTracker のパスワード:" /><TextBlock AutomationProperties.AutomationId="Row.TrackerPassword" VerticalAlignment="Center" IsTextSelectionEnabled="False" Text="{x:Bind ViewModel.Deployments.Current.TrackerPasswordText, Mode=OneWay}" />
                                         <Button Content="コピー" Command="{x:Bind ViewModel.Deployments.Current.CopyTrackerPasswordCommand, Mode=OneWay}" />
                                     </StackPanel>
                                     <Button AutomationProperties.AutomationId="Row.TogglePasswords" Content="表示する・伏せる" Command="{x:Bind ViewModel.Deployments.Current.TogglePasswordsCommand, Mode=OneWay}" />
@@ -513,7 +513,7 @@
                         <TextBox AutomationProperties.AutomationId="DryRun.TtTag" Header="timetracker イメージのタグ（空なら既定のタグ）" PlaceholderText="{x:Bind ViewModel.Settings.DefaultTag, Mode=OneWay}"
                                  Text="{x:Bind ViewModel.Settings.TtTag, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="480" HorizontalAlignment="Left" />
                         <PasswordBox AutomationProperties.AutomationId="DryRun.DbPassword" Header="DB のパスワード（8 文字以上）" Password="{x:Bind ViewModel.Settings.DbPassword, Mode=TwoWay}" Width="480" HorizontalAlignment="Left" />
-                        <PasswordBox AutomationProperties.AutomationId="DryRun.TrackerPassword" Header="Timetracker のパスワード（8 文字以上）" Password="{x:Bind ViewModel.Settings.TrackerPassword, Mode=TwoWay}" Width="480" HorizontalAlignment="Left" />
+                        <PasswordBox AutomationProperties.AutomationId="DryRun.TrackerPassword" Header="TimeTracker のパスワード（8 文字以上）" Password="{x:Bind ViewModel.Settings.TrackerPassword, Mode=TwoWay}" Width="480" HorizontalAlignment="Left" />
                         <InfoBar Severity="Warning" IsOpen="True" IsClosable="False" Message="{x:Bind ViewModel.DryRun.EnvWarning}" />
                         <Button AutomationProperties.AutomationId="DryRun.Save" Content="保存先を選んで保存" Command="{x:Bind ViewModel.DryRun.SaveCommand}" Style="{StaticResource AccentButtonStyle}" />
                         <InfoBar AutomationProperties.AutomationId="DryRun.Error" AutomationProperties.Name="{x:Bind ViewModel.DryRun.Error, Mode=OneWay}" Severity="Error" IsOpen="True" IsClosable="False" Message="{x:Bind ViewModel.DryRun.Error, Mode=OneWay}"

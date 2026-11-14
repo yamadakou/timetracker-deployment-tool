@@ -67,9 +67,9 @@ public sealed class DeploymentJobTools
         [Description("DB 名（既定 timetracker）")] string? db_name = null,
         [Description("timetracker イメージのタグ（既定は DB 種別に応じたタグ）")] string? tt_tag = null,
         [Description("DB のパスワード。会話に残るため、サーバーの環境変数 TT_MCP_DB_PASSWORD での設定を推奨")] string? db_password = null,
-        [Description("Timetracker のパスワード。会話に残るため、サーバーの環境変数 TT_MCP_TRACKER_PASSWORD での設定を推奨")] string? tracker_password = null,
-        [Description("Timetracker の CPU（vCPU、既定 1.5）")] double? tt_cpu = null,
-        [Description("Timetracker のメモリ（Gi、既定 3.0）")] double? tt_memory_gi = null,
+        [Description("TimeTracker のパスワード。会話に残るため、サーバーの環境変数 TT_MCP_TRACKER_PASSWORD での設定を推奨")] string? tracker_password = null,
+        [Description("TimeTracker の CPU（vCPU、既定 1.5）")] double? tt_cpu = null,
+        [Description("TimeTracker のメモリ（Gi、既定 3.0）")] double? tt_memory_gi = null,
         [Description("DB の CPU（vCPU、既定 1.0）")] double? db_cpu = null,
         [Description("DB のメモリ（Gi、既定 2.0）")] double? db_memory_gi = null,
         [Description("Redis の CPU（vCPU、既定 0.5）")] double? redis_cpu = null,
@@ -154,7 +154,7 @@ public sealed class DeploymentJobTools
     [McpServerTool(Name = "get_job_status", Title = "ジョブの状態",
         ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false, UseStructuredContent = true)]
     [Description("デプロイ・削除のジョブの状態（running / succeeded / failed）、実行中の手順、ログ、結果（デプロイの成功時は result に " +
-                 "Timetracker の URL、削除の成功時は deletion_result に削除したリソース）、エラーを返す。" +
+                 "TimeTracker の URL、削除の成功時は deletion_result に削除したリソース）、エラーを返す。" +
                  "log_offset に前回の next_log_offset を渡すと、続きのログだけを返す。")]
     public JobStatusResult GetJobStatus(
         [Description("start_deployment または start_deletion が返した job_id")] string job_id,
@@ -201,8 +201,8 @@ public sealed class DeploymentJobTools
 
     [McpServerTool(Name = "get_deployment_info", Title = "デプロイ済みの環境の状態",
         ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = true, UseStructuredContent = true)]
-    [Description("Azure 上のデプロイ済みの環境（Environment と DB / Redis / Timetracker の Container App）の状態、イメージ、" +
-                 "CPU とメモリ、最新のリビジョン、管理タグの有無、Timetracker の URL、DB のデータの永続化の状態（persistence）、グループ（group）を返す（Azure は変更しない）。")]
+    [Description("Azure 上のデプロイ済みの環境（Environment と DB / Redis / TimeTracker の Container App）の状態、イメージ、" +
+                 "CPU とメモリ、最新のリビジョン、管理タグの有無、TimeTracker の URL、DB のデータの永続化の状態（persistence）、グループ（group）を返す（Azure は変更しない）。")]
     public async Task<DeploymentInfoResult> GetDeploymentInfo(
         [Description("サブスクリプション ID（省略時はサーバーの既定値 TT_MCP_DEFAULT_SUBSCRIPTION）")] string? subscription = null,
         [Description("リソースグループ名（省略時はサーバーの既定値 TT_MCP_DEFAULT_RESOURCE_GROUP）")] string? resource_group = null,

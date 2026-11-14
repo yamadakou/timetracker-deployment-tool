@@ -9,7 +9,7 @@ using TTDeployTool.Domain.Deployment;
 namespace TTDeployTool.Infrastructure.Azure;
 
 /// <summary>
-/// Timetracker / DB / Redis の各 Container App の定義（ContainerAppData）を組み立てる。
+/// TimeTracker / DB / Redis の各 Container App の定義（ContainerAppData）を組み立てる。
 /// Azure への送信は行わないため、単体テストで内容を検証できる。
 /// </summary>
 public static class ContainerAppSpecBuilder
@@ -156,7 +156,7 @@ public static class ContainerAppSpecBuilder
                 {
                     Env("POSTGRES_USER", GetDbUser(opts)),
                     SecretEnv("POSTGRES_PASSWORD", DbPasswordSecretName),
-                    // POSTGRES_DB で DB を事前作成しない（サンプルDB作成が失敗するため。DB は Timetracker のセットアップで作成される）
+                    // POSTGRES_DB で DB を事前作成しない（サンプルDB作成が失敗するため。DB は TimeTracker のセットアップで作成される）
                 },
                 Resources = new AppContainerResources()
                 {
@@ -238,7 +238,7 @@ public static class ContainerAppSpecBuilder
         };
     }
 
-    // 3) Timetracker 用 Container App（External Ingress: Auto）
+    // 3) TimeTracker 用 Container App（External Ingress: Auto）
     public static ContainerAppData BuildTimetrackerApp(
         DeployOptions opts, string location, ResourceIdentifier envId, string dbEndpointHost, string redisEndpointHost)
     {

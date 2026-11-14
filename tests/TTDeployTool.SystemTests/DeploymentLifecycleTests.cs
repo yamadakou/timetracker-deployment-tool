@@ -31,7 +31,7 @@ public sealed class DeploymentLifecycleTests
         await azure.CreateResourceGroupAsync(rg, SystemTestSettings.Location, ct);
         try
         {
-            // 1. デプロイ: 4 つのリソースに管理タグが付き、Timetracker が HTTP で応答する
+            // 1. デプロイ: 4 つのリソースに管理タグが付き、TimeTracker が HTTP で応答する
             var deploy = await cli.DeployAsync(app, password);
             deploy.ExitCode.Should().Be(0, deploy.ToString());
             deploy.Output.Should().Contain("[VERBOSE] 権限の事前確認: OK");

@@ -47,8 +47,8 @@ public sealed class DeploymentTools
         "デプロイには利用可能期限があります（expires_on。省略すると新しいデプロイは今日から 32 日後、再デプロイは今の期限を引き継ぎ、none で期限なし）。" +
         DeploymentTools.ExpiryNote,
         "SQL Server は Developer エディションです（本番環境では使えません）。",
-        "Azure 上の SQL Server 構成ではサンプル DB を作成できません（Timetracker のセットアップで空の DB を選択してください）。",
-        "Timetracker のメモリが 2Gi 以下だと、サンプル DB の作成が OutOfMemory で失敗することがあります。",
+        "Azure 上の SQL Server 構成ではサンプル DB を作成できません（TimeTracker のセットアップで空の DB を選択してください）。",
+        "TimeTracker のメモリが 2Gi 以下だと、サンプル DB の作成が OutOfMemory で失敗することがあります。",
     ];
 
     private readonly McpServerSettings _settings;
@@ -112,9 +112,9 @@ public sealed class DeploymentTools
         [Description("DB 名（既定 timetracker）")] string? db_name = null,
         [Description("timetracker イメージのタグ（既定は DB 種別に応じたタグ）")] string? tt_tag = null,
         [Description("DB のパスワード。会話に残るため、サーバーの環境変数 TT_MCP_DB_PASSWORD での設定を推奨")] string? db_password = null,
-        [Description("Timetracker のパスワード。会話に残るため、サーバーの環境変数 TT_MCP_TRACKER_PASSWORD での設定を推奨")] string? tracker_password = null,
-        [Description("Timetracker の CPU（vCPU、既定 1.5）")] double? tt_cpu = null,
-        [Description("Timetracker のメモリ（Gi、既定 3.0）")] double? tt_memory_gi = null,
+        [Description("TimeTracker のパスワード。会話に残るため、サーバーの環境変数 TT_MCP_TRACKER_PASSWORD での設定を推奨")] string? tracker_password = null,
+        [Description("TimeTracker の CPU（vCPU、既定 1.5）")] double? tt_cpu = null,
+        [Description("TimeTracker のメモリ（Gi、既定 3.0）")] double? tt_memory_gi = null,
         [Description("DB の CPU（vCPU、既定 1.0）")] double? db_cpu = null,
         [Description("DB のメモリ（Gi、既定 2.0）")] double? db_memory_gi = null,
         [Description("Redis の CPU（vCPU、既定 0.5）")] double? redis_cpu = null,

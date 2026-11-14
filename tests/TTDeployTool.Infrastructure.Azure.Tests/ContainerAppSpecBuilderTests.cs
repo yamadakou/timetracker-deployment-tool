@@ -138,7 +138,7 @@ public class ContainerAppSpecBuilderTests
     [Fact]
     public void Postgres_DbApp_Should_Not_PreCreate_Database()
     {
-        // compose と同様、DB は Timetracker のセットアップで作成させる（サンプルDB作成の失敗を防ぐ）
+        // compose と同様、DB は TimeTracker のセットアップで作成させる（サンプルDB作成の失敗を防ぐ）
         ContainerAppSpecBuilder.BuildDbApp(CreateOptions("postgresql"), "japaneast", EnvId)
             .Template.Containers[0].Env.Select(e => e.Name).Should().NotContain("POSTGRES_DB");
     }

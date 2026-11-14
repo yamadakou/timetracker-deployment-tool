@@ -18,11 +18,11 @@ public sealed class TimetrackerPrompts
         _settings = settings;
     }
 
-    [McpServerPrompt(Name = "deploy-timetracker", Title = "Timetracker を Azure にデプロイする")]
+    [McpServerPrompt(Name = "deploy-timetracker", Title = "TimeTracker を Azure にデプロイする")]
     [Description("設定の確認 → サブスクリプションの選択 → 検証 → 計画 → 利用者の確認 → 実行 → 状態の確認の手順を案内する。")]
     public string DeployTimetracker(
         [Description("DB 種別の希望（postgresql または sqlserver。省略時は利用者に確認する）")] string? db_type = null) => $"""
-        Timetracker の検証環境を Azure Container Apps にデプロイします。次の順に進めてください。
+        TimeTracker の検証環境を Azure Container Apps にデプロイします。次の順に進めてください。
         1. get_deployment_options を呼び、既定値・注意事項・サーバーの設定（server.password_env など）を確認する。
            検証環境向けであり、DB のデータは既定では永続化されないことを利用者に伝える。データを残したい場合は persist_db=true で
            Azure Files に置けること（ストレージの料金がかかり、削除では keep_db_data=true を指定しない限り消えること）を伝え、利用者に選んでもらう。
@@ -33,7 +33,7 @@ public sealed class TimetrackerPrompts
         5. plan_deployment で計画を作り、actions・warnings・blockers・estimated_duration を利用者に示して、実行してよいか確認する。
            requires_data_loss_ack が true の場合は、DB のデータが失われることを伝え、利用者が明示的に同意した場合だけ
            start_deployment に acknowledge_data_loss=true を指定する。
-        6. start_deployment に plan_id を渡し、get_job_status を 15〜30 秒の間隔で呼んで、結果の Timetracker の URL を伝える。
+        6. start_deployment に plan_id を渡し、get_job_status を 15〜30 秒の間隔で呼んで、結果の TimeTracker の URL を伝える。
         7. get_deployment_info で状態を確認する。
         {Notes()}
         """;
@@ -59,7 +59,7 @@ public sealed class TimetrackerPrompts
 
     // HTTP: サーバーはファイルを書かないため、内容を利用者に保存してもらう
     private const string LocalDryRunContent = """
-        Timetracker をローカルの Docker で試します（Azure は使いません）。次の順に進めてください。
+        TimeTracker をローカルの Docker で試します（Azure は使いません）。次の順に進めてください。
         1. get_deployment_options を呼び、既定値を確認する。
         2. generate_compose で docker-compose.yml と .env の内容を生成する（このサーバーはファイルを書き込まない）。
            設定は generate_compose が検証し、パスワードは不要（validate_deployment はパスワードを求めるため、ここでは使わない）。
@@ -70,7 +70,7 @@ public sealed class TimetrackerPrompts
         """;
 
     private static string LocalDryRunToFiles(string? output_dir) => $"""
-        Timetracker をローカルの Docker で試します（Azure は使いません）。次の順に進めてください。
+        TimeTracker をローカルの Docker で試します（Azure は使いません）。次の順に進めてください。
         1. get_deployment_options を呼び、既定値とサーバーの設定（server.password_env、server.output_root）を確認する。
         2. 出力先は {(string.IsNullOrWhiteSpace(output_dir) ? "利用者に絶対パスを確認する" : $"「{output_dir}」を使う（利用者に確認してから）")}。
            server.output_root が設定されていれば、その配下にする。
@@ -80,11 +80,11 @@ public sealed class TimetrackerPrompts
         5. 結果の next_steps のとおり、利用者に docker compose up -d を実行してもらい、http://localhost:8080 を開くよう案内する。
         """;
 
-    [McpServerPrompt(Name = "delete-timetracker", Title = "Azure から Timetracker を削除する")]
+    [McpServerPrompt(Name = "delete-timetracker", Title = "Azure から TimeTracker を削除する")]
     [Description("計画 → 対象と残るものを示して確認 → アプリ名の確認 → 実行 → 状態の確認の手順を案内する。")]
     public static string DeleteTimetracker(
         [Description("削除するアプリ名（省略時は利用者に確認する）")] string? app_name = null) => $"""
-        Azure 上の Timetracker の検証環境を削除します。次の順に進めてください。
+        Azure 上の TimeTracker の検証環境を削除します。次の順に進めてください。
         1. 対象のサブスクリプション・リソースグループ・アプリ名（{(string.IsNullOrWhiteSpace(app_name) ? "利用者に確認する" : $"「{app_name}」")}）を利用者に確認する。
         2. plan_deletion で計画を作り、targets（削除するもの・しないものと理由）、kept（リソースグループは既定では削除しない）、warnings、blockers を利用者に示す。
            DB アプリを削除する場合は、DB のデータがすべて失われることを伝える。persist_db で永続化したストレージアカウントがある場合は、

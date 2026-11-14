@@ -40,7 +40,7 @@
       EntryPoint="$targetentrypoint$">
       <uap:VisualElements
         DisplayName="TTDeployTool"
-        Description="Timetracker の検証環境を Azure Container Apps にデプロイ・確認・削除し、ローカル検証用の docker-compose を作ります。"
+        Description="TimeTracker の検証環境を Azure Container Apps にデプロイ・確認・削除し、ローカル検証用の docker-compose を作ります。"
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png">

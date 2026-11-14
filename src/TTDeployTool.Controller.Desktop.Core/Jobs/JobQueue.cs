@@ -53,6 +53,11 @@ public sealed class JobQueue : ObservableObject, IDisposable
     /// <summary>デプロイのジョブの設定を「新しくデプロイ」に読み込んで開く（無ければ、ジョブの「この設定で新しくデプロイ」は押せない）。</summary>
     public Func<DeploymentTemplate, Task>? Redeploy { get; set; }
 
+    /// <summary>
+    /// まだ始めていない削除のジョブの「リソースグループも削除する」を変える（計画し直し、確かめてから入れ替える。理由を返す。変えたら null。無ければ押せない）。
+    /// </summary>
+    public Func<JobViewModel, bool, Task<string?>>? ChangeDeletion { get; set; }
+
     /// <summary>ジョブが終わったとき（完了・失敗・停止。取り消しは含めない）。画面のスレッドで呼ぶ。</summary>
     public event Action<JobViewModel>? Finished;
 
@@ -212,6 +217,24 @@ public sealed class JobQueue : ObservableObject, IDisposable
         job.ChangedAt = _time.GetUtcNow();
         Change(job, job.State == DesktopJobState.Paused ? DesktopJobState.Paused : DesktopJobState.Scheduled, scheduledAt,
             $"予定を {scheduledAt.ToLocalTime():MM/dd HH:mm} に変えました");
+        return null;
+    }
+
+    /// <summary>
+    /// まだ始めていない削除のジョブの始め方と、保存する計画を入れ替える（「リソースグループも削除する」を変えたとき）。始まっていれば入れ替えずに理由を返す。
+    /// </summary>
+    internal string? ReplaceDeletion(JobViewModel job, Func<Task<Job>> starter, SavedDeletion saved)
+    {
+        lock (_lock)
+        {
+            if (job.State is not (DesktopJobState.Scheduled or DesktopJobState.Waiting or DesktopJobState.Paused))
+                return "ジョブが始まったため、削除の設定は変えていません。";
+            job.Replace(starter, saved);
+            job.ChangedAt = _time.GetUtcNow();
+        }
+        job.NotifyChanged();
+        _logger.LogInformation("削除の設定を変えました（リソースグループ: {DeleteResourceGroup}）: {Title}", saved.DeleteResourceGroup, job.Title);
+        Changed();
         return null;
     }
 

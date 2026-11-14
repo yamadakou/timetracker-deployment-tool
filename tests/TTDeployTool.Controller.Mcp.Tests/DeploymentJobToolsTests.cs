@@ -270,7 +270,7 @@ public sealed class DeploymentJobToolsTests
         status.Status.Should().Be("succeeded");
         status.Kind.Should().Be("deploy");
         status.Target.Should().Be(new JobTargetInfo("sub", "rg", "demo"));
-        status.CurrentStep.Should().Be(new JobStepInfo(3, 3, "Container Apps（DB / Redis / Timetracker）"));
+        status.CurrentStep.Should().Be(new JobStepInfo(3, 3, "Container Apps（DB / Redis / TimeTracker）"));
         status.Result.Should().Be(new DeploymentJobResult("rg", "demo-env", "demo-tt", "demo-db", "demo-redis", "https://demo-tt.example.io",
             ExpiresOn: DefaultExpiry));
         status.Error.Should().BeNull();
@@ -495,7 +495,7 @@ public sealed class DeploymentJobToolsTests
 
         var status = Tools().GetJobStatus(started.JobId);
         status.Status.Should().Be("succeeded");
-        status.CurrentStep.Should().Be(new JobStepInfo(4, 4, "Container Apps（DB / Redis / Timetracker）"));
+        status.CurrentStep.Should().Be(new JobStepInfo(4, 4, "Container Apps（DB / Redis / TimeTracker）"));
         status.Result!.StorageAccount.Should().Be(Account);
         _gateway.Verify(g => g.EnsureDbStorageAsync("sub", "rg", "demo", "japaneast", It.IsAny<ContainerAppManagedEnvironmentResource>(), It.IsAny<CancellationToken>()), Times.Once);
         _gateway.Verify(g => g.CreateOrUpdateContainerAppAsync("sub", "rg", "demo", "japaneast",

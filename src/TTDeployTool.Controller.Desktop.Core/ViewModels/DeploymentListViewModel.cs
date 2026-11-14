@@ -28,6 +28,14 @@ public enum DeploymentSortKey
 /// <summary>並べ替えの選択肢。</summary>
 public sealed record DeploymentSortOption(DeploymentSortKey Key, bool Descending, string Label);
 
+/// <summary>デプロイの一覧の件数のカードでの絞り込み。</summary>
+public enum DeploymentQuickFilter
+{
+    All,
+    ExpiringSoon,
+    Attention,
+}
+
 /// <summary>
 /// デプロイの一覧（docs/design/desktop/desktop-jobs.md の 6.3・6.4）。サインインしたアカウントが読めるサブスクリプションから、本ツールで作った
 /// リソースを Resource Graph で読み、デプロイごとにまとめる。フィルタ・並べ替え・ページングは、読んだ結果に対してアプリの中で行う。
@@ -35,6 +43,7 @@ public sealed record DeploymentSortOption(DeploymentSortKey Key, bool Descending
 /// </summary>
 public sealed class DeploymentListViewModel : ObservableObject
 {
+    private DeploymentQuickFilter _quickFilter;
     /// <summary>このアプリで終えた操作を、読んだ結果に重ねる時間（Resource Graph の反映の遅れ）。</summary>
     public static readonly TimeSpan RecentWindow = TimeSpan.FromMinutes(15);
 
@@ -128,6 +137,7 @@ public sealed class DeploymentListViewModel : ObservableObject
         {
             if (e.PropertyName != nameof(JobQueue.Summary))
                 return;
+            OnPropertyChanged(nameof(ActiveJobCount));
             var jobs = JobValues();
             if (jobs != _jobValues && (Filters.IsFiltered(JobColumn) || Filters.Text.Length > 0))
                 Refresh(resetPage: false, keepRows: true);
@@ -164,6 +174,39 @@ public sealed class DeploymentListViewModel : ObservableObject
 
     /// <summary>読んだデプロイの数（フィルタの前）。</summary>
     public int TotalCount => _entries.Count;
+
+    // ---- 件数のカード（推奨のデザイン、オーナーの判断 2026-11-13。押すと、その条件で絞り込む）
+
+    /// <summary>利用可能期限が 7 日以内（過ぎたものを含む）のデプロイの数。</summary>
+    public int ExpiringSoonCount => _entries.Count(IsExpiringSoon);
+
+    /// <summary>要確認（一部だけ・失敗・リソースグループだけ）のデプロイの数。</summary>
+    public int AttentionCount => _entries.Count(NeedsAttention);
+
+    /// <summary>実行中・予定・待機中・一時停止のジョブの数（すべての対象）。</summary>
+    public int ActiveJobCount => _queue.Jobs.Count(j => j.IsActive);
+
+    /// <summary>件数のカードでの絞り込み（表の上のフィルタと合わせて効く）。</summary>
+    public DeploymentQuickFilter QuickFilter
+    {
+        get => _quickFilter;
+        set
+        {
+            if (SetProperty(ref _quickFilter, value))
+                Refresh(resetPage: true, keepRows: false);
+        }
+    }
+
+    private bool IsExpiringSoon(DeploymentEntry e) => e is { ExpiryKind: ExpiryKind.Date, ExpiresAt: { } at } && at <= Time.GetUtcNow().AddDays(SoonDays);
+
+    private static bool NeedsAttention(DeploymentEntry e) => DeploymentStates.Of(e) is DeploymentState.Partial or DeploymentState.Failed or DeploymentState.ResourceGroupOnly;
+
+    private bool MatchesQuick(DeploymentEntry e) => _quickFilter switch
+    {
+        DeploymentQuickFilter.ExpiringSoon => IsExpiringSoon(e),
+        DeploymentQuickFilter.Attention => NeedsAttention(e),
+        _ => true,
+    };
 
     /// <summary>フィルタに合うデプロイの数。</summary>
     public int FilteredCount => _filteredCount;
@@ -474,7 +517,7 @@ public sealed class DeploymentListViewModel : ObservableObject
         new AppEntry(r.TimetrackerAppName, null, null, null, null, null), new AppEntry(r.DbAppName, null, null, null, null, null),
         new AppEntry(r.RedisAppName, null, null, null, null, null), r.EnvironmentName, r.StorageAccountName, r.StorageAccountName != null);
 
-    // デプロイしたものを重ねる。Resource Graph に一部だけ反映されている場合（デプロイの直後に Timetracker のアプリが無い、など）は、無いものを
+    // デプロイしたものを重ねる。Resource Graph に一部だけ反映されている場合（デプロイの直後に TimeTracker のアプリが無い、など）は、無いものを
     // デプロイの結果で補う（「パスワードを表示」が押せなかった。Desktop System Test、2026-10-23）
     private static DeploymentEntry Deployed(DeploymentEntry? e, DeploymentEntry placeholder) => e == null
         ? placeholder
@@ -587,7 +630,7 @@ public sealed class DeploymentListViewModel : ObservableObject
         _entries = Apply();
         NotifyGroups();
         EntriesChanged.Invoke();
-        _filtered = Sorted(_entries.Where(Filters.Matches)).ToList();
+        _filtered = Sorted(_entries.Where(Filters.Matches).Where(MatchesQuick)).ToList();
         _filteredCount = _filtered.Count;
         if (resetPage || _pageIndex >= PageCount)
             _pageIndex = 0;
@@ -614,6 +657,8 @@ public sealed class DeploymentListViewModel : ObservableObject
         SetSelection(Rows.Where(r => selected.Any(e => r.Entry.IsFor(e.SubscriptionId, e.ResourceGroup, e.AppName))));
         _logger.LogInformation("デプロイの一覧を表示し直しました: {Count} 行（選択 {Selected} 行、行を使い続ける {KeepRows}）", Rows.Count, _selected.Count, keepRows);
         OnPropertyChanged(nameof(TotalCount));
+        OnPropertyChanged(nameof(ExpiringSoonCount));
+        OnPropertyChanged(nameof(AttentionCount));
         OnPropertyChanged(nameof(FilteredCount));
         OnPropertyChanged(nameof(PageCount));
         OnPropertyChanged(nameof(PageIndex));

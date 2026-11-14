@@ -2,7 +2,7 @@
 
 [README に戻る](../README.md)
 
-CLI（`ttdeploytool-cli.exe`）と同じ機能を、AI アシスタント（Claude Code、VS Code の GitHub Copilot、Claude Desktop など）との対話で使えるようにするサーバーです。「Timetracker の検証環境を Azure に作って」のように頼むと、アシスタントがこのサーバーの機能（ツール）を呼び出して、計画の作成 → 利用者の確認 → 実行の順に進めます。
+CLI（`ttdeploytool-cli.exe`）と同じ機能を、AI アシスタント（Claude Code、VS Code の GitHub Copilot、Claude Desktop など）との対話で使えるようにするサーバーです。「TimeTracker の検証環境を Azure に作って」のように頼むと、アシスタントがこのサーバーの機能（ツール）を呼び出して、計画の作成 → 利用者の確認 → 実行の順に進めます。
 
 アシスタントとの接続には、[MCP（Model Context Protocol）](https://modelcontextprotocol.io/)という共通の仕組みを使います。MCP に対応したアシスタントなら、どれからでも使えます。
 
@@ -46,7 +46,7 @@ Azure を使わずに、ローカル用の `docker-compose.yml` を作るだけ�
 | `list_subscriptions` | 使えるサブスクリプションの一覧 | しない |
 | `plan_deployment` → `start_deployment` | デプロイの計画 → 実行（時間がかかるため、ジョブとして裏で進めます） | `start_deployment` だけ |
 | `plan_deletion` → `start_deletion` | 削除の計画 → 実行（ジョブ。削除の規則は CLI の `delete` と同じ） | `start_deletion` だけ |
-| `get_job_status` / `list_jobs` | ジョブの進み具合・ログ・結果（Timetracker の URL など） | しない |
+| `get_job_status` / `list_jobs` | ジョブの進み具合・ログ・結果（TimeTracker の URL など） | しない |
 | `get_deployment_info` | デプロイ済みの環境の状態と URL | しない |
 
 ツールのほかに、次のものも用意しています。対応していないアシスタントでも、ツールだけで同じことができます。
@@ -83,7 +83,7 @@ Azure を使わずに、ローカル用の `docker-compose.yml` を作るだけ�
 | `TT_MCP_DEFAULT_SUBSCRIPTION` | なし | サブスクリプションを省略したときに使う ID |
 | `TT_MCP_DEFAULT_RESOURCE_GROUP` | なし | リソースグループを省略したときに使う名前 |
 | `TT_MCP_DB_PASSWORD` | なし | DB のパスワード（設定すると、アシスタントはパスワードを尋ねません） |
-| `TT_MCP_TRACKER_PASSWORD` | なし | Timetracker のパスワード（同上） |
+| `TT_MCP_TRACKER_PASSWORD` | なし | TimeTracker のパスワード（同上） |
 | `TT_MCP_OUTPUT_ROOT` | なし | 設定すると、`generate_compose` でファイルを書く場所を、このフォルダーの下に限ります（絶対パス） |
 | `TT_MCP_VERBOSE` | `false` | `true` で詳しいログを出します（ログは標準エラー出力に出ます） |
 
@@ -124,8 +124,8 @@ claude mcp add ttdeploytool `
 ```json
 {
   "inputs": [
-    { "type": "promptString", "id": "db-password", "description": "Timetracker の DB パスワード", "password": true },
-    { "type": "promptString", "id": "tracker-password", "description": "Timetracker のパスワード", "password": true }
+    { "type": "promptString", "id": "db-password", "description": "TimeTracker の DB パスワード", "password": true },
+    { "type": "promptString", "id": "tracker-password", "description": "TimeTracker のパスワード", "password": true }
   ],
   "servers": {
     "ttdeploytool": {
@@ -166,12 +166,12 @@ claude mcp add ttdeploytool `
 
 | 頼み方の例 | 進み方 |
 |---|---|
-| 「Timetracker の検証環境を、Azure の rg-tt-demo に PostgreSQL で作ってください」 | 設定の確認と検証 → `plan_deployment` の結果（作るリソース・警告）が示されるので、確認して実行を指示します → 数分後に Timetracker の URL が返ります |
+| 「TimeTracker の検証環境を、Azure の rg-tt-demo に PostgreSQL で作ってください」 | 設定の確認と検証 → `plan_deployment` の結果（作るリソース・警告）が示されるので、確認して実行を指示します → 数分後に TimeTracker の URL が返ります |
 | 「DB のデータを残したいので、永続化してデプロイしてください」 | `persist_db=true` で計画します。ストレージの料金と、削除での扱いが案内されます |
 | 「研修用のグループでデプロイしてください」 | `group="研修"` で計画します。計画の結果に「グループ: 研修」が出ます |
 | 「来月末まで使うので、期限を 2026-11-30 にしてデプロイしてください」 | `expires_on="2026-11-30"` で計画します。期限を過ぎるとデスクトップアプリが自動で削除することが案内されます |
 | 「ローカルの Docker で試したいので、C:\work\timetracker に compose ファイルを作ってください」 | `generate_compose` で `docker-compose.yml` と `.env` を作ります（Azure は使いません） |
-| 「rg-tt-demo の Timetracker を削除してください」 | `plan_deletion` の結果（削除するもの・残すもの）が示されるので、確認してアプリ名を入力します |
+| 「rg-tt-demo の TimeTracker を削除してください」 | `plan_deletion` の結果（削除するもの・残すもの）が示されるので、確認してアプリ名を入力します |
 
 計画とジョブは、サーバーのプロセスの中にだけ保存されます。アシスタントを再起動すると消えますが、Azure の状態は `get_deployment_info` でいつでも確かめられます。
 

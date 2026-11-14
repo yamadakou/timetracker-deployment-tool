@@ -56,7 +56,7 @@ public sealed record JobStepInfo(int Index, int Total, string Name);
 public sealed record JobLogInfo(string Level, string Message, DateTimeOffset At);
 
 /// <summary>
-/// デプロイのジョブが成功したときの結果。<see cref="Endpoint"/> は Timetracker の URL（取得できなければ null）。
+/// デプロイのジョブが成功したときの結果。<see cref="Endpoint"/> は TimeTracker の URL（取得できなければ null）。
 /// <see cref="StorageAccount"/> は DB のデータを置いたストレージアカウント（永続化しない場合は null）。
 /// </summary>
 public sealed record DeploymentJobResult(

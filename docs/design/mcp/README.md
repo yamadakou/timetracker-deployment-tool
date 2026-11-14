@@ -4,7 +4,7 @@
 - 関連: [共通部分の構造](../common/README.md)（層・ドメインモデル・Azure に作るもの）・[`MCP_SERVER.md`](../../MCP_SERVER.md)（使い方と設定）・[`MCP_TOOL_DESIGN.md`](../../MCP_TOOL_DESIGN.md)（全体設計）・[`mcp-phase3a.md`](mcp-phase3a.md)〜[`mcp-phase4c.md`](mcp-phase4c.md)（段階ごとの詳細設計）
 - 図は Mermaid で書いています（GitHub と、Mermaid に対応したエディターで図として表示されます）。コードの構成を変えたら、この図も直します
 
-MCP サーバー（`TTDeployTool.Controller.Mcp`）は、AI アシスタントが Timetracker のデプロイと削除を行うための入り口です。同じプログラムを 2 つの形で動かします。
+MCP サーバー（`TTDeployTool.Controller.Mcp`）は、AI アシスタントが TimeTracker のデプロイと削除を行うための入り口です。同じプログラムを 2 つの形で動かします。
 
 - **stdio:** 利用者の PC で、MCP クライアントが子プロセスとして起動します。Azure は PC の資格情報（`TT_MCP_AUTH_MODE`）で操作します
 - **HTTP:** サーバー（Container Apps）に置き、Entra ID のアクセストークンで呼び出し元を確かめます。Azure を操作する権限は、サーバーの ID（`server` 方式）か利用者本人（`user` 方式、OBO）です
@@ -72,7 +72,7 @@ sequenceDiagram
   participant M as MCP サーバー
   participant WF as Workflows
   participant J as JobManager
-  U->>A: 「rg-demo に Timetracker をデプロイして」
+  U->>A: 「rg-demo に TimeTracker をデプロイして」
   A->>M: plan_deployment（入力・azure_identity）
   M->>WF: PlanAsync（呼び出し元・方式を計画に記録）
   WF-->>M: 計画（操作・ブロッカー・警告）と plan_id
@@ -88,7 +88,7 @@ sequenceDiagram
     A->>M: get_job_status（job_id）
     M-->>A: 状態・手順・ログ
   end
-  A->>U: 結果（Timetracker の URL）
+  A->>U: 結果（TimeTracker の URL）
 ```
 
 ## 4. HTTP 版の守り

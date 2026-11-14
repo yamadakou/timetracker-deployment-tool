@@ -43,7 +43,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public MainViewModel(
         ISignInService signIn, IAzureClients clients, IDialogService dialogs, ISystemLauncher launcher, TimeProvider time, ILoggerFactory loggers,
         TimeSpan? pollInterval = null, IAppPreferences? preferences = null, INotificationService? notifications = null, IClipboardService? clipboard = null,
-        IStartupTaskService? startupTask = null, ISecretProtector? secrets = null, IJobHistoryFile? history = null)
+        IStartupTaskService? startupTask = null, ISecretProtector? secrets = null, IJobHistoryFile? history = null, Pricing.IPriceCatalog? prices = null)
     {
         _dialogs = dialogs;
         _notifications = notifications;
@@ -99,8 +99,12 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         // グループ名の入力の候補は、デプロイの一覧のグループ（docs/design/common/deployment-groups.md の 4）
         Settings.UseGroups(() => Deployments.GroupNames);
         Deployment = new DeploymentViewModel(new DeploymentWorkflow(plans, jobs, caller, logger, time), Target, Settings, Queue, Show, time, secrets);
-        Deletion = new DeletionViewModel(deletions, Target, Queue, Show, time, clipboard);
+        Deletion = new DeletionViewModel(deletions, Target, Queue, Show, time, clipboard, dialogs);
+        // まだ始めていない削除のジョブの「リソースグループも削除する」の変更（実行状況の画面。オーナーの依頼、2026-11-13）
+        Queue.ChangeDeletion = Deletion.ChangeResourceGroupAsync;
         DryRun = new DryRunViewModel(Settings, dialogs, launcher);
+        // 料金の目安（単価は Azure の公開の価格表。無ければアプリに入れた価格。オーナーの依頼、2026-11-13）
+        Cost = new Pricing.CostEstimateViewModel(Settings, Target, prices ?? new Pricing.BuiltInPriceCatalog(), time);
         Wizard = new DeployWizardViewModel(Settings, Deployment, Target, Queue,
             job => job.ScheduledAt == null ? OpenJobAsync(job, Pages.Wizard) : ShowJobListAsync());
         JobList = new JobListViewModel(Queue, time, dialogs, id => Deployments.SubscriptionDisplay(id));
@@ -160,6 +164,9 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public SettingsViewModel Settings { get; }
 
     public DeploymentViewModel Deployment { get; }
+
+    /// <summary>新しくデプロイの料金の目安。</summary>
+    public Pricing.CostEstimateViewModel Cost { get; }
 
     public DeletionViewModel Deletion { get; }
 
@@ -223,7 +230,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     /// <summary>診断用のログのフォルダーを開く（問い合わせのときに、ファイルを添付してもらう）。</summary>
     public AsyncCommand OpenLogFolderCommand { get; }
 
-    /// <summary>デプロイが成功した後に、Timetracker を既定のブラウザーで開く。</summary>
+    /// <summary>デプロイが成功した後に、TimeTracker を既定のブラウザーで開く。</summary>
     public AsyncCommand OpenEndpointCommand { get; }
 
     /// <summary>終わったジョブの記録（アプリを終了しても残す）。</summary>
@@ -349,7 +356,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
                 return Integration.RefreshAsync();
             case Pages.Wizard:
                 Deployment.Schedule.ResetToNextMinute();
-                break;
+                return Cost.RefreshAsync();
             case Pages.Delete:
                 Deletion.Schedule.ResetToNextMinute();
                 break;
@@ -502,7 +509,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             if (CurrentDeployment?.IsSameTarget(job) == true)
                 CurrentDeployment = null;
         }
-        // デプロイが終わって URL が分かったら、「Timetracker を開く」を押せるようにする
+        // デプロイが終わって URL が分かったら、「TimeTracker を開く」を押せるようにする
         job.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(JobViewModel.Endpoint))

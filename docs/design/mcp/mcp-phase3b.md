@@ -68,7 +68,7 @@
 ## 4. 状態の読み取り（Application `DeploymentInspector`、Infrastructure）
 - リソースグループ（有無・リージョン）、Environment（有無・リージョン・プロビジョニング状態・管理タグ）、3 つの Container App の詳細を返す
 - Container App の詳細は、Infrastructure に `ListContainerAppDetailsAsync` を追加して読む: プロビジョニング状態、稼働状態、イメージ、CPU、メモリ、最新のリビジョン、FQDN、管理タグ
-- Timetracker の URL は `-tt` の FQDN から作る（`https://...`）
+- TimeTracker の URL は `-tt` の FQDN から作る（`https://...`）
 
 ## 5. ツール
 ### 5.1 `plan_deployment`

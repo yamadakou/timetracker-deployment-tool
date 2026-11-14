@@ -87,6 +87,8 @@ public partial class App : Microsoft.UI.Xaml.Application
         ISystemLauncher launcher = new Fixtures.FixtureLauncher(events);
         INotificationService notifications = new Fixtures.FixtureNotifications(events, fixtureData.Notifications);
         IStartupTaskService startupTask = new Fixtures.FixtureStartupTask(events, fixtureData.StartupTask);
+        // 料金の目安は、アプリに入れた価格だけを使う（UI テストの結果を Azure の価格表の変化に左右させない）
+        Core.Pricing.IPriceCatalog? prices = null;
 #elif UITEST_SIGNIN
         // UI テストの System Test のビルドだけ、Azure CLI のサインインを使う（Store に出すパッケージには入らない）
         appLogger.LogWarning("UI テスト用のビルドのため、Azure CLI のサインインを使います");
@@ -95,12 +97,14 @@ public partial class App : Microsoft.UI.Xaml.Application
         ISystemLauncher launcher = new SystemLauncher();
         INotificationService notifications = new AppNotificationService();
         IStartupTaskService startupTask = new StartupTaskService();
+        Core.Pricing.IPriceCatalog? prices = PublicPrices();
 #else
         ISignInService signIn = new WamSignInService(hwnd, DesktopSettings.ClientId, DesktopSettings.DataDirectory);
         IAzureClients azure = new AzureClients();
         ISystemLauncher launcher = new SystemLauncher();
         INotificationService notifications = new AppNotificationService();
         IStartupTaskService startupTask = new StartupTaskService();
+        Core.Pricing.IPriceCatalog? prices = PublicPrices();
 #endif
         var viewModel = new MainViewModel(
             signIn,
@@ -114,7 +118,8 @@ public partial class App : Microsoft.UI.Xaml.Application
             clipboard: new ClipboardService(),
             startupTask: startupTask,
             secrets: new DpapiSecretProtector(),
-            history: new FileJobHistory(Path.Combine(DesktopSettings.DataDirectory, "job-history.json")));
+            history: new FileJobHistory(Path.Combine(DesktopSettings.DataDirectory, "job-history.json")),
+            prices: prices);
         // 常駐中に 2 つ目を起動したら、隠したウィンドウを出す（Program.cs）
         Program.Reactivated += (_, _) => _window.DispatcherQueue.TryEnqueue(_window.ShowFromTray);
         _window.Closed += (_, _) =>
@@ -137,4 +142,8 @@ public partial class App : Microsoft.UI.Xaml.Application
         var arguments = new Dictionary<string, string>(args.Arguments);
         _window?.DispatcherQueue.TryEnqueue(() => _window.ShowFromNotification(arguments));
     }
+
+    // 料金の目安の単価は Azure の公開の価格表（サインイン不要）から読み、読めなければアプリに入れた価格を使う（No.86。Blazor 版と同じ）
+    private static Core.Pricing.IPriceCatalog PublicPrices() =>
+        new Core.Pricing.AzureRetailPriceCatalog(new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(15) }, TimeProvider.System);
 }

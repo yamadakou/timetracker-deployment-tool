@@ -44,10 +44,10 @@ public static class DbPersistence
         (false, true) =>
             $"DB アプリ '{dbAppName}' は、今は DB のデータを永続化していません。永続化に切り替えると DB コンテナが再起動し、" +
             "今の DB に保存されているデータは消えます。切り替えた後の DB は、以前に永続化していたときのデータ（初めて永続化する場合は空の DB）になります。" +
-            "今のデータを残したい場合は、事前に Timetracker でエクスポートしてください。",
+            "今のデータを残したい場合は、事前に TimeTracker でエクスポートしてください。",
         (true, false) =>
             $"DB アプリ '{dbAppName}' は、今は DB のデータを Azure Files に永続化しています。永続化をやめると DB コンテナが再起動し、" +
-            "Timetracker からは空の DB に見えます。これまでのデータは消えずにストレージアカウントに残り、" +
+            "TimeTracker からは空の DB に見えます。これまでのデータは消えずにストレージアカウントに残り、" +
             "もう一度 --persist-db（MCP では persist_db=true）を指定してデプロイすると元に戻ります。",
         _ =>
             $"DB アプリ '{dbAppName}' は既に存在します。設定が変わると DB コンテナが再起動し、" +
@@ -63,5 +63,5 @@ public static class DbPersistence
     /// <summary>永続化した既存の DB アプリを更新するときの案内。</summary>
     public static string RestartNotice(string dbAppName) =>
         $"DB アプリ '{dbAppName}' は DB のデータを Azure Files に永続化しているため、データを守るために一度停止してから更新し、開始します。" +
-        "DB のデータはそのまま残りますが、その間（数分程度）は Timetracker を使えません。";
+        "DB のデータはそのまま残りますが、その間（数分程度）は TimeTracker を使えません。";
 }

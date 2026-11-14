@@ -13,7 +13,7 @@ namespace TTDeployTool.Controller.Mcp.Tools;
 public sealed class ComposeContentTools
 {
     public const string DbPasswordPlaceholder = "<DB パスワードを設定>";
-    public const string TrackerPasswordPlaceholder = "<Timetracker のパスワードを設定>";
+    public const string TrackerPasswordPlaceholder = "<TimeTracker のパスワードを設定>";
 
     // 検証のための仮のパスワード（SQL Server のパスワード要件を満たす）。結果には出さない
     private const string ValidationPassword = "Placeholder-Passw0rd";

@@ -30,7 +30,7 @@ public sealed class DeploymentPlanner
             ? new Dictionary<string, string> { [DeploymentExpiry.ExpiresAtKey] = value }
             : null;
 
-    /// <summary>今のデプロイのグループ（Timetracker・DB・Redis の Container App の順に、最初に見つかったもの。無ければ null）。</summary>
+    /// <summary>今のデプロイのグループ（TimeTracker・DB・Redis の Container App の順に、最初に見つかったもの。無ければ null）。</summary>
     public static string? CurrentGroup(IReadOnlyList<ContainerAppInfo> apps, string appName) =>
         DeploymentGroup.Combine(new[] { ResourceNaming.TimetrackerApp(appName), ResourceNaming.DbApp(appName), ResourceNaming.RedisApp(appName) }
             .Select(name => DeploymentGroup.Read(apps.FirstOrDefault(a => string.Equals(a.Name, name, StringComparison.OrdinalIgnoreCase))?.Tags)));

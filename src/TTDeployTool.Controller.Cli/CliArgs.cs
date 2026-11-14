@@ -53,14 +53,14 @@ public sealed class CliArgs
 
     public const string HelpText = """
         使い方:
-          ttdeploytool-cli [deploy] [オプション]  Timetracker を Azure Container Apps にデプロイ（--dry-run でローカル用のファイルを生成）
+          ttdeploytool-cli [deploy] [オプション]  TimeTracker を Azure Container Apps にデプロイ（--dry-run でローカル用のファイルを生成）
           ttdeploytool-cli delete [オプション]    deploy で作成したリソースを削除
 
         deploy の必須:
           --subscription <ID>         Azure サブスクリプション ID（--dry-run 時は不要）
           --resource-group <名前>     リソースグループ名（存在しなければ作成。--dry-run 時は不要）
           --db-password <値>          DB パスワード
-          --tracker-password <値>     Timetracker アプリパスワード
+          --tracker-password <値>     TimeTracker アプリパスワード
 
         deploy の任意:
           --location <リージョン>     既定: japaneast
@@ -69,7 +69,7 @@ public sealed class CliArgs
           --db-name <名前>            既定: timetracker
           --tt-tag <タグ>             timetracker イメージタグ（既定: postgresql→11.0.1-linux-postgres / sqlserver→11.0.1-linux-mssql）
           --auth-mode <モード>        default | azure-cli | sp-env | device-code | managed-identity（既定: default）
-          --tt-cpu / --tt-memory      Timetracker の vCPU / メモリ(Gi)（既定: 1.5 / 3.0）
+          --tt-cpu / --tt-memory      TimeTracker の vCPU / メモリ(Gi)（既定: 1.5 / 3.0）
           --db-cpu / --db-memory      DB の vCPU / メモリ(Gi)（既定: 1.0 / 2.0）
           --redis-cpu / --redis-memory Redis の vCPU / メモリ(Gi)（既定: 0.5 / 1.0）
           --persist-db [true|false]   DB のデータを Azure Files に置き、DB コンテナの再起動の後も残す（ストレージの料金がかかる）。

@@ -38,14 +38,18 @@ public sealed class DeletionViewModel : ObservableObject
     private string? _note;
     private string? _message;
     private readonly IClipboardService? _clipboard;
+    private readonly IDialogService? _dialogs;
 
     /// <param name="queue">ジョブの順番待ち（同じ対象のジョブがあれば、計画・登録しない）</param>
     /// <param name="registered">登録したジョブを画面に表示する</param>
     /// <param name="clipboard">計画とアプリ名のコピー先（省略時はコピーできない）</param>
+    /// <param name="dialogs">削除の設定を変えて広げるときの確かめ（無ければ確かめない）</param>
     public DeletionViewModel(
-        DeletionWorkflow workflow, TargetViewModel target, JobQueue queue, Action<JobViewModel> registered, TimeProvider time, IClipboardService? clipboard = null)
+        DeletionWorkflow workflow, TargetViewModel target, JobQueue queue, Action<JobViewModel> registered, TimeProvider time, IClipboardService? clipboard = null,
+        IDialogService? dialogs = null)
     {
         _clipboard = clipboard;
+        _dialogs = dialogs;
         CopyPlanCommand = new AsyncCommand(() => Copy(ToMarkdown()!, "削除の計画を Markdown でコピーしました。"), () => _clipboard != null && HasPlan);
         CopyAppNameCommand = new AsyncCommand(
             () => Copy(AppNameToConfirm!, $"アプリ名 {AppNameToConfirm} をコピーしました。"), () => _clipboard != null && AppNameToConfirm != null);
@@ -59,8 +63,22 @@ public sealed class DeletionViewModel : ObservableObject
         PlanCommand = new AsyncCommand(() => Busy.RunAsync("計画を作っています", PlanAsync));
         StartCommand = new AsyncCommand(() => RegisterAsync(null), () => CanStart);
         ScheduleCommand = new AsyncCommand(() => RegisterAsync(Schedule), () => CanStart);
-        _target.Changed += (_, _) => Ticket = null;
+        _target.Changed += (_, _) =>
+        {
+            Ticket = null;
+            OnPropertyChanged(nameof(IsResourceGroupOnly));
+            OnPropertyChanged(nameof(ConfirmLabel));
+        };
     }
+
+    /// <summary>
+    /// リソースグループだけの削除か（デプロイの一覧の「リソースグループだけ」の行から開いた。対象のアプリ名が空）。リソースグループは必ず削除の対象にし、
+    /// 確かめにはリソースグループ名を入れてもらう（オーナーの依頼、2026-11-13）。
+    /// </summary>
+    public bool IsResourceGroupOnly => _target.AppName.Length == 0;
+
+    /// <summary>確かめに入れてもらう名前の種類（アプリ名・リソースグループ名）。</summary>
+    public string ConfirmLabel => IsResourceGroupOnly ? "リソースグループ名" : "アプリ名";
 
     public AsyncCommand PlanCommand { get; }
 
@@ -156,8 +174,8 @@ public sealed class DeletionViewModel : ObservableObject
 
     public bool HasPlan => _ticket != null;
 
-    /// <summary>入力してもらうアプリ名（計画のアプリ名）。</summary>
-    public string? AppNameToConfirm => _ticket?.CanRun == true ? _ticket.Plan.AppName : null;
+    /// <summary>入力してもらうアプリ名（計画のアプリ名。リソースグループだけの削除はリソースグループ名）。</summary>
+    public string? AppNameToConfirm => _ticket?.CanRun == true ? _ticket.Plan.IsResourceGroupOnly ? _ticket.Plan.ResourceGroup : _ticket.Plan.AppName : null;
 
     /// <summary>アプリ名の入力欄を表示するか。</summary>
     public bool NeedsAppNameConfirmation => AppNameToConfirm != null;
@@ -166,7 +184,7 @@ public sealed class DeletionViewModel : ObservableObject
     {
         null => null,
         { Plan.KeepsDbData: true } t => $"{KeptResourceGroup(t.Plan)}\n{KeptDbDataNotice(t.Plan)}",
-        { Plan.DeletesResourceGroup: true } => null,
+        { Plan.DeletesResourceGroup: true } or { Plan.IsResourceGroupOnly: true } => null,
         { } t => KeptResourceGroup(t.Plan),
     };
 
@@ -176,7 +194,7 @@ public sealed class DeletionViewModel : ObservableObject
     public string? BlockedText => AppNameToConfirm == null
         ? null
         : !CanStart
-            ? $"アプリ名「{AppNameToConfirm}」を入力すると、「今すぐ削除」と「予定に追加」が押せます。"
+            ? $"{ConfirmLabel}「{AppNameToConfirm}」を入力すると、「今すぐ削除」と「予定に追加」が押せます。"
             : Schedule.Error is { } error ? $"「予定に追加」: {error}" : null;
 
     /// <summary>押せない理由を出すか。</summary>
@@ -273,7 +291,7 @@ public sealed class DeletionViewModel : ObservableObject
     {
         Error = null;
         Ticket = null;
-        if (_target.TargetError is { } targetError)
+        if ((IsResourceGroupOnly ? _target.ResourceGroupError : _target.TargetError) is { } targetError)
         {
             Error = targetError;
             return;
@@ -305,9 +323,10 @@ public sealed class DeletionViewModel : ObservableObject
             return Task.CompletedTask;
         }
         var ticket = _ticket!;
-        var confirmed = ConfirmAppName;
-        var session = _target.CreateJobSession();
         var plan = ticket.Plan;
+        // リソースグループだけの削除は、確かめた名前（リソースグループ名）ではなく、計画のアプリ名（空）で始める
+        var confirmed = plan.IsResourceGroupOnly ? plan.AppName : ConfirmAppName;
+        var session = _target.CreateJobSession();
         try
         {
             _registered(_queue.Register(JobKind.Delete, new JobTarget(plan.Subscription, plan.ResourceGroup, plan.AppName), schedule?.At,
@@ -343,6 +362,37 @@ public sealed class DeletionViewModel : ObservableObject
                 throw new WorkflowException(WorkflowFailure.Changed);
             return await _workflow.StartAsync(fresh.Saved!.PlanId, confirmedAppName, _ => session, KeptNotice);
         }
+    }
+
+    /// <summary>
+    /// まだ始めていない削除のジョブの「リソースグループも削除する」を変える（オーナーの依頼、2026-11-13）。登録したときと同じ選択とアプリ名で計画し直し、
+    /// 実行できなければ理由を返す。広げる（リソースグループも削除する）ときは確かめる。変えたら、ジョブの始め方と保存する計画を入れ替えて null を返す。
+    /// </summary>
+    internal async Task<string?> ChangeResourceGroupAsync(JobViewModel job, bool deleteResourceGroup)
+    {
+        var saved = job.Saved!;
+        var target = job.Target;
+        var session = _target.CreateJobSessionFor(target.Subscription);
+        DeletionPlanTicket fresh;
+        try
+        {
+            fresh = await _workflow.PlanAsync(session, target.Subscription, target.ResourceGroup, target.AppName, saved.IncludeUntagged, saved.KeepDbData,
+                deleteResourceGroup: deleteResourceGroup);
+        }
+        catch (Exception ex)
+        {
+            return DesktopMessages.ForAzure(ex);
+        }
+        if (fresh.Blockers.Count > 0)
+            return string.Join("\n", fresh.Blockers.Select(b => b.Replace("リソースグループの削除の指定を外して", "「リソースグループも削除する」のチェックを外して")));
+        if (!fresh.CanRun)
+            return "削除するものはありません（既に削除されています）。";
+        if (deleteResourceGroup && _dialogs != null && !await _dialogs.ConfirmAsync(
+                "リソースグループも削除しますか？",
+                $"予定の削除で、リソースグループ {target.ResourceGroup} も削除します（本ツールのリソースを削除した後に空になる場合だけ）。元に戻せません。",
+                "リソースグループも削除する"))
+            return "削除の設定は変えていません。";
+        return _queue.ReplaceDeletion(job, () => StartPlannedAsync(fresh, saved.ConfirmedAppName, session), SavedDeletion.From(fresh.Plan, saved.ConfirmedAppName));
     }
 
     /// <summary>

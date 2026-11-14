@@ -7,7 +7,7 @@ namespace TTDeployTool.Controller.Mcp;
 internal static class ServerInstructions
 {
     public const string Text = """
-        Timetracker（DENSO CREATE の工数管理ツール）の検証環境を構築するためのサーバーです。
+        TimeTracker（DENSO CREATE の工数管理ツール）の検証環境を構築するためのサーバーです。
         - 検証環境向けです。Azure 上の DB のデータは、既定では永続化されず、DB コンテナの再起動・再デプロイ・削除で消えます。本番環境には使わないでください。
           利用者がデータを残したい場合だけ、plan_deployment / validate_deployment に persist_db=true を指定すると、DB のデータを Azure Files に置きます（ストレージの料金がかかります）。
           persist_db を省略すると、既存の DB アプリの今の状態（永続化しているか）を引き継ぎます。
@@ -16,7 +16,7 @@ internal static class ServerInstructions
           get_deployment_options の server.password_env が true の項目は、利用者にパスワードを尋ねないでください。
         - 設定を決めたら validate_deployment で検証し、errors があれば利用者と相談して直してください。warnings は利用者に伝えてください。
         - ローカルの Docker で試す場合は generate_compose（Dry-run）で docker-compose.yml と .env を作ります。output_dir は利用者に確認した絶対パスにしてください。
-        - SQL Server を Azure で使う場合はサンプル DB を作れません。Timetracker のメモリは 3Gi 以上を推奨します。
+        - SQL Server を Azure で使う場合はサンプル DB を作れません。TimeTracker のメモリは 3Gi 以上を推奨します。
         - Azure へのデプロイは、必ず次の順に行ってください。
           1. plan_deployment で計画を作る（Azure は変更しない）。
           2. 結果の actions・warnings・blockers を利用者に示し、実行してよいか確認する。requires_data_loss_ack が true の場合は、
@@ -25,7 +25,7 @@ internal static class ServerInstructions
              結果の expires_on（利用可能期限）も利用者に示す。expires_on を省略すると、新しいデプロイは今日から 32 日後、再デプロイは今の期限を引き継ぐ。
              期限を過ぎると、TTDeployTool のデスクトップアプリが自動で削除する（DB のデータも消える）。期限を変えるには expires_on に yyyy-MM-dd か none（期限なし）を指定する。
              利用者が用途・利用者ごとに分けたい場合は group にグループ名を指定する（省略すると、再デプロイは今のグループを引き継ぐ）。結果の group.display も利用者に示す。
-          3. start_deployment に plan_id を渡して始める。その後は get_job_status を 15〜30 秒の間隔で呼び、結果（Timetracker の URL）を伝える。
+          3. start_deployment に plan_id を渡して始める。その後は get_job_status を 15〜30 秒の間隔で呼び、結果（TimeTracker の URL）を伝える。
         - デプロイ済みの環境の状態や URL は get_deployment_info で確認できます。
         - Azure から削除する場合も、必ず次の順に行ってください。
           1. plan_deletion で計画を作る（Azure は変更しない）。
@@ -49,7 +49,7 @@ internal static class ServerInstructions
     private const string IdentityPlaceholder = "{identity}";
 
     private const string HttpText = """
-        Timetracker（DENSO CREATE の工数管理ツール）の検証環境を構築するためのサーバーです（HTTP で共有しているサーバー）。
+        TimeTracker（DENSO CREATE の工数管理ツール）の検証環境を構築するためのサーバーです（HTTP で共有しているサーバー）。
         - 検証環境向けです。Azure 上の DB のデータは、既定では永続化されず、DB コンテナの再起動・再デプロイ・削除で消えます。本番環境には使わないでください。
           利用者がデータを残したい場合だけ、plan_deployment / validate_deployment に persist_db=true を指定すると、DB のデータを Azure Files に置きます（ストレージの料金がかかります）。
           persist_db を省略すると、既存の DB アプリの今の状態（永続化しているか）を引き継ぎます。
@@ -61,7 +61,7 @@ internal static class ServerInstructions
         - ローカルの Docker で試す場合は generate_compose で docker-compose.yml と .env の内容を返します（このサーバーはファイルを書き込みません）。
           設定は generate_compose が検証するため、validate_deployment（パスワードを求める）は不要です。
           利用者に 2 つのファイルを保存してもらい、.env のパスワードのプレースホルダーは利用者自身に置き換えてもらってください。
-        - SQL Server を Azure で使う場合はサンプル DB を作れません。Timetracker のメモリは 3Gi 以上を推奨します。
+        - SQL Server を Azure で使う場合はサンプル DB を作れません。TimeTracker のメモリは 3Gi 以上を推奨します。
         - Azure へのデプロイは、必ず次の順に行ってください。
           1. plan_deployment で計画を作る（Azure は変更しない）。
           2. 結果の actions・warnings・blockers を利用者に示し、実行してよいか確認する。requires_data_loss_ack が true の場合は、
@@ -70,7 +70,7 @@ internal static class ServerInstructions
              結果の expires_on（利用可能期限）も利用者に示す。expires_on を省略すると、新しいデプロイは今日から 32 日後、再デプロイは今の期限を引き継ぐ。
              期限を過ぎると、TTDeployTool のデスクトップアプリが自動で削除する（DB のデータも消える）。期限を変えるには expires_on に yyyy-MM-dd か none（期限なし）を指定する。
              利用者が用途・利用者ごとに分けたい場合は group にグループ名を指定する（省略すると、再デプロイは今のグループを引き継ぐ）。結果の group.display も利用者に示す。
-          3. start_deployment に plan_id を渡して始める。その後は get_job_status を 15〜30 秒の間隔で呼び、結果（Timetracker の URL）を伝える。
+          3. start_deployment に plan_id を渡して始める。その後は get_job_status を 15〜30 秒の間隔で呼び、結果（TimeTracker の URL）を伝える。
         - デプロイ済みの環境の状態や URL は get_deployment_info で確認できます。
         - Azure から削除する場合も、必ず次の順に行ってください。
           1. plan_deletion で計画を作る（Azure は変更しない）。
