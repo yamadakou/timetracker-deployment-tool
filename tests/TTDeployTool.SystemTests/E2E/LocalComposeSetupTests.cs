@@ -42,6 +42,8 @@ public sealed class LocalComposeSetupTests
             TestContext.Current.TestOutputHelper?.WriteLine($"上限: {limits}");
         }
 
+        var succeeded = false;
+        var stopwatch = Stopwatch.StartNew();
         try
         {
             (await RunAsync("docker", ["compose", "-p", project, "up", "-d"], dir)).Should().Be(0);
@@ -58,14 +60,21 @@ public sealed class LocalComposeSetupTests
 
             // サンプルデータベースのユーザーが一覧に表示される
             TimetrackerSetupWizard.ActiveUserCount(home).Should().BeGreaterThan(1, home);
+            succeeded = true;
         }
         finally
         {
             // 調べたときは、成否にかかわらず、コンテナごとのメモリの最大の使用量（cgroup v2 の memory.peak）を出す
             if (E2ESettings.Limits != null)
             {
+                var peaks = new List<string>();
                 foreach (var container in new[] { "timetracker-app", dbType == "postgresql" ? "timetracker-postgres" : "timetracker-sqlserver", "timetracker-redis" })
-                    await RunAsync("docker", ["exec", container, "cat", "/sys/fs/cgroup/memory.peak"], dir);
+                    peaks.Add($"{container}={await ReadAsync("docker", ["exec", container, "cat", "/sys/fs/cgroup/memory.peak"], dir)}");
+                var line = $"{E2ESettings.Limits} {(succeeded ? "成功" : "失敗")} {stopwatch.Elapsed:mm\\:ss} {string.Join(" ", peaks)}";
+                TestContext.Current.TestOutputHelper?.WriteLine(line);
+                // 成功したテストの出力は結果のファイルに残らないため、別のファイルに書く（ci.yml の spec-probe の成果物）
+                if (Environment.GetEnvironmentVariable("TT_E2E_PROBE_OUT") is { Length: > 0 } outFile)
+                    await File.AppendAllTextAsync(outFile, line + "\n");
                 await RunAsync("docker", ["compose", "-p", project, "logs", "--tail", "80", "timetracker"], dir);
             }
             await RunAsync("docker", ["compose", "-p", project, "down", "-v"], dir);
@@ -84,6 +93,14 @@ public sealed class LocalComposeSetupTests
         {
             return false; // docker コマンドが無い
         }
+    }
+
+    private static async Task<string> ReadAsync(string command, string[] args, string workingDirectory)
+    {
+        using var process = Process.Start(new ProcessStartInfo(command, args) { WorkingDirectory = workingDirectory, RedirectStandardOutput = true, RedirectStandardError = true })!;
+        var stdout = await process.StandardOutput.ReadToEndAsync();
+        await process.WaitForExitAsync();
+        return stdout.Trim();
     }
 
     private static async Task<int> RunAsync(string command, string[] args, string workingDirectory, bool quiet = false)

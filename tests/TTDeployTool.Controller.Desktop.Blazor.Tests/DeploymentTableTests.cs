@@ -46,7 +46,7 @@ public sealed class DeploymentTableTests : IAsyncLifetime
     public void Should_Show_The_First_Page_With_The_Default_Sort_And_Fill_The_Last_Column()
     {
         Rows.Should().HaveCount(20);
-        HeaderKeys.Should().Equal("Subscription", "ResourceGroup", "AppName", "Group", "State", "ExpiresAt", "DeployedAt", "Job");
+        HeaderKeys.Should().Equal("Subscription", "ResourceGroup", "AppName", "Group", "State", "ExpiresAt", "Cost", "DeployedAt", "Job");
         Header("Subscription").GetAttribute("aria-sort").Should().Be("ascending");
         Header("ResourceGroup").GetAttribute("aria-sort").Should().Be("none");
         // 右端の列（ジョブ）は幅を指定せず、最小の幅だけ持つ。並べ替えない列は、ボタンではない
@@ -55,7 +55,7 @@ public sealed class DeploymentTableTests : IAsyncLifetime
         Header("Job").GetAttribute("style").Should().Be("min-width: 160px");
         Header("Job").QuerySelector("button.tt-sort").Should().BeNull();
         Header("Job").QuerySelector(".tt-nosort").Should().NotBeNull();
-        _page.Find("table").GetAttribute("style").Should().Be("min-width: 1220px");
+        _page.Find("table").GetAttribute("style").Should().Be("min-width: 1350px");
         _page.Find(".tt-page-text").TextContent.Should().Contain("1〜20 件目");
         _page.Find("[data-id='Deployments.Notices']").TextContent.Should().Contain("Azure に反映されるまで");
     }
@@ -306,7 +306,7 @@ public sealed class DeploymentTableTests : IAsyncLifetime
         await table.InvokeAsync(() => table.Instance.ColumnMoved("Job", "Job"));
         HeaderKeys[^1].Should().Be("Job");
         await table.InvokeAsync(() => table.Instance.ColumnMoved("Job", "Subscription"));
-        HeaderKeys.Should().Equal("Job", "Subscription", "AppName", "ResourceGroup", "Group", "State", "ExpiresAt", "DeployedAt");
+        HeaderKeys.Should().Equal("Job", "Subscription", "AppName", "ResourceGroup", "Group", "State", "ExpiresAt", "Cost", "DeployedAt");
         // 動かした右端の列（幅 0）は最小の幅になり、新しい右端の列が残りの幅いっぱいに伸びる
         _page.Find("col[data-key='Job']").GetAttribute("style").Should().Be("width: 176px");
         _page.Find("col[data-key='DeployedAt']").HasAttribute("style").Should().BeFalse();
@@ -318,7 +318,7 @@ public sealed class DeploymentTableTests : IAsyncLifetime
         again.FindAll("thead th[data-key]").Select(h => h.GetAttribute("data-key")).First().Should().Be("Job");
 
         _page.Find(".tt-reset").Click();
-        HeaderKeys.Should().Equal("Subscription", "ResourceGroup", "AppName", "Group", "State", "ExpiresAt", "DeployedAt", "Job");
+        HeaderKeys.Should().Equal("Subscription", "ResourceGroup", "AppName", "Group", "State", "ExpiresAt", "Cost", "DeployedAt", "Job");
         _app.ViewModel.DeploymentsLayout.Current.Should().Equal(_app.ViewModel.DeploymentsLayout.Defaults);
     }
 

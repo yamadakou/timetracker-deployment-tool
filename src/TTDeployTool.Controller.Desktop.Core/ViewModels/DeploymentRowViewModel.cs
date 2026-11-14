@@ -125,6 +125,19 @@ public sealed class DeploymentRowViewModel : ObservableObject
     /// <summary>期限の残りのバーの長さ（0〜1。90 日で 1）。</summary>
     public double ExpiryShare => DaysLeft is { } d ? Math.Min(1, d / 90.0) : 0;
 
+    /// <summary>料金の目安（デプロイから期限まで。期限なしは 1 か月分。見積もれなければ null）。</summary>
+    public string? CostText => _owner.Costs.For(_entry)?.Text;
+
+    /// <summary>料金の目安の 2 行目（1 日あたり）。</summary>
+    public string? CostPerDayText => _owner.Costs.For(_entry)?.PerDayText;
+
+    /// <summary>単価を読んだ・単位を変えたとき。</summary>
+    internal void CostsChanged()
+    {
+        OnPropertyChanged(nameof(CostText));
+        OnPropertyChanged(nameof(CostPerDayText));
+    }
+
     /// <summary>この行の操作の処理中の表示。</summary>
     public BusyState Busy { get; } = new();
 
@@ -271,7 +284,7 @@ public sealed class DeploymentRowViewModel : ObservableObject
                  {
                      nameof(Entry), nameof(Url), nameof(HasUrl), nameof(DeployedText), nameof(ExpiryText), nameof(ExpiryWarning), nameof(HasExpiryWarning),
                      nameof(GroupText), nameof(GroupWarning),
-                     nameof(Level), nameof(IsExpired), nameof(IsExpirySoon), nameof(DaysLeft), nameof(DaysLeftText), nameof(ExpiryShare),
+                     nameof(Level), nameof(IsExpired), nameof(IsExpirySoon), nameof(DaysLeft), nameof(DaysLeftText), nameof(ExpiryShare), nameof(CostText), nameof(CostPerDayText),
                      nameof(DbTypeText), nameof(PersistenceText), nameof(SpecText), nameof(StateText), nameof(State), nameof(StateDetail),
                  })
             OnPropertyChanged(name);

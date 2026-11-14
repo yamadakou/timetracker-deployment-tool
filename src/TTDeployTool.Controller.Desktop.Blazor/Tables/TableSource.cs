@@ -67,6 +67,7 @@ public static class TableSources
         "ExpiresAt" => new(row.ExpiryText, Css: "tt-exp " + row.Level switch { ExpiryLevel.Expired => "tt-critical", ExpiryLevel.Soon => "tt-caution", _ => "" },
             Sub: row.DaysLeftText, Bar: row.DaysLeft == null ? null : row.ExpiryShare, BarCss: row.DaysLeft switch { <= DeploymentListViewModel.SoonDays => "tt-soon", <= 30 => "tt-mid", _ => null }),
         "DeployedAt" => new(row.DeployedText),
+        "Cost" => new(row.CostText ?? "見積もれません", Css: row.CostText == null ? "tt-subtle" : null, Sub: row.CostPerDayText),
         _ => new(row.JobText, Css: "tt-caution"),
     };
 

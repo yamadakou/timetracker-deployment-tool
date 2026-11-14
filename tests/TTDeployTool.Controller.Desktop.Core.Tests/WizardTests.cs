@@ -35,7 +35,7 @@ public class DeployWizardViewModelTests
     {
         var vm = new Harness().Main.Wizard;
 
-        (vm.Step, vm.StepText, vm.IsTarget).Should().Be((WizardStep.Target, "① 対象（1 / 5）", true));
+        (vm.Step, vm.StepText, vm.IsTarget).Should().Be((WizardStep.Target, "対象（1 / 5）", true));
         vm.BackCommand.CanExecute(null).Should().BeFalse();
         vm.CanGoNext.Should().BeFalse();
         vm.NextCommand.CanExecute(null).Should().BeFalse();

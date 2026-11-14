@@ -141,7 +141,7 @@ public sealed class BrowserHostTests
 
         await page.Locator(".tt-reset").ClickAsync();
         await Assertions.Expect(page.Locator("thead th[data-key]").First).ToHaveAttributeAsync("data-key", "Subscription");
-        (await HeaderKeys(page)).Should().Equal("Subscription", "ResourceGroup", "AppName", "Group", "State", "ExpiresAt", "DeployedAt", "Job");
+        (await HeaderKeys(page)).Should().Equal("Subscription", "ResourceGroup", "AppName", "Group", "State", "ExpiresAt", "Cost", "DeployedAt", "Job");
         (await WidthOf(page, "ResourceGroup")).Should().BeApproximately(before, 1);
     }
 
@@ -223,7 +223,7 @@ public sealed class BrowserHostTests
         (await Header(page, "Group").EvaluateAsync<bool>("h => h.classList.contains('tt-dragging')")).Should().Be(drags);
         await page.Mouse.UpAsync();
         await Assertions.Expect(Header(page, "Group")).ToHaveAttributeAsync("aria-sort", drags ? "none" : "ascending");
-        (await HeaderKeys(page)).Should().Equal("Subscription", "ResourceGroup", "AppName", "Group", "State", "ExpiresAt", "DeployedAt", "Job");
+        (await HeaderKeys(page)).Should().Equal("Subscription", "ResourceGroup", "AppName", "Group", "State", "ExpiresAt", "Cost", "DeployedAt", "Job");
     }
 
     [Fact]
@@ -303,7 +303,7 @@ public sealed class BrowserHostTests
         var table = (await page.Locator("table.tt-table").BoundingBoxAsync())!;
         var last = (await Header(page, "Job").BoundingBoxAsync())!;
         (last.X + last.Width).Should().BeApproximately(table.X + table.Width, 1);
-        last.Width.Should().BeGreaterThan(400);
+        last.Width.Should().BeGreaterThan(300, "最小の幅（160）より広がる。料金の目安の列〔130〕を足した後の値");
 
         await page.SetViewportSizeAsync(900, 1000);
         await Assertions.Expect(Header(page, "Job")).ToHaveCSSAsync("min-width", "160px");

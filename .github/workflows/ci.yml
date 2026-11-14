@@ -182,10 +182,14 @@ jobs:
         dotnet build tests/TTDeployTool.SystemTests
         pwsh tests/TTDeployTool.SystemTests/bin/Debug/net10.0/playwright.ps1 install --with-deps chromium
 
+    - name: Prepare the results directory
+      run: mkdir -p TestResults
+
     - name: Setup wizard with limits (docker compose)
       env:
         TT_E2E_DB_TYPE: postgresql
         TT_E2E_LIMITS: ${{ matrix.limits }}
+        TT_E2E_PROBE_OUT: ${{ github.workspace }}/TestResults/probe.txt
         TT_E2E_LICENSE_KEY: ${{ secrets.TT_E2E_LICENSE_KEY }}
         TT_E2E_SAMPLE_LOGIN: ${{ secrets.TT_E2E_SAMPLE_LOGIN }}
         TT_E2E_SAMPLE_PASSWORD: ${{ secrets.TT_E2E_SAMPLE_PASSWORD }}

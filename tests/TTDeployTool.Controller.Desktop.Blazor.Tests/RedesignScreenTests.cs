@@ -62,6 +62,41 @@ public sealed class RedesignScreenTests : IDisposable
     }
 
     [Fact]
+    public async Task The_List_Should_Show_The_Cost_Of_Each_Row_And_The_Totals_And_Switch_The_Unit()
+    {
+        var page = await DeploymentsAsync();
+        page.WaitForAssertion(() => Id(page, "Deployments.Cost.Total").TextContent.Should().StartWith("約 ").And.EndWith(" 円"));
+        Id(page, "Deployments.Cost.Month").TextContent.Should().EndWith(" 円");
+        Id(page, "Deployments.Cost.MonthLabel").TextContent.Should().EndWith("月の見込み");
+        Id(page, "Deployments.Cost.TotalNote").TextContent.Should().Contain("件のデプロイから期限まで");
+        Id(page, "Deployments.Cost.Note").TextContent.Should().StartWith("料金は目安です");
+        page.FindAll("td[data-key='Cost']").Select(c => c.TextContent).Should().Contain(t => t.EndsWith(" 円")).And.Contain("見積もれません");
+        page.FindAll("td[data-key='Cost'] [data-sub]").Select(c => c.GetAttribute("data-sub")).Should().Contain(t => t!.StartsWith("1 日 約 "));
+
+        Id(page, "Deployments.Cost.Unit.Usd").Click();
+        page.WaitForAssertion(() => Id(page, "Deployments.Cost.Total").TextContent.Should().StartWith("約 $"));
+        Id(page, "Deployments.Cost.Unit.Usd").GetAttribute("aria-pressed").Should().Be("true");
+    }
+
+    [Fact]
+    public async Task The_Batch_Deletion_Should_Explain_Resource_Group_Only_Rows_And_Hide_The_Options_When_All_Are()
+    {
+        await DeploymentsAsync();
+        var group = List.Rows.Single(r => r.AppName == "").Entry;
+        var other = List.Rows.First(r => r.AppName != "").Entry;
+        await _app.ViewModel.BatchDeletion.OpenAsync([group, other]);
+        var page = _app.Context.Render<BatchDeletePage>(p => p.Add(x => x.Model, _app.ViewModel));
+        Id(page, "BatchDelete.ResourceGroupOnly").TextContent.Should().StartWith("リソースグループだけの行（1 件）は");
+        page.FindAll("[data-id='BatchDelete.DeleteResourceGroup']").Should().NotBeEmpty();
+        page.Find("[data-id='BatchDelete.Items']").TextContent.Should().Contain("rg-old（リソースグループだけ）");
+
+        await page.InvokeAsync(() => _app.ViewModel.BatchDeletion.OpenAsync([group]));
+        page.WaitForAssertion(() => page.FindAll("[data-id='BatchDelete.DeleteResourceGroup']").Should().BeEmpty());
+        page.FindAll("[data-id='BatchDelete.KeepDbData']").Should().BeEmpty();
+        Id(page, "BatchDelete.ResourceGroupOnly").TextContent.Should().StartWith("選んだのは、本ツールのアプリのリソースが無い");
+    }
+
+    [Fact]
     public async Task The_Job_Cards_Should_Filter()
     {
         await _app.SignInAsync();

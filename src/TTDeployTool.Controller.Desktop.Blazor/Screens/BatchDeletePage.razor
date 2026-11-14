@@ -6,9 +6,14 @@
     <div class="tt-surface tt-section">
     <button type="button" data-id="BatchDelete.BackToList" @onclick="() => Back.InvokeAsync(Pages.Deployments)">デプロイの一覧に戻る</button>
     <p>選んだデプロイごとに、本ツールで作ったリソースだけを削除します。下の指定は、すべてのデプロイに当てます。計画に誤りがあるもの・ジョブがあるものは外します。</p>
-    <CheckField Id="BatchDelete.KeepDbData" Label="DB のデータを残す（ストレージアカウントを削除しない。料金がかかり続けます）" Value="Batch.KeepDbData" ValueChanged="v => Batch.KeepDbData = v" />
-    <CheckField Id="BatchDelete.DeleteResourceGroup" Label="リソースグループも削除する（本ツールのリソースを削除した後に、中が空になる場合だけ。元に戻せません）"
-                Value="Batch.DeleteResourceGroup" ValueChanged="v => Batch.DeleteResourceGroup = v" />
+    @* リソースグループだけの行は、指定にかかわらずリソースグループを削除する。すべてそうなら、指定を出さない（オーナーの指摘、2026-11-14） *@
+    <Message Id="BatchDelete.ResourceGroupOnly" Text="@Batch.ResourceGroupOnlyText" Kind="MessageKind.Caution" />
+    @if (!Batch.IsAllResourceGroupOnly)
+    {
+        <CheckField Id="BatchDelete.KeepDbData" Label="DB のデータを残す（ストレージアカウントを削除しない。料金がかかり続けます）" Value="Batch.KeepDbData" ValueChanged="v => Batch.KeepDbData = v" />
+        <CheckField Id="BatchDelete.DeleteResourceGroup" Label="リソースグループも削除する（本ツールのリソースを削除した後に、中が空になる場合だけ。元に戻せません）"
+                    Value="Batch.DeleteResourceGroup" ValueChanged="v => Batch.DeleteResourceGroup = v" />
+    }
     <CommandButton Id="BatchDelete.Plan" Command="Batch.PlanCommand" Text="計画し直す" />
     <BusyView Id="BatchDelete.Busy" State="Batch.Busy" />
     <ul class="tt-apps" data-id="BatchDelete.Items">

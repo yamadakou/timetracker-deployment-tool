@@ -14,7 +14,7 @@ namespace TTDeployTool.Controller.Desktop.Core.ViewModels;
 /// </summary>
 public sealed record BatchDeletionItem(DeploymentEntry Entry, DeletionPlanTicket? Ticket, string Summary, string? Excluded)
 {
-    public string Title => $"{Entry.AppName}（{Entry.ResourceGroup}）";
+    public string Title => Entry.IsResourceGroupOnly ? $"{Entry.ResourceGroup}（リソースグループだけ）" : $"{Entry.AppName}（{Entry.ResourceGroup}）";
 
     public bool WillRun => Excluded == null;
 
@@ -72,6 +72,17 @@ public sealed class BatchDeletionViewModel : ObservableObject
 
     /// <summary>削除する件数（外したものを除く）。</summary>
     public int RunnableCount => Items.Count(i => i.WillRun);
+
+    /// <summary>選んだのが、すべてリソースグループだけの行か（DB のデータ・リソースグループの指定を出さない。オーナーの指摘、2026-11-14）。</summary>
+    public bool IsAllResourceGroupOnly => _entries.Count > 0 && _entries.All(e => e.IsResourceGroupOnly);
+
+    /// <summary>リソースグループだけの行の扱いの説明（そのような行が無ければ null）。</summary>
+    public string? ResourceGroupOnlyText => _entries.Count(e => e.IsResourceGroupOnly) switch
+    {
+        0 => null,
+        _ when IsAllResourceGroupOnly => "選んだのは、本ツールのアプリのリソースが無い、リソースグループだけの行です。リソースグループを削除します（中にほかのリソースがあれば削除しません。元に戻せません）。",
+        var n => $"リソースグループだけの行（{n} 件）は、下の指定にかかわらず、リソースグループを削除します（中にほかのリソースがあれば削除しません）。",
+    };
 
     /// <summary>全部に当てる: DB のデータ（ストレージアカウント）を残すか。</summary>
     public bool KeepDbData
@@ -139,6 +150,8 @@ public sealed class BatchDeletionViewModel : ObservableObject
     public async Task OpenAsync(IReadOnlyList<DeploymentEntry> entries)
     {
         _entries = entries;
+        OnPropertyChanged(nameof(IsAllResourceGroupOnly));
+        OnPropertyChanged(nameof(ResourceGroupOnlyText));
         PlanCommand.RaiseCanExecuteChanged();
         await PlanCommand.ExecuteAsync();
     }
@@ -150,7 +163,7 @@ public sealed class BatchDeletionViewModel : ObservableObject
         ClearPlans();
         foreach (var entry in _entries)
         {
-            Busy.Report($"{entry.AppName}（{entry.ResourceGroup}）の削除の計画を作っています");
+            Busy.Report(entry.IsResourceGroupOnly ? $"{entry.ResourceGroup}（リソースグループだけ）の削除の計画を作っています" : $"{entry.AppName}（{entry.ResourceGroup}）の削除の計画を作っています");
             Items.Add(await PlanOneAsync(entry));
         }
         Changed();
@@ -180,6 +193,9 @@ public sealed class BatchDeletionViewModel : ObservableObject
     // 削除するもの・残すもの・DB のデータ・リソースグループの要約
     private static string Summary(DeletionPlan plan)
     {
+        // リソースグループだけの行は、リソースグループを削除する（DB のデータ・リソースグループの指定は当てない）
+        if (plan.IsResourceGroupOnly)
+            return $"リソースグループ {plan.ResourceGroup} を削除します（中にほかのリソースがあれば削除しません。元に戻せません）。";
         var deletes = plan.Targets.Where(t => t.WillDelete).Select(t => t.Name).ToList();
         var parts = new List<string> { deletes.Count == 0 ? "削除するものはありません。" : $"削除する: {string.Join("、", deletes)}。" };
         var kept = plan.Targets.Where(t => !t.WillDelete && t.Exists).Select(t => t.Name).ToList();
@@ -221,6 +237,8 @@ public sealed class BatchDeletionViewModel : ObservableObject
             Error = "登録できなかったもの:\n- " + string.Join("\n- ", failed);
         // 登録した計画は使ったものとして、画面から外す（次は計画からやり直す）
         _entries = [];
+        OnPropertyChanged(nameof(IsAllResourceGroupOnly));
+        OnPropertyChanged(nameof(ResourceGroupOnlyText));
         ClearPlans();
         PlanCommand.RaiseCanExecuteChanged();
         _registered(jobs);

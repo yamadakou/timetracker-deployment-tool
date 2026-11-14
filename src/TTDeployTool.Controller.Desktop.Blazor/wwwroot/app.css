@@ -86,6 +86,9 @@ input[type=range] { accent-color: var(--tt-accent); }
 .tt-commandbar > button, .tt-commandbar .tt-cmd { border-color: transparent; background: transparent; }
 .tt-commandbar > button.tt-primary { background: var(--tt-accent); border-color: var(--tt-accent); }
 .tt-sep { width: 1px; height: 20px; background: var(--tt-line); margin: 0 4px; }
+.tt-costbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 28px; padding: 12px 16px; margin-bottom: 14px; }
+.tt-costbar .tt-units { margin-left: auto; }
+.tt-costbar > p { flex-basis: 100%; margin: 0; font-size: 12px; }
 .tt-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
 .tt-stat { display: flex; align-items: center; gap: 12px; padding: 12px 14px; text-align: left; justify-content: flex-start; min-height: 0;
   background: var(--tt-card); border: 1px solid var(--tt-line); border-radius: var(--tt-radius); box-shadow: var(--tt-shadow); }

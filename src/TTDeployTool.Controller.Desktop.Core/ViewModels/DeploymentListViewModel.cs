@@ -23,6 +23,9 @@ public enum DeploymentSortKey
 
     /// <summary>グループ名（docs/design/common/deployment-groups.md の 5）。</summary>
     Group,
+
+    /// <summary>料金の目安（期限まで。オーナーの依頼、2026-11-14）。</summary>
+    Cost,
 }
 
 /// <summary>並べ替えの選択肢。</summary>
@@ -68,6 +71,8 @@ public sealed class DeploymentListViewModel : ObservableObject
         new(DeploymentSortKey.State, true, "状態（不明から）"),
         new(DeploymentSortKey.Group, false, "グループ（昇順）"),
         new(DeploymentSortKey.Group, true, "グループ（降順）"),
+        new(DeploymentSortKey.Cost, false, "料金の目安（安い順）"),
+        new(DeploymentSortKey.Cost, true, "料金の目安（高い順）"),
     ];
 
     private readonly TargetViewModel _target;
@@ -101,8 +106,10 @@ public sealed class DeploymentListViewModel : ObservableObject
     public DeploymentListViewModel(
         TargetViewModel target, JobQueue queue, IDeploymentLogger deploymentLogger, ILogger logger, TimeProvider time,
         ISystemLauncher launcher, IClipboardService? clipboard, Func<string, Task> open, Func<IReadOnlyList<DeploymentEntry>, Task> openBatchDeletion,
-        IDialogService? dialogs = null)
+        IDialogService? dialogs = null, Pricing.IPriceCatalog? prices = null)
     {
+        Costs = new Pricing.DeploymentCostBook(prices ?? new Pricing.BuiltInPriceCatalog(), time);
+        Costs.CurrencyChanged += () => _ = UpdateCostsAsync();
         _dialogs = dialogs;
         _target = target;
         _deploymentLogger = deploymentLogger;
@@ -148,6 +155,39 @@ public sealed class DeploymentListViewModel : ObservableObject
     }
 
     internal TimeProvider Time { get; }
+
+    // ---- 料金の目安（オーナーの依頼、2026-11-14: 列に各デプロイの目安、上部に全体と今月分の合計）
+
+    /// <summary>行ごとの料金の目安と、単位の切り替え。</summary>
+    public Pricing.DeploymentCostBook Costs { get; }
+
+    /// <summary>上部の「料金の目安（全体）」（読んだすべてのデプロイ。見積もれなければ null）。</summary>
+    public string? CostTotalText => Costs.TotalText(_entries);
+
+    /// <summary>「全体」の数え方（「3 件のデプロイから期限まで（期限なしの 1 件は 1 か月分）」）。</summary>
+    public string? CostTotalNote => Costs.TotalNote(_entries);
+
+    /// <summary>上部の「今月分」（今月の 1 日から月末までの見込み）。</summary>
+    public string? CostThisMonthText => Costs.ThisMonthText(_entries);
+
+    /// <summary>「今月分」の見出し（「11 月の見込み」）。</summary>
+    public string CostThisMonthLabel => Costs.ThisMonthLabel;
+
+    // 行のリージョンの単価を読み、新しく読めたら表示し直す（料金で並べていれば並べ直す）
+    private async Task UpdateCostsAsync()
+    {
+        if (await Costs.LoadAsync(_entries))
+        {
+            Refresh(resetPage: false, keepRows: true);
+            return;
+        }
+        OnPropertyChanged(nameof(CostTotalText));
+        OnPropertyChanged(nameof(CostTotalNote));
+        OnPropertyChanged(nameof(CostThisMonthText));
+        OnPropertyChanged(nameof(CostThisMonthLabel));
+        foreach (var row in Rows)
+            row.CostsChanged();
+    }
 
     public AsyncCommand LoadCommand { get; }
 
@@ -587,6 +627,7 @@ public sealed class DeploymentListViewModel : ObservableObject
                 ExpiryKind.Date => Day(e.ExpiresAt!.Value),
                 _ => "記録なし",
             }, date: e => e.ExpiryKind == ExpiryKind.Date ? e.ExpiresAt : null),
+            new(nameof(DeploymentSortKey.Cost), "料金の目安", e => Costs.For(e)?.Text ?? "見積もれません"),
             new(nameof(DeploymentSortKey.DeployedAt), "デプロイ日", e => e.DeployedAt is { } at ? Day(at) : "記録なし", date: e => e.DeployedAt),
             new(JobColumn, "ジョブ", e => _queue.ActiveFor(e.SubscriptionId, e.ResourceGroup, e.AppName) is { } job ? job.IsDeployment ? "デプロイのジョブ" : "削除のジョブ" : "なし"),
         ];
@@ -604,6 +645,7 @@ public sealed class DeploymentListViewModel : ObservableObject
             DeploymentSortKey.DeployedAt => e.DeployedAt,
             DeploymentSortKey.State => DeploymentStates.Of(e),
             DeploymentSortKey.Group => e.Group,
+            DeploymentSortKey.Cost => Costs.For(e)?.Total,
             _ => e.ExpiryKind == ExpiryKind.Date ? e.ExpiresAt : null,
         }));
         var withValue = keyed.Where(x => x.Key != null);
@@ -665,6 +707,7 @@ public sealed class DeploymentListViewModel : ObservableObject
         OnPropertyChanged(nameof(PageText));
         PreviousPageCommand.RaiseCanExecuteChanged();
         NextPageCommand.RaiseCanExecuteChanged();
+        _ = UpdateCostsAsync();
     }
 
     // 期限の入力の初期値（今日から 32 日後）

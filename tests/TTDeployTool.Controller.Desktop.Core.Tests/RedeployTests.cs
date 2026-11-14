@@ -74,7 +74,7 @@ public sealed class RedeployTests
         (h.Main.Settings.DbPassword, h.Main.Settings.TrackerPassword).Should().Be(("DbPassw0rd!", "TrackerPass!"));
         h.Navigations.Should().Equal(Pages.Wizard);
         (h.Main.Wizard.Step, h.Main.Wizard.IsCompleted).Should().Be((WizardStep.Target, false));
-        h.Main.Settings.Message.Should().Be("ジョブの設定（rg / demo）を入力しました。パスワードは記録に残していないため、③ で入れてください（入力済みなら、そのまま使います）。");
+        h.Main.Settings.Message.Should().Be("ジョブの設定（rg / demo）を入力しました。パスワードは記録に残していないため、手順「パスワード」で入れてください（入力済みなら、そのまま使います）。");
     }
 
     [Fact]

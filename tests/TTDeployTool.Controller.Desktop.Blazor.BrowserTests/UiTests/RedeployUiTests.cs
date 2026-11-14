@@ -34,7 +34,7 @@ public sealed class RedeployUiTests
         await row.ClickAsync();
         await page.ClickIdAsync("Jobs.Redeploy");
         await Assertions.Expect(page.Id("Panel.Wizard")).ToBeVisibleAsync();
-        await page.ExpectTextAsync("Wizard.Step", "①");
+        await page.ExpectTextAsync("Wizard.Step", "対象（1 / 5）");
         await Assertions.Expect(page.Id("Target.ResourceGroup")).ToHaveValueAsync("rg-failed");
         await Assertions.Expect(page.Id("Target.AppName")).ToHaveValueAsync("app-failed");
         await page.ExpectTextAsync("Settings.Message", "ジョブの設定（rg-failed / app-failed）を入力しました。");
