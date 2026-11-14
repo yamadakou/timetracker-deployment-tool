@@ -26,6 +26,8 @@ public class MockInputTests
     {
         app.Show("Jobs");
         app.WaitForText("Jobs.Count", t => t.Contains($"全 {Records} 件"), "記録の 45 件");
+        // 件数のカード・操作のボタン・フィルタの下にある表を、画面の上の方に出す（見出しとセルをマウスで押すため）
+        app.ScrollToTop("Jobs.Text");
     }
 
     private static Rectangle Header(AppSession app, string name) => app.ColumnHeader(Table, name).BoundingRectangle;

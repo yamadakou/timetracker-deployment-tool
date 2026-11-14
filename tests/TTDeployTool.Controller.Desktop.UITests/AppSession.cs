@@ -433,6 +433,31 @@ public sealed class AppSession : IDisposable
     }
 
     /// <summary>
+    /// 要素が画面の上の方に来るまで、それを含むページ（縦にスクロールできる親）を下へスクロールする。件数のカードなどで表が画面の下に追いやられ、
+    /// 見出しやセルが画面の外に出ると、マウスの入力を合成するテストが押せない（No.86。CI の画面は 1024 × 768）。
+    /// </summary>
+    public void ScrollToTop(string automationId)
+    {
+        var target = Find(automationId);
+        var walker = Window.Automation.TreeWalkerFactory.GetControlViewWalker();
+        var page = walker.GetParent(target);
+        while (page != null && !(page.Patterns.Scroll.TryGetPattern(out var s) && s.VerticallyScrollable.Value))
+            page = walker.GetParent(page);
+        if (page == null)
+            return;
+        var scroll = page.Patterns.Scroll.Pattern;
+        for (var i = 0; i < 100 && target.BoundingRectangle.Top > page.BoundingRectangle.Top + 40; i++)
+        {
+            var before = scroll.VerticalScrollPercent.Value;
+            scroll.Scroll(ScrollAmount.NoAmount, ScrollAmount.SmallIncrement);
+            Thread.Sleep(50);
+            if (scroll.VerticalScrollPercent.Value == before)
+                break;
+        }
+        Thread.Sleep(300);
+    }
+
+    /// <summary>
     /// 表の行の数（今のページの行）。表は見えている行の分しか行の要素を作らない（仮想化）ため、子の数ではなく Grid パターンの行の数で読む
     /// （CI の UI テスト、run 41066697432: 20 行のうち 11 行しか子に無かった）。
     /// </summary>
