@@ -45,6 +45,12 @@ public sealed class RowMenuUiTests
         await page.ClickIdAsync("Detail.CopySelection");
         await WaitUntilAsync(async () => (await host.ClipboardAsync()).Trim() == app, "選んだ文字がコピーされる");
 
+        // 詳細の外で選んだ文字は、詳細のコピーの対象にしない
+        var outside = await page.EvaluateAsync<string>(
+            "async () => { const h = document.querySelector('h1'); const r = document.createRange(); r.selectNodeContents(h); const s = getSelection(); s.removeAllRanges(); s.addRange(r);" +
+            " const m = await import('./_content/TTDeployTool.Controller.Desktop.Blazor/table.js'); return m.selectionIn(document.querySelector(\"[data-id='Deployments.Detail']\")); }");
+        outside.Should().BeEmpty();
+
         // 「詳細をコピー」
         await page.Id("Deployments.Detail").ClickAsync(new() { Button = MouseButton.Right, Position = new() { X = 10, Y = 10 } });
         await page.ClickIdAsync("Detail.CopyAll");
