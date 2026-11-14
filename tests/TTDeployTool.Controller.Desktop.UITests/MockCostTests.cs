@@ -16,6 +16,9 @@ public class MockCostTests
         SignIn(app);
         app.Show("Wizard");
         app.Find("Panel.Wizard");
+        // モックのサブスクリプションは 2 つあるため、どちらかを選ぶまで次へ進めない
+        AppSession.WaitUntil(() => app.ItemsOf("Target.Subscription").Count > 0, "サブスクリプションの一覧が読まれる");
+        app.Select("Target.Subscription", app.ItemsOf("Target.Subscription")[0]);
         app.SetText("Target.ResourceGroup", "rg-mock-cost");
         app.SetText("Target.AppName", "cost");
         app.SetText("Target.Location", "japaneast");
