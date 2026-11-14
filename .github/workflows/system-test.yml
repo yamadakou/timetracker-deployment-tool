@@ -4,6 +4,11 @@ name: System Test
 # リリース前などに手動で実行する。準備（OIDC 用のアプリ登録・変数・シークレット）は docs/SYSTEM_TESTS.md を参照。
 on:
   workflow_dispatch:
+    inputs:
+      spec_probe:
+        description: 'サンプル DB の作成に要るスペックの確認だけを行う（JSON の配列。例: ["tt=1.25:2.5,db=0.5:1.0,redis=0.25:0.5"]。vCPU:GiB）。空ならシステムテストを行う'
+        required: false
+        default: ''
 
 # 権限不足のシナリオは共有のリソースグループ（rg-ttst-limited）を使うため、同時に 1 つだけ実行する
 concurrency:
@@ -16,6 +21,7 @@ permissions:
 
 jobs:
   system-test:
+    if: inputs.spec_probe == ''
     runs-on: ubuntu-latest
     environment: systemtest
     timeout-minutes: 110
@@ -56,6 +62,7 @@ jobs:
       run: >
         dotnet test --project tests/TTDeployTool.SystemTests --
         --filter-not-class TTDeployTool.SystemTests.E2E.LocalComposeSetupTests
+        --filter-not-class TTDeployTool.SystemTests.SpecProbeTests
         --output detailed --report-xunit-trx --results-directory=TestResults
 
     - name: Upload test results
@@ -63,4 +70,58 @@ jobs:
       uses: actions/upload-artifact@v7
       with:
         name: system-test-results
+        path: TestResults
+
+  # サンプル DB の作成に要るスペックの Azure での確認（オーナーの依頼、2026-11-14。spec_probe を渡したときだけ）。組ごとにジョブを分け、
+  # 専用のリソースグループにデプロイしてサンプルデータベースを作り、最後にリソースグループを削除する
+  spec-probe:
+    if: inputs.spec_probe != ''
+    runs-on: ubuntu-latest
+    environment: systemtest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        spec: ${{ fromJSON(inputs.spec_probe || '[]') }}
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: 10.0.x
+
+    - name: Azure login (OIDC)
+      uses: azure/login@v3
+      with:
+        client-id: ${{ vars.AZURE_CLIENT_ID }}
+        tenant-id: ${{ vars.AZURE_TENANT_ID }}
+        subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+    - name: Install Playwright browser
+      run: |
+        dotnet build tests/TTDeployTool.SystemTests
+        pwsh tests/TTDeployTool.SystemTests/bin/Debug/net10.0/playwright.ps1 install --with-deps chromium
+        mkdir -p TestResults
+
+    - name: Spec probe
+      env:
+        TT_SYSTEMTEST_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+        TT_SYSTEMTEST_LOCATION: ${{ vars.TT_SYSTEMTEST_LOCATION || 'japaneast' }}
+        TT_AZURE_SPEC_PROBE: ${{ matrix.spec }}
+        TT_E2E_PROBE_OUT: ${{ github.workspace }}/TestResults/probe.txt
+        TT_E2E_LICENSE_KEY: ${{ secrets.TT_E2E_LICENSE_KEY }}
+        TT_E2E_SAMPLE_LOGIN: ${{ secrets.TT_E2E_SAMPLE_LOGIN }}
+        TT_E2E_SAMPLE_PASSWORD: ${{ secrets.TT_E2E_SAMPLE_PASSWORD }}
+      run: >
+        dotnet test --project tests/TTDeployTool.SystemTests --no-build --
+        --filter-class TTDeployTool.SystemTests.SpecProbeTests
+        --output detailed --report-xunit-trx --results-directory=TestResults
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: spec-probe-azure-${{ strategy.job-index }}
         path: TestResults
