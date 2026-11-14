@@ -488,7 +488,7 @@ WinUI 3 版の UI テストとの対応（名前は同じ。中身の違い）:
 | 使う所 | ファイル |
 |---|---|
 | exe のアイコン・ウィンドウの題の左とタスク バー・通知領域のアイコン | `Blazor.Wpf/Assets/TTDeployTool.ico`（出力では `TrayIcon.ico`） |
-| MSIX の画像（Square44x44Logo・StoreLogo は小さい版、Square150x150Logo・Wide310x150Logo・SplashScreen は元の版。横長の画像は真ん中に置き、まわりは透明） | `Blazor.Wpf/Assets/*.png`（`docs/design/desktop/icon/render.js` で SVG から作る） |
+| MSIX の画像（Square44x44Logo・StoreLogo は小さい版、Square150x150Logo・Wide310x150Logo・SplashScreen は元の版。横長の画像は真ん中に置き、まわりは透明） | `Blazor.Package/Images/*.png`（`docs/design/desktop/icon/render.js` で SVG から作る。WPF のプロジェクトに置くと、MSIX を作るときにアプリの出力からも探して止まった） |
 | 左のメニューの上の印 | `Blazor/wwwroot/icon.svg`（小さい版） |
 
 - 前は WinUI 3 版のフォルダー（`src/TTDeployTool.Controller.Desktop/Assets`）の画像を借りていた。WinUI 3 版のファイルは、このブランチでは変えないため、Blazor 版のフォルダーに分けた

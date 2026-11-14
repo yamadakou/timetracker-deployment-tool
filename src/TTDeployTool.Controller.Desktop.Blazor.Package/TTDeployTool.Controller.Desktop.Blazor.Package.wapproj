@@ -36,7 +36,8 @@
   </ItemGroup>
   <ItemGroup>
     <!-- アプリのアイコン（オーナーの用意したもの、2026-11-14。docs/design/desktop/icon/render.js で SVG から作った画像） -->
-    <Content Include="..\TTDeployTool.Controller.Desktop.Blazor.Wpf\Assets\*.png" Link="Images\%(Filename)%(Extension)" />
+    <!-- WPF のプロジェクトのフォルダーに置くと、パッケージがアプリの出力からも探して止まった（MSB3030。CI、2026-11-14）ため、このプロジェクトに置く -->
+    <Content Include="Images\*.png" />
   </ItemGroup>
   <Import Project="$(WapProjPath)\Microsoft.DesktopBridge.targets" />
   <ItemGroup>
