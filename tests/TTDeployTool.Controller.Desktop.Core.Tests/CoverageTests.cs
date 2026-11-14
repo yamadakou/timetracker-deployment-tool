@@ -244,13 +244,13 @@ public class CoverageTests
             vm.SavedDirectory.Should().Be(root);
             var changes = new ChangeRecorder(vm);
 
-            h.Main.Settings.TtMemoryGi = "2";
+            h.Main.Settings.TtTag = "7.0.0-linux-postgres";
             await vm.SaveCommand.ExecuteAsync();
 
             vm.SavedDirectory.Should().Be(root);
             changes.Names.Should().NotContain(nameof(DryRunViewModel.SavedDirectory), "同じフォルダーなら知らせない");
             // 2 回目の保存の内容（警告）は出し直す
-            vm.Warnings.Should().ContainSingle().Which.Should().StartWith("tt-memory が 2Gi です。");
+            vm.Warnings.Should().ContainSingle().Which.Should().StartWith("tt-tag '7.0.0-linux-postgres' は既定のタグ");
             vm.ComposeContent.Should().Be(File.ReadAllText(Path.Combine(root, "docker-compose.yml")));
             vm.OpenFolderCommand.CanExecute(null).Should().BeTrue();
         }

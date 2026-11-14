@@ -164,6 +164,9 @@ public sealed class DeploymentListViewModel : ObservableObject
     /// <summary>上部の「料金の目安（全体）」（読んだすべてのデプロイ。見積もれなければ null）。</summary>
     public string? CostTotalText => Costs.TotalText(_entries);
 
+    /// <summary>上部の「料金の目安（全体）」の表示（単価を読む前は「計算しています」、見積もれる行が無ければその旨）。</summary>
+    public string CostTotalDisplay => CostTotalText ?? (Costs.HasPricesFor(_entries) ? "—（見積もれる行がありません）" : "計算しています");
+
     /// <summary>「全体」の数え方（「3 件のデプロイから期限まで（期限なしの 1 件は 1 か月分）」）。</summary>
     public string? CostTotalNote => Costs.TotalNote(_entries);
 
@@ -183,6 +186,7 @@ public sealed class DeploymentListViewModel : ObservableObject
             return;
         }
         OnPropertyChanged(nameof(CostTotalText));
+        OnPropertyChanged(nameof(CostTotalDisplay));
         OnPropertyChanged(nameof(CostTotalNote));
         OnPropertyChanged(nameof(CostThisMonthText));
         OnPropertyChanged(nameof(CostThisMonthLabel));
@@ -334,6 +338,72 @@ public sealed class DeploymentListViewModel : ObservableObject
 
     /// <summary>選択をすべて外す。</summary>
     public AsyncCommand ClearSelectionCommand { get; }
+
+    /// <summary>右クリックのメニューの「期限・グループを変える…」で、上の操作の帯（期限日の入力）に移ってほしいとき。</summary>
+    public event Action BatchEditRequested = () => { };
+
+    /// <summary>
+    /// 行の右クリックのメニューの操作（オーナーの依頼、2026-11-14）。1 行なら、詳細・ブラウザーで開く・対象に入れる・最後の設定で新しくデプロイ・状態の確認・
+    /// パスワード・期限の延長・期限とグループの変更・Azure から削除。2 行以上なら、まとめての期限の延長・期限とグループの変更・Azure から削除。
+    /// </summary>
+    public IReadOnlyList<RowMenuItem> MenuFor(IReadOnlyList<DeploymentRowViewModel> rows)
+    {
+        if (rows.Count == 0)
+            return [];
+        Task Select(Func<Task> then)
+        {
+            SetSelection(rows);
+            return then();
+        }
+        Task EditBatch()
+        {
+            SetSelection(rows);
+            BatchEditRequested.Invoke();
+            return Task.CompletedTask;
+        }
+        if (rows.Count == 1)
+        {
+            var r = rows[0];
+            return
+            [
+                new("Row.Detail", "詳細を開く", () => Select(() => Task.CompletedTask)),
+                new("Row.Open", "TimeTracker をブラウザーで開く", r.OpenCommand.ExecuteAsync, r.OpenCommand.CanExecute(null)),
+                new("Row.UseAsTarget", "対象に入れる（新しくデプロイ）", r.UseAsTargetCommand.ExecuteAsync, r.UseAsTargetCommand.CanExecute(null), StartsGroup: true),
+                new("Row.Redeploy", "最後のデプロイの設定で新しくデプロイ", r.RedeployCommand.ExecuteAsync, r.RedeployCommand.CanExecute(null)),
+                new("Row.CheckStatus", r.CheckStatusText, r.CheckStatusCommand.ExecuteAsync, r.CheckStatusCommand.CanExecute(null)),
+                new("Row.ShowPasswords", "パスワードを表示", () => Select(r.ShowPasswordsCommand.ExecuteAsync), r.ShowPasswordsCommand.CanExecute(null)),
+                new("Row.Extend7", "期限を 7 日延ばす", r.Extend7Command.ExecuteAsync, r.Extend7Command.CanExecute(null), StartsGroup: true),
+                new("Row.Extend30", "期限を 30 日延ばす", r.Extend30Command.ExecuteAsync, r.Extend30Command.CanExecute(null)),
+                new("Row.EditBatch", "期限・グループを変える…", EditBatch),
+                new("Row.Delete", "Azure から削除…", r.DeleteCommand.ExecuteAsync, r.DeleteCommand.CanExecute(null), IsDanger: true, StartsGroup: true),
+            ];
+        }
+        var extendable = rows.Any(r => r.Extend7Command.CanExecute(null));
+        return
+        [
+            new("Rows.Extend7", $"選んだ {rows.Count} 件の期限を 7 日延ばす", () => ExtendAllAsync(rows, 7), extendable),
+            new("Rows.Extend30", $"選んだ {rows.Count} 件の期限を 30 日延ばす", () => ExtendAllAsync(rows, 30), extendable),
+            new("Rows.EditBatch", $"選んだ {rows.Count} 件の期限・グループを変える…", EditBatch),
+            new("Rows.Delete", $"選んだ {rows.Count} 件を Azure から削除…", () => Select(DeleteSelectedCommand.ExecuteAsync), IsDanger: true, StartsGroup: true),
+        ];
+    }
+
+    // まとめて期限を延ばす（ジョブのある行・延ばせない行は飛ばす。行ごとの誤りは行に出す）
+    private async Task ExtendAllAsync(IReadOnlyList<DeploymentRowViewModel> rows, int days)
+    {
+        var done = new List<string>();
+        foreach (var row in rows)
+        {
+            var command = days == 7 ? row.Extend7Command : row.Extend30Command;
+            if (!command.CanExecute(null))
+                continue;
+            await command.ExecuteAsync();
+            if (row.Error == null)
+                done.Add(row.AppName);
+        }
+        BatchMessage = $"{done.Count} 件の利用可能期限を {days} 日延ばしました" + (done.Count == 0 ? "。" : $"（{string.Join("、", done)}）。") +
+                       (done.Count < rows.Count ? $" 延ばせなかったもの・飛ばしたもの: {rows.Count - done.Count} 件。" : "");
+    }
 
     /// <summary>選んだ行の利用可能期限を変える。</summary>
     public AsyncCommand ChangeSelectedExpiryCommand { get; }

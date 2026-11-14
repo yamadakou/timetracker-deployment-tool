@@ -130,7 +130,8 @@ public sealed class DryRunViewModelTests : IDisposable
     {
         var h = Ready();
         h.Dialogs.Folder = _root;
-        h.Main.Settings.TtMemoryGi = "2";
+        // スペックの警告は Azure だけ（docker-compose にはスペックを書かない）。ローカル向けの警告は、既定でないイメージのタグで確かめる
+        h.Main.Settings.TtTag = "7.0.0-linux-postgres";
         var vm = h.Main.DryRun;
 
         await vm.SaveCommand.ExecuteAsync();
@@ -140,7 +141,7 @@ public sealed class DryRunViewModelTests : IDisposable
         vm.ComposeContent.Should().Be(File.ReadAllText(Path.Combine(_root, "docker-compose.yml"))).And.NotContain("DbPassw0rd!");
         File.ReadAllText(Path.Combine(_root, ".env")).Should().Contain("DbPassw0rd!");
         vm.EnvWarning.Should().Be(DesktopMessages.EnvFileWarning);
-        vm.Warnings.Should().ContainSingle().Which.Should().StartWith("tt-memory が 2Gi です。");
+        vm.Warnings.Should().ContainSingle().Which.Should().StartWith("tt-tag '7.0.0-linux-postgres' は既定のタグ");
         vm.NextSteps.Should().HaveCount(3).And.Contain($"{_root} で docker compose up -d を実行する");
         h.Dialogs.Confirmations.Should().BeEmpty();
 

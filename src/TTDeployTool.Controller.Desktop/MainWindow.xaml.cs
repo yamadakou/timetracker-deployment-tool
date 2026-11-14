@@ -37,6 +37,8 @@ public sealed partial class MainWindow : Window
         ViewModel = viewModel;
         Bindings.Update();
         AppWindow.Closing += OnClosing;
+        // 題の左とタスク バーのアイコン（オーナーのアイコン。No.89）
+        AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "TrayIcon.ico"));
         // デプロイの一覧の行の操作で、画面を切り替える
         viewModel.NavigationRequested += Navigate;
         // 表の選択と ViewModel の選択は、Core の SelectionSync が合わせる（画面の側は渡すだけ）
@@ -51,6 +53,17 @@ public sealed partial class MainWindow : Window
         _jobsTable = new TableBinder<JobViewModel>(JobsList, jobs.Filters, viewModel.JobsLayout, jobs, row => row as JobViewModel, JobListViewModel.CanSortBy,
             () => jobs.SortColumn, () => jobs.SortDescending, jobs.SortBy, jobs.ClearSort);
         JobsList.CellDoubleTapped += OnJobCellDoubleTapped;
+        // 行の右クリックのメニューの操作（項目は Core が作る。No.89）と、デプロイの一覧の行のダブルクリック（その行だけを選んで詳細を出す）
+        _deploymentsTable.RowMenu = rows => deployments.MenuFor([.. rows.OfType<DeploymentRowViewModel>()]);
+        _jobsTable.RowMenu = rows => jobs.MenuFor([.. rows.OfType<JobViewModel>()], viewModel.OpenJobAsync, viewModel.SignIn.IsSignedIn);
+        deployments.BatchEditRequested += () => DispatcherQueue.TryEnqueue(() => BatchExpiryDate.Focus(FocusState.Programmatic));
+        jobs.RescheduleRequested += () => DispatcherQueue.TryEnqueue(() => JobsScheduleDate.Focus(FocusState.Programmatic));
+        DeploymentsTable.CellDoubleTapped += (_, e) =>
+        {
+            if (e.Item is DeploymentRowViewModel row)
+                deployments.SetSelection([row]);
+        };
+        PrepareDetailText(DeploymentDetail);
         _deploymentsTable.BindText(DeploymentsText);
         _jobsTable.BindText(JobsText);
         CreateTray();
@@ -162,6 +175,46 @@ public sealed partial class MainWindow : Window
             _ = ViewModel.OpenJobAsync(job);
     }
 
+    // 右の詳細の文字を範囲選択できるようにし（パスワードは除く）、右クリックで「選んだ文字をコピー」「詳細をコピー」を出す（No.89）
+    private void PrepareDetailText(FrameworkElement detail)
+    {
+        TextBlock? source = null;
+        var selected = new MenuFlyoutItem { Text = "選んだ文字をコピー" };
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(selected, "Detail.CopySelection");
+        selected.Click += (_, _) =>
+        {
+            if (ViewModel.Deployments.Current is { } row && source != null)
+                _ = row.CopySelectedTextAsync(source.SelectedText);
+        };
+        var all = new MenuFlyoutItem { Text = "詳細をコピー" };
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(all, "Detail.CopyAll");
+        all.Click += (_, _) => _ = ViewModel.Deployments.Current?.CopyDetailCommand.ExecuteAsync();
+        var menu = new MenuFlyout { Items = { selected, all } };
+        menu.Opening += (_, _) =>
+        {
+            source = menu.Target as TextBlock;
+            selected.IsEnabled = source is { SelectedText.Length: > 0 };
+        };
+        detail.ContextFlyout = menu;
+        foreach (var text in TextBlocksIn(detail))
+        {
+            if (!text.IsTextSelectionEnabled && Microsoft.UI.Xaml.Automation.AutomationProperties.GetAutomationId(text) is "Row.DbPassword" or "Row.TrackerPassword")
+                continue;
+            text.IsTextSelectionEnabled = true;
+            text.SelectionFlyout = null;
+            text.ContextFlyout = menu;
+        }
+    }
+
+    // 詳細の中の文字（パネル・枠の子。テンプレートは使っていない）
+    private static IEnumerable<TextBlock> TextBlocksIn(DependencyObject element) => element switch
+    {
+        TextBlock text => new[] { text },
+        Panel panel => panel.Children.SelectMany(TextBlocksIn),
+        Border { Child: { } child } => TextBlocksIn(child),
+        _ => Enumerable.Empty<TextBlock>(),
+    };
+
     // 実行状況の画面の「戻る」: 開いた画面（ジョブの一覧かデプロイの一覧）に戻る
     private void OnBackFromStatus(object sender, RoutedEventArgs e) => Navigate(ViewModel.ReturnPage);
 
@@ -266,7 +319,7 @@ public sealed partial class MainWindow : Window
         _tray = new TaskbarIcon
         {
             ToolTipText = TrayToolTip(),
-            // System.Drawing.Icon で読むため、ICO（BMP の形式。Assets/Square150x150Logo.png から作ったもの）にする
+            // System.Drawing.Icon で読むため、ICO（BMP の形式。オーナーのアイコン docs/design/desktop/icon/TTDeployTool.ico の各サイズを BMP にしたもの。No.89）にする
             IconSource = new BitmapImage(new Uri("ms-appx:///Assets/TrayIcon.ico")),
             ContextMenuMode = ContextMenuMode.PopupMenu,
             ContextFlyout = menu,

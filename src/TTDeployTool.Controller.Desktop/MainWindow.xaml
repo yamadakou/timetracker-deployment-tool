@@ -241,40 +241,58 @@
                                 <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="12">
                                     <StackPanel Spacing="4">
                                         <Grid><TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind ViewModel.Settings.TtSpec.Name}" />
-                                            <TextBlock AutomationProperties.AutomationId="Settings.TtSpecText" HorizontalAlignment="Right" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" Text="{x:Bind ViewModel.Settings.TtSpec.Text, Mode=OneWay}" /></Grid>
+                                            <TextBlock AutomationProperties.AutomationId="Settings.TtSpecText" HorizontalAlignment="Right" Foreground="{x:Bind local:Ui.SpecBrush(ViewModel.Settings.TtSpec.IsBelowMinimum, 'AccentTextFillColorPrimaryBrush'), Mode=OneWay}" Text="{x:Bind ViewModel.Settings.TtSpec.Text, Mode=OneWay}" /></Grid>
                                         <Slider AutomationProperties.AutomationId="Settings.TtSpec" AutomationProperties.Name="TimeTracker の CPU" Minimum="0" Maximum="{x:Bind ViewModel.Settings.TtSpec.MaxStep}" StepFrequency="1" TickFrequency="1" TickPlacement="BottomRight"
-                                                SnapsTo="Ticks" IsThumbToolTipEnabled="False" Value="{x:Bind ViewModel.Settings.TtSpec.Step, Mode=OneWay}" Tag="TtSpec" ValueChanged="OnSpecStepChanged" />
-                                        <ItemsControl ItemsSource="{x:Bind ViewModel.Settings.TtSpec.Labels}">
+                                                SnapsTo="Ticks" IsThumbToolTipEnabled="False" Value="{x:Bind ViewModel.Settings.TtSpec.Step, Mode=OneWay}" Tag="TtSpec" ValueChanged="OnSpecStepChanged"
+                                                Foreground="{x:Bind local:Ui.SpecBrush(ViewModel.Settings.TtSpec.IsBelowMinimum, 'AccentFillColorDefaultBrush'), Mode=OneWay}" />
+                                        <!-- サンプル DB を作れる実用上の最低スペックを下回る範囲の赤の帯（No.89） -->
+                                        <Grid Height="4" Margin="10,0" Visibility="{x:Bind local:Ui.IfPositive(ViewModel.Settings.TtSpec.BelowMinimumShare)}"><Grid.ColumnDefinitions><ColumnDefinition Width="{x:Bind local:Ui.Star(ViewModel.Settings.TtSpec.BelowMinimumShare)}" /><ColumnDefinition Width="{x:Bind local:Ui.Star(local:Ui.Rest(ViewModel.Settings.TtSpec.BelowMinimumShare))}" /></Grid.ColumnDefinitions>
+                                            <Rectangle AutomationProperties.AutomationId="Settings.TtSpecBelowMinimum" Fill="{ThemeResource SystemFillColorCriticalBrush}" RadiusX="2" RadiusY="2" /></Grid>
+                                        <ItemsControl ItemsSource="{x:Bind local:Ui.SpecLabels(ViewModel.Settings.TtSpec)}">
                                             <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="0" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-                                            <ItemsControl.ItemTemplate><DataTemplate x:DataType="x:String"><TextBlock Style="{StaticResource CaptionTextBlockStyle}" Width="60" Text="{x:Bind}" /></DataTemplate></ItemsControl.ItemTemplate>
+                                            <ItemsControl.ItemTemplate><DataTemplate x:DataType="local:SpecLabel"><TextBlock Style="{StaticResource CaptionTextBlockStyle}" Width="60" Text="{x:Bind Text}" Foreground="{x:Bind Brush}" /></DataTemplate></ItemsControl.ItemTemplate>
                                         </ItemsControl>
                                         <TextBlock Style="{StaticResource CaptionTextBlockStyle}" TextWrapping="Wrap" Text="{x:Bind ViewModel.Settings.TtSpec.Note, Mode=OneWay}" />
+                                        <TextBlock AutomationProperties.AutomationId="Settings.TtSpecMinimum" Style="{StaticResource CaptionTextBlockStyle}" TextWrapping="Wrap" Text="{x:Bind ViewModel.Settings.TtSpec.MinimumText, Mode=OneWay}"
+                                                   Foreground="{x:Bind local:Ui.SpecBrush(ViewModel.Settings.TtSpec.IsBelowMinimum, 'TextFillColorSecondaryBrush'), Mode=OneWay}" />
                                     </StackPanel>
                                 </Border>
                                 <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="12">
                                     <StackPanel Spacing="4">
                                         <Grid><TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind ViewModel.Settings.DbSpec.Name}" />
-                                            <TextBlock AutomationProperties.AutomationId="Settings.DbSpecText" HorizontalAlignment="Right" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" Text="{x:Bind ViewModel.Settings.DbSpec.Text, Mode=OneWay}" /></Grid>
+                                            <TextBlock AutomationProperties.AutomationId="Settings.DbSpecText" HorizontalAlignment="Right" Foreground="{x:Bind local:Ui.SpecBrush(ViewModel.Settings.DbSpec.IsBelowMinimum, 'AccentTextFillColorPrimaryBrush'), Mode=OneWay}" Text="{x:Bind ViewModel.Settings.DbSpec.Text, Mode=OneWay}" /></Grid>
                                         <Slider AutomationProperties.AutomationId="Settings.DbSpec" AutomationProperties.Name="DB の CPU" Minimum="0" Maximum="{x:Bind ViewModel.Settings.DbSpec.MaxStep}" StepFrequency="1" TickFrequency="1" TickPlacement="BottomRight"
-                                                SnapsTo="Ticks" IsThumbToolTipEnabled="False" Value="{x:Bind ViewModel.Settings.DbSpec.Step, Mode=OneWay}" Tag="DbSpec" ValueChanged="OnSpecStepChanged" />
-                                        <ItemsControl ItemsSource="{x:Bind ViewModel.Settings.DbSpec.Labels}">
+                                                SnapsTo="Ticks" IsThumbToolTipEnabled="False" Value="{x:Bind ViewModel.Settings.DbSpec.Step, Mode=OneWay}" Tag="DbSpec" ValueChanged="OnSpecStepChanged"
+                                                Foreground="{x:Bind local:Ui.SpecBrush(ViewModel.Settings.DbSpec.IsBelowMinimum, 'AccentFillColorDefaultBrush'), Mode=OneWay}" />
+                                        <!-- サンプル DB を作れる実用上の最低スペックを下回る範囲の赤の帯（No.89） -->
+                                        <Grid Height="4" Margin="10,0" Visibility="{x:Bind local:Ui.IfPositive(ViewModel.Settings.DbSpec.BelowMinimumShare)}"><Grid.ColumnDefinitions><ColumnDefinition Width="{x:Bind local:Ui.Star(ViewModel.Settings.DbSpec.BelowMinimumShare)}" /><ColumnDefinition Width="{x:Bind local:Ui.Star(local:Ui.Rest(ViewModel.Settings.DbSpec.BelowMinimumShare))}" /></Grid.ColumnDefinitions>
+                                            <Rectangle AutomationProperties.AutomationId="Settings.DbSpecBelowMinimum" Fill="{ThemeResource SystemFillColorCriticalBrush}" RadiusX="2" RadiusY="2" /></Grid>
+                                        <ItemsControl ItemsSource="{x:Bind local:Ui.SpecLabels(ViewModel.Settings.DbSpec)}">
                                             <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="0" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-                                            <ItemsControl.ItemTemplate><DataTemplate x:DataType="x:String"><TextBlock Style="{StaticResource CaptionTextBlockStyle}" Width="60" Text="{x:Bind}" /></DataTemplate></ItemsControl.ItemTemplate>
+                                            <ItemsControl.ItemTemplate><DataTemplate x:DataType="local:SpecLabel"><TextBlock Style="{StaticResource CaptionTextBlockStyle}" Width="60" Text="{x:Bind Text}" Foreground="{x:Bind Brush}" /></DataTemplate></ItemsControl.ItemTemplate>
                                         </ItemsControl>
                                         <TextBlock Style="{StaticResource CaptionTextBlockStyle}" TextWrapping="Wrap" Text="{x:Bind ViewModel.Settings.DbSpec.Note, Mode=OneWay}" />
+                                        <TextBlock AutomationProperties.AutomationId="Settings.DbSpecMinimum" Style="{StaticResource CaptionTextBlockStyle}" TextWrapping="Wrap" Text="{x:Bind ViewModel.Settings.DbSpec.MinimumText, Mode=OneWay}"
+                                                   Foreground="{x:Bind local:Ui.SpecBrush(ViewModel.Settings.DbSpec.IsBelowMinimum, 'TextFillColorSecondaryBrush'), Mode=OneWay}" />
                                     </StackPanel>
                                 </Border>
                                 <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="12">
                                     <StackPanel Spacing="4">
                                         <Grid><TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind ViewModel.Settings.RedisSpec.Name}" />
-                                            <TextBlock AutomationProperties.AutomationId="Settings.RedisSpecText" HorizontalAlignment="Right" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" Text="{x:Bind ViewModel.Settings.RedisSpec.Text, Mode=OneWay}" /></Grid>
+                                            <TextBlock AutomationProperties.AutomationId="Settings.RedisSpecText" HorizontalAlignment="Right" Foreground="{x:Bind local:Ui.SpecBrush(ViewModel.Settings.RedisSpec.IsBelowMinimum, 'AccentTextFillColorPrimaryBrush'), Mode=OneWay}" Text="{x:Bind ViewModel.Settings.RedisSpec.Text, Mode=OneWay}" /></Grid>
                                         <Slider AutomationProperties.AutomationId="Settings.RedisSpec" AutomationProperties.Name="Redis の CPU" Minimum="0" Maximum="{x:Bind ViewModel.Settings.RedisSpec.MaxStep}" StepFrequency="1" TickFrequency="1" TickPlacement="BottomRight"
-                                                SnapsTo="Ticks" IsThumbToolTipEnabled="False" Value="{x:Bind ViewModel.Settings.RedisSpec.Step, Mode=OneWay}" Tag="RedisSpec" ValueChanged="OnSpecStepChanged" />
-                                        <ItemsControl ItemsSource="{x:Bind ViewModel.Settings.RedisSpec.Labels}">
+                                                SnapsTo="Ticks" IsThumbToolTipEnabled="False" Value="{x:Bind ViewModel.Settings.RedisSpec.Step, Mode=OneWay}" Tag="RedisSpec" ValueChanged="OnSpecStepChanged"
+                                                Foreground="{x:Bind local:Ui.SpecBrush(ViewModel.Settings.RedisSpec.IsBelowMinimum, 'AccentFillColorDefaultBrush'), Mode=OneWay}" />
+                                        <!-- サンプル DB を作れる実用上の最低スペックを下回る範囲の赤の帯（No.89） -->
+                                        <Grid Height="4" Margin="10,0" Visibility="{x:Bind local:Ui.IfPositive(ViewModel.Settings.RedisSpec.BelowMinimumShare)}"><Grid.ColumnDefinitions><ColumnDefinition Width="{x:Bind local:Ui.Star(ViewModel.Settings.RedisSpec.BelowMinimumShare)}" /><ColumnDefinition Width="{x:Bind local:Ui.Star(local:Ui.Rest(ViewModel.Settings.RedisSpec.BelowMinimumShare))}" /></Grid.ColumnDefinitions>
+                                            <Rectangle AutomationProperties.AutomationId="Settings.RedisSpecBelowMinimum" Fill="{ThemeResource SystemFillColorCriticalBrush}" RadiusX="2" RadiusY="2" /></Grid>
+                                        <ItemsControl ItemsSource="{x:Bind local:Ui.SpecLabels(ViewModel.Settings.RedisSpec)}">
                                             <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="0" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-                                            <ItemsControl.ItemTemplate><DataTemplate x:DataType="x:String"><TextBlock Style="{StaticResource CaptionTextBlockStyle}" Width="60" Text="{x:Bind}" /></DataTemplate></ItemsControl.ItemTemplate>
+                                            <ItemsControl.ItemTemplate><DataTemplate x:DataType="local:SpecLabel"><TextBlock Style="{StaticResource CaptionTextBlockStyle}" Width="60" Text="{x:Bind Text}" Foreground="{x:Bind Brush}" /></DataTemplate></ItemsControl.ItemTemplate>
                                         </ItemsControl>
                                         <TextBlock Style="{StaticResource CaptionTextBlockStyle}" TextWrapping="Wrap" Text="{x:Bind ViewModel.Settings.RedisSpec.Note, Mode=OneWay}" />
+                                        <TextBlock AutomationProperties.AutomationId="Settings.RedisSpecMinimum" Style="{StaticResource CaptionTextBlockStyle}" TextWrapping="Wrap" Text="{x:Bind ViewModel.Settings.RedisSpec.MinimumText, Mode=OneWay}"
+                                                   Foreground="{x:Bind local:Ui.SpecBrush(ViewModel.Settings.RedisSpec.IsBelowMinimum, 'TextFillColorSecondaryBrush'), Mode=OneWay}" />
                                     </StackPanel>
                                 </Border>
                             </StackPanel>
@@ -453,7 +471,7 @@
                             <Grid ColumnSpacing="24"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                                 <StackPanel>
                                     <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Text="料金の目安（全体）" />
-                                    <TextBlock AutomationProperties.AutomationId="Deployments.CostTotal" Style="{StaticResource SubtitleTextBlockStyle}" Text="{x:Bind ViewModel.Deployments.CostTotalText, Mode=OneWay, TargetNullValue='—'}" />
+                                    <TextBlock AutomationProperties.AutomationId="Deployments.CostTotal" Style="{StaticResource SubtitleTextBlockStyle}" Text="{x:Bind ViewModel.Deployments.CostTotalDisplay, Mode=OneWay}" />
                                     <TextBlock Style="{StaticResource CaptionTextBlockStyle}" TextWrapping="Wrap" Text="{x:Bind ViewModel.Deployments.CostTotalNote, Mode=OneWay, TargetNullValue=''}" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1">
@@ -474,7 +492,7 @@
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <TextBlock AutomationProperties.AutomationId="Deployments.Selection" VerticalAlignment="Center" Text="{x:Bind ViewModel.Deployments.SelectionText, Mode=OneWay}" />
                             <CheckBox AutomationProperties.AutomationId="Deployments.BatchNoExpiry" Content="期限なし" IsChecked="{x:Bind ViewModel.Deployments.BatchNoExpiry, Mode=TwoWay}" VerticalAlignment="Center" />
-                            <DatePicker AutomationProperties.AutomationId="Deployments.BatchExpiryDate" Date="{x:Bind ViewModel.Deployments.BatchExpiryDate, Mode=TwoWay}"
+                            <DatePicker x:Name="BatchExpiryDate" AutomationProperties.AutomationId="Deployments.BatchExpiryDate" Date="{x:Bind ViewModel.Deployments.BatchExpiryDate, Mode=TwoWay}"
                                         IsEnabled="{x:Bind local:Ui.Not(ViewModel.Deployments.BatchNoExpiry), Mode=OneWay}" />
                             <Button AutomationProperties.AutomationId="Deployments.ChangeExpiry" Content="期限を変える" Command="{x:Bind ViewModel.Deployments.ChangeSelectedExpiryCommand}" />
                             <Button AutomationProperties.AutomationId="Deployments.Delete" Content="Azure から削除…" Command="{x:Bind ViewModel.Deployments.DeleteSelectedCommand}" />
@@ -576,7 +594,7 @@
                         </StackPanel>
 
                         <!-- 1 行だけ選んだときの詳細（選んだ行の値を ViewModel から直接結び付ける。テンプレートの ContentControl では、パスワードを読んだ後の表示が変わらなかった） -->
-                        <Border AutomationProperties.AutomationId="Deployments.Detail" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="12"
+                        <Border x:Name="DeploymentDetail" AutomationProperties.AutomationId="Deployments.Detail" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="12"
                                 Visibility="{x:Bind ViewModel.Deployments.HasCurrent, Mode=OneWay}">
                             <StackPanel Spacing="4">
                                 <StackPanel Orientation="Horizontal" Spacing="4">
@@ -787,7 +805,7 @@
                                    Text="{x:Bind ViewModel.JobList.Current.RedeployNote, Mode=OneWay, FallbackValue=''}" />
                         <ContentControl IsTabStop="False" IsEnabled="{x:Bind ViewModel.SignIn.IsSignedIn, Mode=OneWay}">
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                            <DatePicker AutomationProperties.AutomationId="Jobs.ScheduleDate" Header="予定の日付" Date="{x:Bind ViewModel.JobList.Schedule.Date, Mode=TwoWay}" />
+                            <DatePicker x:Name="JobsScheduleDate" AutomationProperties.AutomationId="Jobs.ScheduleDate" Header="予定の日付" Date="{x:Bind ViewModel.JobList.Schedule.Date, Mode=TwoWay}" />
                             <TimePicker AutomationProperties.AutomationId="Jobs.ScheduleTime" Header="時刻" ClockIdentifier="24HourClock" Time="{x:Bind ViewModel.JobList.Schedule.TimeOfDay, Mode=TwoWay}" />
                             <Button AutomationProperties.AutomationId="Jobs.RescheduleSelected" Content="選んだジョブの予定を変える" VerticalAlignment="Bottom" Command="{x:Bind ViewModel.JobList.RescheduleSelectedCommand}" />
                         </StackPanel>

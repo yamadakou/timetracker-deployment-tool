@@ -1,5 +1,6 @@
 using System.Globalization;
 using TTDeployTool.Controller.Desktop.Core.Mvvm;
+using TTDeployTool.Domain.Deployment;
 
 namespace TTDeployTool.Controller.Desktop.Core.ViewModels;
 
@@ -28,9 +29,29 @@ public sealed class SpecSlider : ObservableObject
         _setMemory = setMemory;
         _defaultCpu = defaultCpu;
         _defaultMemory = defaultMemory;
+        Minimum = DeploymentAdvisor.SampleDbMinimumOf(name);
     }
 
     public string Name { get; }
+
+    // ---- サンプル DB を作れる実用上の最低スペック（オーナーの依頼、2026-11-14: 下回る範囲を赤にする）
+
+    /// <summary>サンプル DB を作れる実用上の最低スペック。</summary>
+    public SampleDbMinimum Minimum { get; }
+
+    /// <summary>最低スペックを下回る段階の割合（0〜1。スライダーの赤の帯の幅。0 なら帯は無い）。</summary>
+    public double BelowMinimumShare => (double)CpuSteps.Count(c => c < Minimum.Cpu) / MaxStep;
+
+    /// <summary>段階が最低スペックを下回るか（目盛りの文字を赤にする）。</summary>
+    public bool IsBelowMinimumStep(int step) => CpuSteps[step] < Minimum.Cpu;
+
+    /// <summary>今のスペックが最低スペックを下回るか（空の欄は既定値）。</summary>
+    public bool IsBelowMinimum => Minimum.IsBelow(Cpu ?? _defaultCpu, Memory ?? _defaultMemory);
+
+    /// <summary>最低スペックの案内（下回っていれば注意の文）。</summary>
+    public string MinimumText => IsBelowMinimum
+        ? $"サンプル DB を作れる実用上の最低スペック（{Minimum.Text}）を下回っています。サンプル DB の作成ができない場合があります。"
+        : $"サンプル DB を作れる実用上の最低スペック: {Minimum.Text}";
 
     /// <summary>スライダーの最後の段階の番号。</summary>
     public int MaxStep => CpuSteps.Count - 1;
@@ -79,6 +100,8 @@ public sealed class SpecSlider : ObservableObject
         OnPropertyChanged(nameof(Step));
         OnPropertyChanged(nameof(Text));
         OnPropertyChanged(nameof(Note));
+        OnPropertyChanged(nameof(IsBelowMinimum));
+        OnPropertyChanged(nameof(MinimumText));
     }
 
     private static double? Parse(string text) => double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value) ? value : null;

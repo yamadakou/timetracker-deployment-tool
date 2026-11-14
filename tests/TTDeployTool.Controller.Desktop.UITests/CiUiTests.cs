@@ -76,6 +76,9 @@ public class CiUiTests
             app.ItemsOf("Settings.Concurrency").Should().Equal("1", "2", "3", "4");
             app.SelectedOf("Settings.Concurrency").Should().Be("2", "既定は 2");
             app.Select("Settings.Concurrency", "3");
+            // 選んだ値がアプリのデータ（preferences.json）に書かれるのを待ってから起動し直す（選んだ直後に閉じると、変更がアプリに届く前に止まることがあった。No.89）
+            var preferences = Path.Combine(AppSession.DataDirectory(), "preferences.json");
+            AppSession.WaitUntil(() => File.Exists(preferences) && File.ReadAllText(preferences).Contains("\"MaxConcurrentJobs\":3", StringComparison.Ordinal), "同時に実行する数が保存される");
         }, "Concurrency_Should_Be_Saved_Across_Restarts_1");
         AppSession.Run(app =>
         {

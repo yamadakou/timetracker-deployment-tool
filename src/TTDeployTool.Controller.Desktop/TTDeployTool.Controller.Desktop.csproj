@@ -11,6 +11,8 @@
     <RootNamespace>TTDeployTool.Controller.Desktop</RootNamespace>
     <AssemblyName>ttdeploytool-desktop</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- exe のアイコン（オーナーのアイコン。元は docs/design/desktop/icon/。No.89） -->
+    <ApplicationIcon>Assets\TrayIcon.ico</ApplicationIcon>
     <Platforms>x64;ARM64</Platforms>
     <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
     <!-- バンドルでは x64 と arm64 をそれぞれビルドするため、プラットフォームに合わせて実行環境を決める（自己完結のビルドに必要） -->

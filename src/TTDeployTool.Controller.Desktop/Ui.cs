@@ -44,5 +44,24 @@ internal static class Ui
     /// <summary>件数のカードの枠の太さ（今の絞り込みのカードは太くする）。</summary>
     public static Thickness CardThickness(object current, string name) => new(current?.ToString() == name ? 2 : 1);
 
+    /// <summary>最低スペックを下回れば赤、ほかは <paramref name="normal"/> の色（スライダーの値・つまみの帯・案内の文。No.89）。</summary>
+    public static Brush SpecBrush(bool below, string normal) => (Brush)Microsoft.UI.Xaml.Application.Current.Resources[below ? "SystemFillColorCriticalBrush" : normal];
+
+    /// <summary>スライダーの目盛りの文字（最低スペックを下回る段階は赤）。</summary>
+    public static IReadOnlyList<SpecLabel> SpecLabels(SpecSlider slider) =>
+        [.. slider.Labels.Select((text, i) => new SpecLabel(text, SpecBrush(slider.IsBelowMinimumStep(i), "TextFillColorSecondaryBrush")))];
+
+    /// <summary>割合の幅（Grid の列の *）。</summary>
+    public static GridLength Star(double share) => new(share, GridUnitType.Star);
+
+    /// <summary>残りの割合。</summary>
+    public static double Rest(double share) => 1 - share;
+
+    /// <summary>割合が 0 より大きいときだけ出す（Redis は最低がいちばん左のため、赤の帯を出さない）。</summary>
+    public static Visibility IfPositive(double share) => share > 0 ? Visibility.Visible : Visibility.Collapsed;
+
     public static string Time(DateTimeOffset? value) => value is { } t ? $"計画の有効期限: {t.ToLocalTime():HH:mm}" : "";
 }
+
+/// <summary>スライダーの目盛りの文字と色。</summary>
+public sealed record SpecLabel(string Text, Brush Brush);

@@ -75,6 +75,37 @@ public sealed class DeploymentRowViewModel : ObservableObject
 
     public AsyncCommand OpenCommand { get; }
 
+    /// <summary>右の詳細の文字（右クリックの「詳細をコピー」。パスワードは含めない。オーナーの依頼、2026-11-14）。</summary>
+    public string DetailText => string.Join("\n", new[]
+    {
+        $"アプリ名: {(_entry.IsResourceGroupOnly ? "（リソースグループだけ）" : AppName)}",
+        $"リソースグループ: {ResourceGroup}",
+        $"サブスクリプション: {Subscription}",
+        $"状態: {StateText}",
+        _entry.IsResourceGroupOnly ? null : $"利用可能期限: {ExpiryText}" + (DaysLeftText is { } left ? $"、{left}" : ""),
+        Url is { } url ? $"URL: {url}" : null,
+        _entry.IsResourceGroupOnly ? null : $"DB: {DbTypeText}、{PersistenceText}",
+        _entry.IsResourceGroupOnly ? null : $"スペック: {SpecText}",
+        _entry.IsResourceGroupOnly ? null : $"グループ: {GroupText}",
+        _entry.IsResourceGroupOnly ? null : $"デプロイ日: {DeployedText}",
+        CostText is { } cost ? $"料金の目安: {cost}（{CostPerDayText}）" : null,
+    }.OfType<string>());
+
+    /// <summary>右の詳細の右クリックの「詳細をコピー」。</summary>
+    public AsyncCommand CopyDetailCommand => _copyDetail ??= new AsyncCommand(() => CopyTextAsync(DetailText, "詳細をコピーしました。"), () => _owner.CanCopy);
+
+    /// <summary>右の詳細で範囲選択した文字をコピーする（右クリックの「選んだ文字をコピー」）。空なら何もしない。</summary>
+    public Task CopySelectedTextAsync(string text) => text.Length == 0 || !_owner.CanCopy ? Task.CompletedTask : CopyTextAsync(text, "選んだ文字をコピーしました。");
+
+    private AsyncCommand? _copyDetail;
+
+    private Task CopyTextAsync(string text, string done)
+    {
+        _owner.Copy(text);
+        Message = done;
+        return Task.CompletedTask;
+    }
+
     /// <summary>対象に入れて、デプロイのウィザードを開く（再デプロイのため）。</summary>
     public AsyncCommand UseAsTargetCommand { get; }
 

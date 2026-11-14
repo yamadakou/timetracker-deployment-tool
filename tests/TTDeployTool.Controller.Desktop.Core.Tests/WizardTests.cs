@@ -83,7 +83,7 @@ public class DeployWizardViewModelTests
         vm.IsSpec.Should().BeTrue();
         settings.TtMemoryGi = "2";
         vm.StepErrors.Should().BeEmpty();
-        vm.StepWarnings.Should().ContainSingle().Which.Should().StartWith("tt-memory");
+        vm.StepWarnings.Should().ContainSingle().Which.Should().StartWith("tt-cpu / tt-memory（TimeTracker）が 1.5 vCPU / 2Gi です。");
         settings.TtCpu = "x";
         vm.CanGoNext.Should().BeFalse();
         settings.TtCpu = "1.5";

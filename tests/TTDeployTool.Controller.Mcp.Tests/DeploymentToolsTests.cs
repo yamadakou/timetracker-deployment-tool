@@ -216,10 +216,10 @@ public sealed class DeploymentToolsTests : IDisposable
     {
         var dir = Path.Combine(_root, "args");
 
-        var result = FileTools().GenerateCompose(dir, db_password: "ArgDbPass1!", tracker_password: "ArgTracker1!", tt_memory_gi: 2);
+        var result = FileTools().GenerateCompose(dir, db_password: "ArgDbPass1!", tracker_password: "ArgTracker1!", tt_tag: "7.0.0-linux-postgres");
 
         File.ReadAllText(result.EnvPath).Should().Contain("DB_PASSWORD=\"ArgDbPass1!\"").And.Contain("TIMETRACKER_PASSWORD=\"ArgTracker1!\"");
-        result.Warnings.Should().ContainSingle().Which.Should().Contain("OutOfMemory");
+        result.Warnings.Should().ContainSingle().Which.Should().Contain("'7.0.0-linux-postgres'");
     }
 
     [Theory]

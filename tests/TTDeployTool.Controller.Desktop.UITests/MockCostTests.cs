@@ -11,7 +11,7 @@ namespace TTDeployTool.Controller.Desktop.UITests;
 public class MockCostTests
 {
     // ④ スペックと期限まで進める（モックのサインインで、パスワードは画面で入れる）
-    private static void OpenSpec(AppSession app)
+    internal static void OpenSpec(AppSession app)
     {
         SignIn(app);
         app.Show("Wizard");

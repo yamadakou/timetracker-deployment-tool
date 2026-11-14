@@ -35,6 +35,12 @@ internal sealed class TableBinder<T>
     private bool _applying;
     private bool _sortPending;
     private (string Key, object Row)? _menuCell;
+    private int _copyItems;
+
+    /// <summary>
+    /// 右クリックのメニューで、コピーの 3 項目の後に並べる行の操作（Core の <see cref="RowMenuItem"/>。対象は、選んだ行か右クリックした行。No.89）。
+    /// </summary>
+    public Func<IReadOnlyList<object>, IReadOnlyList<RowMenuItem>>? RowMenu { get; set; }
 
     /// <param name="itemOf">表の行（ItemsSource の要素）から、Core の絞り込みの行を取り出す。行でない値（使い回しの途中の行の入れ物が持つ
     /// 「切り離された行」の目印など）には null を返す</param>
@@ -268,8 +274,34 @@ internal sealed class TableBinder<T>
         var markdown = new MenuFlyoutItem { Text = "選んだ行を Markdown 形式でコピー" };
         markdown.Click += (_, _) => Copy(_rows.CopyMarkdown(MenuRows, VisibleKeys));
         var menu = new MenuFlyout { Items = { cell, rows, markdown } };
-        menu.Opening += (_, _) => cell.IsEnabled = _menuCell != null;
+        _copyItems = menu.Items.Count;
+        menu.Opening += (_, _) =>
+        {
+            cell.IsEnabled = _menuCell != null;
+            AddRowMenu(menu);
+        };
         return menu;
+    }
+
+    // コピーの後に区切りの線を引いて行の操作を並べる（StartsGroup の前にも線。元に戻せない操作は赤、押せない操作は押せなくする）
+    private void AddRowMenu(MenuFlyout menu)
+    {
+        while (menu.Items.Count > _copyItems)
+            menu.Items.RemoveAt(menu.Items.Count - 1);
+        if (RowMenu?.Invoke(MenuRows) is not { Count: > 0 } items)
+            return;
+        menu.Items.Add(new MenuFlyoutSeparator());
+        foreach (var item in items)
+        {
+            if (item.StartsGroup)
+                menu.Items.Add(new MenuFlyoutSeparator());
+            var entry = new MenuFlyoutItem { Text = item.Label, IsEnabled = item.IsEnabled };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(entry, "Menu." + item.Id);
+            if (item.IsDanger)
+                entry.Foreground = (Microsoft.UI.Xaml.Media.Brush)Microsoft.UI.Xaml.Application.Current.Resources["SystemFillColorCriticalBrush"];
+            entry.Click += (_, _) => _ = item.Run();
+            menu.Items.Add(entry);
+        }
     }
 
     private void Copy(string text)

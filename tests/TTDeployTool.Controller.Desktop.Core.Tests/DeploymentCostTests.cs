@@ -233,6 +233,35 @@ public sealed class DeploymentCostTests
             list.Rows.Select(r => r.AppName).Should().Equal("forever");
     }
 
+    [Fact]
+    public async Task The_Total_Should_Say_It_Is_Calculating_Until_The_Prices_Arrive_And_When_Nothing_Can_Be_Estimated()
+    {
+        var prices = new TaskCompletionSource<UnitPrices>();
+        var catalog = new Moq.Mock<IPriceCatalog>();
+        catalog.Setup(c => c.GetAsync(Moq.It.IsAny<string>(), Moq.It.IsAny<PriceCurrency>(), Moq.It.IsAny<CancellationToken>())).Returns(prices.Task);
+        var h = new Harness(time: Tokyo(), prices: catalog.Object);
+        h.Azure.RecordsByTenant["t1"] =
+        [
+            new ManagedResourceRecord("/subscriptions/sub/resourceGroups/rg-old", "rg-old", ManagedResourceRecord.ResourceGroupType, "sub", "rg-old", "japaneast",
+                ManagedTags.ForResourceGroup()),
+        ];
+        await h.ReadyAsync();
+        var list = h.Main.Deployments;
+        await list.LoadCommand.ExecuteAsync();
+        list.CostTotalDisplay.Should().Be("計算しています");
+
+        prices.SetResult(BuiltInPriceCatalog.Jpy);
+        await Task.Yield();
+        list.CostTotalDisplay.Should().Be("—（見積もれる行がありません）", "リソースグループだけの行は見積もらない");
+    }
+
+    [Fact]
+    public async Task The_Total_Display_Should_Be_The_Total_When_Estimated()
+    {
+        var list = (await ListedAsync()).Main.Deployments;
+        list.CostTotalDisplay.Should().Be(list.CostTotalText);
+    }
+
     // ---------------- まとめての削除のリソースグループだけの行
 
     [Fact]

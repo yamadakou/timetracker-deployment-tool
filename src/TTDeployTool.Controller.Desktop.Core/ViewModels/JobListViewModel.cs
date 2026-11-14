@@ -270,6 +270,48 @@ public sealed class JobListViewModel : ObservableObject
     /// <summary>選んだ行の予定を <see cref="Schedule"/> の日時に変える（全部に同じ時刻）。</summary>
     public AsyncCommand RescheduleSelectedCommand { get; }
 
+    /// <summary>右クリックのメニューの「予定を変える…」で、予定の日時の入力に移ってほしいとき。</summary>
+    public event Action RescheduleRequested = () => { };
+
+    /// <summary>
+    /// 行の右クリックのメニューの操作（オーナーの依頼、2026-11-14）。1 行なら、詳細（実行状況）・この設定で新しくデプロイ・削除の設定の変更（詳細で変える）も出す。
+    /// 取り消し・一時停止・再開・予定の変更・記録から削除は、選んだ行の操作と同じ（対象の行を選んでから行う）。サインインしていなければ、詳細だけ押せる。
+    /// </summary>
+    /// <param name="open">詳細（実行状況の画面）を開く</param>
+    public IReadOnlyList<RowMenuItem> MenuFor(IReadOnlyList<JobViewModel> jobs, Func<JobViewModel, Task> open, bool signedIn)
+    {
+        if (jobs.Count == 0)
+            return [];
+        Func<Task> Selected(AsyncCommand command) => () =>
+        {
+            SetSelection(jobs);
+            return command.ExecuteAsync();
+        };
+        bool Any(Func<JobViewModel, AsyncCommand> command) => signedIn && jobs.Any(j => command(j).CanExecute(null));
+        Task Reschedule()
+        {
+            SetSelection(jobs);
+            RescheduleRequested.Invoke();
+            return Task.CompletedTask;
+        }
+        var n = jobs.Count == 1 ? "" : $"選んだ {jobs.Count} 件を";
+        var items = new List<RowMenuItem>();
+        if (jobs.Count == 1)
+        {
+            var job = jobs[0];
+            items.Add(new("Job.Detail", "詳細（実行状況・ログ）を開く", () => open(job)));
+            items.Add(new("Job.Redeploy", "この設定で新しくデプロイ", job.RedeployCommand.ExecuteAsync, signedIn && job.CanRedeploy));
+            if (!job.IsDeployment)
+                items.Add(new("Job.ChangeDeletion", "削除の設定を変える…（詳細で）", () => open(job), signedIn && job.CanChangeDeletion));
+        }
+        items.Add(new("Jobs.Cancel", $"{n}取り消し", Selected(CancelSelectedCommand), Any(j => j.CancelCommand), StartsGroup: true));
+        items.Add(new("Jobs.Pause", $"{n}一時停止", Selected(PauseSelectedCommand), Any(j => j.PauseCommand)));
+        items.Add(new("Jobs.Resume", $"{n}再開", Selected(ResumeSelectedCommand), Any(j => j.ResumeCommand)));
+        items.Add(new("Jobs.Reschedule", jobs.Count == 1 ? "予定を変える…" : $"選んだ {jobs.Count} 件の予定を変える…", Reschedule, Any(j => j.RescheduleCommand)));
+        items.Add(new("Jobs.DeleteRecords", $"{n}記録から削除", Selected(DeleteSelectedRecordsCommand), signedIn && jobs.Any(j => !j.IsActive), IsDanger: true, StartsGroup: true));
+        return items;
+    }
+
     /// <summary>「予定を変える」の日時。</summary>
     public ScheduleInput Schedule { get; }
 
