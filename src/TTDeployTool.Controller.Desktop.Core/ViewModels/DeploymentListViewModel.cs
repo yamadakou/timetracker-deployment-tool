@@ -173,10 +173,11 @@ public sealed class DeploymentListViewModel : ObservableObject
     /// <summary>「今月分」の見出し（「11 月の見込み」）。</summary>
     public string CostThisMonthLabel => Costs.ThisMonthLabel;
 
-    // 行のリージョンの単価を読み、新しく読めたら表示し直す（料金で並べていれば並べ直す）
+    // 行のリージョンの単価を読み、料金の表示を出し直す。料金で並べ替え・絞り込みをしていれば、一覧を作り直す
+    // （いつも作り直すと、読み込んだ直後の行の選択が、画面の作り直しと重なって外れることがあった。CI の Playwright、2026-11-14）
     private async Task UpdateCostsAsync()
     {
-        if (await Costs.LoadAsync(_entries))
+        if (await Costs.LoadAsync(_entries) && (Sort.Key == DeploymentSortKey.Cost || Filters.IsFiltered(nameof(DeploymentSortKey.Cost)) || Filters.Text.Length > 0))
         {
             Refresh(resetPage: false, keepRows: true);
             return;

@@ -209,6 +209,30 @@ public sealed class DeploymentCostTests
         rowChanges.Should().Contain(nameof(DeploymentRowViewModel.CostText));
     }
 
+    [Theory]
+    [InlineData("sort")]
+    [InlineData("column")]
+    [InlineData("text")]
+    public async Task Rows_Sorted_Or_Filtered_By_The_Cost_Should_Be_Rebuilt_When_Prices_Arrive(string how)
+    {
+        var list = (await ListedAsync()).Main.Deployments;
+        var forever = list.Rows.Single(r => r.AppName == "forever").CostText!;
+        switch (how)
+        {
+            case "sort": list.SortBy(DeploymentSortKey.Cost); break;
+            case "column": list.Filters.SetValues("Cost", [forever]); break;
+            default: list.Filters.Text = "1 か月"; break;
+        }
+        list.Costs.Currency = CostEstimateViewModel.CurrencyOptions[1];
+
+        // 単価を読み直した後の値で、並べ替え・絞り込みをし直す（円の値で絞り込んでいれば、USD の行は合わない）
+        list.Rows.Select(r => r.CostText).Should().OnlyContain(t => t == null || t.Contains('$'));
+        if (how == "column")
+            list.Rows.Should().BeEmpty();
+        if (how == "text")
+            list.Rows.Select(r => r.AppName).Should().Equal("forever");
+    }
+
     // ---------------- まとめての削除のリソースグループだけの行
 
     [Fact]
