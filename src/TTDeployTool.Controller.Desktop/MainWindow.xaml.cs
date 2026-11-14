@@ -74,6 +74,25 @@ public sealed partial class MainWindow : Window
             ViewModel.Settings.PersistDb = option;
     }
 
+    // スペックのスライダー（No.86）: 目盛りの位置を CPU の段に入れる（Slider の値は double、段は int のため、TwoWay で結べない）
+    private void OnSpecStepChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
+    {
+        var spec = (string)((FrameworkElement)sender).Tag switch
+        {
+            "TtSpec" => ViewModel.Settings.TtSpec,
+            "DbSpec" => ViewModel.Settings.DbSpec,
+            _ => ViewModel.Settings.RedisSpec,
+        };
+        spec.Step = (int)Math.Round(e.NewValue);
+    }
+
+    // 料金の目安の単位（円・USD）
+    private void OnCurrencyChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (((ComboBox)sender).SelectedItem is Core.Pricing.CurrencyOption option)
+            ViewModel.Cost.Currency = option;
+    }
+
     private void OnExpiryChanged(object sender, SelectionChangedEventArgs e)
     {
         if (((ComboBox)sender).SelectedItem is ExpiryOption option)

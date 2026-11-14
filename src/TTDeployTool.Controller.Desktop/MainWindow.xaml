@@ -6,6 +6,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:TTDeployTool.Controller.Desktop"
     xmlns:vm="using:TTDeployTool.Controller.Desktop.Core.ViewModels"
+    xmlns:vmp="using:TTDeployTool.Controller.Desktop.Core.Pricing"
     xmlns:jobs="using:TTDeployTool.Controller.Desktop.Core.Jobs"
     xmlns:tv="using:WinUI.TableView"
     Title="TTDeployTool">
@@ -208,6 +209,75 @@
 
                         <!-- ④ スペックと利用可能期限 -->
                         <StackPanel Spacing="12" Visibility="{x:Bind ViewModel.Wizard.IsSpec, Mode=OneWay}">
+                            <!-- 料金の目安（No.86。Azure の公開の価格表から読み、読めなければアプリに入れた価格。Blazor 版のデザイン） -->
+                            <Border AutomationProperties.AutomationId="Cost.Panel" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16" MaxWidth="640" HorizontalAlignment="Left">
+                                <StackPanel Spacing="8">
+                                    <Grid><TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="料金の目安" VerticalAlignment="Center" />
+                                        <ComboBox AutomationProperties.AutomationId="Cost.Currency" HorizontalAlignment="Right" ItemsSource="{x:Bind vmp:CostEstimateViewModel.CurrencyOptions}" DisplayMemberPath="Label"
+                                                  SelectedItem="{x:Bind ViewModel.Cost.Currency, Mode=OneWay}" SelectionChanged="OnCurrencyChanged" /></Grid>
+                                    <TextBlock AutomationProperties.AutomationId="Cost.Period" Style="{StaticResource CaptionTextBlockStyle}" Text="{x:Bind ViewModel.Cost.PeriodText, Mode=OneWay}" />
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock AutomationProperties.AutomationId="Cost.Total" Style="{StaticResource SubtitleTextBlockStyle}" Text="{x:Bind ViewModel.Cost.TotalText, Mode=OneWay}" />
+                                        <TextBlock AutomationProperties.AutomationId="Cost.PerDay" VerticalAlignment="Bottom" Style="{StaticResource CaptionTextBlockStyle}" Text="{x:Bind ViewModel.Cost.PerDayText, Mode=OneWay}" />
+                                    </StackPanel>
+                                    <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Text="{x:Bind ViewModel.Cost.AmountLabel, Mode=OneWay}" />
+                                    <ItemsControl AutomationProperties.AutomationId="Cost.Lines" ItemsSource="{x:Bind ViewModel.Cost.Lines}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vmp:CostLine">
+                                                <Grid Margin="0,2" ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="120" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                                    <StackPanel Orientation="Horizontal" Spacing="4"><TextBlock Text="{x:Bind Name}" /><TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="{x:Bind Spec}" /></StackPanel>
+                                                    <ProgressBar Grid.Column="1" Maximum="1" Value="{x:Bind Share}" VerticalAlignment="Center" />
+                                                    <TextBlock Grid.Column="2" Text="{x:Bind Amount}" HorizontalAlignment="Right" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <TextBlock AutomationProperties.AutomationId="Cost.Saving" TextWrapping="Wrap" Foreground="{ThemeResource SystemFillColorSuccessBrush}" Text="{x:Bind ViewModel.Cost.SavingText, Mode=OneWay}" />
+                                    <TextBlock AutomationProperties.AutomationId="Cost.Source" Style="{StaticResource CaptionTextBlockStyle}" TextWrapping="Wrap" Text="{x:Bind ViewModel.Cost.SourceText, Mode=OneWay}" />
+                                </StackPanel>
+                            </Border>
+                            <!-- スペックのスライダー（No.86。CPU は 0.25〜2.0、メモリは CPU の 2 倍。細かく決めるときは下の欄に入れる） -->
+                            <StackPanel Spacing="8" MaxWidth="640" HorizontalAlignment="Left">
+                                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="12">
+                                    <StackPanel Spacing="4">
+                                        <Grid><TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind ViewModel.Settings.TtSpec.Name}" />
+                                            <TextBlock AutomationProperties.AutomationId="Settings.TtSpecText" HorizontalAlignment="Right" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" Text="{x:Bind ViewModel.Settings.TtSpec.Text, Mode=OneWay}" /></Grid>
+                                        <Slider AutomationProperties.AutomationId="Settings.TtSpec" AutomationProperties.Name="TimeTracker の CPU" Minimum="0" Maximum="{x:Bind ViewModel.Settings.TtSpec.MaxStep}" StepFrequency="1" TickFrequency="1" TickPlacement="BottomRight"
+                                                SnapsTo="Ticks" IsThumbToolTipEnabled="False" Value="{x:Bind ViewModel.Settings.TtSpec.Step, Mode=OneWay}" Tag="TtSpec" ValueChanged="OnSpecStepChanged" />
+                                        <ItemsControl ItemsSource="{x:Bind ViewModel.Settings.TtSpec.Labels}">
+                                            <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="0" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate><DataTemplate x:DataType="x:String"><TextBlock Style="{StaticResource CaptionTextBlockStyle}" Width="60" Text="{x:Bind}" /></DataTemplate></ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <TextBlock Style="{StaticResource CaptionTextBlockStyle}" TextWrapping="Wrap" Text="{x:Bind ViewModel.Settings.TtSpec.Note, Mode=OneWay}" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="12">
+                                    <StackPanel Spacing="4">
+                                        <Grid><TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind ViewModel.Settings.DbSpec.Name}" />
+                                            <TextBlock AutomationProperties.AutomationId="Settings.DbSpecText" HorizontalAlignment="Right" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" Text="{x:Bind ViewModel.Settings.DbSpec.Text, Mode=OneWay}" /></Grid>
+                                        <Slider AutomationProperties.AutomationId="Settings.DbSpec" AutomationProperties.Name="DB の CPU" Minimum="0" Maximum="{x:Bind ViewModel.Settings.DbSpec.MaxStep}" StepFrequency="1" TickFrequency="1" TickPlacement="BottomRight"
+                                                SnapsTo="Ticks" IsThumbToolTipEnabled="False" Value="{x:Bind ViewModel.Settings.DbSpec.Step, Mode=OneWay}" Tag="DbSpec" ValueChanged="OnSpecStepChanged" />
+                                        <ItemsControl ItemsSource="{x:Bind ViewModel.Settings.DbSpec.Labels}">
+                                            <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="0" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate><DataTemplate x:DataType="x:String"><TextBlock Style="{StaticResource CaptionTextBlockStyle}" Width="60" Text="{x:Bind}" /></DataTemplate></ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <TextBlock Style="{StaticResource CaptionTextBlockStyle}" TextWrapping="Wrap" Text="{x:Bind ViewModel.Settings.DbSpec.Note, Mode=OneWay}" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="12">
+                                    <StackPanel Spacing="4">
+                                        <Grid><TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind ViewModel.Settings.RedisSpec.Name}" />
+                                            <TextBlock AutomationProperties.AutomationId="Settings.RedisSpecText" HorizontalAlignment="Right" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" Text="{x:Bind ViewModel.Settings.RedisSpec.Text, Mode=OneWay}" /></Grid>
+                                        <Slider AutomationProperties.AutomationId="Settings.RedisSpec" AutomationProperties.Name="Redis の CPU" Minimum="0" Maximum="{x:Bind ViewModel.Settings.RedisSpec.MaxStep}" StepFrequency="1" TickFrequency="1" TickPlacement="BottomRight"
+                                                SnapsTo="Ticks" IsThumbToolTipEnabled="False" Value="{x:Bind ViewModel.Settings.RedisSpec.Step, Mode=OneWay}" Tag="RedisSpec" ValueChanged="OnSpecStepChanged" />
+                                        <ItemsControl ItemsSource="{x:Bind ViewModel.Settings.RedisSpec.Labels}">
+                                            <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="0" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate><DataTemplate x:DataType="x:String"><TextBlock Style="{StaticResource CaptionTextBlockStyle}" Width="60" Text="{x:Bind}" /></DataTemplate></ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <TextBlock Style="{StaticResource CaptionTextBlockStyle}" TextWrapping="Wrap" Text="{x:Bind ViewModel.Settings.RedisSpec.Note, Mode=OneWay}" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
                             <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="CPU（vCPU）とメモリ（Gi）" />
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <TextBox AutomationProperties.AutomationId="Settings.TtCpu" Header="TimeTracker の CPU" Text="{x:Bind ViewModel.Settings.TtCpu, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="150" />
