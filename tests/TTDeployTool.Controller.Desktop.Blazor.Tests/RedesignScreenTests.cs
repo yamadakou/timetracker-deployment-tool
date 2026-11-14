@@ -259,4 +259,121 @@ public sealed class RedesignScreenTests : IDisposable
         var redis = _app.Context.Render<SpecSliderView>(p => p.Add(x => x.Spec, _app.ViewModel.Settings.RedisSpec).Add(x => x.Cost, _app.ViewModel.Cost));
         redis.FindAll("[data-id='Spec.Redis.Below']").Should().BeEmpty();
     }
+
+    // ---------------- 行の右クリックのメニュー・ダブルクリック・詳細のコピー（オーナーの依頼、2026-11-14）
+
+    [Fact]
+    public async Task The_Deployment_Row_Menu_Should_Show_The_Operations_And_Double_Click_Should_Open_The_Detail()
+    {
+        var page = await DeploymentsAsync();
+        var row = List.Rows.First(r => r.AppName != "");
+        var cell = page.FindAll("tbody tr")[List.Rows.IndexOf(row)].QuerySelector("td[data-key='AppName']")!;
+        cell.ContextMenu(new Microsoft.AspNetCore.Components.Web.MouseEventArgs { ClientX = 10, ClientY = 10 });
+        var menu = page.Find(".tt-menu");
+        menu.QuerySelectorAll("button").Select(b => b.TextContent).Should().StartWith(["この文字をコピー", "選んだ行をコピー", "選んだ行を Markdown 形式でコピー", "詳細を開く"]);
+        menu.QuerySelectorAll(".tt-menu-sep").Should().HaveCount(4, "コピーとの間と、3 つの区切り");
+        Id(page, "Menu.Row.Delete").ClassList.Should().Contain("tt-danger-text");
+        Id(page, "Menu.Row.Redeploy").HasAttribute("disabled").Should().BeTrue();
+
+        // 「期限・グループを変える…」: その行を選び、上の操作の帯の期限日に移る
+        Id(page, "Menu.Row.EditBatch").Click();
+        page.FindAll(".tt-menu").Should().BeEmpty();
+        List.Current.Should().BeSameAs(row);
+        _app.Module.Invocations.Should().Contain(i => i.Identifier == "focusSelector" && (string)i.Arguments[0]! == "[data-id='Deployments.BatchExpiryDate']");
+
+        // ダブルクリックで、その行だけを選んで右に詳細を出す
+        List.SetSelection([]);
+        var other = List.Rows.Last(r => r.AppName != "");
+        page.FindAll("tbody tr")[List.Rows.IndexOf(other)].DoubleClick();
+        page.WaitForAssertion(() => List.Current.Should().BeSameAs(other));
+        page.Find("[data-id='Deployments.Detail'] h2").TextContent.Should().StartWith(other.AppName);
+
+        // 画面を閉じたら、メニューからの移動の知らせを受けない
+        await _app.Context.DisposeComponentsAsync();
+        await List.MenuFor([row]).Single(i => i.Id == "Row.EditBatch").Run();
+        _app.Module.Invocations.Count(i => i.Identifier == "focusSelector").Should().Be(1);
+    }
+
+    [Fact]
+    public async Task The_Job_Row_Menu_Should_Open_The_Detail_And_Move_To_The_Schedule()
+    {
+        await _app.SignInAsync();
+        var page = _app.Context.Render<JobsPage>(p => p.Add(x => x.Model, _app.ViewModel).Add(x => x.Clipboard, _app.Clipboard));
+        var job = _app.ViewModel.Queue.Register(JobKind.Delete, new JobTarget(Fixtures.FixtureSamples.SubscriptionA, "rg", "menu"), TestApp.Now.AddDays(1),
+            () => new TaskCompletionSource<Job>().Task);
+        page.WaitForAssertion(() => page.FindAll("tbody tr").Should().NotBeEmpty());
+        var index = _app.ViewModel.JobList.Items.IndexOf(job);
+        page.FindAll("tbody tr")[index].QuerySelector("td[data-key]")!.ContextMenu(new Microsoft.AspNetCore.Components.Web.MouseEventArgs());
+        Id(page, "Menu.Jobs.Reschedule").Click();
+        _app.Module.Invocations.Should().Contain(i => i.Identifier == "focusSelector" && (string)i.Arguments[0]! == "[data-id='Jobs.ScheduleDate']");
+
+        var navigations = new List<string>();
+        _app.ViewModel.NavigationRequested += navigations.Add;
+        page.FindAll("tbody tr")[index].QuerySelector("td[data-key]")!.ContextMenu(new Microsoft.AspNetCore.Components.Web.MouseEventArgs());
+        Id(page, "Menu.Job.Detail").Click();
+        page.WaitForAssertion(() => navigations.Should().Contain(Pages.Status));
+        await _app.Context.DisposeComponentsAsync();
+        await _app.ViewModel.JobList.MenuFor([job], _ => Task.CompletedTask, true).Single(i => i.Id == "Jobs.Reschedule").Run();
+        _app.Module.Invocations.Count(i => i.Identifier == "focusSelector").Should().Be(1, "画面を閉じたら受けない");
+    }
+
+    [Fact]
+    public async Task The_Detail_Should_Copy_The_Selected_Text_Or_The_Whole_Detail_From_Its_Menu()
+    {
+        await DeploymentsAsync();
+        var row = List.Rows.First(r => r.AppName != "");
+        List.SetSelection([row]);
+        var detail = _app.Context.Render<DeploymentDetail>(p => p.Add(x => x.Row, row));
+        var aside = Id(detail, "Deployments.Detail");
+        aside.ClassList.Should().Contain("tt-select", "文字を範囲選択できる");
+
+        // 範囲選択していなければ「選んだ文字をコピー」は押せない
+        await aside.ContextMenuAsync(new Microsoft.AspNetCore.Components.Web.MouseEventArgs { ClientX = 20, ClientY = 30 });
+        Id(detail, "Detail.Menu").GetAttribute("style").Should().Be("left: min(20px, calc(100vw - 300px)); top: min(30px, calc(100vh - 92px))");
+        Id(detail, "Detail.CopySelection").HasAttribute("disabled").Should().BeTrue();
+        Id(detail, "Detail.CopyAll").Click();
+        _app.Clipboard.Texts[^1].Should().Be(row.DetailText);
+        detail.FindAll("[data-id='Detail.Menu']").Should().BeEmpty();
+
+        _app.Module.Setup<string?>("selectionIn", _ => true).SetResult("選んだところ");
+        await aside.ContextMenuAsync(new Microsoft.AspNetCore.Components.Web.MouseEventArgs());
+        Id(detail, "Detail.CopySelection").Click();
+        _app.Clipboard.Texts[^1].Should().Be("選んだところ");
+        Id(detail, "Row.Message").TextContent.Should().Be("選んだ文字をコピーしました。");
+
+        // メニューの外を押す・右クリック・Esc で閉じる（ほかのキーでは閉じない）
+        await aside.ContextMenuAsync(new Microsoft.AspNetCore.Components.Web.MouseEventArgs());
+        detail.Find(".tt-overlay").Click();
+        detail.FindAll(".tt-menu").Should().BeEmpty();
+        await aside.ContextMenuAsync(new Microsoft.AspNetCore.Components.Web.MouseEventArgs());
+        detail.Find(".tt-overlay").ContextMenu(new Microsoft.AspNetCore.Components.Web.MouseEventArgs());
+        detail.FindAll(".tt-menu").Should().BeEmpty();
+        await aside.ContextMenuAsync(new Microsoft.AspNetCore.Components.Web.MouseEventArgs());
+        detail.Find(".tt-menu").KeyDown(new Microsoft.AspNetCore.Components.Web.KeyboardEventArgs { Key = "Tab" });
+        detail.FindAll(".tt-menu").Should().HaveCount(1);
+        detail.Find(".tt-menu").KeyDown(new Microsoft.AspNetCore.Components.Web.KeyboardEventArgs { Key = "Escape" });
+        detail.FindAll(".tt-menu").Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task The_Detail_Menu_Should_Still_Open_When_The_Page_Is_Gone()
+    {
+        await DeploymentsAsync();
+        var row = List.Rows.First(r => r.AppName != "");
+        var detail = _app.Context.Render<DeploymentDetail>(p => p.Add(x => x.Row, row));
+        _app.Module.Setup<string?>("selectionIn", _ => true).SetException(new Microsoft.JSInterop.JSDisconnectedException("閉じた"));
+        await Id(detail, "Deployments.Detail").ContextMenuAsync(new Microsoft.AspNetCore.Components.Web.MouseEventArgs());
+        Id(detail, "Detail.CopySelection").HasAttribute("disabled").Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task A_Table_Without_Row_Operations_Should_Show_Only_The_Copies()
+    {
+        await DeploymentsAsync();
+        var table = _app.Context.Render<DataTable<DeploymentRowViewModel, TTDeployTool.Application.Inventory.DeploymentEntry>>(p => p
+            .Add(x => x.Source, TableSources.Deployments(List, _app.ViewModel.DeploymentsLayout)).Add(x => x.Clipboard, _app.Clipboard));
+        table.Find("tbody td[data-key='AppName']").ContextMenu(new Microsoft.AspNetCore.Components.Web.MouseEventArgs());
+        table.FindAll(".tt-menu button").Should().HaveCount(3);
+        table.FindAll(".tt-menu-sep").Should().BeEmpty();
+    }
 }

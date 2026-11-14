@@ -84,10 +84,21 @@
     @if (_menu is { } menu)
     {
         <div class="tt-overlay" @onclick="CloseMenu" @oncontextmenu="CloseMenu" @oncontextmenu:preventDefault></div>
-        <div class="tt-menu" role="menu" style="left: min(@Px(menu.X), calc(100vw - 300px)); top: min(@Px(menu.Y), calc(100vh - 130px))" @onkeydown="OnMenuKeyDown">
+        <div class="tt-menu" role="menu" style="left: min(@Px(menu.X), calc(100vw - 300px)); top: max(8px, min(@Px(menu.Y), calc(100vh - @(MenuHeight)px)))" @onkeydown="OnMenuKeyDown">
             <button type="button" role="menuitem" @onclick="CopyCell">この文字をコピー</button>
             <button type="button" role="menuitem" @onclick="() => CopyRows(markdown: false)">選んだ行をコピー</button>
             <button type="button" role="menuitem" @onclick="() => CopyRows(markdown: true)">選んだ行を Markdown 形式でコピー</button>
+            @* 行の操作（詳細・Azure から削除・変更。オーナーの依頼、2026-11-14） *@
+            @for (var i = 0; i < _menuItems.Count; i++)
+            {
+                var item = _menuItems[i];
+                @if (i == 0 || item.StartsGroup)
+                {
+                    <div class="tt-menu-sep" role="separator"></div>
+                }
+                <button type="button" role="menuitem" class="@(item.IsDanger ? "tt-danger-text" : null)" data-id="@($"Menu.{item.Id}")" disabled="@(!item.IsEnabled)"
+                        @onclick="() => RunMenuItem(item)">@item.Label</button>
+            }
         </div>
     }
     <div class="tt-table-foot">

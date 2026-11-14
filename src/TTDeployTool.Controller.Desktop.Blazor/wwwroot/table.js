@@ -123,3 +123,18 @@ export function attachComposition(input, dotnet) {
 export function setValue(input, value) {
   if (input.value !== value) input.value = value;
 }
+
+// 右クリックのメニューから、入力欄に移る（「期限・グループを変える…」「予定を変える…」）
+export function focusSelector(selector) {
+  const el = document.querySelector(selector);
+  el?.scrollIntoView({ block: 'center' });
+  el?.focus();
+}
+
+// 右の詳細の中で範囲選択した文字（詳細の外の選択は含めない）
+export function selectionIn(root) {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return '';
+  return root.contains(selection.anchorNode) && root.contains(selection.focusNode) ? selection.toString() : '';
+}
+

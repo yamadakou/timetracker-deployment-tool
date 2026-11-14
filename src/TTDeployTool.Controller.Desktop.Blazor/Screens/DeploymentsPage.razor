@@ -1,5 +1,6 @@
 @using TTDeployTool.Application.Inventory
 @inherits ViewModelComponent
+@inject IJSRuntime JS
 
 @* デプロイの一覧（WinUI の画面の DeploymentsPanel。Azure から集める。docs/design/desktop/desktop-jobs.md の 6.3・6.4、desktop-wizard.md の 7） *@
 <section class="tt-page" data-id="Panel.Deployments">
@@ -70,7 +71,9 @@
     <p data-id="Deployments.BatchMessage">@List.BatchMessage</p>
 
     <FilterBar TItem="DeploymentEntry" Filters="List.Filters" Name="deployments" />
-    <DataTable TRow="DeploymentRowViewModel" TItem="DeploymentEntry" Source="_source" Label="デプロイの一覧" Clipboard="Clipboard" />
+    @* 行の右クリックに、コピーの後に行の操作を並べる。行のダブルクリックで、その行だけを選んで右に詳細を出す（オーナーの依頼、2026-11-14） *@
+    <DataTable TRow="DeploymentRowViewModel" TItem="DeploymentEntry" Source="_source" Label="デプロイの一覧" Clipboard="Clipboard"
+               RowMenu="List.MenuFor" OnRowDoubleClick="row => List.SetSelection([row])" />
     <Pager Name="deployments" Previous="List.PreviousPageCommand" Next="List.NextPageCommand" PageSizes="DeploymentListViewModel.PageSizes"
            PageSize="List.PageSize" PageSizeChanged="size => List.PageSize = size" Text="@List.PageText" />
 
@@ -101,5 +104,11 @@
     {
         _source = TableSources.Deployments(List, Model.DeploymentsLayout);
         Watch(List, List.Busy, List.Notices, List.BatchBusy);
+        List.BatchEditRequested += FocusBatchExpiry;
     }
+
+    protected override void OnDispose() => List.BatchEditRequested -= FocusBatchExpiry;
+
+    // 右クリックの「期限・グループを変える…」: 上の操作の帯の期限日に移る
+    private void FocusBatchExpiry() => _ = JsModule.InvokeQuietlyAsync(JsModule.ImportAsync(JS), "focusSelector", "[data-id='Deployments.BatchExpiryDate']");
 }

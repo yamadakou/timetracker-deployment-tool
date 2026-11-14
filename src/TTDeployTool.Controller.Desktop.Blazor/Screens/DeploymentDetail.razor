@@ -1,7 +1,9 @@
 @inherits ViewModelComponent
+@inject IJSRuntime JS
 
 @* デプロイの一覧で 1 行だけ選んだときの詳細（推奨のデザイン: 右の面。期限の残りと「+7 日」「+30 日」、URL・注意・DB とスペック、操作、パスワード） *@
-<aside class="tt-surface tt-aside" data-id="Deployments.Detail">
+@* 文字は範囲選択できる。右クリックで「選んだ文字をコピー」「詳細をコピー」のメニュー（オーナーの依頼、2026-11-14） *@
+<aside class="tt-surface tt-aside tt-select" data-id="Deployments.Detail" @ref="_root" @oncontextmenu="OpenMenuAsync" @oncontextmenu:preventDefault>
     <div>
         <div class="tt-subtle">@Row.ResourceGroup · @Row.Subscription</div>
         <h2>@(Row.Entry.IsResourceGroupOnly ? "（リソースグループだけ）" : Row.AppName) <span class="tt-dot @TableSources.StateTone(Row.State) tt-subtle" style="font-size: 12px; font-weight: 400">@DeploymentStates.Label(Row.State)</span></h2>
@@ -72,10 +74,58 @@
     <p data-id="Row.Message">@Row.Message</p>
     <Message Id="Row.Error" Text="@Row.Error" />
 </aside>
+@if (_menu is { } menu)
+{
+    <div class="tt-overlay" @onclick="CloseMenu" @oncontextmenu="CloseMenu" @oncontextmenu:preventDefault></div>
+    <div class="tt-menu" role="menu" data-id="Detail.Menu" style="left: min(@Px(menu.X), calc(100vw - 300px)); top: min(@Px(menu.Y), calc(100vh - 92px))" @onkeydown="OnMenuKeyDown">
+        <button type="button" role="menuitem" data-id="Detail.CopySelection" disabled="@(menu.Selection.Length == 0 || !Row.CopyDetailCommand.CanExecute(null))"
+                @onclick="() => CopySelectionAsync(menu.Selection)">選んだ文字をコピー</button>
+        <button type="button" role="menuitem" data-id="Detail.CopyAll" disabled="@(!Row.CopyDetailCommand.CanExecute(null))" @onclick="CopyAllAsync">詳細をコピー</button>
+    </div>
+}
 
 @code {
     [Parameter, EditorRequired]
     public DeploymentRowViewModel Row { get; set; } = default!;
 
     protected override void OnParametersSet() => Watcher.Sync([Row, Row.Busy, Row.OpenCommand]);
+
+    private ElementReference _root;
+    private (double X, double Y, string Selection)? _menu;
+
+    // 右クリック: 詳細の中で範囲選択した文字を読んでから、メニューを出す
+    private async Task OpenMenuAsync(MouseEventArgs e)
+    {
+        var selection = "";
+        try
+        {
+            selection = await (await JsModule.ImportAsync(JS)).InvokeAsync<string?>("selectionIn", _root) ?? "";
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        _menu = (e.ClientX, e.ClientY, selection);
+    }
+
+    private void CloseMenu() => _menu = null;
+
+    private void OnMenuKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+            CloseMenu();
+    }
+
+    private Task CopySelectionAsync(string text)
+    {
+        CloseMenu();
+        return Row.CopySelectedTextAsync(text);
+    }
+
+    private Task CopyAllAsync()
+    {
+        CloseMenu();
+        return Row.CopyDetailCommand.ExecuteAsync();
+    }
+
+    private static string Px(double value) => value.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + "px";
 }

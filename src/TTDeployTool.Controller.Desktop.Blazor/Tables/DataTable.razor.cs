@@ -43,6 +43,21 @@ public partial class DataTable<TRow, TItem> : IAsyncDisposable
     [Parameter]
     public EventCallback<TRow> OnRowDoubleClick { get; set; }
 
+    /// <summary>右クリックのメニューの、コピーの後に並べる行の操作（対象の行から作る。無ければコピーだけ）。</summary>
+    [Parameter]
+    public Func<IReadOnlyList<TRow>, IReadOnlyList<RowMenuItem>> RowMenu { get; set; } = _ => [];
+
+    private IReadOnlyList<RowMenuItem> _menuItems = [];
+
+    // メニューの高さの見込み（下の端で内側に寄せる。1 項目 38 ピクセル）
+    private int MenuHeight => 16 + 38 * (3 + _menuItems.Count);
+
+    private async Task RunMenuItem(RowMenuItem item)
+    {
+        CloseMenu();
+        await item.Run();
+    }
+
     /// <summary>今の列の配置（列の順と幅）。</summary>
     public IReadOnlyList<TableColumnLayout> Layout => _layout;
 
@@ -172,7 +187,11 @@ public partial class DataTable<TRow, TItem> : IAsyncDisposable
 
     private void ToggleAll() => Source.SetSelection(AllState == true ? [] : Source.Rows);
 
-    private void OpenMenu(TRow row, string key, MouseEventArgs e) => _menu = (row, key, e.ClientX, e.ClientY);
+    private void OpenMenu(TRow row, string key, MouseEventArgs e)
+    {
+        _menu = (row, key, e.ClientX, e.ClientY);
+        _menuItems = RowMenu([.. MenuRows.Cast<TRow>()]);
+    }
 
     private void CloseMenu() => _menu = null;
 

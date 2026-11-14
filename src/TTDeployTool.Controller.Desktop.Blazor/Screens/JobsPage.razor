@@ -1,4 +1,5 @@
 @inherits ViewModelComponent
+@inject IJSRuntime JS
 
 @* ジョブの一覧（WinUI の画面の JobsPanel。docs/design/desktop/desktop-wizard.md の 7）。サインインしていなくても開ける（過去の記録を見るため。
    ジョブの操作はサインインするまで押せない。No.78）。1 行だけ選んで「詳細」か、行のダブルクリックで、実行状況の画面を開く *@
@@ -45,7 +46,9 @@
     <p data-id="Jobs.Message">@Jobs.Message</p>
     <Message Id="Jobs.RedeployNote" Text="@Jobs.Current?.RedeployNote" Kind="MessageKind.Caution" />
     <FilterBar TItem="JobViewModel" Filters="Jobs.Filters" Name="jobs" />
-    <DataTable TRow="JobViewModel" TItem="JobViewModel" Source="_source" Label="ジョブの一覧" Clipboard="Clipboard" OnRowDoubleClick="Open" />
+    @* 行の右クリックに、コピーの後に行の操作を並べる（オーナーの依頼、2026-11-14）。行のダブルクリックで詳細（実行状況）を開く *@
+    <DataTable TRow="JobViewModel" TItem="JobViewModel" Source="_source" Label="ジョブの一覧" Clipboard="Clipboard" OnRowDoubleClick="Open"
+               RowMenu="jobs => Jobs.MenuFor(jobs, Open, SignedIn)" />
     <Pager Name="jobs" Previous="Jobs.PreviousPageCommand" Next="Jobs.NextPageCommand" PageSizes="JobListViewModel.PageSizes"
            PageSize="Jobs.PageSize" PageSizeChanged="size => Jobs.PageSize = size" Text="@Jobs.CountText" />
 </section>
@@ -67,7 +70,13 @@
     {
         _source = TableSources.Jobs(Jobs, Model.JobsLayout);
         Watch(Jobs, Jobs.Schedule, Model.SignIn);
+        Jobs.RescheduleRequested += FocusSchedule;
     }
+
+    protected override void OnDispose() => Jobs.RescheduleRequested -= FocusSchedule;
+
+    // 右クリックの「予定を変える…」: 予定の日付に移る
+    private void FocusSchedule() => _ = JsModule.InvokeQuietlyAsync(JsModule.ImportAsync(JS), "focusSelector", "[data-id='Jobs.ScheduleDate']");
 
     // 件数のカード: 押したカードの条件で絞り込む。同じカードをもう一度押すと外す
     private void Toggle(JobQuickFilter filter) => Jobs.QuickFilter = Jobs.QuickFilter == filter ? JobQuickFilter.All : filter;

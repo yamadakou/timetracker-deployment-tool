@@ -93,12 +93,21 @@ public sealed class CiUiTests
         (await select.Locator("option").AllTextContentsAsync()).Should().Equal("1", "2", "3", "4");
         (await select.EvaluateAsync<string>("s => s.options[s.selectedIndex].text")).Should().Be("2", "既定は 2");
         await select.SelectOptionAsync(new SelectOptionValue { Label = "3" });
+        // 選んだ値がアプリのデータに書かれるまで待ってから起動し直す（選んだ直後に起動し直すと、画面の変更がアプリに届く前に止めることがあった。CI、2026-11-14）
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (!Saved(host.DataDirectory) && DateTime.UtcNow < deadline)
+            await Task.Delay(100);
+        Saved(host.DataDirectory).Should().BeTrue("選んだ同時に実行する数を保存する");
 
         await host.RestartAsync();
         page = host.Page;
         await page.ShowAsync("AppSettings");
         (await page.Id("Settings.Concurrency").EvaluateAsync<string>("s => s.options[s.selectedIndex].text")).Should().Be("3", "アプリのデータに保存する");
     }
+
+    private static bool Saved(string data) =>
+        Directory.EnumerateFiles(data, "*.json", SearchOption.AllDirectories)
+            .Any(f => System.Text.RegularExpressions.Regex.IsMatch(File.ReadAllText(f), "\"MaxConcurrentJobs\"\\s*:\\s*3"));
 
     [Fact]
     public async Task Signed_Out_State_Should_Allow_Only_Sign_In()
