@@ -36,6 +36,7 @@ public sealed class DesignTests
         // デプロイの一覧: 件数のカードで絞り込み、期限の残りのバーと、右の詳細
         await page.ExpectTextAsync("Deployments.Card.All.Value", $"{Deployments}");
         await Assertions.Expect(page.Locator("[data-id='Panel.Deployments'] td[data-key='ExpiresAt'] .tt-bar-track").First).ToBeVisibleAsync();
+        await Assertions.Expect(page.Id("Deployments.Cost.Total")).ToContainTextAsync("円");
         await page.RowWith("Deployments", "AppName", FixtureSamples.AppName(1)).ClickAsync();
         await Assertions.Expect(page.Id("Row.DaysLeft")).ToHaveTextAsync(new System.Text.RegularExpressions.Regex("^あと \\d+ 日$"));
         await ShotAsync(page, $"deployments-{mode}");

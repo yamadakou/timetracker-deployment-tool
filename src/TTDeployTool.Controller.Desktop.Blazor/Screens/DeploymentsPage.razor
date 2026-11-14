@@ -22,9 +22,11 @@
         <StatCard Id="Deployments.Card.Attention" IconName="warning" Tone="caution" Value="List.AttentionCount" Label="要確認（作りかけなど）" Action="絞り込む"
                   Pressed="List.QuickFilter == DeploymentQuickFilter.Attention" OnClick="() => Toggle(DeploymentQuickFilter.Attention)" />
     </div>
-    @* 料金の目安の合計（オーナーの依頼、2026-11-14: 全体と今月分。スペックからの目安。単位は切り替えられ、既定は円） *@
-    @if (List.CostTotalText is { } costTotal)
+    @* 料金の目安の合計（オーナーの依頼、2026-11-14: 全体と今月分。スペックからの目安。単位は切り替えられ、既定は円）。
+       一覧を読んだら、単価が届く前から場所を取る（後から出すと表が下にずれ、押そうとした行がずれた。CI の Playwright、2026-11-14） *@
+    @if (List.TotalCount > 0)
     {
+        var costTotal = List.CostTotalDisplay;
         <div class="tt-surface tt-costbar" data-id="Deployments.Cost">
             <div><span class="tt-stat-label">料金の目安（全体）</span><br /><span class="tt-total" data-id="Deployments.Cost.Total">@costTotal</span>
                 <span class="tt-subtle" data-id="Deployments.Cost.TotalNote">@List.CostTotalNote</span></div>

@@ -164,6 +164,9 @@ public sealed class DeploymentListViewModel : ObservableObject
     /// <summary>上部の「料金の目安（全体）」（読んだすべてのデプロイ。見積もれなければ null）。</summary>
     public string? CostTotalText => Costs.TotalText(_entries);
 
+    /// <summary>上部の「料金の目安（全体）」の表示（単価を読む前は「計算しています」、見積もれる行が無ければその旨）。</summary>
+    public string CostTotalDisplay => CostTotalText ?? (Costs.HasPricesFor(_entries) ? "—（見積もれる行がありません）" : "計算しています");
+
     /// <summary>「全体」の数え方（「3 件のデプロイから期限まで（期限なしの 1 件は 1 か月分）」）。</summary>
     public string? CostTotalNote => Costs.TotalNote(_entries);
 
@@ -183,6 +186,7 @@ public sealed class DeploymentListViewModel : ObservableObject
             return;
         }
         OnPropertyChanged(nameof(CostTotalText));
+        OnPropertyChanged(nameof(CostTotalDisplay));
         OnPropertyChanged(nameof(CostTotalNote));
         OnPropertyChanged(nameof(CostThisMonthText));
         OnPropertyChanged(nameof(CostThisMonthLabel));

@@ -71,6 +71,9 @@ public sealed class DeploymentCostBook : ObservableObject
         return loaded;
     }
 
+    /// <summary>行のリージョンの単価を、今の単位で読み終えたか。</summary>
+    public bool HasPricesFor(IEnumerable<DeploymentEntry> entries) => entries.All(e => _prices.ContainsKey((Region(e), _currency.Currency)));
+
     /// <summary>行の料金の目安（単価をまだ読んでいない・リソースグループだけの行・数えるものが無い行は null）。</summary>
     public DeploymentCost? For(DeploymentEntry entry)
     {
