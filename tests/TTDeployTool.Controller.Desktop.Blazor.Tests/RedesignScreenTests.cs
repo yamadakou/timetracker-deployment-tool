@@ -42,6 +42,8 @@ public sealed class RedesignScreenTests : IDisposable
     {
         var page = await DeploymentsAsync();
         Id(page, "Deployments.Card.All.Value").TextContent.Should().Be($"{List.TotalCount}");
+        foreach (var card in new[] { "Expiring", "Attention" })
+            Id(page, $"Deployments.Card.{card}").QuerySelector(".tt-stat-go")!.TextContent.Should().Be("絞り込む ›");
         Id(page, "Deployments.Card.All").GetAttribute("aria-pressed").Should().Be("true");
 
         Id(page, "Deployments.Card.Expiring").Click();
@@ -104,6 +106,7 @@ public sealed class RedesignScreenTests : IDisposable
         var jobs = _app.ViewModel.JobList;
         foreach (var (card, filter) in new[] { ("Running", JobQuickFilter.Running), ("Pending", JobQuickFilter.Pending), ("Failed", JobQuickFilter.RecentFailed), ("Succeeded", JobQuickFilter.RecentSucceeded) })
         {
+            Id(page, $"Jobs.Card.{card}").QuerySelector(".tt-stat-go")!.TextContent.Should().Be("絞り込む ›", "押すと絞り込むカードには、デプロイの一覧と同じく「絞り込む」と出す");
             Id(page, $"Jobs.Card.{card}").Click();
             jobs.QuickFilter.Should().Be(filter);
             page.WaitForAssertion(() => Id(page, $"Jobs.Card.{card}").GetAttribute("aria-pressed").Should().Be("true"));

@@ -97,7 +97,7 @@ input[type=range] { accent-color: var(--tt-accent); }
 .tt-stat-value { font-size: 22px; font-weight: 600; line-height: 1.1; }
 .tt-stat-label { color: var(--tt-subtle); font-size: 12px; }
 .tt-stat > span:nth-child(2) { min-width: 0; }
-.tt-stat-go { margin-left: auto; color: var(--tt-accent); font-size: 12px; white-space: nowrap; }
+.tt-stat-go { color: var(--tt-accent); font-size: 12px; white-space: nowrap; }
 .tt-tone-info .tt-stat-icon { background: var(--tt-accent-soft); color: var(--tt-accent); }
 .tt-tone-critical .tt-stat-icon { background: var(--tt-critical-soft); color: var(--tt-critical); }
 .tt-tone-caution .tt-stat-icon { background: var(--tt-caution-soft); color: var(--tt-caution); }

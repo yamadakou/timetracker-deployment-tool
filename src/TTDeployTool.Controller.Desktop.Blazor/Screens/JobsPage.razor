@@ -11,11 +11,11 @@
     </div>
     @* 件数のカード（推奨のデザイン。押すとその条件で絞り込む。もう一度押すと外す） *@
     <div class="tt-cards">
-        <StatCard Id="Jobs.Card.Running" IconName="jobs" Tone="info" Value="Jobs.RunningCount" Label="実行中" Pressed="Jobs.QuickFilter == JobQuickFilter.Running" OnClick="() => Toggle(JobQuickFilter.Running)" />
-        <StatCard Id="Jobs.Card.Pending" IconName="clock" Tone="info" Value="Jobs.PendingCount" Label="予定・待機中・一時停止" Pressed="Jobs.QuickFilter == JobQuickFilter.Pending" OnClick="() => Toggle(JobQuickFilter.Pending)" />
+        <StatCard Id="Jobs.Card.Running" IconName="jobs" Tone="info" Value="Jobs.RunningCount" Label="実行中" Action="絞り込む" Pressed="Jobs.QuickFilter == JobQuickFilter.Running" OnClick="() => Toggle(JobQuickFilter.Running)" />
+        <StatCard Id="Jobs.Card.Pending" IconName="clock" Tone="info" Value="Jobs.PendingCount" Label="予定・待機中・一時停止" Action="絞り込む" Pressed="Jobs.QuickFilter == JobQuickFilter.Pending" OnClick="() => Toggle(JobQuickFilter.Pending)" />
         <StatCard Id="Jobs.Card.Failed" IconName="bell" Tone="critical" Value="Jobs.RecentFailedCount" Label="失敗（7 日以内）" Action="絞り込む"
                   Pressed="Jobs.QuickFilter == JobQuickFilter.RecentFailed" OnClick="() => Toggle(JobQuickFilter.RecentFailed)" />
-        <StatCard Id="Jobs.Card.Succeeded" IconName="check" Tone="ok" Value="Jobs.RecentSucceededCount" Label="完了（7 日以内）"
+        <StatCard Id="Jobs.Card.Succeeded" IconName="check" Tone="ok" Value="Jobs.RecentSucceededCount" Label="完了（7 日以内）" Action="絞り込む"
                   Pressed="Jobs.QuickFilter == JobQuickFilter.RecentSucceeded" OnClick="() => Toggle(JobQuickFilter.RecentSucceeded)" />
     </div>
     <div class="tt-bar">
