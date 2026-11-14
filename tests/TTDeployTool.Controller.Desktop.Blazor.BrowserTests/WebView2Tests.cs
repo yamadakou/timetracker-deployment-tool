@@ -110,6 +110,41 @@ public sealed class WebView2Tests
             await page.Locator(".tt-table-scroll").FocusAsync();
             await page.Keyboard.PressAsync("Control+C");
             await Assertions.Expect(page.Locator(".tt-status")).ToHaveTextAsync("1 行をコピーしました。");
+            var first = (await page.Locator("tbody tr").Nth(0).Locator("td[data-key='AppName']").TextContentAsync())!.Trim();
+            // Windows のクリップボードに入った（ほかのアプリに貼り付けられる。手順書の実機の確認から移した。2026-11-14）
+            await WaitForClipboardAsync(text => text.Contains(first, StringComparison.Ordinal), "Ctrl+C で選んだ行");
+            await page.Locator("tbody tr").Nth(0).Locator("td.tt-check input").UncheckAsync();
+
+            // 行の右クリック: WebView2 の標準のメニューは出さず（contextmenu を止める）、アプリのメニューに行の操作が並ぶ（オーナーの依頼、2026-11-14）
+            var prevented = await page.EvaluateAsync<bool>(
+                "() => { const td = document.querySelector(\"tbody td[data-key='AppName']\"); const e = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 20, clientY: 20 }); td.dispatchEvent(e); return e.defaultPrevented; }");
+            prevented.Should().BeTrue("WebView2 の標準の右クリックのメニューを出さない");
+            await Assertions.Expect(page.Locator("[data-id='Menu.Row.Delete']")).ToBeVisibleAsync();
+            await page.Locator("[data-id='Menu.Row.EditBatch']").ClickAsync();
+            await Assertions.Expect(page.Locator("[data-id='Deployments.BatchExpiryDate']")).ToBeFocusedAsync();
+
+            // 行のダブルクリックで、その行だけを選んで右に詳細を出す
+            var second = page.Locator("tbody tr").Nth(1);
+            var secondApp = (await second.Locator("td[data-key='AppName']").TextContentAsync())!.Trim();
+            await second.Locator("td[data-key='AppName']").DblClickAsync();
+            await Assertions.Expect(page.Locator("[data-id='Deployments.Detail'] h2")).ToContainTextAsync(secondApp);
+
+            // 右の詳細: 範囲選択した文字と、詳細のすべてを、右クリックのメニューから Windows のクリップボードにコピーする
+            var title = page.Locator("[data-id='Deployments.Detail'] h2");
+            await title.EvaluateAsync("h => { const r = document.createRange(); r.selectNodeContents(h.firstChild); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }");
+            var titleBox = (await title.BoundingBoxAsync())!;
+            await title.ClickAsync(new() { Button = MouseButton.Right, Position = new() { X = 6, Y = titleBox.Height / 2 } });
+            await page.Locator("[data-id='Detail.CopySelection']").ClickAsync();
+            await WaitForClipboardAsync(text => text.Trim() == secondApp, "詳細で選んだ文字");
+            await page.Locator("[data-id='Deployments.Detail']").ClickAsync(new() { Button = MouseButton.Right, Position = new() { X = 10, Y = 10 } });
+            await page.Locator("[data-id='Detail.CopyAll']").ClickAsync();
+            await WaitForClipboardAsync(text => text.StartsWith($"アプリ名: {secondApp}", StringComparison.Ordinal) && !text.Contains("パスワード"), "詳細のすべて（パスワードは含めない）");
+
+            // ジョブの一覧の行の右クリック →「詳細（実行状況・ログ）を開く」
+            await page.Locator("[data-id='Nav.Jobs']").ClickAsync();
+            await page.Locator("[data-id='Panel.Jobs'] tbody tr").First.Locator("td[data-key]").First.ClickAsync(new() { Button = MouseButton.Right });
+            await page.Locator("[data-id='Menu.Job.Detail']").ClickAsync();
+            await Assertions.Expect(page.Locator("[data-id='Panel.Status']")).ToBeVisibleAsync();
 
             if (Environment.GetEnvironmentVariable("TT_BLAZOR_REPORT") is { Length: > 0 } report)
             {
@@ -134,6 +169,26 @@ public sealed class WebView2Tests
                 // WebView2 のプロセスが残っていれば、消せないことがある
             }
         }
+    }
+
+    // Windows のクリップボード（PowerShell の Get-Clipboard で読む。WPF のアプリが書いた後、読めるまで待つ）
+    private static async Task WaitForClipboardAsync(Func<string, bool> condition, string what)
+    {
+        var text = "";
+        for (var i = 0; i < 50; i++)
+        {
+            var start = new ProcessStartInfo("powershell", ["-NoProfile", "-Command", "[Console]::OutputEncoding = [Text.Encoding]::UTF8; Get-Clipboard -Raw"])
+            {
+                UseShellExecute = false, RedirectStandardOutput = true, StandardOutputEncoding = System.Text.Encoding.UTF8,
+            };
+            using var process = Process.Start(start)!;
+            text = await process.StandardOutput.ReadToEndAsync();
+            await process.WaitForExitAsync();
+            if (condition(text))
+                return;
+            await Task.Delay(200);
+        }
+        text.Should().Be("（条件に合う文字）", $"{what}が Windows のクリップボードに入る");
     }
 
     // WebView2 のページ（つないだ直後は、まだ無いことがある）
