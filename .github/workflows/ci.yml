@@ -74,6 +74,15 @@ jobs:
     - name: Test
       run: dotnet test TTDeployTool.sln --configuration Release --no-build --verbosity normal
 
+    # 料金の目安の単価を、本物の Azure の公開の価格表（サインイン不要・無料）から読めること（No.88）。Azure 側の障害で CI を止めないよう、参考の扱い
+    - name: Read the public Azure price list (reference only)
+      continue-on-error: true
+      env:
+        TT_LIVE_PRICES: "1"
+      run: >
+        dotnet test --project tests/TTDeployTool.Controller.Desktop.Core.Tests --configuration Release --no-build --
+        --filter-class TTDeployTool.Controller.Desktop.Core.Tests.LivePriceTests --output detailed
+
     # デスクトップアプリの Core（WinUI 3 版と Blazor Hybrid 版が共有する ViewModel など）と UI テスト用のモック（Fixtures）の
     # 行・分岐の網羅率 100%（オーナーの依頼、2026-11-02。No.82。前は CI で測っておらず、分岐が 98% 台に下がっていた）
     - name: Coverage of the desktop Core

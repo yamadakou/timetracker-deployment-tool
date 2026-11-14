@@ -1,6 +1,8 @@
 using FluentAssertions;
 using TTDeployTool.Controller.Desktop.Core.Services;
 using TTDeployTool.Controller.Desktop.Fixtures;
+using TTDeployTool.Domain.Deployment;
+using TTDeployTool.Infrastructure.Azure;
 using Xunit;
 using static TTDeployTool.Controller.Desktop.UITests.MockUiTests;
 
@@ -125,4 +127,35 @@ public class MockSystemTests
         app.SetTime("Delete.ScheduleTime", now.Hour, now.Minute);
         app.WaitForText("Delete.Blocked", t => t.EndsWith("は、今より後にしてください。", StringComparison.Ordinal), "削除の予定を今の時刻では入れられない");
     });
+
+    [Fact]
+    public void Expiry_Notices_Should_Say_Today_Or_Tomorrow() => WithFixture(app =>
+    {
+        // 期限の通知の題は、期限日と今日の日付の差で決める（No.81。当日は「今日までです」、前日は「明日までです」）。題の決め方の境界は Core の ExpiryWatcherTests
+        if (DateTime.Now.Hour == 23 && DateTime.Now.Minute >= 50)
+            Assert.Skip("日付が変わる直前のため確かめない");
+        SignIn(app);
+        Load(app);
+        AppSession.WaitUntil(() => Events().Any(e => e.Kind == FixtureEvents.Notice && e.Text.StartsWith("利用可能期限は今日までです", StringComparison.Ordinal)),
+            "期限が今日のデプロイは「今日までです」と通知する", TimeSpan.FromSeconds(60));
+        AppSession.WaitUntil(() => Events().Any(e => e.Kind == FixtureEvents.Notice && e.Text.StartsWith("利用可能期限は明日までです", StringComparison.Ordinal)),
+            "期限が明日のデプロイは「明日までです」と通知する", TimeSpan.FromSeconds(60));
+        Events().Where(e => e.Kind == FixtureEvents.Notice && e.Text.StartsWith("利用可能期限は今日までです", StringComparison.Ordinal)).Should().ContainSingle()
+            .Which.Text.Should().Contain($"{FixtureSamples.AppName(0)}（{FixtureSamples.ResourceGroup(0)}）");
+    }, data: d => d with
+    {
+        // 期限なしの app00 を今日の終わり、app04 を明日の終わり（この PC の時刻帯の 23:59:59）にする
+        Resources = [.. d.Resources.Select(r => r.ResourceGroup switch
+        {
+            var rg when rg == FixtureSamples.ResourceGroup(0) => WithExpiry(r, 0),
+            var rg when rg == FixtureSamples.ResourceGroup(4) => WithExpiry(r, 1),
+            _ => r,
+        })],
+    });
+
+    private static ManagedResourceRecord WithExpiry(ManagedResourceRecord record, int days)
+    {
+        var end = new DateTimeOffset(DateTime.Today.AddDays(days + 1).AddSeconds(-1));
+        return record with { Tags = new Dictionary<string, string>(record.Tags) { [DeploymentExpiry.ExpiresAtKey] = DeploymentExpiry.FormatTag(end) } };
+    }
 }
