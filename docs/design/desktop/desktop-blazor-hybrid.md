@@ -446,5 +446,8 @@ WinUI 3 版の UI テストとの対応（名前は同じ。中身の違い）:
 
 - 方法: `ci.yml` を手動で実行するときの `spec_probe`（JSON の配列）で、組ごとにジョブを分け、ローカルの docker compose（PostgreSQL）で、コンテナに CPU とメモリの上限（`cpus`・`mem_limit`。スワップなし）を付けて、セットアップウィザードでサンプル DB を作ってログインする（`LocalComposeSetupTests` に `TT_E2E_LIMITS`）。成否・かかった時間・コンテナごとのメモリの最大の使用量（cgroup v2 の `memory.peak`）を残す。Azure は使わない
 - 1 回目（run 43586367451）: 失敗は TimeTracker 1.0 / 2Gi だけ（OutOfMemory。TimeTracker の最大の使用量 1.11 GiB、DB 89 MiB、Redis 8 MiB）。TimeTracker 1.25 / 2.5Gi では、DB 0.25 / 0.5Gi〜1.25 / 2.5Gi、Redis 0.25 / 0.5Gi〜0.5 / 1Gi のすべての組で成功。TimeTracker 2.0 / 4Gi・DB 0.25 / 0.5Gi・Redis 0.25 / 0.5Gi も成功。DB 0.25 vCPU では、テストの時間が約 3 分 40 秒（0.5 vCPU 以上は約 1 分 50 秒）と 2 倍になった
+- 2 回目（run 43587522355。結果・時間・メモリの最大の使用量をファイルに残すようにした）: TimeTracker 1.25 / 2.5Gi・DB 0.5 / 1Gi・Redis 0.25 / 0.5Gi は 2 回とも成功（1 分 47 秒・2 分 00 秒。TimeTracker の最大 1.87 GiB）。DB 0.25 / 0.5Gi は成功（3 分 14 秒）。今の既定（1.5 / 3.0Gi・1.0 / 2Gi・0.5 / 1Gi）は成功（1 分 35 秒。TimeTracker の最大 1.79 GiB）。TimeTracker 1.0 / 2Gi は、DB 0.5 / 1Gi でも OutOfMemory で失敗（TimeTracker の最大 1.55 GiB）。DB の最大の使用量は上限いっぱいになるが、読んだファイルのキャッシュを含む値
+- Azure（オーナーの依頼・承認。`system-test.yml` の `spec_probe`、`SpecProbeTests`。run 43587918814、japaneast）: 構成ごとに専用のリソースグループにデプロイし、サンプル DB の作成とログインを確かめ、リソースグループを削除した。TimeTracker 1.25 / 2.5Gi・DB 0.5 / 1Gi・Redis 0.25 / 0.5Gi は成功（デプロイ 3 分 36 秒、サンプル DB 1 分 57 秒）。DB 0.25 / 0.5Gi も成功（サンプル DB 3 分 06 秒）
+- 結論: サンプル DB を作れる最低構成は TimeTracker 1.25 vCPU / 2.5Gi・DB 0.25 / 0.5Gi・Redis 0.25 / 0.5Gi。DB は 0.5 / 1Gi にすると作成の時間が約 6 割になるため、実用の最低は TimeTracker 1.25 / 2.5Gi・DB 0.5 / 1Gi・Redis 0.25 / 0.5Gi。既定のスペックと警告（2Gi 以下）を変えるかは、オーナーの判断待ち
 - 分かったこと: 失敗の原因は TimeTracker のメモリで、DB・Redis のスペックではない（オーナーの報告の失敗も TimeTracker 1 / 2Gi）。.NET は既定でコンテナのメモリの 75% を上限に使うため、2Gi では 1.5 GiB の中で大きな文字列を確保できずに失敗する
 
