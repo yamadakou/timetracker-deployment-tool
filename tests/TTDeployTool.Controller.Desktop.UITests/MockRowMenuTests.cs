@@ -56,6 +56,8 @@ public class MockRowMenuTests
         app.WaitForText("Deployments.Selection", t => t == "1 件を選んでいます。", "ダブルクリックした行だけを選ぶ");
         app.WaitForText("Row.DaysLeft", t => t.StartsWith("あと ", StringComparison.Ordinal), "app01 の詳細");
 
+        // 詳細は表の下（小さい画面では画面の外）にあるため、上の方に出してから押す（画面の外の要素は位置が空で、押すとウィンドウの左上になる）
+        app.ScrollToTop("Row.DaysLeft");
         // 詳細の右クリック →「詳細をコピー」（パスワードは含めない）
         AppSession.Click(Middle(app.Find("Row.DaysLeft").BoundingRectangle), right: true);
         app.FindAnywhere("Detail.CopySelection").IsEnabled.Should().BeFalse("文字を選んでいなければ押せない");
@@ -81,7 +83,8 @@ public class MockRowMenuTests
         app.ScrollToTop("Jobs.Text");
         // 画面に出ている、いちばん新しい記録の行を右クリックする
         var newest = $"rg-mock-{100 + Records - 1} / app{100 + Records - 1}";
-        AppSession.Click(Middle(Cell(app.RowWith("Jobs.List", "Job.Target", newest), "Job.Target").BoundingRectangle), right: true);
+        // 「対象」の列は画面の右の外にあるため、左の「種類」の列を押す
+        AppSession.Click(Middle(Cell(app.RowWith("Jobs.List", "Job.Target", newest), "Job.Kind").BoundingRectangle), right: true);
         app.FindAnywhere("Menu.Job.Detail").IsEnabled.Should().BeTrue("詳細はサインインの前も押せる");
         app.FindAnywhere("Menu.Jobs.DeleteRecords").IsEnabled.Should().BeFalse("サインインするまで押せない");
         app.FindAnywhere("Menu.Job.Detail").Patterns.Invoke.Pattern.Invoke();
