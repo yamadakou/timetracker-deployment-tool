@@ -18,7 +18,8 @@
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <ApplicationIcon>..\TTDeployTool.Controller.Desktop\Assets\TrayIcon.ico</ApplicationIcon>
+    <!-- アプリのアイコン（オーナーの用意したもの、2026-11-14。元の SVG と画像の作り方は docs/design/desktop/icon） -->
+    <ApplicationIcon>Assets\TTDeployTool.ico</ApplicationIcon>
     <!-- WinUI 3 のアプリと同じく、利用者の PC に .NET のランタイムを求めない（起動時間・メモリを同じ条件で比べる） -->
     <SelfContained>true</SelfContained>
     <!-- 通知（AppNotificationManager）のための Windows App SDK を、アプリと一緒に置く（Windows App SDK のランタイムを PC に求めない） -->
@@ -66,7 +67,7 @@
     <Compile Include="..\TTDeployTool.Controller.Desktop\Services\ClipboardService.cs" Link="Linked\ClipboardService.cs" />
     <!-- .wapproj は、ビルドの出力からパッケージに入れるため、画面の入り口（index.html）を出力にも置く -->
     <Content Update="wwwroot\**" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="..\TTDeployTool.Controller.Desktop\Assets\TrayIcon.ico" Link="TrayIcon.ico" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\TTDeployTool.ico" Link="TrayIcon.ico" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\TTDeployTool.Controller.Desktop.Blazor\TTDeployTool.Controller.Desktop.Blazor.csproj" />

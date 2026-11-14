@@ -24,6 +24,8 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        // ウィンドウの題の左とタスク バーのアイコン（アプリのアイコン。オーナーの用意したもの、2026-11-14）
+        Icon = System.Windows.Media.Imaging.BitmapFrame.Create(new Uri(Path.Combine(AppContext.BaseDirectory, "TrayIcon.ico")));
         Handle = new WindowInteropHelper(this).EnsureHandle();
         // テスト（Playwright の WebView2Tests）だけ: 環境変数 TT_BLAZOR_CDP_PORT があれば、WebView2 を CDP のポートと別のユーザーデータのフォルダーで作る
         // （Microsoft Learn「ASP.NET Core Blazor Hybrid」の Web View configuration: BlazorWebViewInitializing）

@@ -35,7 +35,8 @@
     </AppxManifest>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="..\TTDeployTool.Controller.Desktop\Assets\*.png" Link="Images\%(Filename)%(Extension)" />
+    <!-- アプリのアイコン（オーナーの用意したもの、2026-11-14。docs/design/desktop/icon/render.js で SVG から作った画像） -->
+    <Content Include="..\TTDeployTool.Controller.Desktop.Blazor.Wpf\Assets\*.png" Link="Images\%(Filename)%(Extension)" />
   </ItemGroup>
   <Import Project="$(WapProjPath)\Microsoft.DesktopBridge.targets" />
   <ItemGroup>

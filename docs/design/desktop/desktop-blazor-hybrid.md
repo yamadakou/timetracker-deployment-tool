@@ -482,3 +482,15 @@ WinUI 3 版の UI テストとの対応（名前は同じ。中身の違い）:
 - 案 A（手順書）: 実機で確かめるのを、CI では確かめられないものだけにした（WAM・本物の Azure と会社のネットワーク・通知領域と通知・サインイン時の起動・ファイルの選択の窓・IME と時計の部品・Windows のフォントと拡大率と明暗）。49 行あった確認は、必須 15・任意 3 の 18 項目になった。自動テストで確かめている内容は、前の番号と自動テストの名前を並べて 3.6 に残した。設計書のこれまでの「手順書の n」は、前の番号（3.6 の表）を指す
 - 案 B（Windows の CI）: WPF のアプリを動かす `WebView2Tests` に、右クリックのメニュー（WebView2 の標準のメニューを出さないこと）・メニューからの移動・行のダブルクリック・詳細の範囲選択とコピー・ジョブの一覧のメニューを足した。コピーは、PowerShell の `Get-Clipboard` で Windows のクリップボードを読んで確かめる（ほかのアプリに貼り付けられることの代わり）
 
+### 16.18 アプリのアイコン（オーナーの依頼、2026-11-14）
+オーナーが用意したアイコン（雲と上向きの矢印と「TT」。`TTDeployTool.ico`〔16〜256 ピクセル〕・`TTDeployTool_icon.svg`・線を太くした小さい版の `TTDeployTool_icon_small.svg`）を組み込んだ。元のファイルは `docs/design/desktop/icon/` に置く。
+
+| 使う所 | ファイル |
+|---|---|
+| exe のアイコン・ウィンドウの題の左とタスク バー・通知領域のアイコン | `Blazor.Wpf/Assets/TTDeployTool.ico`（出力では `TrayIcon.ico`） |
+| MSIX の画像（Square44x44Logo・StoreLogo は小さい版、Square150x150Logo・Wide310x150Logo・SplashScreen は元の版。横長の画像は真ん中に置き、まわりは透明） | `Blazor.Wpf/Assets/*.png`（`docs/design/desktop/icon/render.js` で SVG から作る） |
+| 左のメニューの上の印 | `Blazor/wwwroot/icon.svg`（小さい版） |
+
+- 前は WinUI 3 版のフォルダー（`src/TTDeployTool.Controller.Desktop/Assets`）の画像を借りていた。WinUI 3 版のファイルは、このブランチでは変えないため、Blazor 版のフォルダーに分けた
+- WinUI 3 版のセッションに、同じアイコンの反映を頼む
+

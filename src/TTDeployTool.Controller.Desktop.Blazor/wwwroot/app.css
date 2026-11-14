@@ -61,7 +61,7 @@ input[type=range] { accent-color: var(--tt-accent); }
 .tt-main { display: flex; flex: 1 1 auto; min-height: 0; }
 .tt-nav { display: flex; flex-direction: column; gap: 2px; width: 220px; flex: none; padding: 12px 8px; }
 .tt-brand { display: flex; align-items: center; gap: 10px; padding: 4px 12px 14px; font-weight: 600; }
-.tt-brand-logo { width: 20px; height: 20px; border-radius: 5px; background: linear-gradient(135deg, #0078d4, #4cc2ff); }
+.tt-brand-logo { width: 24px; height: 24px; }
 .tt-nav-item { position: relative; justify-content: flex-start; gap: 12px; text-align: left; border: 0; background: none; padding: 9px 12px; border-radius: 6px; }
 .tt-nav-item[aria-current=page] { background: var(--tt-hover); font-weight: 600; }
 .tt-nav-item[aria-current=page]::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 2px; background: var(--tt-accent); }
