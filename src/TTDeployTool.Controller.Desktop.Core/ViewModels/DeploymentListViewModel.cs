@@ -402,7 +402,7 @@ public sealed class DeploymentListViewModel : ObservableObject
                 continue;
             await command.ExecuteAsync();
             if (row.Error == null)
-                done.Add(row.AppName);
+                done.Add(row.DisplayName);
         }
         BatchMessage = $"{done.Count} 件の利用可能期限を {days} 日延ばしました" + (done.Count == 0 ? "。" : $"（{string.Join("、", done)}）。") +
                        (done.Count < rows.Count ? $" 延ばせなかったもの・飛ばしたもの: {rows.Count - done.Count} 件。" : "");
@@ -803,13 +803,13 @@ public sealed class DeploymentListViewModel : ObservableObject
         {
             if (row.HasActiveJob)
             {
-                skipped.Add(row.AppName);
+                skipped.Add(row.DisplayName);
                 continue;
             }
             if (await row.ApplyExpiryAsync(input) is { } error)
-                failed.Add($"{row.AppName}（{error}）");
+                failed.Add($"{row.DisplayName}（{error}）");
             else
-                changed.Add(row.AppName);
+                changed.Add(row.DisplayName);
         }
         BatchMessage = string.Join(" ", new[]
         {
@@ -843,11 +843,11 @@ public sealed class DeploymentListViewModel : ObservableObject
             foreach (var row in rows)
             {
                 if (row.HasActiveJob)
-                    skipped.Add(row.AppName);
+                    skipped.Add(row.DisplayName);
                 else if (await row.ApplyGroupAsync(group) is { } rowError)
-                    failed.Add($"{row.AppName}（{rowError}）");
+                    failed.Add($"{row.DisplayName}（{rowError}）");
                 else
-                    changed.Add(row.AppName);
+                    changed.Add(row.DisplayName);
             }
         });
         BatchMessage = string.Join(" ", new[]
@@ -865,7 +865,7 @@ public sealed class DeploymentListViewModel : ObservableObject
         if (_selected.Count == 1)
         {
             if (_selected[0].HasActiveJob)
-                BatchMessage = $"{_selected[0].AppName} にはジョブがあるため、削除できません。ジョブが終わるか、取り消してから削除してください。";
+                BatchMessage = $"{_selected[0].DisplayName} にはジョブがあるため、削除できません。ジョブが終わるか、取り消してから削除してください。";
             else
                 await UseAsTargetAsync(_selected[0].Entry, Pages.Delete);
             return;

@@ -64,6 +64,23 @@ public sealed class ResourceGroupOnlyTests
     }
 
     [Fact]
+    public async Task Messages_Should_Name_A_Resource_Group_Only_Row_By_Its_Resource_Group()
+    {
+        // アプリ名が無いため、アプリ名で書くと「 にはジョブがあるため…」と名前が抜けていた（オーナーの実機の確認、2026-11-16）
+        var (h, row) = await ListedAsync();
+        row.DisplayName.Should().Be("rg（リソースグループだけ）");
+        await row.DeleteCommand.ExecuteAsync();
+        h.Main.Deletion.ToMarkdown().Should().StartWith("# TTDeployTool の削除の計画（rg（リソースグループだけ））");
+
+        h.Main.Queue.Register(JobKind.Delete, new JobTarget("sub", "rg", ""), DateTimeOffset.UtcNow.AddHours(1), () => new TaskCompletionSource<Job>().Task);
+        await h.Main.Deployments.LoadCommand.ExecuteAsync();
+        var list = h.Main.Deployments;
+        list.SetSelection(list.Rows);
+        await list.DeleteSelectedCommand.ExecuteAsync();
+        list.BatchMessage.Should().Be("rg（リソースグループだけ） にはジョブがあるため、削除できません。ジョブが終わるか、取り消してから削除してください。");
+    }
+
+    [Fact]
     public async Task A_Resource_Group_Not_Made_By_The_Tool_Should_Not_Be_Deletable()
     {
         var (h, row) = await ListedAsync(createdByTool: false);

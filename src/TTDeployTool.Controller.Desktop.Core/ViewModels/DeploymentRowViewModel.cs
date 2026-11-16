@@ -184,6 +184,9 @@ public sealed class DeploymentRowViewModel : ObservableObject
 
     public string AppName => _entry.AppName;
 
+    /// <summary>メッセージに出す名前（アプリ名。リソースグループだけの行はアプリ名が無いため「rg（リソースグループだけ）」。オーナーの実機の確認、2026-11-16）。</summary>
+    public string DisplayName => _entry.IsResourceGroupOnly ? $"{ResourceGroup}（リソースグループだけ）" : AppName;
+
     public Uri? Url => _entry.Url is { } url ? new Uri(url) : null;
 
     public bool HasUrl => Url != null;
