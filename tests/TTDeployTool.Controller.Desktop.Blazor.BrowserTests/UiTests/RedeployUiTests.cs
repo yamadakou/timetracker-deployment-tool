@@ -39,6 +39,12 @@ public sealed class RedeployUiTests
         await Assertions.Expect(page.Id("Target.AppName")).ToHaveValueAsync("app-failed");
         await page.ExpectTextAsync("Settings.Message", "ジョブの設定（rg-failed / app-failed）を入力しました。");
 
+        // 手順の帯（オーナーの依頼、2026-11-16）: 「確認と実行」を押すと、パスワードは記録に残していないため、手順「パスワード」で止まる。「対象」を押すと戻る
+        await page.ClickIdAsync("Wizard.Step5");
+        await page.ExpectTextAsync("Wizard.Step", "パスワード（3 / 5）");
+        await page.ClickIdAsync("Wizard.Step1");
+        await page.ExpectTextAsync("Wizard.Step", "対象（1 / 5）");
+
         // ① の値を変えてから、実行状況の画面（詳細。選んだ行は選んだまま）から読み込み直すと、ジョブの値に戻る
         await page.Id("Target.AppName").FillAsync("changed");
         await page.ShowAsync("Jobs");

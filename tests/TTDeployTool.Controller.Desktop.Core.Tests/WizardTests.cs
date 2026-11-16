@@ -45,6 +45,44 @@ public class DeployWizardViewModelTests
     }
 
     [Fact]
+    public async Task The_Step_Band_Should_Move_Back_Freely_And_Forward_Only_Up_To_The_First_Error()
+    {
+        // 手順の帯で手順を押して移る（オーナーの依頼、2026-11-16。誤りのある手順で止める、完了の表示では押せない）
+        var h = await new Harness().ReadyAsync();
+        h.Azure.ResourceGroup = null;
+        var vm = h.Main.Wizard;
+        var settings = h.Main.Settings;
+        vm.CanGoToStep.Should().BeTrue();
+
+        // パスワードが未入力のため、確認と実行へは飛べず、手順「パスワード」で止まって誤りを出す
+        settings.DbPassword = "";
+        await vm.GoToStepAsync(WizardStep.Confirm);
+        (vm.Step, vm.StepErrors.Count > 0).Should().Be((WizardStep.Passwords, true));
+        h.Main.Deployment.HasPlan.Should().BeFalse();
+
+        // 前の手順へは、いつでも移る。同じ手順を押しても何もしない
+        await vm.GoToStepAsync(WizardStep.Target);
+        vm.Step.Should().Be(WizardStep.Target);
+        var changes = new ChangeRecorder(vm);
+        await vm.GoToStepAsync(WizardStep.Target);
+        changes.Names.Should().BeEmpty();
+
+        // 誤りが無ければ、確認と実行まで飛び、計画を作る
+        settings.DbPassword = "DbPassw0rd!";
+        await vm.GoToStepAsync(WizardStep.Spec);
+        vm.Step.Should().Be(WizardStep.Spec);
+        await vm.GoToStepAsync(WizardStep.Confirm);
+        vm.Step.Should().Be(WizardStep.Confirm);
+        h.Main.Deployment.HasPlan.Should().BeTrue();
+
+        // 完了の表示では押せない
+        await h.Main.Deployment.StartCommand.ExecuteAsync();
+        (vm.IsCompleted, vm.CanGoToStep).Should().Be((true, false));
+        await vm.GoToStepAsync(WizardStep.Target);
+        (vm.IsCompleted, vm.Step).Should().Be((true, WizardStep.Confirm));
+    }
+
+    [Fact]
     public async Task Each_Step_Should_Block_Until_Its_Errors_Are_Fixed_And_The_Last_Should_Plan()
     {
         var h = await new Harness().ReadyAsync();

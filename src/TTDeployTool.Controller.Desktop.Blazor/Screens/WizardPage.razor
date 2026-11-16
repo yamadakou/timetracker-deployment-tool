@@ -9,7 +9,7 @@
             <p class="tt-page-sub">TimeTracker の環境を Azure に作ります。入力は次へ進むたびに確かめます。<span class="tt-strong" data-id="Wizard.Step">@Wizard.StepText</span></p>
         </div>
     </div>
-    <Stepper Current="(int)Wizard.Step" Completed="Wizard.IsCompleted" />
+    <Stepper Current="(int)Wizard.Step" Completed="!Wizard.CanGoToStep" OnSelect="step => Wizard.GoToStepAsync((WizardStep)step)" />
     <div class="tt-split">
     <div class="tt-split-main tt-surface tt-section">
 

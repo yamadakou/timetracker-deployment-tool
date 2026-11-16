@@ -376,4 +376,22 @@ public sealed class RedesignScreenTests : IDisposable
         table.FindAll(".tt-menu button").Should().HaveCount(3);
         table.FindAll(".tt-menu-sep").Should().BeEmpty();
     }
+
+    [Fact]
+    public async Task The_Step_Band_Should_Open_The_Pressed_Step_And_Be_Disabled_When_Completed()
+    {
+        await _app.SignInAsync();
+        var page = _app.Context.Render<WizardPage>(p => p.Add(x => x.Model, _app.ViewModel));
+        var wizard = _app.ViewModel.Wizard;
+        Id(page, "Wizard.Step4").GetAttribute("title").Should().Be("手順「スペックと期限」を開く");
+
+        // 手順「対象」に誤り（サブスクリプション・リソースグループが未入力）があるため、手順 4 を押しても「対象」で止まり、誤りを出す
+        Id(page, "Wizard.Step4").Click();
+        page.WaitForAssertion(() => wizard.StepErrors.Should().NotBeEmpty());
+        wizard.Step.Should().Be(TTDeployTool.Controller.Desktop.Core.ViewModels.WizardStep.Target);
+        Id(page, "Wizard.Step1").GetAttribute("aria-current").Should().Be("step");
+
+        var stepper = _app.Context.Render<Stepper>(p => p.Add(x => x.Current, 5).Add(x => x.Completed, true));
+        stepper.FindAll("button.tt-step").Should().HaveCount(5).And.OnlyContain(b => b.HasAttribute("disabled") && b.GetAttribute("title") == null);
+    }
 }

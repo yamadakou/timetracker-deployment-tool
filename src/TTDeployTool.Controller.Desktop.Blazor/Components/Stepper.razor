@@ -1,10 +1,12 @@
-@* 新しくデプロイの手順の帯（推奨のデザイン: 終わった手順は ✓、今の手順は強調）。完了の表示では、すべて ✓ *@
+@* 新しくデプロイの手順の帯（推奨のデザイン: 終わった手順は ✓、今の手順は強調）。完了の表示では、すべて ✓。
+   手順を押すと、その手順に移る（オーナーの依頼、2026-11-16。先の手順へは、途中の誤りで止める。完了の表示では押せない） *@
 <nav class="tt-surface tt-stepper" aria-label="手順" data-id="Wizard.Stepper">
     @for (var i = 0; i < Names.Length; i++)
     {
         var step = i + 1;
         var css = Completed || step < Current ? "tt-done" : step == Current ? "tt-current" : null;
-        <div class="tt-step @css" aria-current="@(css == "tt-current" ? "step" : null)">
+        <button type="button" class="tt-step @css" data-id="@($"Wizard.Step{step}")" aria-current="@(css == "tt-current" ? "step" : null)" disabled="@Completed"
+                title="@(Completed ? null : $"手順「{Names[i]}」を開く")" @onclick="() => OnSelect.InvokeAsync(step)">
             <span class="tt-step-n">@if (css == "tt-done")
                 {
                     <Icon Name="check" Size="14" />
@@ -13,7 +15,7 @@
                 {
                     @step
                 }</span>@Names[i]
-        </div>
+        </button>
         @if (step < Names.Length)
         {
             <div class="tt-step-bar @(Completed || step < Current ? "tt-done" : null)"></div>
@@ -28,6 +30,11 @@
     [Parameter]
     public int Current { get; set; }
 
+    /// <summary>完了の表示（手順は押せない）。</summary>
     [Parameter]
     public bool Completed { get; set; }
+
+    /// <summary>手順を押したとき（1〜5）。</summary>
+    [Parameter]
+    public EventCallback<int> OnSelect { get; set; }
 }

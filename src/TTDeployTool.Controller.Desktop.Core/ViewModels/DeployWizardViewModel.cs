@@ -161,6 +161,23 @@ public sealed class DeployWizardViewModel : ObservableObject
     public static WizardStep StepOf(string message) =>
         Prefixes.FirstOrDefault(p => message.StartsWith(p.Prefix, StringComparison.Ordinal)) is (not null, var step) ? step : WizardStep.Confirm;
 
+    /// <summary>
+    /// 上の手順の帯で手順を押したとき（オーナーの依頼、2026-11-16。オーナーの判断: 誤りのある手順で止める、完了の表示では押せない）。前の手順へは、いつでも移る。
+    /// 先の手順へは、途中の手順に誤りがあれば、その手順で止めて誤りを出す（「次へ」を続けて押したのと同じ）。完了の表示では、何もしない。
+    /// </summary>
+    public Task GoToStepAsync(WizardStep step)
+    {
+        if (IsCompleted || step == _step)
+            return Task.CompletedTask;
+        if (step < _step)
+            return GoToAsync(step);
+        var blocking = _settings.Errors.Select(StepOf).Where(s => s < step).DefaultIfEmpty(step).Min();
+        return GoToAsync(blocking);
+    }
+
+    /// <summary>手順の帯の手順を押せるか（完了の表示では押せない）。</summary>
+    public bool CanGoToStep => !IsCompleted;
+
     /// <summary>最初の画面に戻す（一覧の「対象に入れる」・完了の表示の「続けて」「新規」）。完了の表示もやめる。</summary>
     public Task StartOverAsync()
     {
@@ -181,7 +198,7 @@ public sealed class DeployWizardViewModel : ObservableObject
     {
         if (!SetProperty(ref _registered, job, nameof(RegisteredJob)))
             return;
-        foreach (var name in new[] { nameof(IsCompleted), nameof(IsEditing), nameof(CompletedText), nameof(ShowJobText), nameof(StepText),
+        foreach (var name in new[] { nameof(IsCompleted), nameof(IsEditing), nameof(CanGoToStep), nameof(CompletedText), nameof(ShowJobText), nameof(StepText),
                      nameof(IsTarget), nameof(IsDb), nameof(IsPasswords), nameof(IsSpec), nameof(IsConfirm) })
             OnPropertyChanged(name);
         ShowJobCommand.RaiseCanExecuteChanged();
