@@ -60,6 +60,10 @@ internal static class Ui
     /// <summary>割合が 0 より大きいときだけ出す（Redis は最低がいちばん左のため、赤の帯を出さない）。</summary>
     public static Visibility IfPositive(double share) => share > 0 ? Visibility.Visible : Visibility.Collapsed;
 
+    /// <summary>手順の帯のボタンの形（今の手順は強調。No.91）。<paramref name="name"/> は手順の名前。</summary>
+    public static Style StepStyle(WizardStep current, string name) => (Style)Microsoft.UI.Xaml.Application.Current.Resources[
+        current.ToString() == name ? "AccentButtonStyle" : "DefaultButtonStyle"];
+
     public static string Time(DateTimeOffset? value) => value is { } t ? $"計画の有効期限: {t.ToLocalTime():HH:mm}" : "";
 }
 

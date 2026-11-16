@@ -215,6 +215,10 @@ public sealed partial class MainWindow : Window
         _ => Enumerable.Empty<TextBlock>(),
     };
 
+    // 手順の帯の手順を押す（Core が、先の手順へは誤りのある手順で止める。No.91）
+    private void OnWizardStepClicked(object sender, RoutedEventArgs e) =>
+        _ = ViewModel.Wizard.GoToStepAsync(Enum.Parse<WizardStep>((string)((FrameworkElement)sender).Tag));
+
     // 実行状況の画面の「戻る」: 開いた画面（ジョブの一覧かデプロイの一覧）に戻る
     private void OnBackFromStatus(object sender, RoutedEventArgs e) => Navigate(ViewModel.ReturnPage);
 

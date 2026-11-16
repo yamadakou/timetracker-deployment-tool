@@ -147,6 +147,19 @@
                     <!-- デプロイのウィザード（docs/design/desktop/desktop-wizard.md の 3。入力は「設定」の ViewModel、計画と実行はデプロイの ViewModel） -->
                     <StackPanel x:Name="WizardPanel" Tag="wizard" Spacing="12" MaxWidth="900" HorizontalAlignment="Left" Visibility="Collapsed">
                         <TextBlock AutomationProperties.AutomationId="Panel.Wizard" Style="{StaticResource SubtitleTextBlockStyle}" Text="新しくデプロイ" />
+                        <!-- 手順の帯（No.91。Blazor 版の 16.20 と同じ: 押すとその手順を開く。前へはいつでも、先へは途中の手順に誤りがあればその手順で止める。完了の表示では押せない） -->
+                        <StackPanel AutomationProperties.AutomationId="Wizard.Steps" Orientation="Horizontal" Spacing="4">
+                            <Button AutomationProperties.AutomationId="Wizard.GoTo.Target" Content="1. 対象" Tag="Target" Click="OnWizardStepClicked" ToolTipService.ToolTip="手順「対象」を開く"
+                                    IsEnabled="{x:Bind ViewModel.Wizard.CanGoToStep, Mode=OneWay}" Style="{x:Bind local:Ui.StepStyle(ViewModel.Wizard.Step, 'Target'), Mode=OneWay}" />
+                            <Button AutomationProperties.AutomationId="Wizard.GoTo.Db" Content="2. DB" Tag="Db" Click="OnWizardStepClicked" ToolTipService.ToolTip="手順「DB」を開く"
+                                    IsEnabled="{x:Bind ViewModel.Wizard.CanGoToStep, Mode=OneWay}" Style="{x:Bind local:Ui.StepStyle(ViewModel.Wizard.Step, 'Db'), Mode=OneWay}" />
+                            <Button AutomationProperties.AutomationId="Wizard.GoTo.Passwords" Content="3. パスワード" Tag="Passwords" Click="OnWizardStepClicked" ToolTipService.ToolTip="手順「パスワード」を開く"
+                                    IsEnabled="{x:Bind ViewModel.Wizard.CanGoToStep, Mode=OneWay}" Style="{x:Bind local:Ui.StepStyle(ViewModel.Wizard.Step, 'Passwords'), Mode=OneWay}" />
+                            <Button AutomationProperties.AutomationId="Wizard.GoTo.Spec" Content="4. スペックと利用可能期限" Tag="Spec" Click="OnWizardStepClicked" ToolTipService.ToolTip="手順「スペックと利用可能期限」を開く"
+                                    IsEnabled="{x:Bind ViewModel.Wizard.CanGoToStep, Mode=OneWay}" Style="{x:Bind local:Ui.StepStyle(ViewModel.Wizard.Step, 'Spec'), Mode=OneWay}" />
+                            <Button AutomationProperties.AutomationId="Wizard.GoTo.Confirm" Content="5. 確認と実行" Tag="Confirm" Click="OnWizardStepClicked" ToolTipService.ToolTip="手順「確認と実行」を開く"
+                                    IsEnabled="{x:Bind ViewModel.Wizard.CanGoToStep, Mode=OneWay}" Style="{x:Bind local:Ui.StepStyle(ViewModel.Wizard.Step, 'Confirm'), Mode=OneWay}" />
+                        </StackPanel>
                         <TextBlock AutomationProperties.AutomationId="Wizard.Step" Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind ViewModel.Wizard.StepText, Mode=OneWay}" />
                         <!-- 完了の表示（登録した後。docs/design/desktop/desktop-wizard.md の 3、Q4・Q13・No.70）: 進み具合と結果、続けて・新規 -->
                         <StackPanel AutomationProperties.AutomationId="Wizard.Completed" Spacing="12" Visibility="{x:Bind ViewModel.Wizard.IsCompleted, Mode=OneWay}">
