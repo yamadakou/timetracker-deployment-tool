@@ -157,10 +157,13 @@ public sealed class DeploymentRowViewModel : ObservableObject
     public double ExpiryShare => DaysLeft is { } d ? Math.Min(1, d / 90.0) : 0;
 
     /// <summary>料金の目安（デプロイから期限まで。期限なしは 1 か月分。見積もれなければ null）。</summary>
-    public string? CostText => _owner.Costs.For(_entry)?.Text;
+    public string? CostText => _owner.Costs.For(_entry)?.Text ?? (IsCostPending ? "計算しています" : null);
 
     /// <summary>料金の目安の 2 行目（1 日あたり）。</summary>
-    public string? CostPerDayText => _owner.Costs.For(_entry)?.PerDayText;
+    public string? CostPerDayText => _owner.Costs.For(_entry)?.PerDayText ?? (IsCostPending ? "1 日 —" : null);
+
+    // 単価をまだ読んでいない（読んだら 2 行で出すため、読む前も 2 行にして、行の高さを変えない。後から高くなると下の行がずれ、押そうとした行がずれた。2026-11-16）
+    private bool IsCostPending => !_entry.IsResourceGroupOnly && !_owner.Costs.HasPricesFor([_entry]);
 
     /// <summary>単価を読んだ・単位を変えたとき。</summary>
     internal void CostsChanged()

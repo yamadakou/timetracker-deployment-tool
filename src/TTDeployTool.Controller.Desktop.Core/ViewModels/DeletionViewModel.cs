@@ -342,7 +342,7 @@ public sealed class DeletionViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 確かめた計画で削除のジョブを始める。計画の有効期限（15 分）が切れていれば計画し直し、対象ごとの「削除するか」が確かめた計画と
+    /// 確かめた計画で削除のジョブを始める。計画の有効期限（15 分）が切れていれば（見つからなくなっていても）計画し直し、対象ごとの「削除するか」が確かめた計画と
     /// 同じ場合だけ始める（予定・待機中のジョブのため。詳細設計 desktop-jobs.md の 4.2）。
     /// </summary>
     internal async Task<Job> StartPlannedAsync(DeletionPlanTicket ticket, string confirmedAppName, IAzureSession session)
@@ -351,7 +351,9 @@ public sealed class DeletionViewModel : ObservableObject
         {
             return await _workflow.StartAsync(ticket.Saved!.PlanId, confirmedAppName, _ => session, KeptNotice);
         }
-        catch (WorkflowException ex) when (ex.Failure == WorkflowFailure.PlanExpired)
+        // 期限の切れた計画は、ほかの計画を保存したときに片付けられ、「見つからない」になる（まとめての削除・予定の削除で、2 件目以降が失敗した。
+        // オーナーの実機、2026-11-16）。どちらも計画し直し、確かめた計画と同じ場合だけ始める
+        catch (WorkflowException ex) when (ex.Failure is WorkflowFailure.PlanExpired or WorkflowFailure.PlanNotFound)
         {
             var plan = ticket.Plan;
             var fresh = await _workflow.PlanAsync(session, plan.Subscription, plan.ResourceGroup, plan.AppName, plan.IncludeUntagged, plan.KeepDbData,

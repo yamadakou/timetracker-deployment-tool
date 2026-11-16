@@ -187,7 +187,7 @@ public class DeletionViewModelTests
         await h.Main.Queue.WhenIdleAsync();
 
         vm.HasPlan.Should().BeFalse();
-        h.Main.CurrentDeletion!.Error.Should().Be("実行しませんでした: " + DesktopMessages.Changed);
+        h.Main.CurrentDeletion!.Error.Should().Be(ExpectedMessages.DeleteChanged);
 
         h.Azure.GatewayMock.Setup(g => g.ListContainerAppsAsync("sub", "rg", It.IsAny<CancellationToken>())).ThrowsAsync(new RequestFailedException(500, "障害"));
         await vm.PlanCommand.ExecuteAsync();
@@ -221,6 +221,25 @@ public class StatusViewModelTests
 
         h.Main.Status.Error.Should().Be("サブスクリプションを選んでください。");
         h.Main.Status.Summary.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task A_Resource_Group_Only_Target_Should_Not_Read_The_Apps_Or_Show_An_App_Name_Error()
+    {
+        // リソースグループだけの削除のジョブの詳細で「アプリ名が空です」と出ていた（オーナーの指摘、2026-11-16）
+        var h = await new Harness().ReadyAsync();
+        h.Main.Target.AppName = "";
+        var vm = h.Main.Status;
+
+        await vm.RefreshCommand.ExecuteAsync();
+
+        (vm.Error, vm.Summary).Should().Be(((string?)null, (string?)null));
+        vm.Note.Should().Be("リソースグループ rg だけの対象のため（本ツールのアプリのリソースはありません）、アプリの状態はありません。");
+
+        // リソースグループの指定が誤っていれば、その誤りを出す
+        h.Main.Target.ResourceGroup = "";
+        await vm.RefreshCommand.ExecuteAsync();
+        vm.Error.Should().NotBeNull();
     }
 
     [Fact]

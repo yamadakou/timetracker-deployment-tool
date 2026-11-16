@@ -267,3 +267,14 @@ internal sealed class ChangeRecorder
 
     public List<string> Names { get; } = [];
 }
+
+/// <summary>ジョブを始められなかったときの文（やり直し方は、ジョブの種類のメニューの操作。オーナーの指摘、2026-11-16）。</summary>
+internal static class ExpectedMessages
+{
+    private const string Changed = "実行しませんでした: 計画の後に Azure の状態が変わりました（リソースが作成・削除された、管理タグが変わったなど）。";
+
+    public const string DeployChanged = Changed + "ジョブの一覧で、このジョブを右クリック →「この設定で新しくデプロイ」でデプロイし直してください。";
+
+    public const string DeleteChanged = Changed + "デプロイの一覧で、その行を右クリック →「Azure から削除…」で削除し直してください。";
+}
+

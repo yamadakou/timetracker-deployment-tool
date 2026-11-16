@@ -256,6 +256,33 @@ public sealed class DeploymentCostTests
     }
 
     [Fact]
+    public async Task Rows_Should_Keep_Two_Lines_While_The_Prices_Are_Read()
+    {
+        // 単価を読む前も 2 行で出す（後から 2 行目が加わると、行が高くなって下の行がずれた。2026-11-16）
+        var prices = new TaskCompletionSource<UnitPrices>();
+        var catalog = new Moq.Mock<IPriceCatalog>();
+        catalog.Setup(c => c.GetAsync(Moq.It.IsAny<string>(), Moq.It.IsAny<PriceCurrency>(), Moq.It.IsAny<CancellationToken>())).Returns(prices.Task);
+        var h = new Harness(time: Tokyo(), prices: catalog.Object);
+        h.Azure.RecordsByTenant["t1"] =
+        [
+            .. DeploymentListViewModelTests.Deployment("sub", "rg", "demo", "2026-11-20T14:59:59Z"),
+            new ManagedResourceRecord("/subscriptions/sub/resourceGroups/rg-old", "rg-old", ManagedResourceRecord.ResourceGroupType, "sub", "rg-old", "japaneast",
+                ManagedTags.ForResourceGroup()),
+        ];
+        await h.ReadyAsync();
+        var list = h.Main.Deployments;
+        await list.LoadCommand.ExecuteAsync();
+        var rows = list.Rows.ToDictionary(r => r.AppName);
+        (rows["demo"].CostText, rows["demo"].CostPerDayText).Should().Be(("計算しています", "1 日 —"));
+        (rows[""].CostText, rows[""].CostPerDayText).Should().Be(((string?)null, (string?)null), "リソースグループだけの行は見積もらない");
+
+        prices.SetResult(BuiltInPriceCatalog.Jpy);
+        await Task.Yield();
+        rows["demo"].CostText.Should().StartWith("約 ").And.EndWith(" 円");
+        rows["demo"].CostPerDayText.Should().StartWith("1 日 約 ");
+    }
+
+    [Fact]
     public async Task The_Total_Display_Should_Be_The_Total_When_Estimated()
     {
         var list = (await ListedAsync()).Main.Deployments;
