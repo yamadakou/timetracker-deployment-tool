@@ -362,7 +362,7 @@ public sealed class JobViewModel : ObservableObject
     public string? Error => _record != null ? _record.Error : _startError is { } startError
         ? $"実行しませんでした: {startError}"
         : _snapshot?.Error is { } error
-            ? $"{error}\n途中まで作成・削除したリソースは、もう一度実行すると続きから処理します（状態は「状態の確認」で見られます）。"
+            ? $"{error}\n途中まで作成・削除したリソースは、もう一度実行すると続きから処理します（Azure の状態は、デプロイの一覧の「状態を確認」で見られます）。"
             : null;
 
     /// <summary>予定より遅れて実行した場合などの注意。</summary>

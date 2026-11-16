@@ -1,7 +1,7 @@
 @* 誤り（Error）・注意（Caution）・お知らせ（Info）の帯。文字が無ければ出さない（WinUI の画面の InfoBar と、色つきの TextBlock） *@
 @if (!string.IsNullOrEmpty(Text))
 {
-    <p class="tt-message tt-@Kind.ToString().ToLowerInvariant()" role="@(Kind == MessageKind.Error ? "alert" : "status")" data-id="@Id">@Text</p>
+    <p class="tt-message tt-@Kind.ToString().ToLowerInvariant()" role="@(Kind == MessageKind.Error ? "alert" : "status")" data-id="@Id"><LinkedText Text="@Text" /></p>
 }
 
 @code {

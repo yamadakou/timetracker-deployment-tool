@@ -7,7 +7,12 @@
     <div class="tt-page-head">
         <div>
             <h1>デプロイの一覧</h1>
-            <p class="tt-page-sub">サインインしたアカウントで読めるサブスクリプションから、本ツールでデプロイした環境（別の PC・CLI・MCP サーバーでデプロイしたものを含む）を読みます。パスワードは「パスワードを表示」を押したときだけ Azure から読み、PC には保存しません。</p>
+            @* 説明は 1 行にし、詳しくは畳む（UX の見直し C、2026-11-16: 一覧に着くまでの文字を減らす） *@
+            <p class="tt-page-sub" data-id="Deployments.Lead">このツールでデプロイした環境を Azure から読みます。</p>
+            <details class="tt-page-more" data-id="Deployments.More">
+                <summary>詳しく</summary>
+                <p class="tt-page-sub">サインインしたアカウントで読めるサブスクリプションから読みます（別の PC・CLI・MCP サーバーでデプロイしたものも含みます）。パスワードは詳細の「パスワードを表示」を押したときだけ Azure から読み、PC には保存しません。</p>
+            </details>
         </div>
         <CommandButton Id="Deployments.Load" Command="List.LoadCommand" Text="読み込む" IconName="refresh" Css="tt-primary" />
     </div>
@@ -48,15 +53,20 @@
     @* 1 行だけ選んだときは、右に詳細の面を出す（選んでいなければ、表を広く使う） *@
     <div class="@(List.Current == null ? null : "tt-split")">
     <div class="tt-split-main">
-    @* 選んだ行への操作（docs/design/desktop/desktop-wizard.md の 7） *@
+    @* 選んだ行への操作（docs/design/desktop/desktop-wizard.md の 7）。行を選ぶまでは、何ができるかの 1 行だけを出す（UX の見直し C、2026-11-16） *@
     <div class="tt-bar tt-surface tt-commandbar">
         <span data-id="Deployments.Selection">@List.SelectionText</span>
+    @if (List.Selected.Count > 0)
+    {
         <CheckField Id="Deployments.BatchNoExpiry" Label="期限なし" Value="List.BatchNoExpiry" ValueChanged="v => List.BatchNoExpiry = v" />
         <DateTimeInput Id="Deployments.BatchExpiry" DateLabel="期限日" Date="List.BatchExpiryDate" DateChanged="d => List.BatchExpiryDate = d" Disabled="List.BatchNoExpiry" />
         <CommandButton Id="Deployments.ChangeExpiry" Command="List.ChangeSelectedExpiryCommand" Text="期限を変える" />
         <CommandButton Id="Deployments.Delete" Command="List.DeleteSelectedCommand" Text="Azure から削除…" />
         <CommandButton Id="Deployments.ClearSelection" Command="List.ClearSelectionCommand" Text="選択を外す" />
+    }
     </div>
+    @if (List.Selected.Count > 0)
+    {
     @* 選んだ行のグループをまとめて変える・外す（docs/design/common/deployment-groups.md の 5） *@
     <div class="tt-bar tt-surface tt-commandbar">
         <TextInput Id="Deployments.BatchGroup" Label="グループ名" Value="@List.BatchGroup" ValueChanged="v => List.BatchGroup = v" List="tt-batch-group-suggestions" />
@@ -69,6 +79,7 @@
         <CommandButton Id="Deployments.ChangeGroup" Command="List.ChangeSelectedGroupCommand" Text="グループを変える" />
         <CommandButton Id="Deployments.RemoveGroup" Command="List.RemoveSelectedGroupCommand" Text="グループを外す" />
     </div>
+    }
     <BusyView Id="Deployments.BatchBusy" State="List.BatchBusy" />
     <p data-id="Deployments.BatchMessage">@List.BatchMessage</p>
 
@@ -111,6 +122,20 @@
 
     protected override void OnDispose() => List.BatchEditRequested -= FocusBatchExpiry;
 
-    // 右クリックの「期限・グループを変える…」: 上の操作の帯の期限日に移る
-    private void FocusBatchExpiry() => _ = JsModule.InvokeQuietlyAsync(JsModule.ImportAsync(JS), "focusSelector", "[data-id='Deployments.BatchExpiryDate']");
+    private bool _focusBatch;
+
+    // 右クリックの「期限・グループを変える…」: 上の操作の帯の期限日に移る。帯は行を選んでから描くため、描き終えてから移る
+    private void FocusBatchExpiry()
+    {
+        _focusBatch = true;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_focusBatch)
+            return;
+        _focusBatch = false;
+        await JsModule.InvokeQuietlyAsync(JsModule.ImportAsync(JS), "focusSelector", "[data-id='Deployments.BatchExpiryDate']");
+    }
 }

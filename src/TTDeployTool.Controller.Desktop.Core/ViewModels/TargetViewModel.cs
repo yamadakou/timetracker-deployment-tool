@@ -87,7 +87,7 @@ public sealed class TargetViewModel : ObservableObject
     public string Subscription => SelectedSubscription?.SubscriptionId ?? "";
 
     /// <summary>選んだサブスクリプションの表示（「設定」の対象の欄）。</summary>
-    public string SubscriptionDisplay => SelectedSubscription?.Display ?? "サブスクリプション: 「サインインと対象」で選んでください。";
+    public string SubscriptionDisplay => SelectedSubscription?.Display ?? "サブスクリプション: 「新しくデプロイ」の手順「対象」で選んでください。";
 
     /// <summary>アプリ名の誤り（削除と状態の確認で、Azure を読む前に確かめる）。</summary>
     public string? TargetError => ResourceGroupError ?? AppNameValidator.GetError(AppName.ToLowerInvariant());

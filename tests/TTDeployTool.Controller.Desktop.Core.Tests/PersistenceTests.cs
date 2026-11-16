@@ -23,7 +23,7 @@ public class PersistenceTests
         vm.PersistDb = SettingsViewModel.PersistDbOptions[1];
         changes.Names.Should().Equal("PersistDb");
         vm.Build(ValidationTarget.Azure).Options.Should().BeNull();
-        vm.Build(ValidationTarget.Compose).Warnings.Should().ContainSingle().Which.Should().StartWith("persist-db は Azure 向けの設定");
+        vm.Build(ValidationTarget.Compose).Warnings.Should().ContainSingle().Which.Should().StartWith("「DB のデータ」の「Azure Files に永続化する」は Azure 向けの設定");
     }
 
     [Fact]
@@ -37,7 +37,8 @@ public class PersistenceTests
 
         vm.PersistDbText.Should().Be($"DB のデータ: Azure Files に永続化する（ストレージアカウント {FakeAzure.StorageAccountName}）");
         vm.Operations.Select(o => o.Resource).Should().Contain(["ストレージアカウント（DB のデータ）", "ファイル共有（DB のデータ）", "Environment のストレージ"]);
-        vm.Warnings.Should().Contain(DbPersistence.StorageNotice(FakeAzure.StorageAccountName));
+        vm.Warnings.Should().Contain(DesktopTerms.ForScreen(DbPersistence.StorageNotice(FakeAzure.StorageAccountName)))
+            .And.Contain(w => w.Contains("「DB のデータを残す」にチェックを入れない限り"), "画面の名前で書く（--keep-db-data ではなく）");
 
         await vm.StartCommand.ExecuteAsync();
         await h.Main.Queue.WhenIdleAsync();

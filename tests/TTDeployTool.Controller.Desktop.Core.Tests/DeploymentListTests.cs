@@ -332,7 +332,7 @@ public class DeploymentListViewModelTests
 
         await h.Main.Deployments.Rows.Single().UseAsTargetCommand.ExecuteAsync();
 
-        h.Main.Deployments.Error.Should().StartWith("サブスクリプション gone が「サインインと対象」の一覧にありません。");
+        h.Main.Deployments.Error.Should().StartWith("サブスクリプション gone が、サインインしたアカウントのサブスクリプションの一覧にありません。");
         h.Navigations.Should().BeEmpty();
     }
 
@@ -524,7 +524,7 @@ public class DeploymentListViewModelTests
         new[] { row.UseAsTargetCommand, row.DeleteCommand, row.ChangeExpiryCommand }.Should().AllSatisfy(c => c.CanExecute(null).Should().BeFalse());
         new[] { row.OpenCommand, row.CheckStatusCommand, row.ShowPasswordsCommand }.Should().AllSatisfy(c => c.CanExecute(null).Should().BeTrue());
         // 「状態を確認」と「ジョブを見る」は同じ画面を開いていたため、1 つにまとめた（オーナーの実機、2026-10-27。No.69）
-        row.CheckStatusText.Should().Be("状態とジョブを確認");
+        row.CheckStatusText.Should().Be("状態を確認");
         Row("other").HasActiveJob.Should().BeFalse("ほかの対象の行は操作できる");
         Row("other").DeleteCommand.CanExecute(null).Should().BeTrue();
 

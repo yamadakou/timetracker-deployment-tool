@@ -519,3 +519,18 @@ WinUI 3 版の UI テストとの対応（名前は同じ。中身の違い）:
 ### 16.21 実機での確認の結果（2026-11-16）
 オーナーが、CI（run 43803982105、feaeb9b）の MSIX を実機（Windows 11）で確かめ、すべて OK。確かめたもの: 16.18 のアイコン、16.19（まとめての削除で複数のリソースグループを削除できる・削除のジョブの詳細にアプリ名の誤りが出ない・入力欄の右クリックで貼り付けられる・料金の列が「計算しています」から金額に変わる）、16.20（手順の帯から手順を開く）と、手順書の実機での確認。
 
+### 16.22 UX の見直し A〜E（オーナーの依頼、2026-11-16。ピーター・モービルのハニカムでの評価から、オーナーの判断で A〜E のすべて）
+画面・メニューに無い名前を使った文を洗い出し、ハニカム（役に立つ・使いやすい・見つけやすい・信頼できる・利用しやすい〔アクセシブル〕・望ましい・価値がある）で評価した改善を入れた。
+
+| 案 | 内容 | 主な場所 |
+|---|---|---|
+| A 用語を画面の名前に | CLI・MCP と共通の誤り・警告（Domain・Application の文。`subscription は必須です。`・`tt-cpu には正の数値を…`・`--persist-db`・`--keep-db-data`・`location に … を指定するか、別の app_name を…` など）を、デスクトップアプリでだけ画面の名前で書き直す（「サブスクリプションを選んでください。」「TimeTracker の CPU には、0 より大きい数値を…」「手順「DB」の「DB のデータ」で「Azure Files に永続化する」を…」「手順「対象」のリージョンを …」）。CLI・MCP の文は変えない。設定の確かめ・デプロイと削除の計画の止める理由と警告・一覧のグループ・行の誤りに通す。ウィザードの手順の誤りの頭も、手順の名前（「対象」「DB」など）にした | `Core/DesktopTerms.cs`（`ForScreen`）・`SettingsViewModel`・`DeploymentViewModel`・`DeletionViewModel`・`DesktopMessages`・`DeployWizardViewModel` |
+| B 名前をそろえる | 同じ操作に別の名前を使っていた所をそろえた: 行の操作は「この対象で新しくデプロイ」「この設定で新しくデプロイ」（右の詳細のボタンにも、何が引き継がれるかの説明〔title〕）、状態の確かめは「状態を確認」、読み直しは「サブスクリプションを読み直す」「状態を読み直す」、タグの欄は「TimeTracker のイメージのタグ（空なら既定のタグ）」。「サインインと対象」「状態の確認」など、画面に無い名前を書いていた文を直した | `DeploymentRowViewModel`・`JobViewModel`・`TargetViewModel`・`WizardPage`・`DryRunPage`・`StatusPage`・`DeploymentDetail`・`CommandButton`（`Title`） |
+| C 一覧の上を軽く | デプロイの一覧・ジョブの一覧の上の説明を 1 行にし、詳しくは「詳しく」で畳む。デプロイの一覧の操作の帯（期限・グループ・削除）は行を選んだときだけ出し、選ぶ前は「行を選ぶと、期限・グループの変更や Azure からの削除ができます（行の右クリックでも操作できます。ダブルクリックで詳細）。」の 1 行だけにする。右クリックの「期限・グループを変える…」は、帯を描いてから期限日に移る | `DeploymentsPage`・`JobsPage`・`DeploymentListViewModel.NoSelectionText` |
+| D キーボードとアクセシビリティ | 表で Shift+F10・メニューキーを押すと、行のメニューを開く（行のチェックボックスにフォーカスがあればその行、表にフォーカスがあれば選んだ行。選んだ行が無ければ選び方を伝える）。開いたメニューは最初の押せる項目にフォーカスを置き、↑/↓ で前後（端で回る）、Home/End で最初・最後、Esc で閉じて表に戻る。右の詳細も、フォーカスを置いて Shift+F10 でメニューを開け、Esc で詳細に戻る。Playwright に axe-core（`Deque.AxeCore.Playwright`、WCAG 2.1 A・AA）の確かめを足し、主な画面（サインインと対象・デプロイの一覧と詳細・右クリックのメニュー・新しくデプロイ・ドライラン・ジョブの一覧・アプリの設定）で影響が serious・critical の違反が無いことを確かめる（入れた時点で違反は 0 件） | `DataTable`（`KeyboardMenu`・`FirstMenuItem`）・`DeploymentDetail`・`wwwroot/table.js`（`focusIn`・メニューのキー）・`AccessibilityUiTests` |
+| E 権限の不足の案内 | 「README の「必要な RBAC ロールと権限」を参照し…」だけでは何をすればよいか分からなかった。必要なロール（共同作成者か所有者）と、管理者に頼むことをその場で書き、資料の URL を添える。メッセージ・一覧の文の中の URL はリンクにし、既定のブラウザーで開く | `DesktopTerms.RbacGuide`・`Components/LinkedText.razor`（`Message`・`Lines`） |
+
+- テスト: Core（`DesktopTermsTests` ほか、文を変えたテスト）、bUnit（`UxReviewScreenTests`: 上の説明と「詳しく」、行を選ぶまで帯を出さない、キーボードのメニューのフォーカス、詳細のメニューのフォーカス、URL のリンク）、Playwright（`RowMenuUiTests.The_Row_Menu_Should_Work_With_The_Keyboard_Only`・`AccessibilityUiTests`）、WebView2（`WebView2Tests`: Shift+F10 でメニュー・↓・Esc で表に戻る）。網羅率は Core・Blazor・table.js とも 100%
+- URL のリンクのテストで、全角の「（」が URL に含まれる誤りが見つかり、直した（「（」「「」も URL の終わりとみなす）
+- Core の変更（A・B・C の文）のため、WinUI 3 版のセッションに同じ仕様の反映を頼む（WinUI 3 の画面の文字〔XAML〕も同じ名前にそろえる）
+

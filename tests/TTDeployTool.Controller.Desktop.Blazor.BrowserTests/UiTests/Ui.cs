@@ -121,7 +121,8 @@ internal static class Ui
     public static async Task OpenDeletionAsync(this IPage page, string appName)
     {
         await page.ShowAsync("Deployments");
-        if (await page.Id("Deployments.ClearSelection").IsEnabledAsync())
+        // 操作の帯は行を選んでいるときだけ出る
+        if (await page.Id("Deployments.ClearSelection").CountAsync() > 0)
             await page.ClickIdAsync("Deployments.ClearSelection");
         await page.SelectDeploymentAsync(appName);
         await page.ClickIdAsync("Deployments.Delete");

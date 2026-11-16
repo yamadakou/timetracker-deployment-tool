@@ -113,6 +113,15 @@ public sealed class WebView2Tests
             var first = (await page.Locator("tbody tr").Nth(0).Locator("td[data-key='AppName']").TextContentAsync())!.Trim();
             // Windows のクリップボードに入った（ほかのアプリに貼り付けられる。手順書の実機の確認から移した。2026-11-14）
             await WaitForClipboardAsync(text => text.Contains(first, StringComparison.Ordinal), "Ctrl+C で選んだ行");
+            // キーボードだけで行のメニュー: Shift+F10 で開いて最初の項目にフォーカス、↓ で次へ、Esc で閉じて表に戻る（UX の見直し D、2026-11-16）
+            await page.Keyboard.PressAsync("Shift+F10");
+            await Assertions.Expect(page.Locator(".tt-menu")).ToBeVisibleAsync();
+            await UiTests.Ui.WaitUntilAsync(async () => await page.EvaluateAsync<string>("document.activeElement.textContent") == "この文字をコピー", "メニューの最初の項目にフォーカス");
+            await page.Keyboard.PressAsync("ArrowDown");
+            (await page.EvaluateAsync<string>("document.activeElement.textContent")).Should().Be("選んだ行をコピー");
+            await page.Keyboard.PressAsync("Escape");
+            await Assertions.Expect(page.Locator(".tt-menu")).ToHaveCountAsync(0);
+            await Assertions.Expect(page.Locator(".tt-table-scroll")).ToBeFocusedAsync();
             await page.Locator("tbody tr").Nth(0).Locator("td.tt-check input").UncheckAsync();
 
             // 行の右クリック: WebView2 の標準のメニューは出さず（contextmenu を止める）、アプリのメニューに行の操作が並ぶ（オーナーの依頼、2026-11-14）

@@ -303,7 +303,8 @@ public sealed class SettingsViewModel : ObservableObject
         if (target == ValidationTarget.Azure && DeploymentExpiry.PastDateError(options.ExpiresOn, _time.GetUtcNow(), _time.LocalTimeZone) is { } pastDate)
             errors.Add(pastDate);
         var warnings = DeploymentAdvisor.GetWarnings(options, target);
-        return new DeploymentInput(errors.Count == 0 ? options : null, errors, warnings);
+        // CLI・MCP と共通の文（オプション名で書く）を、画面の名前で書き直す
+        return new DeploymentInput(errors.Count == 0 ? options : null, DesktopTerms.ForScreen(errors), DesktopTerms.ForScreen(warnings));
     }
 
     /// <summary>設定の Markdown（パスワードは <paramref name="includePasswords"/> のときだけ値を出し、ほかは伏せ字）。</summary>

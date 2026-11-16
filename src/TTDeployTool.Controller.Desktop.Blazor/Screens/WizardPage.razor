@@ -50,7 +50,7 @@
         <div class="tt-bar">
             <SelectField TItem="SubscriptionChoice" Id="Target.Subscription" Label="サブスクリプション" Items="Target.Subscriptions"
                          Value="Target.SelectedSubscription" ValueChanged="s => Target.SelectedSubscription = s" Display="s => s.Display" />
-            <CommandButton Id="Target.Reload" Command="Target.LoadCommand" Text="読み直す" />
+            <CommandButton Id="Target.Reload" Command="Target.LoadCommand" Text="サブスクリプションを読み直す" />
         </div>
         <TextInput Id="Target.ResourceGroup" Label="リソースグループ名（無ければ作成します）" Value="@Target.ResourceGroup" ValueChanged="v => Target.ResourceGroup = v" Css="tt-wide" />
         <TextInput Id="Target.AppName" Label="アプリ名（リソース名の接頭辞）" Value="@Target.AppName" ValueChanged="v => Target.AppName = v" Css="tt-wide" />
@@ -62,7 +62,7 @@
         @* ② DB *@
         <SelectField TItem="string" Id="Settings.DbType" Label="DB 種別" Items="SettingsViewModel.DbTypes" Value="Settings.DbType" ValueChanged="v => Settings.DbType = v" />
         <TextInput Id="Settings.DbName" Label="DB 名" Value="@Settings.DbName" ValueChanged="v => Settings.DbName = v" Css="tt-wide" />
-        <TextInput Id="Settings.TtTag" Label="timetracker イメージのタグ（空なら既定のタグ）" Placeholder="@Settings.DefaultTag" Value="@Settings.TtTag" ValueChanged="v => Settings.TtTag = v" Css="tt-wide" />
+        <TextInput Id="Settings.TtTag" Label="TimeTracker のイメージのタグ（空なら既定のタグ）" Placeholder="@Settings.DefaultTag" Value="@Settings.TtTag" ValueChanged="v => Settings.TtTag = v" Css="tt-wide" />
         <SelectField TItem="PersistDbOption" Id="Settings.PersistDb" Label="DB のデータ" Items="SettingsViewModel.PersistDbOptions" Value="Settings.PersistDb" ValueChanged="v => Settings.PersistDb = v" Display="o => o.Label" />
     }
     else if (Wizard.IsPasswords)
@@ -107,7 +107,7 @@
     else if (Wizard.IsConfirm)
     {
         @* ⑤ 確認と実行（開くと計画を作る） *@
-        <p>「計画」は Azure を読むだけで、変更しません。内容を確かめてから「今すぐ実行」か「予定に追加」を押してください。</p>
+        <p>この手順を開くと、デプロイの計画を作ります（Azure を読むだけで、変更しません）。内容を確かめてから「今すぐ実行」か「予定に追加」を押してください。</p>
         <CommandButton Id="Deploy.Plan" Command="Deployment.PlanCommand" Text="計画し直す" />
         <BusyView Id="Deploy.Busy" State="Deployment.Busy" />
         <Message Id="Deploy.Error" Text="@Deployment.Error" />

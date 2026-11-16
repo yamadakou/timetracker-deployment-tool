@@ -1,0 +1,36 @@
+@* 文字の中の URL（https://…）をリンクにする（権限の不足の案内の資料など。オーナーの依頼、2026-11-16）。BlazorWebView は、アプリの外の URL を既定のブラウザーで開く *@
+@foreach (var (text, isUrl) in Parts(Text))
+{
+    if (isUrl)
+    {
+        <a href="@text" target="_blank" rel="noopener noreferrer">@text</a>
+    }
+    else
+    {
+        @text
+    }
+}
+
+@code {
+    private static readonly System.Text.RegularExpressions.Regex Url = new(@"https?://[^\s（）「」、。]+");
+
+    [Parameter]
+    public string? Text { get; set; }
+
+    /// <summary>文字を、URL とそれ以外に分ける。</summary>
+    public static IEnumerable<(string Text, bool IsUrl)> Parts(string? text)
+    {
+        if (string.IsNullOrEmpty(text))
+            yield break;
+        var at = 0;
+        foreach (System.Text.RegularExpressions.Match m in Url.Matches(text))
+        {
+            if (m.Index > at)
+                yield return (text[at..m.Index], false);
+            yield return (m.Value, true);
+            at = m.Index + m.Length;
+        }
+        if (at < text.Length)
+            yield return (text[at..], false);
+    }
+}

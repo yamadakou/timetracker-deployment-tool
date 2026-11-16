@@ -77,6 +77,8 @@ input[type=range] { accent-color: var(--tt-accent); }
 .tt-page h1 { font-size: 28px; font-weight: 600; letter-spacing: -.2px; margin: 0; }
 .tt-page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin: 4px 0 14px; }
 .tt-page-sub { color: var(--tt-subtle); font-size: 12.5px; margin: 4px 0 0; }
+.tt-page-more { margin-top: 2px; }
+.tt-page-more > summary { color: var(--tt-accent, var(--tt-subtle)); font-size: 12.5px; cursor: pointer; width: fit-content; }
 .tt-page-head > button { flex: none; white-space: nowrap; }
 .tt-page h2 { font-size: 16px; font-weight: 600; margin: 16px 0 8px; }
 .tt-page p { margin: 6px 0; overflow-wrap: anywhere; }

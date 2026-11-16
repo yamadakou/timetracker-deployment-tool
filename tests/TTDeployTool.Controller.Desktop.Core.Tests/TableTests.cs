@@ -58,7 +58,7 @@ public class DeploymentTableTests
     {
         var h = await LoadedAsync(Deployment("sub", "rg", "a"), Deployment("sub", "rg", "b"));
         var vm = h.Main.Deployments;
-        (vm.HasCurrent, vm.SelectionText).Should().Be((false, "行を選ぶと、まとめて操作できます。"));
+        (vm.HasCurrent, vm.SelectionText).Should().Be((false, DeploymentListViewModel.NoSelectionText));
         vm.ChangeSelectedExpiryCommand.CanExecute(null).Should().BeFalse();
         vm.DeleteSelectedCommand.CanExecute(null).Should().BeFalse();
 

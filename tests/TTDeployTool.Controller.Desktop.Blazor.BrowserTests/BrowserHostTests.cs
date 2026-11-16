@@ -377,7 +377,7 @@ public sealed class BrowserHostTests
         await Assertions.Expect(corner).ToBeCheckedAsync();
         await Assertions.Expect(corner).ToHaveJSPropertyAsync("indeterminate", false);
         await corner.ClickAsync();
-        await Assertions.Expect(page.Locator("[data-id='Deployments.Selection']")).ToHaveTextAsync("行を選ぶと、まとめて操作できます。");
+        await Assertions.Expect(page.Locator("[data-id='Deployments.Selection']")).ToHaveTextAsync("行を選ぶと、期限・グループの変更や Azure からの削除ができます（行の右クリックでも操作できます。ダブルクリックで詳細）。");
     }
 
     [Fact]

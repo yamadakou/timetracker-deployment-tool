@@ -314,7 +314,10 @@ public sealed class DeploymentListViewModel : ObservableObject
 
     public bool HasCurrent => Current != null;
 
-    public string SelectionText => _selected.Count == 0 ? "行を選ぶと、まとめて操作できます。" : $"{_selected.Count} 件を選んでいます。";
+    public string SelectionText => _selected.Count == 0 ? NoSelectionText : $"{_selected.Count} 件を選んでいます。";
+
+    /// <summary>行を選ぶ前の操作の帯（何ができるか。UX の見直し C、2026-11-16）。</summary>
+    public const string NoSelectionText = "行を選ぶと、期限・グループの変更や Azure からの削除ができます（行の右クリックでも操作できます。ダブルクリックで詳細）。";
 
     /// <summary>表で選んだ行を伝える（画面の側から）。</summary>
     public void SetSelection(IEnumerable<DeploymentRowViewModel> rows)
@@ -368,8 +371,8 @@ public sealed class DeploymentListViewModel : ObservableObject
             [
                 new("Row.Detail", "詳細を開く", () => Select(() => Task.CompletedTask)),
                 new("Row.Open", "TimeTracker をブラウザーで開く", r.OpenCommand.ExecuteAsync, r.OpenCommand.CanExecute(null)),
-                new("Row.UseAsTarget", "対象に入れる（新しくデプロイ）", r.UseAsTargetCommand.ExecuteAsync, r.UseAsTargetCommand.CanExecute(null), StartsGroup: true),
-                new("Row.Redeploy", "最後のデプロイの設定で新しくデプロイ", r.RedeployCommand.ExecuteAsync, r.RedeployCommand.CanExecute(null)),
+                new("Row.UseAsTarget", "この対象で新しくデプロイ", r.UseAsTargetCommand.ExecuteAsync, r.UseAsTargetCommand.CanExecute(null), StartsGroup: true),
+                new("Row.Redeploy", "この設定で新しくデプロイ", r.RedeployCommand.ExecuteAsync, r.RedeployCommand.CanExecute(null)),
                 new("Row.CheckStatus", r.CheckStatusText, r.CheckStatusCommand.ExecuteAsync, r.CheckStatusCommand.CanExecute(null)),
                 new("Row.ShowPasswords", "パスワードを表示", () => Select(r.ShowPasswordsCommand.ExecuteAsync), r.ShowPasswordsCommand.CanExecute(null)),
                 new("Row.Extend7", "期限を 7 日延ばす", r.Extend7Command.ExecuteAsync, r.Extend7Command.CanExecute(null), StartsGroup: true),
@@ -504,7 +507,7 @@ public sealed class DeploymentListViewModel : ObservableObject
     {
         if (!_target.Select(entry.SubscriptionId, entry.ResourceGroup, entry.AppName))
         {
-            Error = $"サブスクリプション {entry.SubscriptionId} が「サインインと対象」の一覧にありません。サブスクリプションを読み直してください。";
+            Error = $"サブスクリプション {entry.SubscriptionId} が、サインインしたアカウントのサブスクリプションの一覧にありません。「新しくデプロイ」の手順「対象」の「サブスクリプションを読み直す」で読み直してください。";
             return;
         }
         Error = null;
@@ -563,7 +566,7 @@ public sealed class DeploymentListViewModel : ObservableObject
         var groups = _target.Subscriptions.GroupBy(s => s.TenantId).ToList();
         if (groups.Count == 0)
         {
-            Error = "サブスクリプションがありません。「サインインと対象」でサインインし、サブスクリプションを読んでください。";
+            Error = "サブスクリプションがありません。「サインイン」でサインインしてください（サインインしていれば、「新しくデプロイ」の手順「対象」の「サブスクリプションを読み直す」で読み直してください）。";
             return;
         }
         var records = new List<TTDeployTool.Infrastructure.Azure.ManagedResourceRecord>();
@@ -822,7 +825,7 @@ public sealed class DeploymentListViewModel : ObservableObject
         var group = remove ? null : DeploymentGroup.Normalize(BatchGroup);
         if (DeploymentGroup.FormatError(group) is { } error)
         {
-            BatchMessage = error;
+            BatchMessage = DesktopTerms.ForScreen(error);
             return;
         }
         var rows = _selected.ToList();

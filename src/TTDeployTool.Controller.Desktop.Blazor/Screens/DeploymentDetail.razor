@@ -3,7 +3,8 @@
 
 @* デプロイの一覧で 1 行だけ選んだときの詳細（推奨のデザイン: 右の面。期限の残りと「+7 日」「+30 日」、URL・注意・DB とスペック、操作、パスワード） *@
 @* 文字は範囲選択できる。右クリックで「選んだ文字をコピー」「詳細をコピー」のメニュー（オーナーの依頼、2026-11-14） *@
-<aside class="tt-surface tt-aside tt-select" data-id="Deployments.Detail" @ref="_root" @oncontextmenu="OpenMenuAsync" @oncontextmenu:preventDefault>
+@* フォーカスを置けるようにし、Shift+F10・メニューキーでもメニューを開く（UX の見直し D、2026-11-16） *@
+<aside class="tt-surface tt-aside tt-select" data-id="Deployments.Detail" tabindex="0" aria-label="選んだデプロイの詳細" @ref="_root" @oncontextmenu="OpenMenuAsync" @oncontextmenu:preventDefault>
     <div>
         <div class="tt-subtle">@Row.ResourceGroup · @Row.Subscription</div>
         <h2>@(Row.Entry.IsResourceGroupOnly ? "（リソースグループだけ）" : Row.AppName) <span class="tt-dot @TableSources.StateTone(Row.State) tt-subtle" style="font-size: 12px; font-weight: 400">@DeploymentStates.Label(Row.State)</span></h2>
@@ -52,8 +53,8 @@
         </dl>
     }
     <div class="tt-actions">
-        <CommandButton Id="Row.UseAsTarget" Command="Row.UseAsTargetCommand" Text="対象に入れる" />
-        <CommandButton Id="Row.Redeploy" Command="Row.RedeployCommand" Text="最後のデプロイの設定で新しくデプロイ" IconName="redo" />
+        <CommandButton Id="Row.UseAsTarget" Command="Row.UseAsTargetCommand" Text="この対象で新しくデプロイ" Title="このデプロイの対象（サブスクリプション・リソースグループ・アプリ名）を入れて、「新しくデプロイ」を開きます" />
+        <CommandButton Id="Row.Redeploy" Command="Row.RedeployCommand" Text="この設定で新しくデプロイ" Title="この対象の最後のデプロイのジョブの設定（スペック・期限など）を入れて、「新しくデプロイ」を開きます" IconName="redo" />
         <CommandButton Id="Row.CheckStatus" Command="Row.CheckStatusCommand" Text="@Row.CheckStatusText" IconName="cloud" />
         <CommandButton Id="Row.ShowPasswords" Command="Row.ShowPasswordsCommand" Text="パスワードを表示" IconName="key" />
         <CommandButton Id="Row.Delete" Command="Row.DeleteCommand" Text="Azure から削除…" IconName="trash" Css="tt-danger" />
@@ -92,6 +93,16 @@
 
     private ElementReference _root;
     private (double X, double Y, string Selection)? _menu;
+    private string? _focus;
+
+    // 開いたメニューの最初の押せる項目・Esc で閉じた後の詳細に、フォーカスを置く（キーボードで続けて操作できるように）
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focus is not { } selector)
+            return;
+        _focus = null;
+        await JsModule.InvokeQuietlyAsync(JsModule.ImportAsync(JS), "focusSelector", selector);
+    }
 
     // 右クリック: 詳細の中で範囲選択した文字を読んでから、メニューを出す
     private async Task OpenMenuAsync(MouseEventArgs e)
@@ -105,14 +116,17 @@
         {
         }
         _menu = (e.ClientX, e.ClientY, selection);
+        _focus = "[data-id='Detail.Menu'] [role='menuitem']:not([disabled])";
     }
 
     private void CloseMenu() => _menu = null;
 
     private void OnMenuKeyDown(KeyboardEventArgs e)
     {
-        if (e.Key == "Escape")
-            CloseMenu();
+        if (e.Key != "Escape")
+            return;
+        CloseMenu();
+        _focus = "[data-id='Deployments.Detail']";
     }
 
     private Task CopySelectionAsync(string text)

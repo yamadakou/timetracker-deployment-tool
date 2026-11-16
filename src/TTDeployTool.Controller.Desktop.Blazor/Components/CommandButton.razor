@@ -2,7 +2,7 @@
 @inherits ViewModelComponent
 
 @* Core のコマンドのボタン（押せるかは CanExecute。押せなくなったら描き直す） *@
-<button type="button" class="@Css" data-id="@Id" disabled="@(!Command.CanExecute(null) || Disabled)" @onclick="Command.ExecuteAsync">@if (IconName != null)
+<button type="button" class="@Css" data-id="@Id" title="@Title" disabled="@(!Command.CanExecute(null) || Disabled)" @onclick="Command.ExecuteAsync">@if (IconName != null)
     {
         <Icon Name="@IconName" Size="16" />
     }@Text</button>
@@ -10,6 +10,10 @@
 @code {
     [Parameter]
     public string Id { get; set; } = "";
+
+    /// <summary>マウスを置いたときの説明（無ければ出さない）。</summary>
+    [Parameter]
+    public string? Title { get; set; }
 
     [Parameter, EditorRequired]
     public AsyncCommand Command { get; set; } = default!;

@@ -42,6 +42,17 @@ export function attach(root, dotnet) {
     const step = e.key === 'ArrowLeft' ? -1 : 1;
     dotnet.invokeMethodAsync(e.shiftKey ? 'ColumnShifted' : 'ColumnNudged', head.dataset.headKey, step);
   });
+  // 行のメニューをキーボードで開く（Shift+F10・メニューキー。UX の見直し D、2026-11-16）。行のチェックボックスにフォーカスがあればその行、
+  // 表にフォーカスがあれば選んだ行（.NET が決める）。メニューは、その行の下に出す
+  root.addEventListener('keydown', e => {
+    const scroll = e.target.closest('.tt-table-scroll');
+    if (!scroll || (e.key !== 'ContextMenu' && !(e.shiftKey && e.key === 'F10'))) return;
+    e.preventDefault();
+    const row = e.target.closest('tbody tr');
+    const anchor = row ?? scroll.querySelector('tbody tr[aria-selected="true"]') ?? scroll;
+    const rect = anchor.getBoundingClientRect();
+    dotnet.invokeMethodAsync('KeyboardMenu', [...scroll.querySelectorAll('tbody tr')].indexOf(row), rect.left + 24, rect.bottom);
+  });
   root.addEventListener('mouseover', e => {
     const cell = e.target.closest('.tt-cell');
     // 行の ViewModel がツールチップを持つセル（グループの食い違い・各アプリの状態）は、そのまま出す
@@ -138,3 +149,20 @@ export function selectionIn(root) {
   return root.contains(selection.anchorNode) && root.contains(selection.focusNode) ? selection.toString() : '';
 }
 
+// 要素の中の最初に当たるものにフォーカスを置く（開いたメニューの最初の項目・閉じた後の表）
+export function focusIn(root, selector) {
+  root.querySelector(selector)?.focus();
+}
+
+// メニュー（表の行・右の詳細）の中は、↑/↓ で前後の項目、Home/End で最初・最後の項目に移る（押せない項目は飛ばす。UX の見直し D、2026-11-16）
+const menuKeys = ['ArrowDown', 'ArrowUp', 'Home', 'End'];
+
+document.addEventListener('keydown', e => {
+  const menu = e.target.closest('.tt-menu');
+  if (!menu || !menuKeys.includes(e.key)) return;
+  e.preventDefault();
+  const items = [...menu.querySelectorAll('[role="menuitem"]:not([disabled])')];
+  const at = items.indexOf(e.target);
+  const next = e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1 : (at + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length;
+  items[next].focus();
+});

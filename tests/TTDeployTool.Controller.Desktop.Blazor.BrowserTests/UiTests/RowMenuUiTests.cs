@@ -62,4 +62,72 @@ public sealed class RowMenuUiTests
         await page.ClickIdAsync("Menu.Job.Detail");
         await Assertions.Expect(page.Id("Panel.Status")).ToBeVisibleAsync();
     }
+
+    /// <summary>
+    /// キーボードだけで、行のメニューを開いて動き、閉じる（UX の見直し D、2026-11-16）。Shift+F10・メニューキーで開き、最初の項目にフォーカス。
+    /// ↑/↓・Home/End で押せる項目を動き、Esc で閉じて表に戻る。右の詳細も、フォーカスを置いて Shift+F10 で開ける。
+    /// </summary>
+    [Fact]
+    public async Task The_Row_Menu_Should_Work_With_The_Keyboard_Only()
+    {
+        await using var host = await WithFixtureAsync();
+        var page = host.Page;
+        await page.SignInAsync();
+        await page.LoadAsync();
+        var scroll = page.Locator("[data-id='Panel.Deployments'] .tt-table-scroll");
+        var focused = "document.activeElement?.textContent ?? ''";
+
+        // 選んだ行が無いと開かず、選び方を伝える
+        await scroll.FocusAsync();
+        await page.Keyboard.PressAsync("Shift+F10");
+        await Assertions.Expect(page.Locator("[data-id='Panel.Deployments'] .tt-status")).ToContainTextAsync("行を選んでから");
+        (await page.Locator(".tt-menu").CountAsync()).Should().Be(0);
+
+        // 行のチェックボックスにフォーカスを置いて Space で選び、Shift+F10 でその行のメニュー（最初の項目にフォーカス）
+        var row = page.Rows("Deployments").Nth(1);
+        await row.Locator("input[type=checkbox]").FocusAsync();
+        await page.Keyboard.PressAsync("Space");
+        await Assertions.Expect(row).ToHaveAttributeAsync("aria-selected", "true");
+        await page.Keyboard.PressAsync("Shift+F10");
+        await Assertions.Expect(page.Locator(".tt-menu")).ToBeVisibleAsync();
+        await WaitUntilAsync(async () => await page.EvaluateAsync<string>(focused) == "この文字をコピー", "最初の項目にフォーカス");
+
+        // ↓・↑・End・Home（押せない項目は飛ばす）。ほかのキーでは動かない
+        await page.Keyboard.PressAsync("ArrowDown");
+        (await page.EvaluateAsync<string>(focused)).Should().Be("選んだ行をコピー");
+        await page.Keyboard.PressAsync("ArrowUp");
+        await page.Keyboard.PressAsync("ArrowUp");
+        var last = await page.EvaluateAsync<string>(
+            "() => [...document.querySelectorAll('.tt-menu [role=menuitem]:not([disabled])')].at(-1).textContent");
+        (await page.EvaluateAsync<string>(focused)).Should().Be(last, "最初から ↑ で最後に回る");
+        await page.Keyboard.PressAsync("Home");
+        (await page.EvaluateAsync<string>(focused)).Should().Be("この文字をコピー");
+        await page.Keyboard.PressAsync("End");
+        (await page.EvaluateAsync<string>(focused)).Should().Be(last);
+        await page.Keyboard.PressAsync("ArrowDown");
+        (await page.EvaluateAsync<string>(focused)).Should().Be("この文字をコピー", "最後から ↓ で最初に回る");
+        await page.Keyboard.PressAsync("x");
+        (await page.EvaluateAsync<string>(focused)).Should().Be("この文字をコピー");
+
+        // Esc で閉じて、表に戻る
+        await page.Keyboard.PressAsync("Escape");
+        await Assertions.Expect(page.Locator(".tt-menu")).ToHaveCountAsync(0);
+        await Assertions.Expect(scroll).ToBeFocusedAsync();
+
+        // 表にフォーカスがあれば、メニューキーで選んだ行のメニュー。Enter で項目を押す
+        await page.Keyboard.PressAsync("ContextMenu");
+        await Assertions.Expect(page.Id("Menu.Row.Detail")).ToBeVisibleAsync();
+        await page.Id("Menu.Row.Detail").FocusAsync();
+        await page.Keyboard.PressAsync("Enter");
+        await Assertions.Expect(page.Id("Deployments.Detail")).ToBeVisibleAsync();
+
+        // 右の詳細: フォーカスを置いて Shift+F10 でメニュー、Esc で詳細に戻る
+        await page.Id("Deployments.Detail").FocusAsync();
+        await page.Keyboard.PressAsync("Shift+F10");
+        await Assertions.Expect(page.Id("Detail.Menu")).ToBeVisibleAsync();
+        await WaitUntilAsync(async () => await page.EvaluateAsync<string>(focused) == "詳細をコピー", "押せる最初の項目にフォーカス");
+        await page.Keyboard.PressAsync("Escape");
+        await Assertions.Expect(page.Id("Detail.Menu")).ToHaveCountAsync(0);
+        await Assertions.Expect(page.Id("Deployments.Detail")).ToBeFocusedAsync();
+    }
 }

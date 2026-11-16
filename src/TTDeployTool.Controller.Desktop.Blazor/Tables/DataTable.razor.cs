@@ -23,6 +23,7 @@ public partial class DataTable<TRow, TItem> : IAsyncDisposable
     private string? _focusKey;
     private (TRow Row, string Key, double X, double Y)? _menu;
     private string? _message;
+    private string? _focusSelector;
     private Task<IJSObjectReference> _module = default!;
     private DotNetObjectReference<DataTable<TRow, TItem>> _self = default!;
 
@@ -96,6 +97,31 @@ public partial class DataTable<TRow, TItem> : IAsyncDisposable
             _focusKey = null;
             await (await _module).InvokeVoidAsync("focusHead", _root, key);
         }
+        // 開いたメニューの最初の項目・Esc で閉じた後の表に、フォーカスを置く（キーボードで続けて操作できるように。UX の見直し D、2026-11-16）
+        if (_focusSelector is { } selector)
+        {
+            _focusSelector = null;
+            await (await _module).InvokeVoidAsync("focusIn", _root, selector);
+        }
+    }
+
+    /// <summary>メニューの最初の押せる項目。</summary>
+    public const string FirstMenuItem = ".tt-menu [role='menuitem']:not([disabled])";
+
+    /// <summary>
+    /// 表で Shift+F10・メニューキーを押した（JavaScript から。UX の見直し D、2026-11-16）。行のチェックボックスにフォーカスがあれば
+    /// その行（<paramref name="index"/> は表示している行の位置）、無ければ（-1）最初に選んだ行のメニューを、(<paramref name="x"/>, <paramref name="y"/>) に開く。
+    /// 選んだ行が無ければ、開かずに選び方を伝える。
+    /// </summary>
+    [JSInvokable]
+    public void KeyboardMenu(int index, double x, double y)
+    {
+        var row = index >= 0 && index < Source.Rows.Count ? Source.Rows[index] : Source.Selected().FirstOrDefault();
+        if (row == null)
+            _message = "行を選んでから（行のチェックボックスにフォーカスを置いて Space）、Shift+F10 でメニューを開けます。";
+        else
+            Open(row, _layout[0].Key, x, y);
+        StateHasChanged();
     }
 
     /// <summary>つまみのドラッグで幅を変えた（JavaScript から）。</summary>
@@ -187,18 +213,23 @@ public partial class DataTable<TRow, TItem> : IAsyncDisposable
 
     private void ToggleAll() => Source.SetSelection(AllState == true ? [] : Source.Rows);
 
-    private void OpenMenu(TRow row, string key, MouseEventArgs e)
+    private void OpenMenu(TRow row, string key, MouseEventArgs e) => Open(row, key, e.ClientX, e.ClientY);
+
+    private void Open(TRow row, string key, double x, double y)
     {
-        _menu = (row, key, e.ClientX, e.ClientY);
+        _menu = (row, key, x, y);
         _menuItems = RowMenu([.. MenuRows.Cast<TRow>()]);
+        _focusSelector = FirstMenuItem;
     }
 
     private void CloseMenu() => _menu = null;
 
     private void OnMenuKeyDown(KeyboardEventArgs e)
     {
-        if (e.Key == "Escape")
-            CloseMenu();
+        if (e.Key != "Escape")
+            return;
+        CloseMenu();
+        _focusSelector = ".tt-table-scroll";
     }
 
     private void OnKeyDown(KeyboardEventArgs e)
