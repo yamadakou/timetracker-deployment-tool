@@ -98,7 +98,7 @@ public sealed class DeletionViewModel : ObservableObject
     /// <summary>計画の Markdown（計画が無ければ null）。</summary>
     public string? ToMarkdown() => _ticket == null
         ? null
-        : MarkdownText.Document($"TTDeployTool の削除の計画（{_ticket.Plan.ResourceGroup} / {_ticket.Plan.AppName}）",
+        : MarkdownText.Document($"TTDeployTool の削除の計画（{(_ticket.Plan.AppName.Length == 0 ? $"{_ticket.Plan.ResourceGroup}（リソースグループだけ）" : $"{_ticket.Plan.ResourceGroup} / {_ticket.Plan.AppName}")}）",
             (null, MarkdownText.Table(["操作", "名前", "種類", "理由"], Targets.Select(t => new[] { t.Decision, t.Name, t.Resource, t.Reason }))),
             ("実行できない理由", MarkdownText.Bullets(Blockers)),
             ("警告", MarkdownText.Bullets(Warnings)),
