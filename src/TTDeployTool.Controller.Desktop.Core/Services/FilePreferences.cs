@@ -98,6 +98,16 @@ public sealed class FilePreferences : IAppPreferences
         }
     }
 
+    public IReadOnlyList<DeletedDeployment> DeletedDeployments
+    {
+        get => _data.DeletedDeployments ?? [];
+        set
+        {
+            _data = _data with { DeletedDeployments = value };
+            Save();
+        }
+    }
+
     private static Data Load(string path)
     {
         try
@@ -126,5 +136,6 @@ public sealed class FilePreferences : IAppPreferences
     private sealed record Data(
         int? MaxConcurrentJobs = null, IReadOnlyList<DeploymentTemplate>? Templates = null, IReadOnlyList<string>? ExpiryNotices = null, bool StartupTaskAsked = false,
         IReadOnlyList<SavedJob>? SavedJobs = null, StartupLaunch? LastStartupLaunch = null,
-        IReadOnlyDictionary<string, IReadOnlyList<TableColumnLayout>>? TableLayouts = null, NavigationPaneLayout? NavigationPane = null);
+        IReadOnlyDictionary<string, IReadOnlyList<TableColumnLayout>>? TableLayouts = null, NavigationPaneLayout? NavigationPane = null,
+        IReadOnlyList<DeletedDeployment>? DeletedDeployments = null);
 }

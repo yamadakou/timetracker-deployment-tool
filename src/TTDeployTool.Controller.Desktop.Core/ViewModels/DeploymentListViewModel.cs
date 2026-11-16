@@ -82,6 +82,7 @@ public sealed class DeploymentListViewModel : ObservableObject
     private readonly ISystemLauncher _launcher;
     private readonly IClipboardService? _clipboard;
     private readonly IDialogService? _dialogs;
+    private readonly IAppPreferences _preferences;
     private readonly Func<string, Task> _open;
     private readonly Func<IReadOnlyList<DeploymentEntry>, Task> _openBatchDeletion;
     private readonly List<RecentChange> _recent = [];
@@ -106,8 +107,9 @@ public sealed class DeploymentListViewModel : ObservableObject
     public DeploymentListViewModel(
         TargetViewModel target, JobQueue queue, IDeploymentLogger deploymentLogger, ILogger logger, TimeProvider time,
         ISystemLauncher launcher, IClipboardService? clipboard, Func<string, Task> open, Func<IReadOnlyList<DeploymentEntry>, Task> openBatchDeletion,
-        IDialogService? dialogs = null, Pricing.IPriceCatalog? prices = null)
+        IAppPreferences preferences, IDialogService? dialogs = null, Pricing.IPriceCatalog? prices = null)
     {
+        _preferences = preferences;
         Costs = new Pricing.DeploymentCostBook(prices ?? new Pricing.BuiltInPriceCatalog(), time);
         Costs.CurrencyChanged += () => _ = UpdateCostsAsync();
         _dialogs = dialogs;
@@ -171,7 +173,34 @@ public sealed class DeploymentListViewModel : ObservableObject
     public string? CostTotalNote => Costs.TotalNote(_entries);
 
     /// <summary>上部の「今月分」（今月の 1 日から月末までの見込み）。</summary>
-    public string? CostThisMonthText => Costs.ThisMonthText(_entries);
+    public string? CostThisMonthText => Costs.ThisMonthText(_entries, DeletedDeployments);
+
+    /// <summary>上部の「削除したデプロイ」（今月このアプリで削除したデプロイの、削除した日時までの分。無ければ null で、出さない）。</summary>
+    public string? CostDeletedText => Costs.DeletedText(DeletedDeployments);
+
+    /// <summary>「削除したデプロイ」の説明。</summary>
+    public string? CostDeletedNote => Costs.DeletedNote(DeletedDeployments);
+
+    /// <summary>何を数えているか（今あるデプロイだけ。削除したものの扱いと、実際の請求の確かめ方）。</summary>
+    public string CostScopeNote => Pricing.DeploymentCostBook.ScopeNote;
+
+    /// <summary>
+    /// このアプリで削除したデプロイ（今サインインして読めるサブスクリプションのもの・<see cref="DeletedRetention"/> 以内。料金の目安に使う）。
+    /// </summary>
+    public IReadOnlyList<DeletedDeployment> DeletedDeployments
+    {
+        get
+        {
+            var now = Time.GetUtcNow();
+            return [.. _preferences.DeletedDeployments.Where(d => now - d.DeletedAt <= DeletedRetention && FindSubscription(d.Entry.SubscriptionId) != null)];
+        }
+    }
+
+    /// <summary>削除したデプロイの記録を残す期間（ジョブの記録と同じ 180 日）。</summary>
+    public static readonly TimeSpan DeletedRetention = TimeSpan.FromDays(180);
+
+    /// <summary>削除したデプロイの記録の上限の件数。</summary>
+    public const int DeletedLimit = 500;
 
     /// <summary>「今月分」の見出し（「11 月の見込み」）。</summary>
     public string CostThisMonthLabel => Costs.ThisMonthLabel;
@@ -180,7 +209,7 @@ public sealed class DeploymentListViewModel : ObservableObject
     // （いつも作り直すと、読み込んだ直後の行の選択が、画面の作り直しと重なって外れることがあった。CI の Playwright、2026-11-14）
     private async Task UpdateCostsAsync()
     {
-        if (await Costs.LoadAsync(_entries) && (Sort.Key == DeploymentSortKey.Cost || Filters.IsFiltered(nameof(DeploymentSortKey.Cost)) || Filters.Text.Length > 0))
+        if (await Costs.LoadAsync(Pricing.DeploymentCostBook.PricedEntries(_entries, DeletedDeployments)) && (Sort.Key == DeploymentSortKey.Cost || Filters.IsFiltered(nameof(DeploymentSortKey.Cost)) || Filters.Text.Length > 0))
         {
             Refresh(resetPage: false, keepRows: true);
             return;
@@ -190,6 +219,8 @@ public sealed class DeploymentListViewModel : ObservableObject
         OnPropertyChanged(nameof(CostTotalNote));
         OnPropertyChanged(nameof(CostThisMonthText));
         OnPropertyChanged(nameof(CostThisMonthLabel));
+        OnPropertyChanged(nameof(CostDeletedText));
+        OnPropertyChanged(nameof(CostDeletedNote));
         foreach (var row in Rows)
             row.CostsChanged();
     }
@@ -615,6 +646,7 @@ public sealed class DeploymentListViewModel : ObservableObject
                 break;
             case DeletionOutcome d:
                 var gone = d.Deleted.Concat(d.AlreadyDeleted).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                RecordDeleted(_entries.FirstOrDefault(e => e.IsFor(t.Subscription, t.ResourceGroup, t.AppName)), gone, d.ResourceGroupDeleted);
                 Remember(t.Subscription, t.ResourceGroup, t.AppName, e => Without(e, gone, d.ResourceGroupDeleted));
                 break;
         }
@@ -644,6 +676,28 @@ public sealed class DeploymentListViewModel : ObservableObject
             StorageAccountName = e.StorageAccountName ?? placeholder.StorageAccountName,
             DbPersisted = e.DbPersisted || placeholder.DbPersisted,
         };
+
+    /// <summary>
+    /// 削除した部分（Container App と、DB のデータ）を、料金の目安のために残す（オーナーの依頼、2026-11-16: 削除した日までの料金が無かったことにならないように）。
+    /// <paramref name="before"/> は削除の前の行、<paramref name="gone"/> は消したリソースの名前。このアプリの削除のジョブが終わったときに呼ぶ。
+    /// </summary>
+    public void RecordDeleted(DeploymentEntry? before, HashSet<string> gone, bool resourceGroupDeleted)
+    {
+        if (before == null || before.IsResourceGroupOnly)
+            return;
+        bool Gone(string? name) => resourceGroupDeleted || (name != null && gone.Contains(name));
+        AppEntry? Deleted(AppEntry? app) => app != null && Gone(app.Name) ? app : null;
+        var part = before with
+        {
+            Url = null, Timetracker = Deleted(before.Timetracker), Db = Deleted(before.Db), Redis = Deleted(before.Redis),
+            DbPersisted = before.DbPersisted && Gone(before.StorageAccountName),
+        };
+        if (part is { Timetracker: null, Db: null, Redis: null, DbPersisted: false })
+            return;
+        var now = Time.GetUtcNow();
+        _preferences.DeletedDeployments = [.. _preferences.DeletedDeployments.Where(x => now - x.DeletedAt <= DeletedRetention)
+            .Append(new DeletedDeployment(part, now)).TakeLast(DeletedLimit)];
+    }
 
     // 削除したものを除く（何も残らなければ一覧から消す）
     private static DeploymentEntry? Without(DeploymentEntry? e, HashSet<string> gone, bool resourceGroupDeleted)

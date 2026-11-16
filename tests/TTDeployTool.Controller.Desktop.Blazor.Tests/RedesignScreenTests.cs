@@ -70,7 +70,7 @@ public sealed class RedesignScreenTests : IDisposable
         page.WaitForAssertion(() => Id(page, "Deployments.Cost.Total").TextContent.Should().StartWith("約 ").And.EndWith(" 円"));
         Id(page, "Deployments.Cost.Month").TextContent.Should().EndWith(" 円");
         Id(page, "Deployments.Cost.MonthLabel").TextContent.Should().EndWith("月の見込み");
-        Id(page, "Deployments.Cost.TotalNote").TextContent.Should().Contain("件のデプロイから期限まで");
+        Id(page, "Deployments.Cost.TotalNote").TextContent.Should().Contain("件のデプロイの、デプロイから期限まで");
         Id(page, "Deployments.Cost.Note").TextContent.Should().StartWith("料金は目安です");
         page.FindAll("td[data-key='Cost']").Select(c => c.TextContent).Should().Contain(t => t.EndsWith(" 円")).And.Contain("見積もれません");
         page.FindAll("td[data-key='Cost'] [data-sub]").Select(c => c.GetAttribute("data-sub")).Should().Contain(t => t!.StartsWith("1 日 約 "));

@@ -76,7 +76,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             () => Queue.ActiveFor(Target.Subscription, Target.ResourceGroup, Target.AppName.ToLowerInvariant())?.IsRunning == true, clipboard);
         // サインアウトしたときに一覧を消すため、サインインより先に作る
         Deployments = new DeploymentListViewModel(Target, Queue, logger, loggers.CreateLogger("TTDeployTool.Desktop.Deployments"), time,
-            launcher, clipboard, OpenAsync, OpenBatchDeletionAsync, dialogs, prices);
+            launcher, clipboard, OpenAsync, OpenBatchDeletionAsync, preferences, dialogs, prices);
         var deletions = new DeletionWorkflow(plans, jobs, caller, logger, time);
         Expiry = new ExpiryWatcher(Deployments, Queue, Target, deletions, logger, preferences, notifications, time,
             loggers.CreateLogger("TTDeployTool.Desktop.Expiry"), () => SignIn!.IsSignedIn);
@@ -375,6 +375,16 @@ public sealed class MainViewModel : ObservableObject, IDisposable
                 break;
         }
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// サインインしたテナントの Azure Portal の Cost Management（実際の請求を確かめる。料金の目安の上。オーナーの依頼、2026-11-16）。
+    /// </summary>
+    public void OpenCostManagement()
+    {
+        // テナントが分かれば「#@テナント/view/…」、分からなければ「#view/…」
+        var portal = SignIn.PortalUri.ToString();
+        _launcher.OpenUri(new Uri((portal.EndsWith('/') ? portal + "#" : portal + "/") + "view/Microsoft_Azure_CostManagement/Menu/~/overview"));
     }
 
     /// <summary>左のメニューの幅と、畳むか（オーナーの依頼、2026-11-16）。</summary>

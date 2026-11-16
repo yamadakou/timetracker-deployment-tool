@@ -76,7 +76,16 @@ public interface IAppPreferences
 
     /// <summary>左のメニューの幅と、畳んだか（まだ変えていなければ null）。</summary>
     NavigationPaneLayout? NavigationPane { get; set; }
+
+    /// <summary>このアプリで削除したデプロイ（料金の目安の「削除したデプロイ」。オーナーの依頼、2026-11-16）。</summary>
+    IReadOnlyList<DeletedDeployment> DeletedDeployments { get; set; }
 }
+
+/// <summary>
+/// このアプリで削除したデプロイの、削除した部分（<see cref="Entry"/> は削除した Container App と、DB のデータを消したか）と、削除した時刻。
+/// 料金の目安で、削除した日までの分を数える（パスワードなどの秘密の情報は含まない）。
+/// </summary>
+public sealed record DeletedDeployment(TTDeployTool.Application.Inventory.DeploymentEntry Entry, DateTimeOffset DeletedAt);
 
 /// <summary>左のメニューの幅（広げたときの幅）と、アイコンだけに畳んだか（オーナーの依頼、2026-11-16）。</summary>
 public sealed record NavigationPaneLayout(double Width, bool Collapsed);
@@ -99,4 +108,6 @@ public sealed class InMemoryAppPreferences : IAppPreferences
     public IReadOnlyDictionary<string, IReadOnlyList<TableColumnLayout>> TableLayouts { get; set; } = new Dictionary<string, IReadOnlyList<TableColumnLayout>>();
 
     public NavigationPaneLayout? NavigationPane { get; set; }
+
+    public IReadOnlyList<DeletedDeployment> DeletedDeployments { get; set; } = [];
 }

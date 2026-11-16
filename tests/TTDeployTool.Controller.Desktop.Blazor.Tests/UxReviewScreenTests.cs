@@ -49,6 +49,22 @@ public sealed class UxReviewScreenTests : IDisposable
     }
 
     [Fact]
+    public async Task The_Cost_Bar_Should_Say_What_It_Counts_And_Show_The_Deleted_Deployments()
+    {
+        // 削除した日までの料金が無かったことにならないように（オーナーの指摘、2026-11-16。案 1・案 2）
+        var page = await DeploymentsAsync();
+        Id(page, "Deployments.Cost.Scope").TextContent.Should().StartWith(TTDeployTool.Controller.Desktop.Core.Pricing.DeploymentCostBook.ScopeNote);
+        page.FindAll("[data-id='Deployments.Cost.Deleted']").Should().BeEmpty("今月に削除したものが無ければ出さない");
+        Id(page, "Deployments.Cost.OpenCostManagement").Click();
+
+        var entry = List.Rows.First(r => r.AppName != "").Entry;
+        _app.ViewModel.Deployments.RecordDeleted(entry with { DeployedAt = TestApp.Now.AddDays(-3) }, [entry.Timetracker!.Name], false);
+        List.Costs.Currency = TTDeployTool.Controller.Desktop.Core.Pricing.CostEstimateViewModel.CurrencyOptions[1];
+        page.WaitForAssertion(() => Id(page, "Deployments.Cost.DeletedTotal").TextContent.Should().StartWith("約 $"));
+        Id(page, "Deployments.Cost.DeletedNote").TextContent.Should().Be("今月このアプリで削除した 1 件の、削除した日時までの分（今月分に含みます）");
+    }
+
+    [Fact]
     public void The_Job_List_Should_Show_A_Short_Lead()
     {
         var page = _app.Context.Render<JobsPage>(p => p.Add(x => x.Model, _app.ViewModel));

@@ -103,7 +103,7 @@ public sealed class DeploymentCostTests
         var book = await UsdAsync(group, empty);
 
         (book.For(group), book.For(empty), book.For(elsewhere)).Should().Be(((DeploymentCost?)null, (DeploymentCost?)null, (DeploymentCost?)null));
-        (book.TotalText([group]), book.TotalNote([group]), book.ThisMonthText([group])).Should().Be(((string?)null, (string?)null, (string?)null));
+        (book.TotalText([group]), book.TotalNote([group]), book.ThisMonthText([group], [])).Should().Be(((string?)null, (string?)null, (string?)null));
         (await book.LoadAsync([elsewhere])).Should().BeTrue("新しいリージョン");
         (await book.LoadAsync([elsewhere])).Should().BeFalse("読んだリージョンは読み直さない");
         book.For(elsewhere).Should().NotBeNull();
@@ -116,9 +116,9 @@ public sealed class DeploymentCostTests
         var none = Entry(new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.Zero), ExpiryKind.None, null, app: "none");
         var book = await UsdAsync(dated, none);
 
-        (book.TotalText([dated, none]), book.TotalNote([dated, none]), book.ThisMonthText([dated, none]), book.ThisMonthLabel)
-            .Should().Be(("約 $129.60", "2 件のデプロイから期限まで（期限なしの 1 件は 1 か月分）", "約 $129.60", "11 月の見込み"));
-        book.TotalNote([dated]).Should().Be("1 件のデプロイから期限まで");
+        (book.TotalText([dated, none]), book.TotalNote([dated, none]), book.ThisMonthText([dated, none], []), book.ThisMonthLabel)
+            .Should().Be(("約 $129.60", "今ある 2 件のデプロイの、デプロイから期限まで（期限なしの 1 件は 1 か月分）", "約 $129.60", "11 月の見込み"));
+        book.TotalNote([dated]).Should().Be("今ある 1 件のデプロイの、デプロイから期限まで");
     }
 
     [Fact]
@@ -175,7 +175,7 @@ public sealed class DeploymentCostTests
         (rows[""].CostText, rows[""].CostPerDayText).Should().Be(((string?)null, (string?)null), "リソースグループだけの行は見積もらない");
         list.Filters.Columns.Single(c => c.Key == "Cost").TextOf(rows[""].Entry).Should().Be("見積もれません");
         list.CostTotalText.Should().StartWith("約 ").And.EndWith(" 円");
-        list.CostTotalNote.Should().Be("3 件のデプロイから期限まで（期限なしの 1 件は 1 か月分）");
+        list.CostTotalNote.Should().Be("今ある 3 件のデプロイの、デプロイから期限まで（期限なしの 1 件は 1 か月分）");
         (list.CostThisMonthText, list.CostThisMonthLabel).Should().Match<(string?, string)>(x => x.Item1!.EndsWith(" 円") && x.Item2 == "11 月の見込み");
     }
 

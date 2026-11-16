@@ -33,9 +33,15 @@
     {
         var costTotal = List.CostTotalDisplay;
         <div class="tt-surface tt-costbar" data-id="Deployments.Cost">
-            <div><span class="tt-stat-label">料金の目安（全体）</span><br /><span class="tt-total" data-id="Deployments.Cost.Total">@costTotal</span>
+            <div><span class="tt-stat-label">料金の目安（今あるデプロイの全体）</span><br /><span class="tt-total" data-id="Deployments.Cost.Total">@costTotal</span>
                 <span class="tt-subtle" data-id="Deployments.Cost.TotalNote">@List.CostTotalNote</span></div>
             <div><span class="tt-stat-label" data-id="Deployments.Cost.MonthLabel">@List.CostThisMonthLabel</span><br /><span class="tt-total" data-id="Deployments.Cost.Month">@List.CostThisMonthText</span></div>
+            @* このアプリで削除したデプロイの、削除した日時までの分（オーナーの依頼、2026-11-16: 削除した日までの料金が無かったことにならないように） *@
+            @if (List.CostDeletedText is { } deleted)
+            {
+                <div data-id="Deployments.Cost.Deleted"><span class="tt-stat-label">削除したデプロイ（今月）</span><br /><span class="tt-total" data-id="Deployments.Cost.DeletedTotal">@deleted</span>
+                    <span class="tt-subtle" data-id="Deployments.Cost.DeletedNote">@List.CostDeletedNote</span></div>
+            }
             <span class="tt-units" role="group" aria-label="単位">
                 @foreach (var option in TTDeployTool.Controller.Desktop.Core.Pricing.CostEstimateViewModel.CurrencyOptions)
                 {
@@ -44,6 +50,8 @@
                 }
             </span>
             <p class="tt-subtle" data-id="Deployments.Cost.Note">@TTDeployTool.Controller.Desktop.Core.Pricing.DeploymentCostBook.Note</p>
+            <p class="tt-subtle tt-costscope" data-id="Deployments.Cost.Scope">@List.CostScopeNote
+                <button type="button" class="tt-link-button" data-id="Deployments.Cost.OpenCostManagement" @onclick="Model.OpenCostManagement">Cost Management を開く</button></p>
         </div>
     }
     <BusyView Id="Deployments.Busy" State="List.Busy" />

@@ -557,3 +557,15 @@ WinUI 3 版の UI テストとの対応（名前は同じ。中身の違い）:
 - テスト: Core（`AccountAndNavigationTests`。前からある `TableTests` のサインアウトは、ジョブがあるため「はい」で答えるようにした）、bUnit（`NavigationShellTests`）、Playwright（`NavigationPaneUiTests`: ドラッグ・←/→・ダブルクリック・畳む・起動し直した後も残る、アカウントの 2 行・メニュー・Azure Portal・コピー・サインアウト）、WebView2（`WebView2Tests`: つまみのドラッグ・畳む・アカウントの右クリック）。網羅率は Core・Blazor・table.js とも 100%
 - 既定の幅は、今までの見た目（幅 220 px と左右の余白で 236 px）に近い 240 px にした（幅は余白を含めて数える）
 - Core の変更のため、WinUI 3 版のセッションに反映を頼む（WinUI 3 の NavigationView は標準で畳めるため、幅の変更とアカウントのメニューを中心に）
+
+### 16.25 料金の目安の、削除したデプロイの分（オーナーの指摘、2026-11-16。オーナーの判断: 案 1 と案 2）
+デプロイの一覧の料金の目安は、今 Azure にあるデプロイだけを数えていた。削除すると、そのデプロイの分が「全体」「今月分」から消え、削除した日までの料金が無かったことになると勘違いしやすかった。
+案 3（Azure Cost Management の実績を読む）は、ロール（Cost Management 閲覧者など）が要り、反映が 8〜24 時間遅れ、サブスクリプションの種類によっては読めないため、見送った。
+
+| 案 | 内容 | 主な場所 |
+|---|---|---|
+| 1 数える範囲を書く | 見出しを「料金の目安（今あるデプロイの全体）」、説明を「今ある n 件のデプロイの、デプロイから期限まで」にする。その下に「「全体」は今あるデプロイだけを数えます。削除したデプロイも、削除した日時までの料金はかかっています。このアプリで削除したものは「削除したデプロイ」と「今月分」に含めますが、CLI・MCP サーバー・別の PC で削除したものは含みません。実際の請求は、Azure Portal の Cost Management で確かめてください。」と、「Cost Management を開く」（サインインしたテナントの Cost Management を既定のブラウザーで） | `DeploymentCostBook.ScopeNote`・`TotalNote`、`MainViewModel.OpenCostManagement`、`DeploymentsPage` |
+| 2 削除したデプロイを記録して数える | このアプリの削除のジョブ（期限での自動の削除を含む）が終わったら、削除した部分（消した Container App と、DB のデータを消したか。アプリ名・リージョン・デプロイの日時・スペック）と削除した時刻を、アプリの設定（preferences.json）に記録する（180 日・500 件まで。パスワードなどは含めない）。上部に「削除したデプロイ（今月）」（今月に削除したものの、今月の 1 日〔デプロイがその後ならデプロイ〕から削除までの分と件数）を出し、「今月分」に含める。今サインインして読めるサブスクリプションのものだけを数える。デプロイの日時が分からないものは数えない | `DeletedDeployment`・`IAppPreferences.DeletedDeployments`、`DeploymentListViewModel.RecordDeleted`・`DeletedDeployments`・`CostDeletedText`、`DeploymentCostBook.ForDeleted`・`DeletedText`・`ThisMonthText` |
+
+- テスト: Core（`DeletedDeploymentCostTests`: 今月の中・先月から・先月に削除・デプロイの日時なし・単価を読んでいない、このアプリでの削除で記録し今月分に含める、180 日を過ぎた記録・読めないサブスクリプション、DB のデータを残した削除・リソースグループごとの削除、上限の件数、ファイルへの保存、Cost Management の URL）、bUnit（`UxReviewScreenTests`）、Playwright（`DeletedCostUiTests`: 削除すると「削除したデプロイ（今月）」が出て、起動し直しても残る。「Cost Management を開く」）。網羅率は Core・Blazor・table.js とも 100%
+- Core の変更のため、WinUI 3 版のセッションに反映を頼む

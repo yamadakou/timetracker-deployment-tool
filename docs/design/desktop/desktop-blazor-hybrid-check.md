@@ -97,6 +97,7 @@ CI（`ci.yml`）で毎回確かめている。前の手順書の番号（2026-11
 | 右クリックのメニュー・ダブルクリック・詳細の範囲選択とコピー（Windows のクリップボードに入り、ほかのアプリに貼れる）・WebView2 の標準の右クリックのメニューを出さない | 43〜46 | Core（`RowMenuTests`）、bUnit、Playwright（`RowMenuUiTests`）、Windows の WebView2（`WebView2Tests`） |
 | キーボードだけで行のメニューを開く・動く・閉じる（Shift+F10・メニューキー・↑/↓・Home/End・Esc）、主な画面のアクセシビリティ（axe-core、serious・critical の違反なし）、誤り・警告の文が画面の名前で書かれる、権限の不足の案内のリンク、行を選ぶまで操作の帯を出さない（2026-11-16 に追加） | — | Core（`DesktopTermsTests`）、bUnit（`UxReviewScreenTests`）、Playwright（`RowMenuUiTests`・`AccessibilityUiTests`）、Windows の WebView2（`WebView2Tests`） |
 | 左のメニューの幅（ドラッグ・←/→・ダブルクリック）・畳む・起動し直した後も残る、アカウントの 2 行の表示とメニュー（Azure Portal・コピー・切り替え・サインアウト。ジョブがあれば先に尋ねる）（2026-11-16 に追加） | — | Core（`AccountAndNavigationTests`）、bUnit（`NavigationShellTests`）、Playwright（`NavigationPaneUiTests`）、Windows の WebView2（`WebView2Tests`） |
+| 料金の目安の数える範囲の説明・「Cost Management を開く」・削除したデプロイの削除までの分（起動し直しても残る）（2026-11-16 に追加） | — | Core（`DeletedDeploymentCostTests`）、bUnit（`UxReviewScreenTests`）、Playwright（`DeletedCostUiTests`） |
 | 表記「TimeTracker」 | 37 | 画面の文字を確かめる bUnit・Playwright のテストで使う文字 |
 
 ## 4. 片付け
