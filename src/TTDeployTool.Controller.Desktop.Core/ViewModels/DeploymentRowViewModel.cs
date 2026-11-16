@@ -119,7 +119,8 @@ public sealed class DeploymentRowViewModel : ObservableObject
     public AsyncCommand CheckStatusCommand { get; }
 
     /// <summary>「状態を確認」の文言（ジョブがあるときは、ジョブも見られることが分かるようにする。No.69）。</summary>
-    public string CheckStatusText => HasActiveJob ? "状態とジョブを確認" : "状態を確認";
+    // 同じ機能は同じ名前にする（前はジョブがあると「状態とジョブを確認」だった。オーナーの指摘、2026-11-16。実行状況の画面には、ジョブがあればジョブも出す）
+    public string CheckStatusText => "状態を確認";
 
     /// <summary>対象に入れて、削除の画面を開き、計画を作る（アプリ名の入力 → 実行は、削除の画面で行う）。</summary>
     public AsyncCommand DeleteCommand { get; }
@@ -430,7 +431,7 @@ public sealed class DeploymentRowViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            Error = ex is ArgumentException or InvalidOperationException ? ex.Message : DesktopMessages.ForAzure(ex);
+            Error = ex is ArgumentException or InvalidOperationException ? DesktopTerms.ForScreen(ex.Message) : DesktopMessages.ForAzure(ex);
         }
         return Error;
     }
@@ -451,7 +452,7 @@ public sealed class DeploymentRowViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            Error = ex is ArgumentException or InvalidOperationException ? ex.Message : DesktopMessages.ForAzure(ex);
+            Error = ex is ArgumentException or InvalidOperationException ? DesktopTerms.ForScreen(ex.Message) : DesktopMessages.ForAzure(ex);
         }
         return Error;
     }

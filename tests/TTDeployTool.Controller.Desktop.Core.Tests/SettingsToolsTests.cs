@@ -48,7 +48,7 @@ public sealed class SettingsToolsTests : IDisposable
             .And.Contain("| 作るリソース | demo-env、demo-tt、demo-db、demo-redis |")
             .And.NotContain("DbPassw0rd!")
             // タグが DB 種別に合わないため、誤りの節も出る（「|」は置き換える）
-            .And.Contain("## 誤り\n\n- 不適切な組み合わせ: db-type='postgresql' と tt-tag='custom\\|tag'");
+            .And.Contain("## 誤り\n\n- DB 種別（postgresql）と TimeTracker のイメージのタグ（custom\\|tag）の組み合わせが合いません。");
         vm.ToMarkdown(includePasswords: true).Should().Contain("| DB のパスワード | DbPassw0rd! |").And.Contain("| TimeTracker のパスワード | TrackerPass! |");
     }
 
@@ -61,13 +61,13 @@ public sealed class SettingsToolsTests : IDisposable
 
         var markdown = vm.ToMarkdown(includePasswords: true);
 
-        new Harness().Main.Target.SubscriptionDisplay.Should().StartWith("サブスクリプション: 「サインインと対象」で選んでください");
+        new Harness().Main.Target.SubscriptionDisplay.Should().StartWith("サブスクリプション: 「新しくデプロイ」の手順「対象」で選んでください");
         markdown.Should().Contain("| サブスクリプション | （未選択） |")
             .And.Contain("| リソースグループ | （未入力） |")
             .And.Contain("| DB のパスワード | （未入力） |")
             .And.Contain($"| TimeTracker のイメージのタグ | {Defaults.TimetrackerTagSqlServer}（既定） |")
             .And.Contain($"| 利用可能期限日 | {SettingsViewModel.ExpiryOptions[0].Label} |")
-            .And.Contain("## 誤り\n\n- subscription は必須です。")
+            .And.Contain("## 誤り\n\n- サブスクリプションを選んでください。")
             .And.Contain("## 警告\n\n- ");
         vm.Expiry = SettingsViewModel.ExpiryOptions[2];
         vm.ToMarkdown(false).Should().Contain("| 利用可能期限日 | 期限なし |");

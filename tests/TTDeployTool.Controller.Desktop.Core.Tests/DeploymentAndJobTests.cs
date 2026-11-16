@@ -19,7 +19,7 @@ public class DeploymentViewModelTests
 
         await vm.PlanCommand.ExecuteAsync();
 
-        vm.Error.Should().StartWith("設定に誤りがあります:\n- subscription は必須です。");
+        vm.Error.Should().StartWith("設定に誤りがあります:\n- サブスクリプションを選んでください。");
         vm.HasPlan.Should().BeFalse();
         h.Azure.Credentials.Should().BeEmpty();
     }
@@ -200,7 +200,7 @@ public class JobViewModelTests
 
         var job = h.Main.CurrentJob!;
         job.StatusText.Should().Be("失敗");
-        job.Error.Should().Be("リソースグループ rg（手順 1/3）で失敗しました: 作成できません\n途中まで作成・削除したリソースは、もう一度実行すると続きから処理します（状態は「状態の確認」で見られます）。");
+        job.Error.Should().Be("リソースグループ rg（手順 1/3）で失敗しました: 作成できません\n途中まで作成・削除したリソースは、もう一度実行すると続きから処理します（Azure の状態は、デプロイの一覧の「状態を確認」で見られます）。");
     }
 
     [Fact]

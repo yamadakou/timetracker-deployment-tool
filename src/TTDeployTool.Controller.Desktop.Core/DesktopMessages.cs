@@ -53,7 +53,7 @@ public static class DesktopMessages
         WorkflowFailure.DataLossNotAcknowledged => DataLossNotAcknowledged,
         WorkflowFailure.AppNameMismatch => AppNameMismatch,
         WorkflowFailure.OutOfScope or WorkflowFailure.Blocked =>
-            "実行の直前の確認で、実行できない状態になっていました:\n- " + string.Join("\n- ", ex.Blockers),
+            "実行の直前の確認で、実行できない状態になっていました:\n- " + string.Join("\n- ", DesktopTerms.ForScreen(ex.Blockers)),
         WorkflowFailure.Changed => ChangedReason + Retry(hint),
         WorkflowFailure.Conflict =>
             $"同じ対象（{(ex.Target!.AppName.Length == 0 ? $"{ex.Target.ResourceGroup}（リソースグループだけ）" : $"{ex.Target.ResourceGroup} / {ex.Target.AppName}")}）" +

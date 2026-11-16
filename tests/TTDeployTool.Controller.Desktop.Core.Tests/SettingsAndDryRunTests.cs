@@ -15,8 +15,8 @@ public class SettingsViewModelTests
         vm.TtCpu.Should().Be("1.5");
         vm.TtMemoryGi.Should().Be("3.0");
         vm.DefaultTag.Should().Be(Defaults.GetDefaultTimetrackerTag("postgresql"));
-        vm.Errors.Should().Equal("subscription は必須です。", "resource-group は必須です。",
-            "tracker-password が不足または短すぎます。", "db-password が不足または短すぎます。");
+        vm.Errors.Should().Equal("サブスクリプションを選んでください。", "リソースグループ名を入力してください。",
+            "TimeTracker のパスワードを 8 文字以上で入力してください。", "DB のパスワードを 8 文字以上で入力してください。");
         vm.Warnings.Should().BeEmpty();
     }
 
@@ -37,8 +37,8 @@ public class SettingsViewModelTests
         changes.Names.Should().Contain("DefaultTag");
         vm.DefaultTag.Should().Be(Defaults.GetDefaultTimetrackerTag("sqlserver"));
         vm.Errors.Should().HaveCount(2);
-        vm.Errors[0].Should().Be("tt-cpu には数値を指定してください（小数点は「.」）: '1,5'");
-        vm.Errors[1].Should().StartWith("db-password が SQL Server のパスワード要件を満たしていません");
+        vm.Errors[0].Should().Be("TimeTracker の CPU には、数値を入れてください（小数点は「.」）: '1,5'");
+        vm.Errors[1].Should().StartWith("DB のパスワードが SQL Server のパスワード要件を満たしていません");
         vm.Warnings.Should().HaveCount(2);
         vm.Build(ValidationTarget.Azure).Options.Should().BeNull();
     }
@@ -110,7 +110,7 @@ public sealed class DryRunViewModelTests : IDisposable
 
         await h.Main.DryRun.SaveCommand.ExecuteAsync();
 
-        h.Main.DryRun.Error.Should().StartWith("設定に誤りがあるため、ファイルを保存しませんでした:\n- tracker-password");
+        h.Main.DryRun.Error.Should().StartWith("設定に誤りがあるため、ファイルを保存しませんでした:\n- TimeTracker のパスワード");
         Directory.Exists(_root).Should().BeFalse();
     }
 
@@ -141,7 +141,7 @@ public sealed class DryRunViewModelTests : IDisposable
         vm.ComposeContent.Should().Be(File.ReadAllText(Path.Combine(_root, "docker-compose.yml"))).And.NotContain("DbPassw0rd!");
         File.ReadAllText(Path.Combine(_root, ".env")).Should().Contain("DbPassw0rd!");
         vm.EnvWarning.Should().Be(DesktopMessages.EnvFileWarning);
-        vm.Warnings.Should().ContainSingle().Which.Should().StartWith("tt-tag '7.0.0-linux-postgres' は既定のタグ");
+        vm.Warnings.Should().ContainSingle().Which.Should().StartWith("TimeTracker のイメージのタグ「7.0.0-linux-postgres」は既定のタグ");
         vm.NextSteps.Should().HaveCount(3).And.Contain($"{_root} で docker compose up -d を実行する");
         h.Dialogs.Confirmations.Should().BeEmpty();
 

@@ -34,15 +34,15 @@ public sealed class DeployWizardViewModel : ObservableObject
 {
     public static readonly IReadOnlyList<string> Titles = ["対象", "DB", "パスワード", "スペックと利用可能期限", "確認と実行"];
 
-    // メッセージの先頭の項目名（CLI のオプション名）で、誤り・警告の画面を決める（DeploymentValidator・DeploymentAdvisor・SettingsViewModel のメッセージ）
+    // メッセージの先頭の項目名（画面の名前。DesktopTerms で書き直した後の DeploymentValidator・DeploymentAdvisor・SettingsViewModel のメッセージ）で、誤り・警告の手順を決める
     private static readonly (string Prefix, WizardStep Step)[] Prefixes =
     [
-        ("subscription", WizardStep.Target), ("resource-group", WizardStep.Target), ("アプリ名", WizardStep.Target),
-        ("db-type", WizardStep.Db), ("tt-tag", WizardStep.Db), ("不適切な組み合わせ", WizardStep.Db), ("Azure 上の SQL Server", WizardStep.Db),
-        ("persist-db", WizardStep.Db),
-        ("tracker-password", WizardStep.Passwords), ("db-password", WizardStep.Passwords),
-        ("tt-cpu", WizardStep.Spec), ("tt-memory", WizardStep.Spec), ("db-cpu", WizardStep.Spec), ("db-memory", WizardStep.Spec),
-        ("redis-cpu", WizardStep.Spec), ("redis-memory", WizardStep.Spec), ("expires-on", WizardStep.Spec), ("利用可能期限日", WizardStep.Spec),
+        ("サブスクリプション", WizardStep.Target), ("リソースグループ", WizardStep.Target), ("アプリ名", WizardStep.Target),
+        ("DB 種別", WizardStep.Db), ("TimeTracker のイメージのタグ", WizardStep.Db), ("Azure 上の SQL Server", WizardStep.Db),
+        ("「DB のデータ」", WizardStep.Db),
+        ("TimeTracker のパスワード", WizardStep.Passwords), ("DB のパスワード", WizardStep.Passwords),
+        ("TimeTracker の CPU", WizardStep.Spec), ("TimeTracker のメモリ", WizardStep.Spec), ("DB の CPU", WizardStep.Spec), ("DB のメモリ", WizardStep.Spec),
+        ("Redis の CPU", WizardStep.Spec), ("Redis のメモリ", WizardStep.Spec), ("利用可能期限日", WizardStep.Spec), ("グループ名", WizardStep.Spec),
     ];
 
     private readonly SettingsViewModel _settings;
@@ -155,7 +155,7 @@ public sealed class DeployWizardViewModel : ObservableObject
         ? null
         : StepErrors.Count > 0
             ? $"誤りが {StepErrors.Count} 件あるため、次へ進めません。"
-            : "前の画面に誤りがあるため、次へ進めません。「戻る」で直してください。";
+            : "前の手順に誤りがあるため、次へ進めません。「戻る」か、上の手順の帯で誤りのある手順を開いて直してください。";
 
     /// <summary>誤り・警告のメッセージを出す画面（項目名が分からないものは ⑤）。</summary>
     public static WizardStep StepOf(string message) =>

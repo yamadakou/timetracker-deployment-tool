@@ -64,6 +64,10 @@ internal static class Ui
     public static Style StepStyle(WizardStep current, string name) => (Style)Microsoft.UI.Xaml.Application.Current.Resources[
         current.ToString() == name ? "AccentButtonStyle" : "DefaultButtonStyle"];
 
+    /// <summary>行を選んでいるときだけ出す（デプロイの一覧の操作の帯。行を選ぶ前は、何ができるかの 1 行だけ。No.92）。</summary>
+    public static Visibility IfSelected(string selectionText) =>
+        selectionText == DeploymentListViewModel.NoSelectionText ? Visibility.Collapsed : Visibility.Visible;
+
     public static string Time(DateTimeOffset? value) => value is { } t ? $"計画の有効期限: {t.ToLocalTime():HH:mm}" : "";
 }
 

@@ -85,7 +85,8 @@ public class MockRedeployTests
         // 3. デプロイの一覧の行の詳細（その対象の最後のデプロイの設定）
         app.Show("Deployments");
         app.Select("Deployments.PageSize", "50");
-        if (app.IsEnabled("Deployments.ClearSelection"))
+        // 操作の帯は行を選んだときだけ出る（No.92）ため、出ていれば外す
+        if (app.Exists("Deployments.ClearSelection") && app.IsEnabled("Deployments.ClearSelection"))
             app.Invoke("Deployments.ClearSelection");
         app.SelectRowWith("Deployments.Rows", "Row.AppName", Settings.AppName);
         AppSession.WaitUntil(() => app.IsEnabled("Row.Redeploy"), "その対象に設定のある終わったデプロイのジョブがあれば押せる");

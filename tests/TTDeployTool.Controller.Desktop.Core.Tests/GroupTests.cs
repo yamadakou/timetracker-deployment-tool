@@ -59,7 +59,7 @@ public class GroupTests
         settings.GroupSuggestions.Should().BeEmpty();
 
         settings.Group = new string('x', 65);
-        settings.Errors.Should().Contain("group（グループ名）は 64 文字までにしてください（65 文字）。");
+        settings.Errors.Should().Contain("グループ名は 64 文字までにしてください（65 文字）。");
 
         settings.Group = "研修";
         settings.TemplateName = "研修用";
@@ -197,7 +197,7 @@ public class GroupTests
         h.Dialogs.Confirmations.Clear();
         vm.BatchGroup = new string('x', 65);
         await vm.ChangeSelectedGroupCommand.ExecuteAsync();
-        vm.BatchMessage.Should().Be("group（グループ名）は 64 文字までにしてください（65 文字）。");
+        vm.BatchMessage.Should().Be("グループ名は 64 文字までにしてください（65 文字）。");
         h.Dialogs.Confirmations.Should().BeEmpty();
     }
 }

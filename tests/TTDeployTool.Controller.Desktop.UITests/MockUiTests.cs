@@ -194,7 +194,8 @@ public class MockUiTests
     internal static void OpenDeletion(AppSession app, string appName)
     {
         app.Show("Deployments");
-        if (app.IsEnabled("Deployments.ClearSelection"))
+        // 操作の帯は行を選んだときだけ出る（No.92）ため、出ていれば外す
+        if (app.Exists("Deployments.ClearSelection") && app.IsEnabled("Deployments.ClearSelection"))
             app.Invoke("Deployments.ClearSelection");
         app.SelectRowWith("Deployments.Rows", "Row.AppName", appName);
         app.Invoke("Deployments.Delete");

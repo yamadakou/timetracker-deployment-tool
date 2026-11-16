@@ -8,23 +8,23 @@ namespace TTDeployTool.Controller.Desktop.Core.Tests;
 public class DeployWizardViewModelTests
 {
     [Theory]
-    [InlineData("subscription は必須です。", WizardStep.Target)]
-    [InlineData("resource-group は必須です。", WizardStep.Target)]
+    [InlineData("サブスクリプションを選んでください。", WizardStep.Target)]
+    [InlineData("リソースグループ名を入力してください。", WizardStep.Target)]
     [InlineData("アプリ名が空です。", WizardStep.Target)]
-    [InlineData("db-type は postgresql または sqlserver を指定してください。", WizardStep.Db)]
-    [InlineData("tt-tag（timetracker イメージタグ）が空です。", WizardStep.Db)]
-    [InlineData("不適切な組み合わせ: db-type='postgresql'", WizardStep.Db)]
+    [InlineData("DB 種別を PostgreSQL か SQL Server から選んでください。", WizardStep.Db)]
+    [InlineData("TimeTracker のイメージのタグが空です。", WizardStep.Db)]
+    [InlineData("DB 種別（postgresql）と TimeTracker のイメージのタグ", WizardStep.Db)]
     [InlineData("Azure 上の SQL Server 構成ではサンプル DB を作成できません", WizardStep.Db)]
-    [InlineData("persist-db は Azure 向けの設定のため", WizardStep.Db)]
-    [InlineData("tracker-password が不足または短すぎます。", WizardStep.Passwords)]
-    [InlineData("db-password が SQL Server のパスワード要件を満たしていません。", WizardStep.Passwords)]
-    [InlineData("tt-cpu には数値を指定してください（小数点は「.」）: 'x'", WizardStep.Spec)]
-    [InlineData("tt-memory が 2Gi です。", WizardStep.Spec)]
-    [InlineData("db-cpu には正の数値を指定してください: 0", WizardStep.Spec)]
-    [InlineData("db-memory には正の数値を指定してください: 0", WizardStep.Spec)]
-    [InlineData("redis-cpu には正の数値を指定してください: 0", WizardStep.Spec)]
-    [InlineData("redis-memory には正の数値を指定してください: 0", WizardStep.Spec)]
-    [InlineData("expires-on には yyyy-MM-dd の日付か none を指定してください: x", WizardStep.Spec)]
+    [InlineData("「DB のデータ」の「Azure Files に永続化する」は Azure 向けの設定のため", WizardStep.Db)]
+    [InlineData("TimeTracker のパスワードを 8 文字以上で入力してください。", WizardStep.Passwords)]
+    [InlineData("DB のパスワードが SQL Server のパスワード要件を満たしていません。", WizardStep.Passwords)]
+    [InlineData("TimeTracker の CPU には、数値を入れてください（小数点は「.」）: 'x'", WizardStep.Spec)]
+    [InlineData("TimeTracker の CPU・メモリが 1 vCPU / 2Gi です。", WizardStep.Spec)]
+    [InlineData("DB の CPU には、0 より大きい数値を入れてください: 0", WizardStep.Spec)]
+    [InlineData("DB のメモリには、0 より大きい数値を入れてください: 0", WizardStep.Spec)]
+    [InlineData("Redis の CPU には、0 より大きい数値を入れてください: 0", WizardStep.Spec)]
+    [InlineData("Redis のメモリには、0 より大きい数値を入れてください: 0", WizardStep.Spec)]
+    [InlineData("利用可能期限日を、正しい日付にしてください: x", WizardStep.Spec)]
     [InlineData("利用可能期限日（2026-10-21）は、今日以降の日付を指定してください。", WizardStep.Spec)]
     [InlineData("ほかの注意", WizardStep.Confirm)]
     public void Messages_Should_Be_Shown_On_The_Step_Of_The_Item(string message, WizardStep step) =>
@@ -39,7 +39,7 @@ public class DeployWizardViewModelTests
         vm.BackCommand.CanExecute(null).Should().BeFalse();
         vm.CanGoNext.Should().BeFalse();
         vm.NextCommand.CanExecute(null).Should().BeFalse();
-        vm.StepErrors.Should().Equal("subscription は必須です。", "resource-group は必須です。");
+        vm.StepErrors.Should().Equal("サブスクリプションを選んでください。", "リソースグループ名を入力してください。");
         vm.BlockedText.Should().Be("誤りが 2 件あるため、次へ進めません。");
         DeployWizardViewModel.Titles.Should().HaveCount(5);
     }
@@ -98,8 +98,8 @@ public class DeployWizardViewModelTests
         changes.Names.Should().Contain(nameof(DeployWizardViewModel.IsTarget)).And.Contain(nameof(DeployWizardViewModel.StepText));
         settings.TtTag = "11.0.1-linux-mssql";
         vm.CanGoNext.Should().BeFalse();
-        vm.StepErrors.Should().ContainSingle().Which.Should().StartWith("不適切な組み合わせ");
-        vm.StepWarnings.Should().ContainSingle().Which.Should().StartWith("tt-tag");
+        vm.StepErrors.Should().ContainSingle().Which.Should().StartWith("DB 種別（");
+        vm.StepWarnings.Should().ContainSingle().Which.Should().StartWith("TimeTracker のイメージのタグ「11.0.1-linux-mssql」は既定のタグ");
         settings.TtTag = "";
         vm.CanGoNext.Should().BeTrue();
 
@@ -107,13 +107,13 @@ public class DeployWizardViewModelTests
         h.Main.Target.ResourceGroup = "";
         vm.CanGoNext.Should().BeFalse();
         vm.StepErrors.Should().BeEmpty();
-        vm.BlockedText.Should().Be("前の画面に誤りがあるため、次へ進めません。「戻る」で直してください。");
+        vm.BlockedText.Should().Be("前の手順に誤りがあるため、次へ進めません。「戻る」か、上の手順の帯で誤りのある手順を開いて直してください。");
         h.Main.Target.ResourceGroup = "rg";
 
         await vm.NextCommand.ExecuteAsync();
         vm.IsPasswords.Should().BeTrue();
         settings.DbPassword = "short";
-        vm.StepErrors.Should().Equal("db-password が不足または短すぎます。");
+        vm.StepErrors.Should().Equal("DB のパスワードを 8 文字以上で入力してください。");
         vm.NextCommand.CanExecute(null).Should().BeFalse();
         settings.DbPassword = "DbPassw0rd!";
 
@@ -121,7 +121,7 @@ public class DeployWizardViewModelTests
         vm.IsSpec.Should().BeTrue();
         settings.TtMemoryGi = "2";
         vm.StepErrors.Should().BeEmpty();
-        vm.StepWarnings.Should().ContainSingle().Which.Should().StartWith("tt-cpu / tt-memory（TimeTracker）が 1.5 vCPU / 2Gi です。");
+        vm.StepWarnings.Should().ContainSingle().Which.Should().StartWith("TimeTracker の CPU・メモリが 1.5 vCPU / 2Gi です。");
         settings.TtCpu = "x";
         vm.CanGoNext.Should().BeFalse();
         settings.TtCpu = "1.5";

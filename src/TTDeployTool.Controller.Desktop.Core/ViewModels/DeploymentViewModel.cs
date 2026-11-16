@@ -187,9 +187,9 @@ public sealed class DeploymentViewModel : ObservableObject
                 foreach (var op in value.Plan.Operations)
                     Operations.Add(ToRow(op));
                 foreach (var blocker in value.Plan.Blockers)
-                    Blockers.Add(blocker);
+                    Blockers.Add(DesktopTerms.ForScreen(blocker));
                 foreach (var warning in DeploymentAdvisor.GetWarnings(value.Plan.Options, ValidationTarget.Azure).Concat(value.Plan.Warnings))
-                    Warnings.Add(warning);
+                    Warnings.Add(DesktopTerms.ForScreen(warning));
             }
             OnPropertyChanged(nameof(HasPlan));
             OnPropertyChanged(nameof(PermissionText));

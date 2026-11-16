@@ -243,12 +243,12 @@ public sealed class DeletionViewModel : ObservableObject
                             _ => "ストレージアカウント（DB のデータ）",
                         },
                         t.WillDelete ? "削除する" : "削除しない",
-                        t.Reason == DeletionPlanner.KeptReason ? KeptReason : t.Reason,
+                        t.Reason == DeletionPlanner.KeptReason ? KeptReason : t.Reason is { } reason ? DesktopTerms.ForScreen(reason) : null,
                         t.WillDelete));
                 if (plan.ResourceGroupTarget is { } rg)
                     Targets.Add(new DeletionRow(plan.ResourceGroup, "リソースグループ", rg.WillDelete ? "削除する" : "削除しない", rg.Reason, rg.WillDelete));
                 foreach (var blocker in value.Blockers)
-                    Blockers.Add(blocker.Replace("リソースグループの削除の指定を外して", "「リソースグループも削除する」のチェックを外して"));
+                    Blockers.Add(DesktopTerms.ForScreen(blocker.Replace("リソースグループの削除の指定を外して", "「リソースグループも削除する」のチェックを外して")));
                 if (plan.DeletesResourceGroup)
                     Warnings.Add($"リソースグループ {plan.ResourceGroup} も削除します。元に戻せません。");
                 if (plan.LosesDbData)
