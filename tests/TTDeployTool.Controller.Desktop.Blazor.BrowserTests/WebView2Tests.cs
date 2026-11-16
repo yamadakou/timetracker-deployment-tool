@@ -155,6 +155,24 @@ public sealed class WebView2Tests
             await page.Locator("[data-id='Menu.Job.Detail']").ClickAsync();
             await Assertions.Expect(page.Locator("[data-id='Panel.Status']")).ToBeVisibleAsync();
 
+            // 左のメニュー: つまみのドラッグで幅、ボタンで畳む・広げる。アカウントの右クリックでメニュー（オーナーの依頼、2026-11-16）
+            var nav = page.Locator("[data-id='Nav']");
+            var navWidth = (await nav.BoundingBoxAsync())!.Width;
+            var grip = (await page.Locator("[data-id='Nav.Grip']").BoundingBoxAsync())!;
+            await page.Mouse.MoveAsync(grip.X + grip.Width / 2, grip.Y + 200);
+            await page.Mouse.DownAsync();
+            await page.Mouse.MoveAsync(grip.X + grip.Width / 2 + 40, grip.Y + 200, new() { Steps = 6 });
+            await page.Mouse.UpAsync();
+            await UiTests.Ui.WaitUntilAsync(async () => (await nav.BoundingBoxAsync())!.Width == navWidth + 40, "つまみのドラッグで広がる");
+            await page.Locator("[data-id='Nav.Grip']").DblClickAsync();
+            await page.Locator("[data-id='Nav.Toggle']").ClickAsync();
+            await UiTests.Ui.WaitUntilAsync(async () => (await nav.BoundingBoxAsync())!.Width == 60, "畳む");
+            await page.Locator("[data-id='Nav.Toggle']").ClickAsync();
+            await page.Locator("[data-id='Nav.Account']").ClickAsync(new() { Button = MouseButton.Right });
+            await Assertions.Expect(page.Locator("[data-id='Menu.Account.Portal']")).ToBeVisibleAsync();
+            await page.Keyboard.PressAsync("Escape");
+            await Assertions.Expect(page.Locator("[data-id='Account.Menu']")).ToHaveCountAsync(0);
+
             if (Environment.GetEnvironmentVariable("TT_BLAZOR_REPORT") is { Length: > 0 } report)
             {
                 await File.WriteAllTextAsync(report, JsonSerializer.Serialize(new

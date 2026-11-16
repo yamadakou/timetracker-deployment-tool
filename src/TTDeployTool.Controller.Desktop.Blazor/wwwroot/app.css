@@ -59,16 +59,31 @@ input[type=range] { accent-color: var(--tt-accent); }
 .tt-banner { display: flex; align-items: center; gap: 12px; padding: 8px 16px; border-bottom: 1px solid var(--tt-line); }
 .tt-banner.tt-info { background: var(--tt-accent-soft); }
 .tt-main { display: flex; flex: 1 1 auto; min-height: 0; }
-.tt-nav { display: flex; flex-direction: column; gap: 2px; width: 220px; flex: none; padding: 12px 8px; }
-.tt-brand { display: flex; align-items: center; gap: 10px; padding: 4px 12px 14px; font-weight: 600; }
+.tt-nav { box-sizing: border-box; position: relative; display: flex; flex-direction: column; gap: 2px; width: 240px; flex: none; padding: 12px 8px; min-width: 0; }
+.tt-brand { display: flex; align-items: center; gap: 10px; padding: 4px 4px 14px 12px; font-weight: 600; min-width: 0; }
 .tt-brand-logo { width: 24px; height: 24px; }
 .tt-nav-item { position: relative; justify-content: flex-start; gap: 12px; text-align: left; border: 0; background: none; padding: 9px 12px; border-radius: 6px; }
 .tt-nav-item[aria-current=page] { background: var(--tt-hover); font-weight: 600; }
 .tt-nav-item[aria-current=page]::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 2px; background: var(--tt-accent); }
 .tt-nav-space { flex: 1 1 auto; }
-.tt-account { display: flex; align-items: center; gap: 10px; padding: 10px 12px 4px; min-width: 0; }
+.tt-account { display: flex; align-items: center; gap: 10px; padding: 8px 12px; min-width: 0; border: 0; background: none; border-radius: 6px; text-align: left; justify-content: flex-start; }
+.tt-account:hover { background: var(--tt-hover); }
 .tt-avatar { flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--tt-accent-soft); color: var(--tt-accent); display: grid; place-items: center; font-weight: 700; font-size: 12px; }
-.tt-account-text { min-width: 0; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tt-account-text { display: flex; flex-direction: column; min-width: 0; font-size: 12px; line-height: 1.35; }
+.tt-account-user, .tt-account-domain { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tt-account-domain { color: var(--tt-subtle); font-size: 11px; }
+.tt-nav-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tt-nav-toggle { margin-left: auto; flex: none; border: 0; background: none; padding: 4px; border-radius: 6px; color: var(--tt-subtle); }
+.tt-nav-toggle:hover { background: var(--tt-hover); }
+.tt-nav-grip { position: absolute; top: 0; right: -3px; bottom: 0; width: 6px; cursor: col-resize; z-index: 5; }
+.tt-nav-grip:hover, .tt-nav-grip:focus-visible { background: var(--tt-accent-soft); outline: none; box-shadow: inset -2px 0 0 var(--tt-accent); }
+/* 畳んだ左のメニュー: アイコンだけ（文字は隠し、マウスを置くと名前） */
+.tt-nav-collapsed .tt-nav-label { display: none; }
+.tt-nav-collapsed .tt-brand { flex-direction: column; padding: 4px 0 14px; gap: 8px; }
+.tt-nav-collapsed .tt-nav-toggle { margin: 0; }
+.tt-nav-collapsed .tt-nav-item, .tt-nav-collapsed .tt-account { justify-content: center; padding-left: 0; padding-right: 0; }
+.tt-account-menu { bottom: 12px; min-width: 260px; }
+.tt-menu-head { padding: 8px 12px 6px; font-size: 12px; color: var(--tt-subtle); word-break: break-all; max-width: 320px; }
 .tt-icon { flex: none; }
 .tt-content { flex: 1 1 auto; min-width: 0; overflow: auto; padding: 20px 24px 20px 8px; }
 .tt-narrow { max-width: 1240px; }

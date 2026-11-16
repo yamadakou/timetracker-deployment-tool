@@ -88,6 +88,16 @@ public sealed class FilePreferences : IAppPreferences
         }
     }
 
+    public NavigationPaneLayout? NavigationPane
+    {
+        get => _data.NavigationPane;
+        set
+        {
+            _data = _data with { NavigationPane = value };
+            Save();
+        }
+    }
+
     private static Data Load(string path)
     {
         try
@@ -116,5 +126,5 @@ public sealed class FilePreferences : IAppPreferences
     private sealed record Data(
         int? MaxConcurrentJobs = null, IReadOnlyList<DeploymentTemplate>? Templates = null, IReadOnlyList<string>? ExpiryNotices = null, bool StartupTaskAsked = false,
         IReadOnlyList<SavedJob>? SavedJobs = null, StartupLaunch? LastStartupLaunch = null,
-        IReadOnlyDictionary<string, IReadOnlyList<TableColumnLayout>>? TableLayouts = null);
+        IReadOnlyDictionary<string, IReadOnlyList<TableColumnLayout>>? TableLayouts = null, NavigationPaneLayout? NavigationPane = null);
 }

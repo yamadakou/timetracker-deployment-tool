@@ -44,6 +44,7 @@ CI の実行の **Summary** の下の **Artifacts** から `ttdeploytool-blazor-
 |---|---|---|
 | 1 | 「サインイン」を押す | Windows のアカウントを選ぶ窓（WAM）が、**TTDeployTool のウィンドウの前に**出る（後ろに隠れない）。選ぶとサインインでき、左下にアカウントが出る |
 | 2 | 終了して（通知領域のアイコンを右クリック →「終了」）、もう一度起動する | 対話なしで、前のアカウントでサインインした状態で始まる |
+| 2a | 左下のアカウントを右クリック →「Azure Portal を開く」。もう一度開いて「アカウントを切り替える…」→ 同じアカウントを選ぶ | 既定のブラウザーで、サインインしたテナントの Azure Portal が開く。切り替えでは、Windows のアカウントを選ぶ窓（WAM）が TTDeployTool の前に出て、選ぶとサインインした状態に戻る |
 | 3 | 「デプロイの一覧」→「読み込む」 | 本ツールでデプロイした環境が、今の WinUI 3 版と同じ件数・中身で出る。本ツールのリソースを消してリソースグループだけが残った環境があれば、「リソースグループだけ」の行が出る |
 | 4 | 「新しくデプロイ」の手順「スペックと利用可能期限」の右の「料金の目安」の下の文を見る | 「Azure の公開の価格表、MM/dd HH:mm に読んだ値」と出る（会社のネットワークで価格表を読めた）。「アプリに入れた価格」と出たら、読めなかったことを記録する |
 | 5 | 1 行を選び、右の詳細で「パスワードを表示」→ DB のパスワードの「コピー」。次に **Win+V**（クリップボードの履歴）を開く | パスワードが出て、コピーでき、**クリップボードの履歴に残らない** |
@@ -95,6 +96,7 @@ CI（`ci.yml`）で毎回確かめている。前の手順書の番号（2026-11
 | 手順の名前・まとめての削除のリソースグループだけの行 | 38・39 | Core（`WizardTests`・`DeploymentCostTests`）、bUnit |
 | 右クリックのメニュー・ダブルクリック・詳細の範囲選択とコピー（Windows のクリップボードに入り、ほかのアプリに貼れる）・WebView2 の標準の右クリックのメニューを出さない | 43〜46 | Core（`RowMenuTests`）、bUnit、Playwright（`RowMenuUiTests`）、Windows の WebView2（`WebView2Tests`） |
 | キーボードだけで行のメニューを開く・動く・閉じる（Shift+F10・メニューキー・↑/↓・Home/End・Esc）、主な画面のアクセシビリティ（axe-core、serious・critical の違反なし）、誤り・警告の文が画面の名前で書かれる、権限の不足の案内のリンク、行を選ぶまで操作の帯を出さない（2026-11-16 に追加） | — | Core（`DesktopTermsTests`）、bUnit（`UxReviewScreenTests`）、Playwright（`RowMenuUiTests`・`AccessibilityUiTests`）、Windows の WebView2（`WebView2Tests`） |
+| 左のメニューの幅（ドラッグ・←/→・ダブルクリック）・畳む・起動し直した後も残る、アカウントの 2 行の表示とメニュー（Azure Portal・コピー・切り替え・サインアウト。ジョブがあれば先に尋ねる）（2026-11-16 に追加） | — | Core（`AccountAndNavigationTests`）、bUnit（`NavigationShellTests`）、Playwright（`NavigationPaneUiTests`）、Windows の WebView2（`WebView2Tests`） |
 | 表記「TimeTracker」 | 37 | 画面の文字を確かめる bUnit・Playwright のテストで使う文字 |
 
 ## 4. 片付け

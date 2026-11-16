@@ -1,4 +1,6 @@
 @inherits ViewModelComponent
+@implements IAsyncDisposable
+@inject IJSRuntime JS
 
 @* 画面の根（WinUI の画面の MainWindow: 上の帯〔Store の更新・終わっていないジョブ〕、左のメニュー、画面〔Core の Pages の名前〕、確かめるダイアログ）。
    メニューに無い画面（実行状況・削除・まとめての削除）は、ViewModel の NavigationRequested で開く（docs/design/desktop/desktop-wizard.md の 2） *@
@@ -19,8 +21,12 @@
         </div>
     }
     <div class="tt-main">
-        <nav class="tt-nav" aria-label="画面">
-            <div class="tt-brand"><img class="tt-brand-logo" src="_content/TTDeployTool.Controller.Desktop.Blazor/icon.svg" alt="" aria-hidden="true" />TTDeployTool</div>
+        @* 左のメニュー: 右端のつまみで幅（ドラッグ・←/→。ダブルクリックで既定の幅）、上のボタンでアイコンだけに畳む（オーナーの依頼、2026-11-16） *@
+        <nav class="tt-nav@(Pane.IsCollapsed ? " tt-nav-collapsed" : "")" aria-label="画面" data-id="Nav" style="width: @Px(Pane.CurrentWidth)" @ref="_nav">
+            <div class="tt-brand"><img class="tt-brand-logo" src="_content/TTDeployTool.Controller.Desktop.Blazor/icon.svg" alt="" aria-hidden="true" /><span class="tt-nav-label">TTDeployTool</span>
+                <button type="button" class="tt-nav-toggle" data-id="Nav.Toggle" title="@Pane.ToggleText" aria-label="@Pane.ToggleText"
+                        aria-expanded="@(Pane.IsCollapsed ? "false" : "true")" @onclick="Pane.Toggle"><Icon Name="panel" Size="16" /></button>
+            </div>
             @foreach (var item in NavItems)
             {
                 @if (item.Page == Pages.Settings)
@@ -28,14 +34,42 @@
                     <span class="tt-nav-space"></span>
                 }
                 <button type="button" class="tt-nav-item" data-id="@item.Id" aria-current="@(_page == item.Page ? "page" : null)"
-                        disabled="@(item.NeedsSignIn && !Model.SignIn.IsSignedIn)" @onclick="() => Navigate(item.Page)"><Icon Name="@item.Icon" />@item.Text</button>
+                        title="@(Pane.IsCollapsed ? item.Text : null)" aria-label="@(Pane.IsCollapsed ? item.Text : null)"
+                        disabled="@(item.NeedsSignIn && !Model.SignIn.IsSignedIn)" @onclick="() => Navigate(item.Page)"><Icon Name="@item.Icon" /><span class="tt-nav-label">@item.Text</span></button>
             }
-            @* サインインしたアカウント（推奨のデザイン: メニューの下） *@
-            <div class="tt-account" data-id="Nav.Account">
+            @* サインインしたアカウント（推奨のデザイン: メニューの下）。名前は 2 行（ユーザー名・@ドメイン）、マウスを置くと全文。
+               クリック・右クリックでアカウントのメニュー（Azure Portal・コピー・切り替え・サインアウト。オーナーの依頼、2026-11-16） *@
+            <button type="button" class="tt-account" data-id="Nav.Account" title="@Model.SignIn.AccountDisplay" aria-haspopup="menu"
+                    aria-expanded="@(_accountMenu ? "true" : "false")" aria-label="@($"アカウント: {Model.SignIn.AccountDisplay}")"
+                    @onclick="OpenAccountMenu" @oncontextmenu="OpenAccountMenu" @oncontextmenu:preventDefault>
                 <span class="tt-avatar" aria-hidden="true">@Initials</span>
-                <span class="tt-account-text">@Model.SignIn.AccountDisplay</span>
-            </div>
+                <span class="tt-account-text tt-nav-label" aria-hidden="true"><span class="tt-account-user">@Model.SignIn.UserLine</span>@if (Model.SignIn.DomainLine is { } domain)
+                    {
+                        <span class="tt-account-domain">@domain</span>
+                    }</span>
+            </button>
+            @if (!Pane.IsCollapsed)
+            {
+                <div class="tt-nav-grip" data-id="Nav.Grip" role="separator" aria-orientation="vertical" aria-label="メニューの幅（←/→ で変える。ダブルクリックで既定の幅）"
+                     aria-valuemin="@NavigationPaneViewModel.MinWidth" aria-valuemax="@NavigationPaneViewModel.MaxWidth" aria-valuenow="@Pane.Width"
+                     tabindex="0" @onkeydown="OnGripKeyDown" @ondblclick="Pane.Reset"></div>
+            }
         </nav>
+        @if (_accountMenu)
+        {
+            <div class="tt-overlay" @onclick="CloseAccountMenu" @oncontextmenu="CloseAccountMenu" @oncontextmenu:preventDefault></div>
+            <div class="tt-menu tt-account-menu" role="menu" data-id="Account.Menu" aria-label="アカウント" style="left: @Px(Pane.CurrentWidth - 4)" @onkeydown="OnAccountMenuKeyDown">
+                <div class="tt-menu-head" data-id="Account.Name">@Model.SignIn.AccountDisplay</div>
+                @foreach (var item in _accountItems)
+                {
+                    @if (item.StartsGroup)
+                    {
+                        <div class="tt-menu-sep" role="separator"></div>
+                    }
+                    <button type="button" role="menuitem" data-id="@($"Menu.{item.Id}")" disabled="@(!item.IsEnabled)" @onclick="() => RunAccountItem(item)">@item.Label</button>
+                }
+            </div>
+        }
         <main class="tt-content">
             @switch (_page)
             {
@@ -85,12 +119,82 @@
 
     protected override void OnInitialized()
     {
-        Watch(Session, Model, Model.Queue, Model.SignIn);
+        Watch(Session, Model, Model.Queue, Model.SignIn, Model.NavigationPane);
         Model.NavigationRequested += OnNavigationRequested;
+        // 左のメニューのつまみのドラッグ（ポインターのイベント。表の列の幅と同じく table.js で受ける）
+        _self = DotNetObjectReference.Create(this);
+        _module = JsModule.ImportAsync(JS);
         _ = Session.StartAsync();
     }
 
     protected override void OnDispose() => Model.NavigationRequested -= OnNavigationRequested;
+
+    private NavigationPaneViewModel Pane => Model.NavigationPane;
+
+    private ElementReference _nav;
+    private Task<IJSObjectReference> _module = default!;
+    private DotNetObjectReference<DesktopShell> _self = default!;
+    private bool _accountMenu;
+    private IReadOnlyList<RowMenuItem> _accountItems = [];
+    private string? _focus;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+            await JsModule.InvokeQuietlyAsync(_module, "attachNavGrip", _nav, _self);
+        // 開いたアカウントのメニューの最初の項目・Esc で閉じた後のアカウントの欄に、フォーカスを置く
+        if (_focus is { } selector)
+        {
+            _focus = null;
+            await JsModule.InvokeQuietlyAsync(_module, "focusSelector", selector);
+        }
+    }
+
+    /// <summary>つまみのドラッグで幅を変えた（JavaScript から）。</summary>
+    [JSInvokable]
+    public void NavResized(double width)
+    {
+        Pane.Resize(width);
+        StateHasChanged();
+    }
+
+    private void OnGripKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key is "ArrowLeft" or "ArrowRight")
+            Pane.Nudge(e.Key == "ArrowLeft" ? -1 : 1);
+    }
+
+    private void OpenAccountMenu()
+    {
+        _accountItems = Model.AccountMenu();
+        _accountMenu = true;
+        _focus = "[data-id='Account.Menu'] [role='menuitem']:not([disabled])";
+    }
+
+    private void CloseAccountMenu() => _accountMenu = false;
+
+    private void OnAccountMenuKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key != "Escape")
+            return;
+        CloseAccountMenu();
+        _focus = "[data-id='Nav.Account']";
+    }
+
+    private async Task RunAccountItem(RowMenuItem item)
+    {
+        CloseAccountMenu();
+        await item.Run();
+    }
+
+    private static string Px(double value) => value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + "px";
+
+    public async ValueTask DisposeAsync()
+    {
+        Dispose();
+        await JsModule.DisposeQuietlyAsync(_module);
+        _self.Dispose();
+    }
 
     // ViewModel が画面を開くよう求めた（行の操作・サインアウト・通知から。Core の処理の続きで呼ばれる）
     private void OnNavigationRequested(string page) => _ = InvokeAsync(() => Navigate(page));

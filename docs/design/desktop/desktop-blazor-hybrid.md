@@ -542,3 +542,18 @@ WinUI 3 版の UI テストとの対応（名前は同じ。中身の違い）:
 - 削除の計画の Markdown の見出しも、リソースグループだけの対象は「rg / 」ではなく「rg（リソースグループだけ）」にする
 - テスト: Core（`ResourceGroupOnlyTests.Messages_Should_Name_A_Resource_Group_Only_Row_By_Its_Resource_Group`）。網羅率は Core 100%
 - Core の変更のため、WinUI 3 版のセッションに反映を頼む
+
+### 16.24 左のメニューの幅・畳む・アカウントのメニュー（オーナーの依頼、2026-11-16。オーナーの判断: 名前の表示は A・B・C のすべて、メニューは Azure Portal・コピー・切り替え・サインアウト）
+左のメニューの幅を変えられず、長いアカウント名が読めなかった。また、アカウントの欄を使って UX を良くする操作が無かった。
+
+| 項目 | 内容 | 主な場所 |
+|---|---|---|
+| A 名前の表示 | アカウントの欄は 2 行（ユーザー名・@ドメイン）。収まらなければ「…」で切り、マウスを置くと全文。アカウントのメニューの頭にも全文 | `SignInViewModel.UserLine`・`DomainLine`、`DesktopShell` |
+| B 幅の変更 | 左のメニューの右端のつまみをドラッグして幅を変える（180〜420 px。既定は 240 px）。つまみにフォーカスを置いて ←/→ で 10 px ずつ、ダブルクリックで既定の幅。幅はアプリの設定（preferences.json）に保存し、起動し直しても残る | `NavigationPaneViewModel`・`IAppPreferences.NavigationPane`、`wwwroot/table.js`（`attachNavGrip`） |
+| C 畳む | 上のボタンで、アイコンだけ（60 px）に畳む・広げる。畳んでいる間はつまみを出さず、メニューの名前はマウスを置くと出る。広げると前の幅に戻る | 同上 |
+| アカウントのメニュー | アカウントの欄のクリック・右クリックで開く（ダブルクリックは気付きにくいため使わない）。「Azure Portal を開く」（サインインしたテナントの Portal を既定のブラウザーで）、「アカウント名をコピー」、区切りの後に「アカウントを切り替える…」（サインアウトしてから、アカウントを選んでサインインし直す）・「サインアウト…」。サインインしていなければ「サインインする」だけ。開くと最初の項目にフォーカスを置き、↑/↓・Home/End で動き、Esc で閉じてアカウントの欄に戻る | `MainViewModel.AccountMenu`・`SignInViewModel.SwitchAccountCommand`、`DesktopShell` |
+| ジョブがあるときの確かめ | 終わっていないジョブ（実行中・予定）があるときにサインアウト・切り替えをすると、ジョブが Azure を操作できずに失敗することがあるため、先に尋ねる（「サインイン」の画面の「サインアウト」も同じ） | `SignInViewModel.ConfirmSignOut`・`MainViewModel.ConfirmSignOutAsync` |
+
+- テスト: Core（`AccountAndNavigationTests`。前からある `TableTests` のサインアウトは、ジョブがあるため「はい」で答えるようにした）、bUnit（`NavigationShellTests`）、Playwright（`NavigationPaneUiTests`: ドラッグ・←/→・ダブルクリック・畳む・起動し直した後も残る、アカウントの 2 行・メニュー・Azure Portal・コピー・サインアウト）、WebView2（`WebView2Tests`: つまみのドラッグ・畳む・アカウントの右クリック）。網羅率は Core・Blazor・table.js とも 100%
+- 既定の幅は、今までの見た目（幅 220 px と左右の余白で 236 px）に近い 240 px にした（幅は余白を含めて数える）
+- Core の変更のため、WinUI 3 版のセッションに反映を頼む（WinUI 3 の NavigationView は標準で畳めるため、幅の変更とアカウントのメニューを中心に）

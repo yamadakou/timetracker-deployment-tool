@@ -38,6 +38,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private JobViewModel? _currentDeployment;
     private JobViewModel? _currentDeletion;
     private JobViewModel? _statusJob;
+    private readonly ISystemLauncher _launcher;
+    private readonly IClipboardService? _clipboard;
     private string _returnPage = Pages.Deployments;
 
     public MainViewModel(
@@ -46,6 +48,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         IStartupTaskService? startupTask = null, ISecretProtector? secrets = null, IJobHistoryFile? history = null, Pricing.IPriceCatalog? prices = null)
     {
         _dialogs = dialogs;
+        _launcher = launcher;
+        _clipboard = clipboard;
         _notifications = notifications;
         preferences ??= new InMemoryAppPreferences();
         _preferences = preferences;
@@ -95,6 +99,9 @@ public sealed class MainViewModel : ObservableObject, IDisposable
                 NavigationRequested?.Invoke(Pages.Target);
             }
         }, loggers.CreateLogger("TTDeployTool.Desktop.SignIn"));
+        // 終わっていないジョブがあれば、サインアウト・アカウントの切り替えの前に尋ねる（ジョブは今のアカウントで Azure を操作するため）
+        SignIn.ConfirmSignOut = ConfirmSignOutAsync;
+        NavigationPane = new NavigationPaneViewModel(preferences);
         Settings = new SettingsViewModel(Target, time, preferences, dialogs, clipboard);
         // グループ名の入力の候補は、デプロイの一覧のグループ（docs/design/common/deployment-groups.md の 4）
         Settings.UseGroups(() => Deployments.GroupNames);
@@ -369,6 +376,39 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         }
         return Task.CompletedTask;
     }
+
+    /// <summary>左のメニューの幅と、畳むか（オーナーの依頼、2026-11-16）。</summary>
+    public NavigationPaneViewModel NavigationPane { get; }
+
+    /// <summary>
+    /// 左のメニューのアカウントのメニュー（クリック・右クリック。オーナーの依頼、2026-11-16。オーナーの判断: Azure Portal・コピー・切り替え・サインアウト）。
+    /// サインインしていなければ「サインインする」だけ。
+    /// </summary>
+    public IReadOnlyList<RowMenuItem> AccountMenu() => !SignIn.IsSignedIn
+        ? [new("Account.SignIn", "サインインする", SignIn.SignInCommand.ExecuteAsync, SignIn.SignInCommand.CanExecute(null))]
+        :
+        [
+            new("Account.Portal", "Azure Portal を開く", () =>
+            {
+                _launcher.OpenUri(SignIn.PortalUri);
+                return Task.CompletedTask;
+            }),
+            new("Account.Copy", "アカウント名をコピー", () =>
+            {
+                _clipboard!.CopyText(SignIn.Account!.UserName);
+                return Task.CompletedTask;
+            }, _clipboard != null),
+            new("Account.Switch", "アカウントを切り替える…", SignIn.SwitchAccountCommand.ExecuteAsync, SignIn.SwitchAccountCommand.CanExecute(null), StartsGroup: true),
+            new("Account.SignOut", "サインアウト…", SignIn.SignOutCommand.ExecuteAsync, SignIn.SignOutCommand.CanExecute(null)),
+        ];
+
+    // サインアウト・切り替えの前に、終わっていないジョブがあれば尋ねる
+    private async Task<bool> ConfirmSignOutAsync(bool switching) =>
+        !HasRunningJob || await _dialogs.ConfirmAsync(
+            "終わっていないジョブがあります",
+            $"ジョブ（{Queue.Summary}）があります。サインアウトすると、これらのジョブは Azure を操作できずに失敗することがあります" +
+            (switching ? "（切り替えた後のアカウントに権限が無い場合も失敗します）。アカウントを切り替えますか？" : "。サインアウトしますか？"),
+            switching ? "切り替える" : "サインアウトする");
 
     /// <summary>
     /// アプリを終了してよいか（通知領域の「終了」）。終わっていないジョブがあれば確認する（終了すると実行中のジョブは止まり、予定・待機中のジョブは消える）。

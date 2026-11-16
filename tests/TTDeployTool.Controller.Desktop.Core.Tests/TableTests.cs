@@ -422,7 +422,10 @@ public class JobTableTests
         h.Main.Jobs.Should().HaveCount(4);
         foreach (var page in new[] { "wizard", "status", "delete", "settings" })
             await h.Main.OpenAsync(page);
+        // ジョブがあるため、サインアウトの前に尋ねる（2026-11-16）。「はい」でサインアウトする
+        h.Dialogs.Confirm = true;
         await h.Main.SignIn.SignOutCommand.ExecuteAsync();
+        (h.Main.SignIn.IsSignedIn, h.Dialogs.Confirmations[^1]).Should().Be((false, "終わっていないジョブがあります"));
         h.Navigations.Should().BeEmpty();
     }
 

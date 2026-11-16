@@ -20,13 +20,10 @@ public sealed class SignInViewModel : ObservableObject
         _accountChanged = accountChanged;
         _logger = logger;
         SignInCommand = new AsyncCommand(SignInAsync, () => !IsSignedIn && !Busy.IsBusy);
-        SignOutCommand = new AsyncCommand(SignOutAsync, () => IsSignedIn && !Busy.IsBusy);
+        SignOutCommand = new AsyncCommand(() => SignOutAsync(switching: false), () => IsSignedIn && !Busy.IsBusy);
+        SwitchAccountCommand = new AsyncCommand(SwitchAccountAsync, () => IsSignedIn && !Busy.IsBusy);
         // 前回のサインインを確かめている間に「サインイン」を押して、2 つのサインインが同時に進まないようにする
-        Busy.PropertyChanged += (_, _) =>
-        {
-            SignInCommand.RaiseCanExecuteChanged();
-            SignOutCommand.RaiseCanExecuteChanged();
-        };
+        Busy.PropertyChanged += (_, _) => RaiseCommands();
     }
 
     /// <summary>
@@ -38,6 +35,23 @@ public sealed class SignInViewModel : ObservableObject
     public AsyncCommand SignInCommand { get; }
 
     public AsyncCommand SignOutCommand { get; }
+
+    /// <summary>アカウントを切り替える（サインアウトしてから、アカウントを選んでサインインし直す。オーナーの依頼、2026-11-16）。</summary>
+    public AsyncCommand SwitchAccountCommand { get; }
+
+    /// <summary>
+    /// サインアウト・切り替えの前の確かめ（引数は切り替えか。false なら止める）。終わっていないジョブがあるときに尋ねる（<see cref="MainViewModel"/> が入れる）。
+    /// </summary>
+    public Func<bool, Task<bool>>? ConfirmSignOut { get; set; }
+
+    /// <summary>左のメニューのアカウントの 1 行目（ユーザー名。メールアドレスの @ の前）。</summary>
+    public string UserLine => Account is { } account ? Split(account.UserName).User : "サインインしていません";
+
+    /// <summary>左のメニューのアカウントの 2 行目（@ からのドメイン。無ければ null）。</summary>
+    public string? DomainLine => Account is { } account ? Split(account.UserName).Domain : null;
+
+    /// <summary>サインインしたテナントの Azure Portal（テナントが分からなければ、既定のディレクトリー）。</summary>
+    public Uri PortalUri => new(Account?.HomeTenantId is { Length: > 0 } tenant ? $"https://portal.azure.com/#@{tenant}" : "https://portal.azure.com/");
 
     public SignedInAccount? Account => _account;
 
@@ -92,8 +106,18 @@ public sealed class SignInViewModel : ObservableObject
         }
     }
 
-    private async Task SignOutAsync()
+    private async Task SwitchAccountAsync()
     {
+        if (!await SignOutAsync(switching: true))
+            return;
+        await SignInAsync();
+    }
+
+    // サインアウトしたら true（確かめで止めたら false）
+    private async Task<bool> SignOutAsync(bool switching)
+    {
+        if (ConfirmSignOut != null && !await ConfirmSignOut(switching))
+            return false;
         Error = null;
         try
         {
@@ -106,6 +130,18 @@ public sealed class SignInViewModel : ObservableObject
         }
         // サインアウトに失敗しても、このアプリでは使わない（次回は対話でサインインする）
         await SetAccountAsync(null);
+        return true;
+    }
+
+    // 「user@example.com」を「user」と「@example.com」に分ける（@ が無ければ 1 行だけ）
+    private static (string User, string? Domain) Split(string name) =>
+        name.LastIndexOf('@') is var at and > 0 ? (name[..at], name[at..]) : (name, null);
+
+    private void RaiseCommands()
+    {
+        SignInCommand.RaiseCanExecuteChanged();
+        SignOutCommand.RaiseCanExecuteChanged();
+        SwitchAccountCommand.RaiseCanExecuteChanged();
     }
 
     private async Task SetAccountAsync(SignedInAccount? account)
@@ -114,8 +150,10 @@ public sealed class SignInViewModel : ObservableObject
             return;
         OnPropertyChanged(nameof(IsSignedIn));
         OnPropertyChanged(nameof(AccountDisplay));
-        SignInCommand.RaiseCanExecuteChanged();
-        SignOutCommand.RaiseCanExecuteChanged();
+        OnPropertyChanged(nameof(UserLine));
+        OnPropertyChanged(nameof(DomainLine));
+        OnPropertyChanged(nameof(PortalUri));
+        RaiseCommands();
         // アカウント名は書かない（ホームのテナントだけ）
         _logger.LogInformation("サインインの状態: {State}（ホームのテナント {TenantId}）", account != null ? "サインイン" : "サインアウト", account?.HomeTenantId);
         await _accountChanged(account != null);

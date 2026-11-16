@@ -149,6 +149,33 @@ export function selectionIn(root) {
   return root.contains(selection.anchorNode) && root.contains(selection.focusNode) ? selection.toString() : '';
 }
 
+// 左のメニューの右端のつまみのドラッグで、メニューの幅を変える（オーナーの依頼、2026-11-16）。動かしている間だけ幅を直接変え、
+// 離したら元に戻して .NET に渡す（.NET が範囲に収めて保存し、描き直す）
+export function attachNavGrip(nav, dotnet) {
+  nav.addEventListener('pointerdown', e => {
+    const grip = e.target.closest('.tt-nav-grip');
+    if (!grip) return;
+    e.preventDefault();
+    const start = e.clientX;
+    const startWidth = nav.getBoundingClientRect().width;
+    const original = nav.style.width;
+    let width = startWidth;
+    grip.setPointerCapture(e.pointerId);
+    const move = ev => {
+      width = startWidth + ev.clientX - start;
+      nav.style.width = `${width}px`;
+    };
+    const up = () => {
+      grip.removeEventListener('pointermove', move);
+      grip.removeEventListener('pointerup', up);
+      nav.style.width = original;
+      dotnet.invokeMethodAsync('NavResized', width);
+    };
+    grip.addEventListener('pointermove', move);
+    grip.addEventListener('pointerup', up);
+  });
+}
+
 // 要素の中の最初に当たるものにフォーカスを置く（開いたメニューの最初の項目・閉じた後の表）
 export function focusIn(root, selector) {
   root.querySelector(selector)?.focus();
