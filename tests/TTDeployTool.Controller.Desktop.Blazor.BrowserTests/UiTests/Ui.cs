@@ -27,6 +27,27 @@ internal static class Ui
     /// <summary>表の行（デプロイの一覧は Panel.Deployments、ジョブの一覧は Panel.Jobs）。</summary>
     public static ILocator Rows(this IPage page, string panel) => page.Locator($"[data-id='Panel.{panel}'] tbody tr");
 
+    /// <summary>
+    /// デプロイの一覧の行を押して選ぶ。選ばれるまで待ち、選ばれていなければ押し直す（すべてのテストを続けて流すと、押した直後に表が描き直されて、
+    /// まれに押したことが届かなかった。CI と手元、2026-11-16）。
+    /// </summary>
+    public static async Task SelectDeploymentAsync(this IPage page, string appName)
+    {
+        var row = page.RowWith("Deployments", "AppName", appName);
+        for (var i = 0; i < 3; i++)
+        {
+            await row.ClickAsync();
+            try
+            {
+                await Assertions.Expect(row).ToHaveAttributeAsync("aria-selected", "true", new() { Timeout = 3000 });
+                return;
+            }
+            catch (PlaywrightException) when (i < 2)
+            {
+            }
+        }
+    }
+
     /// <summary>列の値が <paramref name="text"/> の行。</summary>
     public static ILocator RowWith(this IPage page, string panel, string key, string text) =>
         page.Rows(panel).Filter(new() { Has = page.Locator($"td[data-key='{key}']", new() { HasTextRegex = new System.Text.RegularExpressions.Regex($"^{System.Text.RegularExpressions.Regex.Escape(text)}$") }) });
@@ -72,6 +93,8 @@ internal static class Ui
         await page.ShowAsync("Deployments");
         await page.ClickIdAsync("Deployments.Load");
         await Assertions.Expect(page.PageText("deployments")).ToContainTextAsync($"全 {Deployments} 件");
+        // 料金の単価が届くまで待つ（届く前と後で表示が変わるため、行を押す前に落ち着かせる）
+        await Assertions.Expect(page.Id("Deployments.Cost.Total")).ToContainTextAsync("円");
     }
 
     /// <summary>
@@ -100,7 +123,7 @@ internal static class Ui
         await page.ShowAsync("Deployments");
         if (await page.Id("Deployments.ClearSelection").IsEnabledAsync())
             await page.ClickIdAsync("Deployments.ClearSelection");
-        await page.RowWith("Deployments", "AppName", appName).ClickAsync();
+        await page.SelectDeploymentAsync(appName);
         await page.ClickIdAsync("Deployments.Delete");
         await Assertions.Expect(page.Id("Panel.Delete")).ToBeVisibleAsync();
         await Assertions.Expect(page.Id("Delete.ConfirmAppName")).ToBeVisibleAsync();

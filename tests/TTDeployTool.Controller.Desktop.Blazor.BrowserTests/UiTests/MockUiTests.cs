@@ -47,12 +47,12 @@ public sealed class MockUiTests
         await Assertions.Expect(page.Rows("Deployments")).ToHaveCountAsync(Deployments);
 
         // 1 行選ぶと詳細（パスワードはモックのシークレット）、2 行選ぶとまとめての操作
-        await page.RowWith("Deployments", "AppName", "app00").ClickAsync();
+        await page.SelectDeploymentAsync("app00");
         await page.ClickIdAsync("Row.ShowPasswords");
         await Assertions.Expect(page.Id("Row.DbPassword")).ToHaveTextAsync("••••••••");
         await page.ClickIdAsync("Row.TogglePasswords");
         await Assertions.Expect(page.Id("Row.DbPassword")).ToHaveTextAsync("Db-Pass-00");
-        await page.RowWith("Deployments", "AppName", "app02").ClickAsync();
+        await page.SelectDeploymentAsync("app02");
         await Assertions.Expect(page.Id("Row.ShowPasswords")).ToHaveCountAsync(0);
         await Assertions.Expect(page.Id("Deployments.ChangeExpiry")).ToBeEnabledAsync();
         await Assertions.Expect(page.Id("Deployments.Delete")).ToBeEnabledAsync();

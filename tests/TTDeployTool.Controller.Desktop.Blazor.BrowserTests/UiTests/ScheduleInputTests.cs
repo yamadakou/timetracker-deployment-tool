@@ -47,7 +47,7 @@ public sealed class ScheduleInputTests
         var page = host.Page;
         await page.SignInAsync();
         await page.LoadAsync();
-        await page.RowWith("Deployments", "AppName", "app08").ClickAsync();
+        await page.SelectDeploymentAsync("app08");
         await page.ClickIdAsync("Deployments.Delete");
         await page.Id("Delete.ConfirmAppName").FillAsync("app08");
         await page.ScheduleInAnHourAsync("Delete.Schedule");
@@ -120,7 +120,7 @@ public sealed class ScheduleInputTests
         var page = host.Page;
         await page.SignInAsync();
         await page.LoadAsync();
-        await page.RowWith("Deployments", "AppName", "app08").ClickAsync();
+        await page.SelectDeploymentAsync("app08");
         await page.ClickIdAsync("Deployments.Delete");
         await page.Id("Delete.ConfirmAppName").FillAsync("app08");
         await SetDateTimeAsync(page, "Delete.Schedule", time);
