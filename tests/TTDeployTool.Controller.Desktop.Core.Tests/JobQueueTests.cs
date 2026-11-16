@@ -316,7 +316,7 @@ public sealed class JobQueueTests : IDisposable
 
         job.State.Should().Be(DesktopJobState.Failed);
         job.Title.Should().Be("削除（rg / demo）");
-        job.Error.Should().Be("実行しませんでした: " + DesktopMessages.Changed);
+        job.Error.Should().Be(ExpectedMessages.DeleteChanged);
         job.StatusText.Should().Be("失敗");
     }
 
@@ -471,7 +471,7 @@ public class JobRegistrationTests
         await blocker.CancelCommand.ExecuteAsync();
         h.Main.Queue.MaxConcurrency = 2;
         await changed.Finished;
-        changed.Error.Should().Be("実行しませんでした: " + DesktopMessages.Changed);
+        changed.Error.Should().Be(ExpectedMessages.DeployChanged);
 
         // 計画し直すと、データ消失の同意が新たに要る（DB アプリができた）
         h.Azure.Apps.Clear();
@@ -483,7 +483,7 @@ public class JobRegistrationTests
         h.Azure.Deployed();
         time.Advance(TimeSpan.FromMinutes(30));
         await needsAck.Finished;
-        needsAck.Error.Should().Be("実行しませんでした: " + DesktopMessages.Changed);
+        needsAck.Error.Should().Be(ExpectedMessages.DeployChanged);
 
         // 計画し直すと、権限が足りない
         h.Azure.Apps.Clear();
@@ -571,6 +571,54 @@ public class JobRegistrationTests
     }
 
     [Fact]
+    public async Task A_Late_Deletion_Should_Run_Even_When_Its_Expired_Plan_Was_Cleared_By_Another_Plan()
+    {
+        // まとめての削除・予定の削除で、待っている間に計画の有効期限が切れ、ほかの計画を保存したときに片付けられる（「見つからない」になる）。
+        // それでも計画し直して始める（オーナーの実機で、2 件目以降が「計画が見つかりません」で失敗した。2026-11-16）
+        var time = Time();
+        var h = await ReadyAsync(time);
+        h.Azure.Deployed();
+        var vm = h.Main.Deletion;
+        await vm.PlanCommand.ExecuteAsync();
+        vm.ConfirmAppName = "demo";
+        vm.Schedule.Date = time.GetUtcNow();
+        vm.Schedule.TimeOfDay = time.GetUtcNow().TimeOfDay + TimeSpan.FromHours(1);
+        await vm.ScheduleCommand.ExecuteAsync();
+        var job = h.Main.CurrentDeletion!;
+
+        time.Advance(TimeSpan.FromMinutes(30));
+        h.Main.Target.AppName = "other";
+        await h.Main.Deployment.PlanCommand.ExecuteAsync();
+        h.Main.Deployment.HasPlan.Should().BeTrue("ほかの対象の計画を保存して、期限の切れた計画を片付けさせる");
+        time.Advance(TimeSpan.FromMinutes(30));
+        await job.Finished;
+
+        (job.State, job.Error).Should().Be((DesktopJobState.Succeeded, (string?)null));
+    }
+
+    [Fact]
+    public async Task A_Late_Deployment_Should_Run_Even_When_Its_Expired_Plan_Was_Cleared_By_Another_Plan()
+    {
+        var time = Time();
+        var h = await ReadyAsync(time);
+        var vm = h.Main.Deployment;
+        await vm.PlanCommand.ExecuteAsync();
+        vm.Schedule.Date = time.GetUtcNow();
+        vm.Schedule.TimeOfDay = time.GetUtcNow().TimeOfDay + TimeSpan.FromHours(1);
+        await vm.ScheduleCommand.ExecuteAsync();
+        var job = h.Main.CurrentDeployment!;
+
+        time.Advance(TimeSpan.FromMinutes(30));
+        h.Main.Target.AppName = "other";
+        await vm.PlanCommand.ExecuteAsync();
+        vm.HasPlan.Should().BeTrue("ほかの対象の計画を保存して、期限の切れた計画を片付けさせる");
+        time.Advance(TimeSpan.FromMinutes(30));
+        await job.Finished;
+
+        (job.State, job.Error).Should().Be((DesktopJobState.Succeeded, (string?)null));
+    }
+
+    [Fact]
     public async Task A_Late_Deletion_Should_Not_Run_When_Azure_Changed_Or_Blocks_It()
     {
         var time = Time();
@@ -587,7 +635,7 @@ public class JobRegistrationTests
         h.Azure.Apps.RemoveAt(0);
         time.Advance(TimeSpan.FromHours(1));
         await changed.Finished;
-        changed.Error.Should().Be("実行しませんでした: " + DesktopMessages.Changed);
+        changed.Error.Should().Be(ExpectedMessages.DeleteChanged);
 
         h.Azure.Apps.Clear();
         h.Azure.Deployed();

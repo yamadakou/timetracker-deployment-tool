@@ -287,7 +287,7 @@ public sealed class JobQueue : ObservableObject, IDisposable
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "ジョブを始められませんでした: {Title}", job.Title);
-            job.FailToStart(DesktopMessages.ForAzure(ex));
+            job.FailToStart(DesktopMessages.ForAzure(ex, job.IsDeployment ? RetryHint.DeployJob : RetryHint.DeleteJob));
             Pump();
             return;
         }

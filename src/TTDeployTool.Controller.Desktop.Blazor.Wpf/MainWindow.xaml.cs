@@ -38,7 +38,12 @@ public partial class MainWindow : Window
                     e.UserDataFolder = folder;
             };
         }
-        WebView.BlazorWebViewInitialized += (_, e) => Core = e.WebView.CoreWebView2;
+        WebView.BlazorWebViewInitialized += (_, e) =>
+        {
+            Core = e.WebView.CoreWebView2;
+            // 入力欄の右クリックの「切り取り・コピー・貼り付け・すべて選択」（EditMenu）
+            EditMenu.Attach(Core);
+        };
         Closing += OnClosing;
     }
 

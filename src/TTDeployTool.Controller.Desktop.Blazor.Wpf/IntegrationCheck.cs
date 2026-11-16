@@ -49,6 +49,8 @@ internal static class IntegrationCheck
         });
         Try(report, "folderDialog", () => new Microsoft.Win32.OpenFolderDialog { Title = "フォルダーを選ぶ" }.Title.Length > 0);
         report["shellRendered"] = await TryAsync(async () => await ShellRenderedAsync(window));
+        // 入力欄の右クリックのメニュー（貼り付け）を出せる設定になっていること（EditMenu）
+        Try(report, "editContextMenu", () => window.Core?.Settings.AreDefaultContextMenusEnabled);
 
         // 閉じたときの動き（ジョブも期限のあるデプロイも無ければ終了する。WinUI のアプリと同じ Core の判断）と、隠したウィンドウを通知領域から出せること
         Try(report, "closeAction", () => window.Session.ViewModel.RequestClose().ToString());

@@ -130,6 +130,12 @@ public sealed class StatusViewModel : ObservableObject
         Error = null;
         Info = null;
         Note = null;
+        // リソースグループだけの対象（本ツールのアプリのリソースが無い）は、アプリの状態を読まない（アプリ名の誤りを出していた。オーナーの指摘、2026-11-16）
+        if (_target.AppName.Length == 0 && _target.ResourceGroupError == null)
+        {
+            Note = $"リソースグループ {_target.ResourceGroup} だけの対象のため（本ツールのアプリのリソースはありません）、アプリの状態はありません。";
+            return;
+        }
         if (_target.TargetError is { } targetError)
         {
             Error = targetError;

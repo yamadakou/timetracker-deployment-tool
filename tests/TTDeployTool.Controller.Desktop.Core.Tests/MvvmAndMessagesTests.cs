@@ -117,6 +117,24 @@ public class DesktopMessagesTests
     }
 
     [Fact]
+    public void Retries_Should_Name_The_Button_Or_The_Menu_To_Use()
+    {
+        // 「「計画」から」では何をすればよいか分からなかった（オーナーの指摘、2026-11-16）。画面とメニューにある名前で書く
+        DesktopMessages.PlanExpired.Should().Be("計画の有効期限（15 分）が切れました。「計画し直す」を押し、内容を確かめてから実行してください。");
+        DesktopMessages.For(new WorkflowException(WorkflowFailure.PlanNotFound), RetryHint.DeleteJob)
+            .Should().Be("計画が見つかりません（アプリを起動し直したか、もう使われています）。デプロイの一覧で、その行を右クリック →「Azure から削除…」で削除し直してください。");
+        DesktopMessages.For(new WorkflowException(WorkflowFailure.PlanExpired), RetryHint.DeployJob)
+            .Should().Be("計画の有効期限（15 分）が切れました。ジョブの一覧で、このジョブを右クリック →「この設定で新しくデプロイ」でデプロイし直してください。");
+        DesktopMessages.ForAzure(new AuthenticationFailedException("AADSTS50076: x"), RetryHint.DeleteJob)
+            .Should().EndWith("MFA を行ってから、デプロイの一覧で、その行を右クリック →「Azure から削除…」で削除し直してください。");
+        DesktopMessages.For(new WorkflowException(WorkflowFailure.Conflict, target: new JobTarget("sub", "rg", ""), conflictingJobId: "job_1"), RetryHint.DeleteJob)
+            .Should().StartWith("同じ対象（rg（リソースグループだけ））のデプロイまたは削除が実行中です。完了してから、デプロイの一覧で");
+        DesktopMessages.Retry(RetryHint.Page).Should().Be("「計画し直す」を押し、内容を確かめてから実行してください。");
+        new[] { DesktopMessages.PlanNotFound, DesktopMessages.PlanExpired, DesktopMessages.Changed, DesktopMessages.MfaRequired }
+            .Should().NotContain(m => m.Contains("「計画」から"));
+    }
+
+    [Fact]
     public void Azure_Failures_Should_Be_Explained()
     {
         DesktopMessages.ForAzure(new WorkflowException(WorkflowFailure.Changed)).Should().Be(DesktopMessages.Changed);

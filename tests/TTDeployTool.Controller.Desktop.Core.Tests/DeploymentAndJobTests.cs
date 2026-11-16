@@ -133,7 +133,7 @@ public class DeploymentViewModelTests
         vm.HasPlan.Should().BeFalse();
         var job = h.Main.CurrentJob!;
         job.State.Should().Be(DesktopJobState.Failed);
-        job.Error.Should().Be("実行しませんでした: " + DesktopMessages.Changed);
+        job.Error.Should().Be(ExpectedMessages.DeployChanged);
     }
 
     [Fact]
