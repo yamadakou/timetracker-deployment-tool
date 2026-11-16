@@ -40,10 +40,10 @@
             @* サインインしたアカウント（推奨のデザイン: メニューの下）。名前は 2 行（ユーザー名・@ドメイン）、マウスを置くと全文。
                クリック・右クリックでアカウントのメニュー（Azure Portal・コピー・切り替え・サインアウト。オーナーの依頼、2026-11-16） *@
             <button type="button" class="tt-account" data-id="Nav.Account" title="@Model.SignIn.AccountDisplay" aria-haspopup="menu"
-                    aria-expanded="@(_accountMenu ? "true" : "false")" aria-label="@($"アカウント: {Model.SignIn.AccountDisplay}")"
+                    aria-expanded="@(_accountMenu ? "true" : "false")"
                     @onclick="OpenAccountMenu" @oncontextmenu="OpenAccountMenu" @oncontextmenu:preventDefault>
                 <span class="tt-avatar" aria-hidden="true">@Initials</span>
-                <span class="tt-account-text tt-nav-label" aria-hidden="true"><span class="tt-account-user">@Model.SignIn.UserLine</span>@if (Model.SignIn.DomainLine is { } domain)
+                <span class="tt-account-text tt-nav-label"><span class="tt-account-user">@Model.SignIn.UserLine</span>@if (Model.SignIn.DomainLine is { } domain)
                     {
                         <span class="tt-account-domain">@domain</span>
                     }</span>
