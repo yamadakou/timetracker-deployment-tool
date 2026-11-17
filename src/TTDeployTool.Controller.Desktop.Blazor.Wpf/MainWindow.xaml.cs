@@ -31,7 +31,11 @@ public partial class MainWindow : Window
     /// <summary>これより長くロック・スリープしていたら、戻ったときに画面を作り直す（WebView2 の描いたものの取り込みが途切れ、出し直しでは戻らないことがあるため）。</summary>
     public static readonly TimeSpan LongLock = TimeSpan.FromMinutes(1);
 
+    /// <summary>作り直した画面ができあがるまで待つ長さ。</summary>
+    public static readonly TimeSpan CreateTimeout = TimeSpan.FromSeconds(30);
+
     private DateTimeOffset? _lockedAt;
+    private TaskCompletionSource _created = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private bool _exiting;
     private DesktopSession? _session;
     private ILogger _logger = NullLogger.Instance;
@@ -93,6 +97,7 @@ public partial class MainWindow : Window
             EditMenu.Attach(Core);
             // 画面のプロセスが落ちた・止まったら、ログに残して戻す（前は受けておらず、真っ白のままだった）
             Core.ProcessFailed += OnProcessFailed;
+            _created.TrySetResult();
         };
     }
 
@@ -143,6 +148,7 @@ public partial class MainWindow : Window
         Hook(fresh);
         Core = null;
         _webView2 = null;
+        _created = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         _view = fresh;
         Content = fresh;
         Recreations++;
@@ -200,10 +206,27 @@ public partial class MainWindow : Window
         _logger.LogInformation("{What}（{Minutes:0.#} 分）。画面が応えるかを確かめます", what, locked.TotalMinutes);
         await Task.Delay(ResumeDelay);
         if (locked >= LongLock)
+        {
             RecreateWebView();
+            // 新しい WebView2 ができあがるまで待ってから確かめる（すぐに確かめると「画面がまだありません」になった。CI、2026-11-18）
+            await Task.WhenAny(_created.Task, Task.Delay(CreateTimeout));
+            await WaitRenderedAsync();
+        }
         else
             Repaint();
         return await CheckResponsiveAsync();
+    }
+
+    // 作り直した画面を、Blazor が描き終えるまで待つ（CreateTimeout まで）
+    private async Task WaitRenderedAsync()
+    {
+        var until = DateTimeOffset.Now + CreateTimeout;
+        while (DateTimeOffset.Now < until)
+        {
+            if (Core is { } core && await core.ExecuteScriptAsync("document.querySelector('.tt-app') !== null") == "true")
+                return;
+            await Task.Delay(250);
+        }
     }
 
     /// <summary>
