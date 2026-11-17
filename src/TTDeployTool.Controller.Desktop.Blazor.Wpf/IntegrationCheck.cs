@@ -117,6 +117,24 @@ internal static class IntegrationCheck
             return (await context.GetAppAndOptionalStorePackageUpdatesAsync()).Count;
         });
 
+        // 画面（WebView2）が止まったときの戻し方（オーナーの実機の確認、2026-11-17: ロックから戻ると真っ白で「応答なし」）。
+        // 画面が応えるかの確かめ（ロックの解除・復帰で動くもの）、画面を描くプロセスを落としたら読み直して描き直すか、WebView を作り直して描き直すか
+        report["responsiveCheck"] = await TryAsync(async () => await window.CheckResponsiveAsync());
+        report["rendererCrashRecovered"] = await TryAsync(async () =>
+        {
+            var before = window.Recoveries;
+            // CDP の Page.crash で、画面を描くプロセスを落とす（ProcessFailed の RenderProcessExited が来る）
+            _ = window.Core!.CallDevToolsProtocolMethodAsync("Page.crash", "{}");
+            for (var i = 0; i < 40 && window.Recoveries == before; i++)
+                await Task.Delay(500);
+            return window.Recoveries > before && await ShellRenderedAsync(window) is true;
+        });
+        report["webViewRecreated"] = await TryAsync(async () =>
+        {
+            window.RecreateWebView();
+            return window.Recreations == 1 && await ShellRenderedAsync(window) is true && window.Core?.Settings.AreDefaultContextMenusEnabled == true;
+        });
+
         // 2 つ目の起動が 1 つ目に渡り、ウィンドウを出す（CI が印を見て 2 つ目を起動する）
         if (waitForReactivation)
         {

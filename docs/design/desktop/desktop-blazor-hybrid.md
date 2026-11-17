@@ -569,3 +569,24 @@ WinUI 3 版の UI テストとの対応（名前は同じ。中身の違い）:
 
 - テスト: Core（`DeletedDeploymentCostTests`: 今月の中・先月から・先月に削除・デプロイの日時なし・単価を読んでいない、このアプリでの削除で記録し今月分に含める、180 日を過ぎた記録・読めないサブスクリプション、DB のデータを残した削除・リソースグループごとの削除、上限の件数、ファイルへの保存、Cost Management の URL）、bUnit（`UxReviewScreenTests`）、Playwright（`DeletedCostUiTests`: 削除すると「削除したデプロイ（今月）」が出て、起動し直しても残る。「Cost Management を開く」）。網羅率は Core・Blazor・table.js とも 100%
 - Core の変更のため、WinUI 3 版のセッションに反映を頼む
+
+### 16.26 ロックから戻ると画面が真っ白で「応答なし」・× で閉じると異常終了（オーナーの実機の確認、2026-11-17・18）
+長い時間起動したまま PC をロックし、ロックから戻ると、画面が真っ白で「応答なし」になり、操作できなかった。オーナーのログ（11/17・11/18）を読んだ結果:
+
+- 真っ白になった間（11/17 22:39 から 11/18 00:41）に、アプリ（.NET）の例外・警告は無い。00:41 に × を押した操作はウィンドウに届いて処理されており、UI スレッドは動いていた。
+  画面を描く WebView2 のプロセス（msedgewebview2.exe）がロックからの復帰で止まった・落ちたとみられる（別のプロセスの子のウィンドウが止まると、親のウィンドウも「応答なし」になる）。
+  アプリは WebView2 の `ProcessFailed` を受けておらず、ログにも残らず、真っ白のままだった
+- 00:41:53 に × を押すと、`InvalidOperationException`（Window が閉じている場合、… Close … を呼び出せない）で異常終了していた。ジョブも期限のあるデプロイも無いときは
+  閉じて終了するが、閉じている途中の `OnClosing` で `Exit`（`Close`）を呼んでいた。ジョブも期限のあるデプロイも無いときに × で閉じると、いつも異常終了していた
+  （確認〔`--check`〕は `Exit` を直接呼んでおり、× の道筋を通していなかった）
+
+| 対策 | 内容 | 主な場所 |
+|---|---|---|
+| ① × で閉じたときの異常終了 | 閉じて終了するときは、閉じている途中でもう一度閉じず、そのまま閉じる（`ShutdownMode` が `OnMainWindowClose` のため、アプリも終わる） | `MainWindow.OnClosing` |
+| ② WebView2 の異常を受けて戻す | `ProcessFailed` を受けて、種類・理由・終了コードをログに残す。画面を描くプロセスが落ちた・応えないときは画面を読み直し、WebView2 の全体が落ちたときは WebView を作り直す（GPU などのほかのプロセスは、WebView2 が作り直すため、ログに残すだけ） | `MainWindow.OnProcessFailed`・`ReloadPage`・`RecreateWebView` |
+| ③ ロックの解除・復帰で確かめる | Windows のロック・ロックの解除・スリープ・スリープからの復帰をログに残す。解除・復帰の 2 秒後に、画面が 5 秒以内に応えるかを確かめ、応えなければ WebView を作り直し、描かれていなければ読み直す（結果もログに残す） | `MainWindow.OnSessionSwitch`・`OnPowerModeChanged`・`CheckResponsiveAsync` |
+
+- 画面を読み直す・作り直しても、ジョブ・一覧・設定は .NET の側（MainViewModel）にあるため消えない。始めの処理（前回のサインインの復元など）は 1 回だけ（`DesktopSession.StartAsync`）
+- 確かめ: Windows の確認（`--check`）に、画面が応えるか（`responsiveCheck`）、CDP の `Page.crash` で画面を描くプロセスを落とした後に読み直して描き直すか（`rendererCrashRecovered`）、
+  WebView を作り直して描き直し、入力欄の右クリックのメニューの設定も入るか（`webViewRecreated`）を足し、最後は × と同じ道筋で閉じて、正常に終了したか（`<報告>.closed`）を CI で確かめる
+- 実機での確認: ロックから戻った後に画面が使えること。止まった場合は、ログに「画面（WebView2）のプロセスが止まりました」「画面の確かめ: …」が残る（手順書の 3.2 の 8b）

@@ -93,7 +93,7 @@ public partial class App : System.Windows.Application
             var atStartup = activation == ExtendedActivationKind.StartupTask;
             appLogger.LogInformation("起動の種類: {Kind}", atStartup ? "サインイン時の起動" : "通常");
             var session = new DesktopSession(viewModel, dialogs, new ClipboardService(), vm => vm.StartAsync(atStartup));
-            _window.Initialize(session);
+            _window.Initialize(session, appLogger);
             Exit += (_, _) =>
             {
                 viewModel.Dispose();
@@ -105,7 +105,12 @@ public partial class App : System.Windows.Application
                 _window.Loaded += async (_, _) =>
                 {
                     await IntegrationCheck.WriteAsync(_window, report, waitForReactivation);
-                    _window.Exit();
+                    // × と同じ道筋で閉じる（ジョブも期限のあるデプロイも無いため終了する）。異常終了せずに終われば、印を書く（CI が確かめる）
+                    Exit += (_, _) => File.WriteAllText(report + ".closed", "ok");
+                    if (viewModel.RequestClose() == TTDeployTool.Controller.Desktop.Core.ViewModels.CloseAction.Exit)
+                        _window.Close();
+                    else
+                        _window.Exit();
                 };
             }
             // サインイン時の起動は、ウィンドウを出さずに始めの処理だけ動かす（画面は、通知領域から開いたときに描く。始めの処理は 1 回だけ）

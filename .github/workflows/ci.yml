@@ -466,6 +466,14 @@ jobs:
         Get-WinEvent -FilterHashtable @{ LogName = "Application"; StartTime = (Get-Date).AddMinutes(-10); Id = 1000, 1001, 1026 } -ErrorAction SilentlyContinue |
           Format-List TimeCreated, Id, ProviderName, Message | Out-String -Width 300 | Write-Host
         Get-Content $report
+        # 画面が止まったときの戻し方と、× で閉じたときに異常終了しないこと（オーナーの実機の確認、2026-11-17・18。desktop-blazor-hybrid.md の 16.26）
+        $result = Get-Content -Raw $report | ConvertFrom-Json
+        $problems = @()
+        if ($result.responsiveCheck -ne "応えました") { $problems += "画面の確かめ: $($result.responsiveCheck)" }
+        if ($result.rendererCrashRecovered -ne $true) { $problems += "画面のプロセスを落とした後: $($result.rendererCrashRecovered)" }
+        if ($result.webViewRecreated -ne $true) { $problems += "WebView の作り直し: $($result.webViewRecreated)" }
+        if (-not (Test-Path "$report.closed")) { $problems += "× と同じ道筋で閉じて、正常に終了しなかった（終了コード $($p.ExitCode)）" }
+        if ($problems.Count -gt 0) { throw ($problems -join " / ") }
         "TT_BLAZOR_WPF_EXE=$exe" >> $env:GITHUB_ENV
 
     # テスト用のビルド（/p:UiTestMock=true。Fixtures のモックのサインインと Azure）を別のフォルダーに作り、WebView2 のテストと計測に使う（WinUI 3 のアプリの比べる相手も同じモックのビルド）

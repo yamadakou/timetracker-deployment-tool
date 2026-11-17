@@ -3,6 +3,10 @@ using System.Windows.Interop;
 using H.NotifyIcon;
 using Microsoft.AspNetCore.Components.WebView.Wpf;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Web.WebView2.Core;
+using Microsoft.Win32;
 using TTDeployTool.Controller.Desktop.Blazor.Shell;
 using TTDeployTool.Controller.Desktop.Core.Jobs;
 using TTDeployTool.Controller.Desktop.Core.Mvvm;
@@ -18,8 +22,16 @@ namespace TTDeployTool.Controller.Desktop.Blazor.Wpf;
 /// </summary>
 public partial class MainWindow : Window
 {
+    /// <summary>ロックの解除・復帰の後、画面に確かめるまでの待ち（画面とネットワークが戻るのを待つ）。</summary>
+    public static readonly TimeSpan ResumeDelay = TimeSpan.FromSeconds(2);
+
+    /// <summary>画面がこの時間までに応えなければ、止まったとみなして作り直す。</summary>
+    public static readonly TimeSpan ResponseTimeout = TimeSpan.FromSeconds(5);
+
     private bool _exiting;
     private DesktopSession? _session;
+    private ILogger _logger = NullLogger.Instance;
+    private BlazorWebView _view;
 
     public MainWindow()
     {
@@ -29,22 +41,163 @@ public partial class MainWindow : Window
         Handle = new WindowInteropHelper(this).EnsureHandle();
         // テスト（Playwright の WebView2Tests）だけ: 環境変数 TT_BLAZOR_CDP_PORT があれば、WebView2 を CDP のポートと別のユーザーデータのフォルダーで作る
         // （Microsoft Learn「ASP.NET Core Blazor Hybrid」の Web View configuration: BlazorWebViewInitializing）
+        _view = WebView;
+        Hook(_view);
+        Closing += OnClosing;
+        // ロックの解除・スリープからの復帰で、画面（WebView2）が応えるかを確かめる（オーナーの実機の確認、2026-11-17: 長い時間のロックから戻ると、
+        // 画面が真っ白で「応答なし」になった。アプリのログには誤りが無く、WebView2 のプロセスが止まったとみられる。desktop-blazor-hybrid.md の 16.26）
+        SystemEvents.SessionSwitch += OnSessionSwitch;
+        SystemEvents.PowerModeChanged += OnPowerModeChanged;
+        Closed += (_, _) =>
+        {
+            SystemEvents.SessionSwitch -= OnSessionSwitch;
+            SystemEvents.PowerModeChanged -= OnPowerModeChanged;
+        };
+    }
+
+    /// <summary>画面のプロセスが落ちた・止まったのを受けて、戻した回数（確認で読む）。</summary>
+    public int Recoveries { get; private set; }
+
+    /// <summary>画面の WebView を作り直した回数（確認で読む）。</summary>
+    public int Recreations { get; private set; }
+
+    // WebView2 を作るときの設定と、作った後の処理（作り直したときも同じ）
+    private void Hook(BlazorWebView view)
+    {
+        // テスト（Playwright の WebView2Tests）だけ: 環境変数 TT_BLAZOR_CDP_PORT があれば、WebView2 を CDP のポートと別のユーザーデータのフォルダーで作る
+        // （Microsoft Learn「ASP.NET Core Blazor Hybrid」の Web View configuration: BlazorWebViewInitializing）
         if (Environment.GetEnvironmentVariable("TT_BLAZOR_CDP_PORT") is { Length: > 0 } port)
         {
-            WebView.BlazorWebViewInitializing += (_, e) =>
+            view.BlazorWebViewInitializing += (_, e) =>
             {
-                e.EnvironmentOptions = new Microsoft.Web.WebView2.Core.CoreWebView2EnvironmentOptions($"--remote-debugging-port={port}");
+                e.EnvironmentOptions = new CoreWebView2EnvironmentOptions($"--remote-debugging-port={port}");
                 if (Environment.GetEnvironmentVariable("TT_BLAZOR_USER_DATA") is { Length: > 0 } folder)
                     e.UserDataFolder = folder;
             };
         }
-        WebView.BlazorWebViewInitialized += (_, e) =>
+        view.BlazorWebViewInitialized += (_, e) =>
         {
             Core = e.WebView.CoreWebView2;
             // 入力欄の右クリックの「切り取り・コピー・貼り付け・すべて選択」（EditMenu）
             EditMenu.Attach(Core);
+            // 画面のプロセスが落ちた・止まったら、ログに残して戻す（前は受けておらず、真っ白のままだった）
+            Core.ProcessFailed += OnProcessFailed;
         };
-        Closing += OnClosing;
+    }
+
+    private void OnProcessFailed(object? sender, CoreWebView2ProcessFailedEventArgs e)
+    {
+        _logger.LogWarning("画面（WebView2）のプロセスが止まりました: {Kind}（理由 {Reason}・終了コード {ExitCode}・{Description}）",
+            e.ProcessFailedKind, e.Reason, e.ExitCode, e.ProcessDescription);
+        switch (e.ProcessFailedKind)
+        {
+            // 画面を描くプロセスが落ちた・応えない: 画面を読み直す（ジョブと一覧は .NET の側にあるため、消えない）
+            case CoreWebView2ProcessFailedKind.RenderProcessExited:
+            case CoreWebView2ProcessFailedKind.RenderProcessUnresponsive:
+            case CoreWebView2ProcessFailedKind.FrameRenderProcessExited:
+                Recoveries++;
+                Dispatcher.InvokeAsync(ReloadPage);
+                break;
+            // WebView2 の全体が落ちた: WebView を作り直す
+            case CoreWebView2ProcessFailedKind.BrowserProcessExited:
+                Recoveries++;
+                Dispatcher.InvokeAsync(RecreateWebView);
+                break;
+            // GPU などのほかのプロセスは、WebView2 が作り直す（ログに残すだけ）
+        }
+    }
+
+    private void ReloadPage()
+    {
+        _logger.LogInformation("画面を読み直します");
+        try
+        {
+            Core?.Reload();
+        }
+        catch (Exception ex)
+        {
+            // 読み直せない（WebView2 の全体が使えない）なら、作り直す
+            _logger.LogWarning(ex, "画面を読み直せませんでした。作り直します");
+            RecreateWebView();
+        }
+    }
+
+    /// <summary>画面の WebView を作り直す（止まった WebView2 を捨てて、新しく作る。画面は今の状態から描き直す）。</summary>
+    public void RecreateWebView()
+    {
+        _logger.LogInformation("画面（WebView2）を作り直します");
+        var old = _view;
+        var fresh = new BlazorWebView { HostPage = old.HostPage, Services = old.Services };
+        fresh.RootComponents.Add(new RootComponent { Selector = "#app", ComponentType = typeof(DesktopShell) });
+        Hook(fresh);
+        Core = null;
+        _view = fresh;
+        Content = fresh;
+        Recreations++;
+        _ = DisposeQuietlyAsync(old);
+    }
+
+    private async Task DisposeQuietlyAsync(BlazorWebView view)
+    {
+        try
+        {
+            await view.DisposeAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "止まった画面を捨てられませんでした");
+        }
+    }
+
+    private void OnSessionSwitch(object? sender, SessionSwitchEventArgs e)
+    {
+        if (e.Reason is SessionSwitchReason.SessionUnlock or SessionSwitchReason.ConsoleConnect or SessionSwitchReason.RemoteConnect)
+            Dispatcher.InvokeAsync(() => CheckAfterAsync($"Windows のロックを解除しました（{e.Reason}）"));
+        else if (e.Reason is SessionSwitchReason.SessionLock)
+            _logger.LogInformation("Windows をロックしました");
+    }
+
+    private void OnPowerModeChanged(object? sender, PowerModeChangedEventArgs e)
+    {
+        if (e.Mode == PowerModes.Resume)
+            Dispatcher.InvokeAsync(() => CheckAfterAsync("スリープから復帰しました"));
+        else if (e.Mode == PowerModes.Suspend)
+            _logger.LogInformation("スリープに入ります");
+    }
+
+    private async Task CheckAfterAsync(string what)
+    {
+        _logger.LogInformation("{What}。画面が応えるかを確かめます", what);
+        await Task.Delay(ResumeDelay);
+        await CheckResponsiveAsync();
+    }
+
+    /// <summary>
+    /// 画面が応えるかを確かめ、応えなければ作り直す・描かれていなければ読み直す。結果を返す（ログにも残す。確認で読む）。
+    /// </summary>
+    public async Task<string> CheckResponsiveAsync()
+    {
+        string result;
+        if (Core is not { } core)
+            result = "画面がまだありません";
+        else
+        {
+            var probe = core.ExecuteScriptAsync("document.querySelector('.tt-app') !== null");
+            if (await Task.WhenAny(probe, Task.Delay(ResponseTimeout)) != probe)
+            {
+                result = "応えません（作り直しました）";
+                RecreateWebView();
+            }
+            else if (await probe != "true")
+            {
+                result = "描かれていません（読み直しました）";
+                ReloadPage();
+            }
+            else
+                result = "応えました";
+        }
+        _logger.LogInformation("画面の確かめ: {Result}", result);
+        return result;
     }
 
     /// <summary>ウィンドウのハンドル（WAM のサインイン・Store の確認に渡す）。</summary>
@@ -62,9 +215,10 @@ public partial class MainWindow : Window
     private MainViewModel ViewModel => _session!.ViewModel;
 
     /// <summary>画面のサービスを入れ、通知領域のアイコンを作り、Store の更新を確かめる（始めの処理は、画面を描いたときに DesktopShell が始める）。</summary>
-    public void Initialize(DesktopSession session)
+    public void Initialize(DesktopSession session, ILogger? logger = null)
     {
         _session = session;
+        _logger = logger ?? NullLogger.Instance;
         var services = new ServiceCollection();
         services.AddWpfBlazorWebView();
 #if DEBUG
@@ -102,15 +256,20 @@ public partial class MainWindow : Window
         System.Windows.Application.Current.Shutdown();
     }
 
+    // × で閉じた: ジョブか期限のあるデプロイがあれば隠し、無ければそのまま閉じて終了する（ShutdownMode は OnMainWindowClose）。
+    // 前は閉じている途中で Exit（Close）を呼んでおり、WPF が InvalidOperationException を出して異常終了していた（オーナーの実機のログ、2026-11-18）
     private void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
         if (_exiting || _session == null)
             return;
-        e.Cancel = true;
         if (ViewModel.RequestClose() == CloseAction.Hide)
+        {
+            e.Cancel = true;
             Hide();
-        else
-            Exit();
+            return;
+        }
+        _exiting = true;
+        Tray?.Dispose();
     }
 
     private void CreateTray()
