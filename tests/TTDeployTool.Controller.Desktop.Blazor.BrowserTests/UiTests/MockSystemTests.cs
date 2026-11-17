@@ -82,6 +82,8 @@ public sealed class MockSystemTests
         await page.ExpectTextAsync("Jobs.Count", $"全 {Records - 1} 件");
         await page.SignInAsync();
         await page.ShowAsync("Jobs");
+        // 予定は、サインインしてサブスクリプションを読んだ後に戻す。CI が混んでいると 5 秒では戻らなかった（CI、2026-11-17）ため、件数で長めに待つ
+        await Assertions.Expect(page.Id("Jobs.Count")).ToContainTextAsync($"全 {Records} 件", new() { Timeout = 20000 });
         await Assertions.Expect(page.RowWith("Jobs", "Target", "rg-mock-06 / app06").Locator("td[data-key='State']")).ToContainTextAsync("予定");
         (await page.Rows("Jobs").AllInnerTextsAsync()).Should().NotContain(t => t.Contains(newest), "消した記録は戻らない");
     }
