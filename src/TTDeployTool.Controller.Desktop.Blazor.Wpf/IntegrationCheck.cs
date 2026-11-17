@@ -120,6 +120,9 @@ internal static class IntegrationCheck
         // 画面（WebView2）が止まったときの戻し方（オーナーの実機の確認、2026-11-17: ロックから戻ると真っ白で「応答なし」）。
         // 画面が応えるかの確かめ（ロックの解除・復帰で動くもの）、画面を描くプロセスを落としたら読み直して描き直すか、WebView を作り直して描き直すか
         report["responsiveCheck"] = await TryAsync(async () => await window.CheckResponsiveAsync());
+        // ロックから戻った後の描き直し（画面をいったん隠して出し直す）の後も、画面が描かれて見えていること。WebView2 の起動の引数
+        report["repainted"] = await TryAsync(async () => window.Repaint() && await ShellRenderedAsync(window) is true && await window.CheckResponsiveAsync() == "応えました（ページの見え方: visible）");
+        report["browserArguments"] = await TryAsync(async () => await window.Core!.ExecuteScriptAsync("navigator.userAgent") is { Length: > 0 } ? MainWindow.BrowserArguments : null);
         report["rendererCrashRecovered"] = await TryAsync(async () =>
         {
             var before = window.Recoveries;
@@ -133,6 +136,15 @@ internal static class IntegrationCheck
         {
             window.RecreateWebView();
             return window.Recreations == 1 && await ShellRenderedAsync(window) is true && window.Core?.Settings.AreDefaultContextMenusEnabled == true;
+        });
+        // 長いロックの後: 画面を作り直し、開いていた画面（ジョブの一覧）から描く
+        report["recoveredAfterLongLock"] = await TryAsync(async () =>
+        {
+            await window.Core!.ExecuteScriptAsync("document.querySelector(\"[data-id='Nav.Jobs']\").click()");
+            if (!await RenderedAsync(window, "Panel.Jobs"))
+                return "ジョブの一覧を開けない";
+            var result = await window.CheckAfterAsync("確認のための長いロック", MainWindow.LongLock);
+            return window.Recreations == 2 && await RenderedAsync(window, "Panel.Jobs") ? result : $"作り直した後にジョブの一覧が無い（{result}）";
         });
 
         // 2 つ目の起動が 1 つ目に渡り、ウィンドウを出す（CI が印を見て 2 つ目を起動する）
@@ -149,11 +161,14 @@ internal static class IntegrationCheck
     }
 
     // 画面（Razor）がサインインの画面を描いたか（MSIX にまとめたとき、画面のファイルがパッケージに入っているか）。60 秒まで待つ
-    private static async Task<object?> ShellRenderedAsync(MainWindow window)
+    private static async Task<object?> ShellRenderedAsync(MainWindow window) => await RenderedAsync(window, "Panel.Target");
+
+    // 画面に data-id の要素が描かれたか。60 秒まで待つ
+    private static async Task<bool> RenderedAsync(MainWindow window, string id)
     {
         for (var i = 0; i < 120; i++)
         {
-            if (window.Core is { } core && await core.ExecuteScriptAsync("document.querySelector(\"[data-id='Panel.Target']\") !== null") == "true")
+            if (window.Core is { } core && await core.ExecuteScriptAsync($"document.querySelector(\"[data-id='{id}']\") !== null") == "true")
                 return true;
             await Task.Delay(500);
         }

@@ -107,7 +107,12 @@
 </div>
 
 @code {
-    private string _page = Pages.Target;
+    // 今の画面は DesktopSession に置く（画面を作り直しても、同じ画面から描く）
+    private string _page
+    {
+        get => Session.Page;
+        set => Session.Page = value;
+    }
 
     [Inject]
     private DesktopSession Session { get; set; } = default!;

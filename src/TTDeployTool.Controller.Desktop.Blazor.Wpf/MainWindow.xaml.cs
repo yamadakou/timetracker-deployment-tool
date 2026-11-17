@@ -28,10 +28,22 @@ public partial class MainWindow : Window
     /// <summary>画面がこの時間までに応えなければ、止まったとみなして作り直す。</summary>
     public static readonly TimeSpan ResponseTimeout = TimeSpan.FromSeconds(5);
 
+    /// <summary>これより長くロック・スリープしていたら、戻ったときに画面を作り直す（WebView2 の描いたものの取り込みが途切れ、出し直しでは戻らないことがあるため）。</summary>
+    public static readonly TimeSpan LongLock = TimeSpan.FromMinutes(1);
+
+    private DateTimeOffset? _lockedAt;
     private bool _exiting;
     private DesktopSession? _session;
     private ILogger _logger = NullLogger.Instance;
     private BlazorWebView _view;
+    // BlazorWebView が使う WebView2 の WPF の部品（WebView2CompositionControl: WebView2 が描いたものを WPF の画面に取り込んで映す）
+    private FrameworkElement? _webView2;
+
+    /// <summary>
+    /// WebView2 の起動の引数。Chromium のウィンドウの隠れ具合の判定（CalculateNativeWinOcclusion）を止める（オーナーの実機の確認、2026-11-18:
+    /// ロックから戻ると、画面は応える〔「画面の確かめ: 応えました」〕のに真っ白のままだった。ロックの間に隠れたとみなして描くのを止め、戻っても描き直さないことがある）。
+    /// </summary>
+    public const string BrowserArguments = "--disable-features=CalculateNativeWinOcclusion";
 
     public MainWindow()
     {
@@ -66,17 +78,16 @@ public partial class MainWindow : Window
     {
         // テスト（Playwright の WebView2Tests）だけ: 環境変数 TT_BLAZOR_CDP_PORT があれば、WebView2 を CDP のポートと別のユーザーデータのフォルダーで作る
         // （Microsoft Learn「ASP.NET Core Blazor Hybrid」の Web View configuration: BlazorWebViewInitializing）
-        if (Environment.GetEnvironmentVariable("TT_BLAZOR_CDP_PORT") is { Length: > 0 } port)
+        var port = Environment.GetEnvironmentVariable("TT_BLAZOR_CDP_PORT");
+        view.BlazorWebViewInitializing += (_, e) =>
         {
-            view.BlazorWebViewInitializing += (_, e) =>
-            {
-                e.EnvironmentOptions = new CoreWebView2EnvironmentOptions($"--remote-debugging-port={port}");
-                if (Environment.GetEnvironmentVariable("TT_BLAZOR_USER_DATA") is { Length: > 0 } folder)
-                    e.UserDataFolder = folder;
-            };
-        }
+            e.EnvironmentOptions = new CoreWebView2EnvironmentOptions(port is { Length: > 0 } ? $"{BrowserArguments} --remote-debugging-port={port}" : BrowserArguments);
+            if (port is { Length: > 0 } && Environment.GetEnvironmentVariable("TT_BLAZOR_USER_DATA") is { Length: > 0 } folder)
+                e.UserDataFolder = folder;
+        };
         view.BlazorWebViewInitialized += (_, e) =>
         {
+            _webView2 = e.WebView;
             Core = e.WebView.CoreWebView2;
             // 入力欄の右クリックの「切り取り・コピー・貼り付け・すべて選択」（EditMenu）
             EditMenu.Attach(Core);
@@ -131,6 +142,7 @@ public partial class MainWindow : Window
         fresh.RootComponents.Add(new RootComponent { Selector = "#app", ComponentType = typeof(DesktopShell) });
         Hook(fresh);
         Core = null;
+        _webView2 = null;
         _view = fresh;
         Content = fresh;
         Recreations++;
@@ -152,24 +164,60 @@ public partial class MainWindow : Window
     private void OnSessionSwitch(object? sender, SessionSwitchEventArgs e)
     {
         if (e.Reason is SessionSwitchReason.SessionUnlock or SessionSwitchReason.ConsoleConnect or SessionSwitchReason.RemoteConnect)
-            Dispatcher.InvokeAsync(() => CheckAfterAsync($"Windows のロックを解除しました（{e.Reason}）"));
+            Dispatcher.InvokeAsync(() => CheckAfterAsync($"Windows のロックを解除しました（{e.Reason}）", Locked()));
         else if (e.Reason is SessionSwitchReason.SessionLock)
+        {
+            _lockedAt ??= DateTimeOffset.Now;
             _logger.LogInformation("Windows をロックしました");
+        }
     }
 
     private void OnPowerModeChanged(object? sender, PowerModeChangedEventArgs e)
     {
         if (e.Mode == PowerModes.Resume)
-            Dispatcher.InvokeAsync(() => CheckAfterAsync("スリープから復帰しました"));
+            Dispatcher.InvokeAsync(() => CheckAfterAsync("スリープから復帰しました", LongLock));
         else if (e.Mode == PowerModes.Suspend)
+        {
+            _lockedAt ??= DateTimeOffset.Now;
             _logger.LogInformation("スリープに入ります");
+        }
     }
 
-    private async Task CheckAfterAsync(string what)
+    // ロック・スリープしていた長さ（分からなければ 0）
+    private TimeSpan Locked()
     {
-        _logger.LogInformation("{What}。画面が応えるかを確かめます", what);
+        var locked = _lockedAt is { } at ? DateTimeOffset.Now - at : TimeSpan.Zero;
+        _lockedAt = null;
+        return locked;
+    }
+
+    /// <summary>
+    /// ロックの解除・復帰の後の戻し方（オーナーの実機の確認、2026-11-18: 画面は応えるのに真っ白のままだった）。長いロック・スリープの後は画面を作り直し
+    /// （開いていた画面は DesktopSession.Page で戻る）、短ければ描き直させる。その後、画面が応えるかを確かめる。確かめの結果を返す（確認で読む）。
+    /// </summary>
+    public async Task<string> CheckAfterAsync(string what, TimeSpan locked)
+    {
+        _logger.LogInformation("{What}（{Minutes:0.#} 分）。画面が応えるかを確かめます", what, locked.TotalMinutes);
         await Task.Delay(ResumeDelay);
-        await CheckResponsiveAsync();
+        if (locked >= LongLock)
+            RecreateWebView();
+        else
+            Repaint();
+        return await CheckResponsiveAsync();
+    }
+
+    /// <summary>
+    /// 画面をいったん隠して出し直し、WebView2 に描き直させる（ロックの解除・復帰の後。応えるのに真っ白のままのときの戻し方）。描き直させたら true。
+    /// </summary>
+    public bool Repaint()
+    {
+        if (_webView2 is not { } view)
+            return false;
+        view.Visibility = Visibility.Hidden;
+        view.UpdateLayout();
+        view.Visibility = Visibility.Visible;
+        _logger.LogInformation("画面を描き直させました");
+        return true;
     }
 
     /// <summary>
@@ -182,19 +230,20 @@ public partial class MainWindow : Window
             result = "画面がまだありません";
         else
         {
-            var probe = core.ExecuteScriptAsync("document.querySelector('.tt-app') !== null");
+            // 画面が描かれていれば、ページから見た見え方（visible・hidden）を返す。描かれていなければ none
+            var probe = core.ExecuteScriptAsync("document.querySelector('.tt-app') !== null ? document.visibilityState : 'none'");
             if (await Task.WhenAny(probe, Task.Delay(ResponseTimeout)) != probe)
             {
                 result = "応えません（作り直しました）";
                 RecreateWebView();
             }
-            else if (await probe != "true")
+            else if ((await probe).Trim('"') is var state && state == "none")
             {
                 result = "描かれていません（読み直しました）";
                 ReloadPage();
             }
             else
-                result = "応えました";
+                result = $"応えました（ページの見え方: {state}）";
         }
         _logger.LogInformation("画面の確かめ: {Result}", result);
         return result;
@@ -281,6 +330,17 @@ public partial class MainWindow : Window
         });
         var menu = new System.Windows.Controls.ContextMenu();
         menu.Items.Add(new System.Windows.Controls.MenuItem { Header = "開く", Command = open });
+        // 画面が真っ白で戻らないときに、手で作り直す（ジョブと一覧は消えない。オーナーの実機の確認、2026-11-18）
+        menu.Items.Add(new System.Windows.Controls.MenuItem
+        {
+            Header = "画面を作り直す",
+            Command = new AsyncCommand(() =>
+            {
+                ShowFromTray();
+                RecreateWebView();
+                return Task.CompletedTask;
+            }),
+        });
         menu.Items.Add(new System.Windows.Controls.MenuItem { Header = "終了", Command = new AsyncCommand(ExitFromTrayAsync) });
         Tray = new TaskbarIcon
         {

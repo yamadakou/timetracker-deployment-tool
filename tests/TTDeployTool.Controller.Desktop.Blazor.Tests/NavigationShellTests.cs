@@ -97,6 +97,18 @@ public sealed class NavigationShellTests : IDisposable
     }
 
     [Fact]
+    public void A_New_Shell_Should_Start_From_The_Page_Shown_Before()
+    {
+        // 画面（WebView）を作り直しても、開いていた画面から描く（ロックから戻った後。オーナーの実機の確認、2026-11-18）
+        var shell = Render();
+        Id(shell, "Nav.Jobs").Click();
+        _app.Session.Page.Should().Be(TTDeployTool.Controller.Desktop.Core.ViewModels.Pages.Jobs);
+        var again = _app.Context.Render<DesktopShell>();
+        again.Instance.Page.Should().Be(TTDeployTool.Controller.Desktop.Core.ViewModels.Pages.Jobs);
+        again.FindAll("[data-id='Panel.Jobs']").Should().NotBeEmpty();
+    }
+
+    [Fact]
     public async Task The_Shell_Should_Release_Its_Script_When_Closed()
     {
         var shell = Render();

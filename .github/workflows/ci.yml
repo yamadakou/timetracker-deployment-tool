@@ -469,7 +469,9 @@ jobs:
         # 画面が止まったときの戻し方と、× で閉じたときに異常終了しないこと（オーナーの実機の確認、2026-11-17・18。desktop-blazor-hybrid.md の 16.26）
         $result = Get-Content -Raw $report | ConvertFrom-Json
         $problems = @()
-        if ($result.responsiveCheck -ne "応えました") { $problems += "画面の確かめ: $($result.responsiveCheck)" }
+        if ($result.responsiveCheck -ne "応えました（ページの見え方: visible）") { $problems += "画面の確かめ: $($result.responsiveCheck)" }
+        if ($result.repainted -ne $true) { $problems += "描き直し: $($result.repainted)" }
+        if ($result.recoveredAfterLongLock -ne "応えました（ページの見え方: visible）") { $problems += "長いロックの後の作り直し: $($result.recoveredAfterLongLock)" }
         if ($result.rendererCrashRecovered -ne $true) { $problems += "画面のプロセスを落とした後: $($result.rendererCrashRecovered)" }
         if ($result.webViewRecreated -ne $true) { $problems += "WebView の作り直し: $($result.webViewRecreated)" }
         if (-not (Test-Path "$report.closed")) { $problems += "× と同じ道筋で閉じて、正常に終了しなかった（終了コード $($p.ExitCode)）" }

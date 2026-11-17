@@ -25,6 +25,11 @@ public sealed class DesktopSession : ObservableObject
 
     public MainViewModel ViewModel { get; }
 
+    /// <summary>
+    /// 今の画面（<see cref="Pages"/> の名前）。画面（WebView）を作り直しても、同じ画面から描く（オーナーの実機の確認、2026-11-18: ロックから戻った後の作り直し）。
+    /// </summary>
+    public string Page { get; set; } = Pages.Target;
+
     public BlazorDialogService Dialogs { get; }
 
     public IClipboardService? Clipboard { get; }

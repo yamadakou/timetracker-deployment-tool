@@ -590,3 +590,19 @@ WinUI 3 版の UI テストとの対応（名前は同じ。中身の違い）:
 - 確かめ: Windows の確認（`--check`）に、画面が応えるか（`responsiveCheck`）、CDP の `Page.crash` で画面を描くプロセスを落とした後に読み直して描き直すか（`rendererCrashRecovered`）、
   WebView を作り直して描き直し、入力欄の右クリックのメニューの設定も入るか（`webViewRecreated`）を足し、最後は × と同じ道筋で閉じて、正常に終了したか（`<報告>.closed`）を CI で確かめる
 - 実機での確認: ロックから戻った後に画面が使えること。止まった場合は、ログに「画面（WebView2）のプロセスが止まりました」「画面の確かめ: …」が残る（手順書の 3.2 の 8b）
+
+#### 16.26.1 応えるのに真っ白（オーナーの実機の確認、2026-11-18 の 2 回目）
+16.26 の版でも、6 時間ほどのロック（01:22 から 08:37）から戻ると、画面が真っ白になった。今度は「応答なし」にならず、ログには「Windows のロックを解除しました」「画面の確かめ: 応えました」が残った。
+タスク マネージャーでは、WebView2 のプロセス（GPU・マネージャー・画面）はすべて残り、CPU は 0%。画面のページは生きてスクリプトに応えるのに、描いたものがウィンドウに映っていない。
+
+- BlazorWebView（10.0）の WPF 版は、WebView2 を `WebView2CompositionControl`（WebView2 が描いたものを取り込み、WPF の画面に映す）で使う（切り替える設定は無い）。
+  ロック・スリープで WPF の描画（GPU）がいったん切れると、取り込みが途切れて戻らないことがある。また、Chromium はロックの間にウィンドウが隠れたとみなして描くのを止め（CalculateNativeWinOcclusion）、戻っても描き直さないことがある
+
+| 対策 | 内容 | 主な場所 |
+|---|---|---|
+| 隠れ具合の判定を止める | WebView2 の起動の引数に `--disable-features=CalculateNativeWinOcclusion` を入れる（テストの CDP のポートの引数と合わせる） | `MainWindow.BrowserArguments` |
+| 長いロック・スリープの後は作り直す | ロック・スリープの時刻を覚え、1 分以上たってから戻ったら（スリープからの復帰はいつも）画面を作り直す。短ければ、画面をいったん隠して出し直して描き直させる。その後、画面が応えるかとページから見た見え方（visible・hidden）をログに残す | `MainWindow.CheckAfterAsync`・`Repaint` |
+| 開いていた画面に戻す | 今の画面を `DesktopSession.Page` に置き、作り直した後も同じ画面から描く（サインインの画面に戻らない） | `DesktopSession`・`DesktopShell` |
+| 手で作り直す | 通知領域のアイコンのメニューに「画面を作り直す」（それでも真っ白のとき） | `MainWindow.CreateTray` |
+
+- 確かめ: Windows の確認（`--check`）に、描き直しの後も画面が描かれて見えていること（`repainted`）、長いロックの後に作り直して、開いていたジョブの一覧から描くこと（`recoveredAfterLongLock`）を足し、CI で確かめる。bUnit（`NavigationShellTests`: 作り直した画面が、前の画面から描く）
