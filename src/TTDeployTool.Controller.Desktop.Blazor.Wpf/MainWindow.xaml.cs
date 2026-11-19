@@ -112,12 +112,12 @@ public partial class MainWindow : Window
             case CoreWebView2ProcessFailedKind.RenderProcessUnresponsive:
             case CoreWebView2ProcessFailedKind.FrameRenderProcessExited:
                 Recoveries++;
-                Dispatcher.InvokeAsync(ReloadPage);
+                Dispatcher.InvokeAsync(() => RecoverAsync(recreate: false));
                 break;
             // WebView2 の全体が落ちた: WebView を作り直す
             case CoreWebView2ProcessFailedKind.BrowserProcessExited:
                 Recoveries++;
-                Dispatcher.InvokeAsync(RecreateWebView);
+                Dispatcher.InvokeAsync(() => RecoverAsync(recreate: true));
                 break;
             // GPU などのほかのプロセスは、WebView2 が作り直す（ログに残すだけ）
         }
@@ -150,7 +150,9 @@ public partial class MainWindow : Window
         _webView2 = null;
         _created = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         _view = fresh;
-        Content = fresh;
+        // 読み直しの表示（Overlay）の下に入れる
+        Root.Children.Remove(old);
+        Root.Children.Insert(0, fresh);
         Recreations++;
         _ = DisposeQuietlyAsync(old);
     }
@@ -204,17 +206,84 @@ public partial class MainWindow : Window
     public async Task<string> CheckAfterAsync(string what, TimeSpan locked)
     {
         _logger.LogInformation("{What}（{Minutes:0.#} 分）。画面が応えるかを確かめます", what, locked.TotalMinutes);
-        await Task.Delay(ResumeDelay);
-        if (locked >= LongLock)
+        // 白い画面の代わりに、戻るまで「画面を読み直しています…」を出す
+        ShowOverlay();
+        try
         {
-            RecreateWebView();
-            // 新しい WebView2 ができあがるまで待ってから確かめる（すぐに確かめると「画面がまだありません」になった。CI、2026-11-18）
-            await Task.WhenAny(_created.Task, Task.Delay(CreateTimeout));
+            await Task.Delay(ResumeDelay);
+            if (locked >= LongLock)
+            {
+                RecreateWebView();
+                // 新しい WebView2 ができあがるまで待ってから確かめる（すぐに確かめると「画面がまだありません」になった。CI、2026-11-18）
+                await Task.WhenAny(_created.Task, Task.Delay(CreateTimeout));
+                await WaitRenderedAsync();
+            }
+            else
+                Repaint();
+            return await CheckResponsiveAsync();
+        }
+        finally
+        {
+            HideOverlay();
+        }
+    }
+
+    private int _overlay;
+
+    /// <summary>「画面を読み直しています…」を出しているか（確認で読む）。</summary>
+    public bool IsOverlayShown => Overlay.Visibility == Visibility.Visible;
+
+    /// <summary>「画面を読み直しています…」を出した回数（確認で読む）。</summary>
+    public int OverlayShows { get; private set; }
+
+    // 重ねて呼ばれても、最後に外すまで出したままにする
+    private void ShowOverlay()
+    {
+        if (_overlay++ == 0)
+        {
+            OverlayShows++;
+            // 画面の明るさ（Windows の「アプリ モード」）に合わせる（WPF の標準の色は、濃い色のモードでも明るいまま）
+            var dark = IsDarkMode();
+            Overlay.Background = new System.Windows.Media.SolidColorBrush(dark ? System.Windows.Media.Color.FromRgb(0x20, 0x20, 0x20) : System.Windows.Media.Colors.White);
+            OverlayTitle.Foreground = dark ? System.Windows.Media.Brushes.White : System.Windows.Media.Brushes.Black;
+            Overlay.Visibility = Visibility.Visible;
+        }
+    }
+
+    // Windows のアプリの既定のモードが濃い色か（読めなければ明るい色）
+    private static bool IsDarkMode() =>
+        Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "AppsUseLightTheme", 1) is 0;
+
+    private void HideOverlay()
+    {
+        if (--_overlay == 0)
+            Overlay.Visibility = Visibility.Collapsed;
+    }
+
+    /// <summary>
+    /// 画面を読み直す（<paramref name="recreate"/> なら作り直す）。その間は「画面を読み直しています…」を出し、描き終えたら外す
+    /// （画面のプロセスが落ちたとき・通知領域の「画面を作り直す」・画面の確かめで応えなかったとき）。
+    /// </summary>
+    public async Task RecoverAsync(bool recreate)
+    {
+        ShowOverlay();
+        try
+        {
+            if (recreate)
+            {
+                RecreateWebView();
+                await Task.WhenAny(_created.Task, Task.Delay(CreateTimeout));
+            }
+            else
+                ReloadPage();
+            // 読み直しの直後は、前のページがまだ残っていることがあるため、少し待ってから描き終えたかを見る
+            await Task.Delay(TimeSpan.FromMilliseconds(300));
             await WaitRenderedAsync();
         }
-        else
-            Repaint();
-        return await CheckResponsiveAsync();
+        finally
+        {
+            HideOverlay();
+        }
     }
 
     // 作り直した画面を、Blazor が描き終えるまで待つ（CreateTimeout まで）
@@ -258,12 +327,12 @@ public partial class MainWindow : Window
             if (await Task.WhenAny(probe, Task.Delay(ResponseTimeout)) != probe)
             {
                 result = "応えません（作り直しました）";
-                RecreateWebView();
+                _ = RecoverAsync(recreate: true);
             }
             else if ((await probe).Trim('"') is var state && state == "none")
             {
                 result = "描かれていません（読み直しました）";
-                ReloadPage();
+                _ = RecoverAsync(recreate: false);
             }
             else
                 result = $"応えました（ページの見え方: {state}）";
@@ -360,8 +429,7 @@ public partial class MainWindow : Window
             Command = new AsyncCommand(() =>
             {
                 ShowFromTray();
-                RecreateWebView();
-                return Task.CompletedTask;
+                return RecoverAsync(recreate: true);
             }),
         });
         menu.Items.Add(new System.Windows.Controls.MenuItem { Header = "終了", Command = new AsyncCommand(ExitFromTrayAsync) });

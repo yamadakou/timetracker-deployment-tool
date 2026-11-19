@@ -143,7 +143,11 @@ internal static class IntegrationCheck
             await window.Core!.ExecuteScriptAsync("document.querySelector(\"[data-id='Nav.Jobs']\").click()");
             if (!await RenderedAsync(window, "Panel.Jobs"))
                 return "ジョブの一覧を開けない";
+            var shows = window.OverlayShows;
             var result = await window.CheckAfterAsync("確認のための長いロック", MainWindow.LongLock);
+            // 作り直す間は「画面を読み直しています…」を出し、終わったら外す
+            if (window.OverlayShows != shows + 1 || window.IsOverlayShown)
+                return $"読み直しの表示が出ない・外れない（{window.OverlayShows - shows} 回・今 {window.IsOverlayShown}）";
             return window.Recreations == 2 && await RenderedAsync(window, "Panel.Jobs") ? result : $"作り直した後にジョブの一覧が無い（{result}）";
         });
 

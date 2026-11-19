@@ -4,10 +4,21 @@
         xmlns:blazor="clr-namespace:Microsoft.AspNetCore.Components.WebView.Wpf;assembly=Microsoft.AspNetCore.Components.WebView.Wpf"
         xmlns:shell="clr-namespace:TTDeployTool.Controller.Desktop.Blazor.Shell;assembly=TTDeployTool.Controller.Desktop.Blazor"
         Title="TTDeployTool" Width="1400" Height="900">
-    <!-- サービス（services）は、App が MainViewModel を組み立てた後に MainWindow.Initialize で入れる -->
-    <blazor:BlazorWebView x:Name="WebView" HostPage="wwwroot\index.html" Services="{DynamicResource services}">
-        <blazor:BlazorWebView.RootComponents>
-            <blazor:RootComponent Selector="#app" ComponentType="{x:Type shell:DesktopShell}" />
-        </blazor:BlazorWebView.RootComponents>
-    </blazor:BlazorWebView>
+    <!-- サービス（services）は、App が MainViewModel を組み立てた後に MainWindow.Initialize で入れる。
+         画面を作り直す・読み直す間は、上に「画面を読み直しています…」を重ねる（オーナーの依頼、2026-11-18: ロックから戻った後の白い画面の代わり） -->
+    <Grid x:Name="Root">
+        <blazor:BlazorWebView x:Name="WebView" HostPage="wwwroot\index.html" Services="{DynamicResource services}">
+            <blazor:BlazorWebView.RootComponents>
+                <blazor:RootComponent Selector="#app" ComponentType="{x:Type shell:DesktopShell}" />
+            </blazor:BlazorWebView.RootComponents>
+        </blazor:BlazorWebView>
+        <Border x:Name="Overlay" Visibility="Collapsed" Background="{DynamicResource {x:Static SystemColors.WindowBrushKey}}">
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                <TextBlock x:Name="OverlayTitle" Text="画面を読み直しています…" FontSize="18" HorizontalAlignment="Center"
+                           Foreground="{DynamicResource {x:Static SystemColors.WindowTextBrushKey}}" />
+                <TextBlock Text="ジョブと一覧はそのまま残っています。数秒で元の画面に戻ります。" FontSize="12" Margin="0,8,0,0" HorizontalAlignment="Center"
+                           Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}" />
+            </StackPanel>
+        </Border>
+    </Grid>
 </Window>
